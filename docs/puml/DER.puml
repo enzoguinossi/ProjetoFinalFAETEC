@@ -133,12 +133,6 @@ enum TipoTelefone {
   COMERCIAL
 }
 
-enum StatusInventario {
-  ABERTO
-  EM_CONTAGEM
-  FINALIZADO
-}
-
 enum StatusNotaSaida {
   ABERTA
   EM_PREPARACAO
@@ -356,7 +350,10 @@ entity "inventario" as inventario {
   --
   * data_inicio : DATE
   data_fim : DATE
-  * status : StatusInventario
+  * contagem_cega : BOOLEAN <<DEF FALSE>>
+  * status : ENUM(ABERTO, EM_CONTAGEM, AGUARDANDO_APROVACAO, FINALIZADO)
+  * ID_usuario_abertura : INT <<FK>>
+  ID_usuario_aprovacao : INT <<FK>>
   observacao : TEXT
 }
 
@@ -366,9 +363,29 @@ entity "item_inventario" as item_inv {
   * ID_inventario : INT <<FK>>
   * ID_lote_produto : INT <<FK>>
   * quantidade_sistema : DECIMAL
-  * quantidade_contada : DECIMAL
-  * diferenca : DECIMAL
   observacao : TEXT
+}
+
+entity "contagem_inventario" as contagem {
+  * ID_contagem_inventario : INT <<PK>>
+  --
+  * ID_item_inventario : INT <<FK>>
+  * ID_funcionario : INT <<FK>>
+  * quantidade_contada : DECIMAL
+  * data_contagem : TIMESTAMP
+  observacao : TEXT
+}
+
+entity "ajuste_inventario" as ajuste_inv {
+  * ID_ajuste_inventario : INT <<PK>>
+  --
+  * ID_inventario : INT <<FK>>
+  * ID_lote_produto : INT <<FK>>
+  * diferenca : DECIMAL
+  * status : ENUM(PENDENTE, APROVADO, REJEITADO)
+  ID_usuario_aprovacao : INT <<FK>>
+  data_aprovacao : TIMESTAMP
+  justificativa : TEXT
 }
 
 ' =========================================================
@@ -624,6 +641,13 @@ lote ||--o{ item_nota
 lote ||--o{ item_rem
 lote ||--o{ mov
 lote ||--o{ item_inv
+lote ||--o{ ajuste_inv
+inventario ||--|{ item_inv
+inventario ||--o{ ajuste_inv
+usuario ||--o{ inventario
+inventario ||--o| usuario
+item_inv ||--o{ contagem
+funcionario ||--o{ contagem
 
 ' Insumo auto-relacionamento
 insumo "0..*" --> "1" produto : "pai"

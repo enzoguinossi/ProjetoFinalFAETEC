@@ -395,21 +395,60 @@ movimentacao_estoque
 
 ```
 inventario
-├── ID_inventario         INT PK auto_increment
-├── data_inicio           DATE NOT NULL
-├── data_fim              DATE
-├── status                ENUM('ABERTO','EM_CONTAGEM','FINALIZADO')
-└── observacao            TEXT
+├── ID_inventario           INT PK auto_increment
+├── data_inicio             DATE NOT NULL
+├── data_fim                DATE
+├── contagem_cega           BOOLEAN DEFAULT FALSE
+├── status                  ENUM('ABERTO','EM_CONTAGEM','AGUARDANDO_APROVACAO','FINALIZADO')
+├── ID_usuario_abertura     INT FK NOT NULL
+├── ID_usuario_aprovacao    INT FK NULL
+└── observacao              TEXT
 
 item_inventario
-├── ID_item_inventario    INT PK auto_increment
-├── ID_inventario         INT FK NOT NULL
-├── ID_lote_produto       INT FK NOT NULL
-├── quantidade_sistema    DECIMAL NOT NULL
-├── quantidade_contada    DECIMAL NOT NULL
-├── diferenca             DECIMAL NOT NULL  ← calculado (quantidade_contada - quantidade_sistema)
-└── observacao            TEXT
+├── ID_item_inventario      INT PK auto_increment
+├── ID_inventario           INT FK NOT NULL
+├── ID_lote_produto         INT FK NOT NULL
+├── quantidade_sistema      DECIMAL NOT NULL   ← snapshot congelado na abertura
+└── observacao              TEXT
+
+contagem_inventario         ← cada funcionário conta
+├── ID_contagem_inventario  INT PK auto_increment
+├── ID_item_inventario      INT FK NOT NULL
+├── ID_funcionario          INT FK → funcionario NOT NULL  ← quem contou
+├── quantidade_contada      DECIMAL NOT NULL
+├── data_contagem           TIMESTAMP
+└── observacao              TEXT
+
+ajuste_inventario           ← aprovação manual das diferenças
+├── ID_ajuste_inventario    INT PK auto_increment
+├── ID_inventario           INT FK NOT NULL
+├── ID_lote_produto         INT FK NOT NULL
+├── diferenca               DECIMAL NOT NULL
+├── status                  ENUM('PENDENTE','APROVADO','REJEITADO')
+├── ID_usuario_aprovacao    INT FK → usuario NULL
+├── data_aprovacao          TIMESTAMP NULL
+└── justificativa           TEXT
 ```
+
+#### 3.9.1 Fluxo do Inventário
+
+| Etapa | Ação no sistema | Impacto |
+|-------|----------------|---------|
+| **Abertura** | Usuário com permissão `inventario.abrir` cria inventário | status = EM_CONTAGEM. Snapshot de `quantidade_sistema` congelado. Movimentações dos produtos BLOQUEADAS |
+| **Contagem cega** | Se marcado no início, usuários SEM permissão `estoque.ver_saldo` não enxergam `quantidade_sistema` | Influencia a contagem física sem viés |
+| **Múltiplas contagens** | Vários funcionários contam o mesmo item | Cada contagem vira um registro em `contagem_inventario`. |
+| **Finalizar contagem** | Usuário encerra a contagem | status = AGUARDANDO_APROVACAO. Sistema calcula média das contagens e dispara pendências de ajuste |
+| **Revisão** | Aprovador vê planilha comparativa: `quantidade_sistema` + contagens individuais + média | Pode escolher uma contagem específica ou usar a média |
+| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` tipo `AJUSTE_INVENTARIO` com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
+| **Finalização** | Inventário é encerrado | status = FINALIZADO. Movimentações dos produtos DESBLOQUEADAS |
+
+#### 3.9.2 Regras do Inventário
+
+- **Bloqueio é por produto**, não geral — apenas os lotes associados aos `item_inventario` ficam congelados
+- **Permissões granulares**: `inventario.abrir`, `inventario.aprovar_ajuste`, `estoque.ver_saldo` (controla contagem cega)
+- **Jonathan e Felipe** têm permissões absolutas (podem abrir, contar, aprovar)
+- **Diferença não gera ajuste automático** — toda diferença precisa de aprovação manual (RN005)
+- **Média vs. escolha manual**: o sistema exibe média, mas o aprovador pode selecionar qualquer contagem individual como valor final
 
 ---
 
@@ -699,6 +738,7 @@ Não é uma tabela — é uma funcionalidade de consulta. Os relatórios previst
 | RN002 | **Saída Prioritária FIFO/PEPS:** Ao alocar produtos perecíveis a uma remessa, selecionar obrigatoriamente o lote com data de validade mais próxima | Essencial |
 | RN003 | **Pendência em Entrega Parcial:** Baixa parcial gera registro automático de pendência vinculado ao destinatário | Essencial |
 | RN004 | **Imutabilidade de Histórico:** Entradas confirmadas e baixas finalizadas não podem ser excluídas — apenas estornadas via ajuste com justificativa | Essencial |
+| RN005 | **Aprovação de Ajuste de Inventário:** Diferenças detectadas em inventário não geram ajuste automático — toda alteração no saldo precisa de aprovação manual de usuário com permissão `inventario.aprovar_ajuste` | Essencial |
 
 ---
 

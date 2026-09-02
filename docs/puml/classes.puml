@@ -234,18 +234,31 @@ package "Produtos e Estoque" as Produtos {
   }
 
   class Inventario {
-    + ID_inventario: Integer
-    + data_inicio: Date
-    + data_fim: Date
-    + status: Enum
-  }
+      + ID_inventario: Integer
+      + data_inicio: Date
+      + data_fim: Date
+      + contagem_cega: Boolean
+      + status: Enum
+      + ID_usuario_abertura: Integer
+      + ID_usuario_aprovacao: Integer
+    }
 
-  class ItemInventario {
-    + ID_item_inventario: Integer
-    + quantidade_sistema: Decimal
-    + quantidade_contada: Decimal
-    + diferenca: Decimal
-  }
+    class ItemInventario {
+      + ID_item_inventario: Integer
+      + quantidade_sistema: Decimal
+    }
+
+    class ContagemInventario {
+      + ID_contagem_inventario: Integer
+      + quantidade_contada: Decimal
+      + data_contagem: Timestamp
+    }
+
+    class AjusteInventario {
+      + ID_ajuste_inventario: Integer
+      + diferenca: Decimal
+      + status: Enum
+    }
 }
 
 Produto "1" --> "0..*" LoteProduto : estocado em >
@@ -254,6 +267,10 @@ Produto "1" <-- "*" ProdutoInsumo : filho de >
 Produto "0..1" --> "1" ConversaoUnidade : conversão padrão >
 LoteProduto "1" --> "*" MovimentacaoEstoque : movimenta >
 Inventario "1" --> "*" ItemInventario : contém >
+ItemInventario "1" --> "*" ContagemInventario : contada em >
+Funcionario "1" --> "*" ContagemInventario : realiza >
+Inventario "1" --> "*" AjusteInventario : gera >
+LoteProduto "1" --> "*" AjusteInventario : ajustado em >
 LoteProduto "1" --> "*" ItemInventario : contado em >
 
 ' Códigos dos produtos
