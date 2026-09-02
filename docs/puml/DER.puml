@@ -160,11 +160,6 @@ enum TipoMovimentacao {
   DESMONTAGEM
 }
 
-enum TipoDocumento {
-  NOTA_ENTRADA
-  NOTA_SAIDA
-}
-
 enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
@@ -302,21 +297,33 @@ entity "produto_insumo" as insumo {
 }
 
 ' =========================================================
-' LOTE / ESTOQUE
+' ESTOQUE
 ' =========================================================
 
-entity "lote_produto" as lote {
-  * ID_lote_produto : INT <<PK>>
+entity "estoque" as estoque {
+  * ID_estoque : INT <<PK>>
   --
   * ID_produto : INT <<FK>>
-  codigo_lote : VARCHAR
   * quantidade_atual : DECIMAL
   * saldo_reservado : DECIMAL
   quantidade_minima : DECIMAL
   quantidade_maxima : DECIMAL
   quantidade_critica : DECIMAL
-  data_validade : DATE
   * data_entrada : DATE
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' LOTE (sugestao FIFO)
+' =========================================================
+
+entity "lote" as lote {
+  * ID_lote : INT <<PK>>
+  --
+  * ID_produto : INT <<FK>>
+  codigo_lote : VARCHAR
+  data_validade : DATE
+  * data_criacao : DATE
   * ativo : BOOLEAN
 }
 
@@ -327,7 +334,7 @@ entity "lote_produto" as lote {
 entity "movimentacao_estoque" as mov {
   * ID_movimentacao : INT <<PK>>
   --
-  * ID_lote_produto : INT <<FK>>
+  * ID_estoque : INT <<FK>>
   * ID_usuario : INT <<FK>>
   * tipo : TipoMovimentacao
   * quantidade : DECIMAL
@@ -361,7 +368,7 @@ entity "item_inventario" as item_inv {
   * ID_item_inventario : INT <<PK>>
   --
   * ID_inventario : INT <<FK>>
-  * ID_lote_produto : INT <<FK>>
+  * ID_estoque : INT <<FK>>
   * quantidade_sistema : DECIMAL
   observacao : TEXT
 }
@@ -380,7 +387,7 @@ entity "ajuste_inventario" as ajuste_inv {
   * ID_ajuste_inventario : INT <<PK>>
   --
   * ID_inventario : INT <<FK>>
-  * ID_lote_produto : INT <<FK>>
+  * ID_estoque : INT <<FK>>
   * diferenca : DECIMAL
   * status : ENUM(PENDENTE, APROVADO, REJEITADO)
   ID_usuario_aprovacao : INT <<FK>>
@@ -405,7 +412,7 @@ entity "item_nota_saida" as item_nota {
   * ID_item_nota_saida : INT <<PK>>
   --
   * ID_nota_saida : INT <<FK>>
-  * ID_lote_produto : INT <<FK>>
+  * ID_estoque : INT <<FK>>
   * quantidade : DECIMAL
 }
 
@@ -430,7 +437,7 @@ entity "item_remessa" as item_rem {
   * ID_item_remessa : INT <<PK>>
   --
   * ID_remessa : INT <<FK>>
-  * ID_lote_produto : INT <<FK>>
+  * ID_estoque : INT <<FK>>
   * quantidade_solicitada : DECIMAL
   quantidade_separada : DECIMAL
   quantidade_entregue : DECIMAL
@@ -489,26 +496,28 @@ entity "veiculo" as veiculo {
 }
 
 ' =========================================================
-' DOCUMENTO FISCAL
+' NOTA DE ENTRADA
 ' =========================================================
 
-entity "documento_fiscal" as doc {
-  * ID_documento_fiscal : INT <<PK>>
+entity "nota_entrada" as nota_entrada {
+  * ID_nota_entrada : INT <<PK>>
   --
   ID_fornecedor : INT <<FK>>
-  * tipo : TipoDocumento
-  numero : VARCHAR
-  data_emissao : DATE
+  * data_criacao : TIMESTAMP
   data_recebimento : DATE
-  arquivo_url : VARCHAR
   observacao : TEXT
   * ativo : BOOLEAN
 }
 
-entity "item_documento" as item_doc {
-  * ID_item_documento : INT <<PK>>
+entity "nota_entrada_chave_acesso" as chave_acesso {
+  * ID_nota_entrada : INT <<PK, FK>>
+  * chave_acesso : VARCHAR <<UK>>
+}
+
+entity "item_nota_entrada" as item_nota_entrada {
+  * ID_item_nota_entrada : INT <<PK>>
   --
-  * ID_documento_fiscal : INT <<FK>>
+  * ID_nota_entrada : INT <<FK>>
   * ID_produto : INT <<FK>>
   ID_conversao : INT <<FK>>
   * quantidade : DECIMAL
@@ -634,14 +643,15 @@ fornecedor ||--o{ forn_email
 
 ' Produto / Estoque
 conv ||--o{ produto
+produto ||--o{ estoque
 produto ||--o{ lote
 produto ||--o{ insumo
-produto ||--o{ item_doc
-lote ||--o{ item_nota
-lote ||--o{ item_rem
-lote ||--o{ mov
-lote ||--o{ item_inv
-lote ||--o{ ajuste_inv
+produto ||--o{ item_nota_entrada
+estoque ||--o{ item_nota
+estoque ||--o{ item_rem
+estoque ||--o{ mov
+estoque ||--o{ item_inv
+estoque ||--o{ ajuste_inv
 inventario ||--|{ item_inv
 inventario ||--o{ ajuste_inv
 usuario ||--o{ inventario
@@ -668,14 +678,13 @@ percurso ||--o{ rota
 rota ||--o{ rota_rem
 remessa ||--o{ rota_rem
 
-' Documento Fiscal
-fornecedor ||--o{ doc
-doc ||--|{ item_doc
-conv ||--o{ item_doc
+' Nota de Entrada
+fornecedor ||--o{ nota_entrada
+nota_entrada ||--|{ item_nota_entrada
+conv ||--o{ item_nota_entrada
 
 ' Anexos
 remessa ||--o{ anexo
-doc ||--o{ anexo
 
 ' Acessos / Auditoria
 usuario ||--o{ user_perfil

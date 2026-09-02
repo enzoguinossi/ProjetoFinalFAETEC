@@ -324,21 +324,19 @@ Regras:
 
 ---
 
-### 3.7 Bloco: Lote e Estoque
+### 3.7 Bloco: Estoque
 
 ```
-lote_produto
-├── ID_lote_produto     INT PK auto_increment
-├── ID_produto          INT FK NOT NULL
-├── codigo_lote         VARCHAR
-├── quantidade_atual    DECIMAL NOT NULL          ← saldo físico real no galpão
-├── saldo_reservado     DECIMAL NOT NULL DEFAULT 0 ← comprometido em notas abertas
-├── quantidade_minima   DECIMAL                   ← alerta
-├── quantidade_maxima   DECIMAL                   ← alerta
-├── quantidade_critica  DECIMAL                   ← alerta severo
-├── data_validade       DATE                      ← obrigatório se produto perecivel
-├── data_entrada        DATE NOT NULL
-└── ativo               BOOLEAN DEFAULT TRUE
+estoque (saldo real — controle de quantidade)
+├── ID_estoque            INT PK auto_increment
+├── ID_produto            INT FK NOT NULL
+├── quantidade_atual      DECIMAL NOT NULL          ← saldo físico real no galpão
+├── saldo_reservado       DECIMAL NOT NULL DEFAULT 0 ← comprometido em notas abertas
+├── quantidade_minima     DECIMAL                   ← alerta
+├── quantidade_maxima     DECIMAL                   ← alerta
+├── quantidade_critica    DECIMAL                   ← alerta severo
+├── data_entrada          DATE NOT NULL
+└── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
 **Cálculo importante (não armazenado, calculado em tempo real):**
@@ -347,11 +345,29 @@ lote_produto
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
 
+```
+lote (agrupamento para sugestão FIFO — 1 lote = 1 produto, sem reserva de estoque)
+├── ID_lote               INT PK auto_increment
+├── ID_produto            INT FK NOT NULL
+├── codigo_lote           VARCHAR
+├── data_validade         DATE
+├── data_criacao          DATE NOT NULL
+└── ativo                 BOOLEAN DEFAULT TRUE
+```
+
+Regras:
+- O lote **não reserva** quantidade no estoque — é apenas um marcador de sugestão
+- Ao montar uma remessa, o sistema prioriza produtos com lote de validade mais próxima (RN002 - FIFO)
+- O lote é criado manualmente pelo Jonathan quando ele identifica itens próximos ao vencimento
+- 1 lote = 1 produto (não pode misturar produtos no mesmo lote)
+- Um produto pode ter **vários lotes** simultâneos (diferentes datas de validade)
+
 #### 3.7.1 Fluxo de Estoque
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
-| Entrada de mercadoria | Cria/atualiza `lote_produto` | `quantidade_atual += X` |
+| Entrada de mercadoria | Cria/atualiza `estoque` | `quantidade_atual += X` |
+| Criação de lote manual | Cria `lote` (opcional, separado) | Apenas registro de sugestão |
 | Cria Nota Saída | Reserva | `saldo_reservado += X` |
 | Cancelamento de Nota | Libera reserva | `saldo_reservado -= X` |
 | Remessa finalizada (total/parcial) | Baixa definitiva | `quantidade_atual -= X` E `saldo_reservado -= X` |
@@ -366,7 +382,7 @@ saldo_disponivel = quantidade_atual - saldo_reservado
 ```
 movimentacao_estoque
 ├── ID_movimentacao       INT PK auto_increment
-├── ID_lote_produto       INT FK NOT NULL
+├── ID_estoque            INT FK NOT NULL
 ├── ID_usuario            INT FK NOT NULL
 ├── tipo                  ENUM(
                             'ENTRADA',
@@ -407,7 +423,7 @@ inventario
 item_inventario
 ├── ID_item_inventario      INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
-├── ID_lote_produto         INT FK NOT NULL
+├── ID_estoque            INT FK NOT NULL
 ├── quantidade_sistema      DECIMAL NOT NULL   ← snapshot congelado na abertura
 └── observacao              TEXT
 
@@ -422,7 +438,7 @@ contagem_inventario         ← cada funcionário conta
 ajuste_inventario           ← aprovação manual das diferenças
 ├── ID_ajuste_inventario    INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
-├── ID_lote_produto         INT FK NOT NULL
+├── ID_estoque            INT FK NOT NULL
 ├── diferenca               DECIMAL NOT NULL
 ├── status                  ENUM('PENDENTE','APROVADO','REJEITADO')
 ├── ID_usuario_aprovacao    INT FK → usuario NULL
@@ -506,7 +522,7 @@ nota_saida
 item_nota_saida
 ├── ID_item_nota_saida     INT PK auto_increment
 ├── ID_nota_saida          INT FK NOT NULL
-├── ID_lote_produto        INT FK NOT NULL      ← lote específico que será reservado
+├── ID_estoque            INT FK NOT NULL      ← lote específico que será reservado
 ├── quantidade             DECIMAL NOT NULL
 ```
 
@@ -539,7 +555,7 @@ remessa
 item_remessa
 ├── ID_item_remessa        INT PK auto_increment
 ├── ID_remessa             INT FK NOT NULL
-├── ID_lote_produto        INT FK NOT NULL
+├── ID_estoque            INT FK NOT NULL
 ├── quantidade_solicitada  DECIMAL NOT NULL
 ├── quantidade_separada    DECIMAL
 ├── quantidade_entregue    DECIMAL
@@ -586,38 +602,43 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 
 ---
 
-### 3.12 Bloco: Documentos Fiscais (Entrada)
+### 3.12 Bloco: Nota de Entrada
 
-Gerencia o recebimento de mercadorias de fornecedores (com ou sem nota fiscal).
+Gerencia o recebimento de mercadorias de fornecedores (com ou sem nota fiscal vinculada).
 
 ```
-documento_fiscal
-├── ID_documento_fiscal    INT PK auto_increment
-├── ID_fornecedor          INT FK → fornecedor NULL
-├── tipo                   ENUM('NOTA_ENTRADA','NOTA_SAIDA')
-├── numero                 VARCHAR
-├── data_emissao           DATE
-├── data_recebimento       DATE
-├── arquivo_url            VARCHAR              ← XML ou PDF anexado
-├── observacao             TEXT
-└── ativo                  BOOLEAN DEFAULT TRUE
+nota_entrada
+├── ID_nota_entrada       INT PK auto_increment
+├── ID_fornecedor         INT FK → fornecedor NULL  ← opcional
+├── data_criacao          TIMESTAMP NOT NULL
+├── data_recebimento      DATE
+├── observacao            TEXT
+└── ativo                 BOOLEAN DEFAULT TRUE
 
-item_documento
-├── ID_item_documento      INT PK auto_increment
-├── ID_documento_fiscal    INT FK NOT NULL
-├── ID_produto             INT FK NOT NULL
-├── ID_conversao           INT FK → conversao_unidade NULL ← qual unidade usou na entrada
-├── quantidade             DECIMAL NOT NULL
-├── quantidade_convertida  DECIMAL NOT NULL     ← qtd * fator_conversao
-└── observacao             TEXT
+nota_entrada_chave_acesso   ← opcional, 0 ou mais chaves NF-e
+├── ID_nota_entrada       INT FK NOT NULL
+├── chave_acesso          VARCHAR(44) UNIQUE NOT NULL
+└── PRIMARY KEY (ID_nota_entrada, chave_acesso)
+
+item_nota_entrada
+├── ID_item_nota_entrada  INT PK auto_increment
+├── ID_nota_entrada       INT FK NOT NULL
+├── ID_produto            INT FK NOT NULL
+├── ID_conversao          INT FK → conversao_unidade NULL
+├── quantidade            DECIMAL NOT NULL         ← qtd recebida (ex: 10 caixas)
+├── quantidade_convertida DECIMAL NOT NULL         ← qtd * fator (ex: 10 * 20 = 200)
+└── observacao            TEXT
 ```
 
 Regras:
-- A entrada pode ser feita **com ou sem** documento fiscal vinculado
+- A entrada pode ser feita **com ou sem** chave de acesso de NF-e
+- A chave de acesso, quando informada, deve ser uma chave válida de NF-e (44 caracteres)
 - A conversão de unidade é aplicada no momento da entrada
+- Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:
-  1. Cria/atualiza `lote_produto` com `quantidade_atual += quantidade_convertida`
+  1. Cria/atualiza `estoque` com `quantidade_atual += quantidade_convertida`
   2. Cria `movimentacao_estoque` tipo `ENTRADA`
+- O lote **não é criado automaticamente** na entrada — é criado manualmente depois pelo Jonathan
 
 ---
 

@@ -210,18 +210,24 @@ package "Produtos e Estoque" as Produtos {
     + ativo: Boolean
   }
 
-  class LoteProduto {
-    + ID_lote_produto: Integer
-    + codigo_lote: String
-    + quantidade_atual: Decimal
-    + saldo_reservado: Decimal
-    + quantidade_minima: Decimal
-    + quantidade_maxima: Decimal
-    + quantidade_critica: Decimal
-    + data_validade: Date
-    + data_entrada: Date
-    + ativo: Boolean
-  }
+  class Estoque {
+      + ID_estoque: Integer
+      + quantidade_atual: Decimal
+      + saldo_reservado: Decimal
+      + quantidade_minima: Decimal
+      + quantidade_maxima: Decimal
+      + quantidade_critica: Decimal
+      + data_entrada: Date
+      + ativo: Boolean
+    }
+
+    class Lote {
+      + ID_lote: Integer
+      + codigo_lote: String
+      + data_validade: Date
+      + data_criacao: Date
+      + ativo: Boolean
+    }
 
   class MovimentacaoEstoque {
     + ID_movimentacao: Integer
@@ -261,17 +267,18 @@ package "Produtos e Estoque" as Produtos {
     }
 }
 
-Produto "1" --> "0..*" LoteProduto : estocado em >
+Produto "1" --> "0..*" Estoque : estocado em >
+Produto "1" --> "0..*" Lote : agrupado em >
 Produto "1" --> "0..*" ProdutoInsumo : pai de >
 Produto "1" <-- "*" ProdutoInsumo : filho de >
 Produto "0..1" --> "1" ConversaoUnidade : conversão padrão >
-LoteProduto "1" --> "*" MovimentacaoEstoque : movimenta >
+Estoque "1" --> "*" MovimentacaoEstoque : movimenta >
 Inventario "1" --> "*" ItemInventario : contém >
 ItemInventario "1" --> "*" ContagemInventario : contada em >
 Funcionario "1" --> "*" ContagemInventario : realiza >
 Inventario "1" --> "*" AjusteInventario : gera >
-LoteProduto "1" --> "*" AjusteInventario : ajustado em >
-LoteProduto "1" --> "*" ItemInventario : contado em >
+Estoque "1" --> "*" AjusteInventario : ajustado em >
+Estoque "1" --> "*" ItemInventario : contado em >
 
 ' Códigos dos produtos
 Produto "1" --> "*" ProdutoCodigo : possui >
@@ -341,14 +348,23 @@ package "Logística" as Logistica {
     + status: Enum
     + ativo: Boolean
   }
+class Anexo {
+    + ID_anexo: Integer
+    + nome_arquivo: String
+    + url: String
+    + tipo_mime: String
+    + data_upload: Timestamp
+    + ativo: Boolean
+  }
 }
 
 NotaSaida "1" --> "*" ItemNotaSaida : contém >
 NotaSaida "1" --> "*" Remessa : gera >
 Destinatario "1" --> "*" NotaSaida : solicita >
 Remessa "1" --> "*" ItemRemessa : contém >
-LoteProduto "1" --> "*" ItemNotaSaida : reservado em >
-LoteProduto "1" --> "*" ItemRemessa : expedido em >
+Remessa "1" --> "*" Anexo : anexa >
+Estoque "1" --> "*" ItemNotaSaida : reservado em >
+Estoque "1" --> "*" ItemRemessa : expedido em >
 Condutor "1" --> "0..*" Remessa : vincula >
 Veiculo "1" --> "0..*" Remessa : vincula >
 Rota "1" --> "*" RotaRemessa : agrupa >
@@ -359,42 +375,33 @@ Rota "0..1" --> "1" Percurso : baseado em (opcional) >
 Remessa "*" --> "1" Destinatario : destinada a >
 
 ' =========================================================
-' DOCUMENTOS FISCAIS
+' NOTA DE ENTRADA
 ' =========================================================
-package "Documentos" as Documentos {
-  class DocumentoFiscal {
-    + ID_documento_fiscal: Integer
-    + tipo: Enum
-    + numero: String
-    + data_emissao: Date
+package "Nota de Entrada" as NotaEntrada {
+  class NotaEntrada {
+    + ID_nota_entrada: Integer
+    + data_criacao: Timestamp
     + data_recebimento: Date
-    + arquivo_url: String
     + observacao: Text
     + ativo: Boolean
   }
 
-  class ItemDocumento {
-    + ID_item_documento: Integer
+  class NotaEntradaChaveAcesso {
+    + chave_acesso: String
+  }
+
+  class ItemNotaEntrada {
+    + ID_item_nota_entrada: Integer
     + quantidade: Decimal
     + quantidade_convertida: Decimal
   }
-
-  class Anexo {
-    + ID_anexo: Integer
-    + nome_arquivo: String
-    + url: String
-    + tipo_mime: String
-    + data_upload: Timestamp
-    + ativo: Boolean
-  }
 }
 
-Fornecedor "1" --> "*" DocumentoFiscal : emite >
-DocumentoFiscal "1" --> "*" ItemDocumento : contém >
-Produto "1" --> "*" ItemDocumento : listado em >
-ConversaoUnidade "1" --> "*" ItemDocumento : conversão usada >
-DocumentoFiscal "1" --> "*" Anexo : anexa >
-Remessa "1" --> "*" Anexo : anexa >
+Fornecedor "1" --> "*" NotaEntrada : emite >
+NotaEntrada "1" --> "*" ItemNotaEntrada : contém >
+NotaEntrada "1" --> "*" NotaEntradaChaveAcesso : referência >
+Produto "1" --> "*" ItemNotaEntrada : listado em >
+ConversaoUnidade "1" --> "*" ItemNotaEntrada : conversão usada >
 
 ' =========================================================
 ' ACESSOS E SEGURANÇA
