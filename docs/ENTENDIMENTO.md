@@ -500,11 +500,38 @@ Regras:
 
 ---
 
-### 3.11 Bloco: Nota Saída e Remessa
+### 3.11 Bloco: Pedido, Nota Saída, Remessa e Coleta
 
-#### 3.11.1 Nota Saída (Pedido Transcrito)
+#### 3.11.0 Pedido da Escola (Solicitação)
 
-Representa o pedido que chega em **papel** da Secretaria e é transcrito para o sistema.
+Representa o pedido que chega em **papel** da Secretaria e é registrado no sistema. Ainda não reserva estoque — é apenas a solicitação.
+
+```
+pedido_escola
+├── ID_pedido_escola        INT PK auto_increment
+├── ID_destinatario         INT FK NOT NULL
+├── data_criacao            TIMESTAMP NOT NULL
+├── status                  ENUM('PENDENTE','CONFIRMADO','RECUSADO')
+├── observacao              TEXT
+└── ativo                   BOOLEAN DEFAULT TRUE
+
+item_pedido_escola
+├── ID_item_pedido_escola   INT PK auto_increment
+├── ID_pedido_escola        INT FK NOT NULL
+├── ID_produto              INT FK NOT NULL
+├── quantidade              DECIMAL NOT NULL
+└── observacao              TEXT
+```
+
+Regras:
+- O pedido é apenas a solicitação — **não reserva estoque**
+- Ao confirmar, o sistema **valida o estoque** (avisa se não tiver saldo, mas permite seguir)
+- Ao confirmar, gera automaticamente uma `nota_saida` com os mesmos itens
+- Um pedido RECUSADO não gera nota
+
+#### 3.11.1 Nota Saída (Compromisso Oficial)
+
+Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**.
 
 ```
 nota_saida
