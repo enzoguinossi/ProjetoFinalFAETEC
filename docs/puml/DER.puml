@@ -155,8 +155,6 @@ enum TipoMovimentacao {
   RESERVA
   LIBERACAO_RESERVA
   AJUSTE_INVENTARIO
-  CONSUMO_INTERNO
-  AVARIA
   DESMONTAGEM
 }
 
@@ -306,11 +304,8 @@ entity "estoque" as estoque {
   * ID_produto : INT <<FK>>
   * quantidade_atual : DECIMAL
   * saldo_reservado : DECIMAL
-  quantidade_minima : DECIMAL
-  quantidade_maxima : DECIMAL
-  quantidade_critica : DECIMAL
-  * data_entrada : DATE
-  * ativo : BOOLEAN
+    * data_entrada : DATE
+    * ativo : BOOLEAN
 }
 
 ' =========================================================
