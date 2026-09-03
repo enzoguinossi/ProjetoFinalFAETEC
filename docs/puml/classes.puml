@@ -214,9 +214,6 @@ package "Produtos e Estoque" as Produtos {
       + ID_estoque: Integer
       + quantidade_atual: Decimal
       + saldo_reservado: Decimal
-      + quantidade_minima: Decimal
-      + quantidade_maxima: Decimal
-      + quantidade_critica: Decimal
       + data_entrada: Date
       + ativo: Boolean
     }

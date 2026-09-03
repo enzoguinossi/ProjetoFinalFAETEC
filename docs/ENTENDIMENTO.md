@@ -332,9 +332,6 @@ estoque (saldo real — controle de quantidade)
 ├── ID_produto            INT FK NOT NULL
 ├── quantidade_atual      DECIMAL NOT NULL          ← saldo físico real no galpão
 ├── saldo_reservado       DECIMAL NOT NULL DEFAULT 0 ← comprometido em notas abertas
-├── quantidade_minima     DECIMAL                   ← alerta
-├── quantidade_maxima     DECIMAL                   ← alerta
-├── quantidade_critica    DECIMAL                   ← alerta severo
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
@@ -390,8 +387,6 @@ movimentacao_estoque
                             'RESERVA',
                             'LIBERACAO_RESERVA',
                             'AJUSTE_INVENTARIO',
-                            'CONSUMO_INTERNO',
-                            'AVARIA',
                             'DESMONTAGEM'
                           )
 ├── quantidade            DECIMAL NOT NULL
@@ -588,15 +583,29 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 │         ↓                                                │
 │  EM_PERCURSO (saiu pra entrega)                          │
 │         ↓                                                │
-│  ┌─────┴─────┐                                          │
-│  ▼            ▼                                          │
-│  Sucesso     Falha                                       │
-│  ↓            ↓                                          │
-│  FINALIZADO   PENDENTE                                   │
-│  (baixa real  (reserva mantida, pode                     │
-│   do estoque)  criar nova remessa)                       │
+│  ┌─────┴──────────┐                                     │
+│  ▼                 ▼                                     │
+│  Sucesso          Falha                                  │
+│  ↓                 ↓                                     │
+│  FINALIZADO_TOTAL PENDENTE                               │
+│  (baixa real do   (reserva mantida, pode                 │
+│   estoque)         criar nova remessa)                   │
 │                                                          │
-│  Sub-status: TOTAL / PARCIAL / CORTE                     │
+│  Entrega Parcial:                                         │
+│  ┌──────────────────────────────────┐                    │
+│  │  Remessa com 10 itens           │                    │
+│  │  ↓                               │                    │
+│  │  Entrega 6 itens                │                    │
+│  │  ↓                               │                    │
+│  │  SPLIT:                          │                    │
+│  │  ├── Remessa A (6 itens) →      │                    │
+│  │  │   FINALIZADO_PARCIAL          │                    │
+│  │  │   (baixa no estoque)          │                    │
+│  │  └── Remessa B (4 itens) →      │                    │
+│  │      PENDENTE (nova remessa,     │                    │
+│  │      mesma nota_saida, pode      │                    │
+│  │      entrar em outra rota)       │                    │
+│  └──────────────────────────────────┘                    │
 └──────────────────────────────────────────────────────────┘
 ```
 
