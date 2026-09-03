@@ -285,58 +285,32 @@ Produto "1" --> "*" ProdutoCodigo : possui >
 ' =========================================================
 package "Logística" as Logistica {
 
-  class PedidoEscola {
-      + ID_pedido_escola: Integer
-      + data_criacao: Timestamp
-      + status: Enum
-      + observacao: Text
-    }
+  class NotaSaida {
+    + ID_nota_saida: Integer
+    + data_criacao: Timestamp
+    + status: Enum
+    + observacao: Text
+  }
 
-    class ItemPedidoEscola {
-      + ID_item_pedido_escola: Integer
-      + quantidade: Decimal
-    }
-
-    class NotaSaida {
-      + ID_nota_saida: Integer
-      + ID_pedido_escola: Integer
-      + data_criacao: Timestamp
-      + status: Enum
-      + observacao: Text
-      + ativo: Boolean
-    }
-
-    class ItemNotaSaida {
-      + ID_item_nota_saida: Integer
-      + qtd_esperada: Decimal
-      + qtd_entregue: Decimal
-    }
+  class ItemNotaSaida {
+    + ID_item_nota_saida: Integer
+    + quantidade: Decimal
+  }
 
   class Remessa {
-      + ID_remessa: Integer
-      + data_criacao: Timestamp
-      + status: Enum
-      + urgente: Boolean
-      + observacao: Text
-    }
+    + ID_remessa: Integer
+    + data_criacao: Timestamp
+    + status: Enum
+    + urgente: Boolean
+    + observacao: Text
+  }
 
-    class ItemRemessa {
-      + ID_item_remessa: Integer
-      + quantidade_solicitada: Decimal
-      + quantidade_separada: Decimal
-      + quantidade_entregue: Decimal
-    }
-
-    class Coleta {
-      + ID_coleta: Integer
-      + data_criacao: Timestamp
-      + observacao: Text
-    }
-
-    class ItemColeta {
-      + ID_item_coleta: Integer
-      + quantidade: Decimal
-    }
+  class ItemRemessa {
+    + ID_item_remessa: Integer
+    + quantidade_solicitada: Decimal
+    + quantidade_separada: Decimal
+    + quantidade_entregue: Decimal
+  }
 
   class Percurso {
     + ID_percurso: Integer
@@ -381,14 +355,10 @@ class Anexo {
   }
 }
 
-PedidoEscola "1" --> "*" ItemPedidoEscola : contém >
-PedidoEscola "1" --> "0..1" NotaSaida : gera >
-Destinatario "1" --> "*" PedidoEscola : solicita >
 NotaSaida "1" --> "*" ItemNotaSaida : contém >
 NotaSaida "1" --> "*" Remessa : gera >
-NotaSaida "1" --> "*" Coleta : gera >
+Destinatario "1" --> "*" NotaSaida : solicita >
 Remessa "1" --> "*" ItemRemessa : contém >
-Coleta "1" --> "*" ItemColeta : contém >
 Remessa "1" --> "*" Anexo : anexa >
 Estoque "1" --> "*" ItemNotaSaida : reservado em >
 Estoque "1" --> "*" ItemRemessa : expedido em >

@@ -133,6 +133,13 @@ enum TipoTelefone {
   COMERCIAL
 }
 
+enum StatusNotaSaida {
+  ABERTA
+  EM_PREPARACAO
+  FINALIZADA
+  CANCELADA
+}
+
 enum StatusRemessa {
   EM_PREPARACAO
   PRONTO_PARA_ENTREGA
@@ -384,41 +391,16 @@ entity "ajuste_inventario" as ajuste_inv {
 }
 
 ' =========================================================
-' PEDIDO ESCOLA
-' =========================================================
-
-entity "pedido_escola" as pedido {
-  * ID_pedido_escola : INT <<PK>>
-  --
-  * ID_destinatario : INT <<FK>>
-  * data_criacao : TIMESTAMP
-  * status : ENUM(PENDENTE, CONFIRMADO, RECUSADO)
-  observacao : TEXT
-  * ativo : BOOLEAN
-}
-
-entity "item_pedido_escola" as item_pedido {
-  * ID_item_pedido_escola : INT <<PK>>
-  --
-  * ID_pedido_escola : INT <<FK>>
-  * ID_produto : INT <<FK>>
-  * quantidade : DECIMAL
-  observacao : TEXT
-}
-
-' =========================================================
 ' NOTA SAIDA
 ' =========================================================
 
 entity "nota_saida" as nota {
   * ID_nota_saida : INT <<PK>>
   --
-  ID_pedido_escola : INT <<FK>>
   * ID_destinatario : INT <<FK>>
   * data_criacao : TIMESTAMP
-  * status : ENUM(ABERTA, EM_ANDAMENTO, BAIXA_TOTAL, BAIXA_PARCIAL, BAIXA_COM_CORTE, CANCELADA)
+  * status : StatusNotaSaida
   observacao : TEXT
-  * ativo : BOOLEAN
 }
 
 entity "item_nota_saida" as item_nota {
@@ -426,9 +408,7 @@ entity "item_nota_saida" as item_nota {
   --
   * ID_nota_saida : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * qtd_esperada : DECIMAL
-  * qtd_entregue : DECIMAL
-  observacao : TEXT
+  * quantidade : DECIMAL
 }
 
 ' =========================================================
@@ -456,27 +436,6 @@ entity "item_remessa" as item_rem {
   * quantidade_solicitada : DECIMAL
   quantidade_separada : DECIMAL
   quantidade_entregue : DECIMAL
-}
-
-' =========================================================
-' COLETA
-' =========================================================
-
-entity "coleta" as coleta {
-  * ID_coleta : INT <<PK>>
-  --
-  * ID_nota_saida : INT <<FK>>
-  * ID_destinatario : INT <<FK>>
-  * data_criacao : TIMESTAMP
-  observacao : TEXT
-}
-
-entity "item_coleta" as item_coleta {
-  * ID_item_coleta : INT <<PK>>
-  --
-  * ID_coleta : INT <<FK>>
-  * ID_estoque : INT <<FK>>
-  * quantidade : DECIMAL
 }
 
 ' =========================================================
@@ -699,18 +658,11 @@ funcionario ||--o{ contagem
 insumo "0..*" --> "1" produto : "pai"
 insumo "0..*" --> "1" produto : "filho"
 
-' Pedido Escola
-destinatario ||--o{ pedido
-pedido ||--|{ item_pedido
-pedido ||--o| nota
-
 ' Nota Saida / Remessa
 destinatario ||--o{ nota
 nota ||--|{ item_nota
 nota ||--o{ remessa
-nota ||--o{ coleta
 remessa ||--|{ item_rem
-coleta ||--|{ item_coleta
 condutor ||--o{ remessa
 veiculo ||--o{ remessa
 
