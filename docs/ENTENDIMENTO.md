@@ -270,10 +270,11 @@ Quem usa:
 produto
 ├── ID_produto            INT PK auto_increment
 ├── descricao             VARCHAR NOT NULL
-├── foto_url              VARCHAR          ← upload para servidor local
+├── foto_url              VARCHAR
 ├── perecivel             BOOLEAN DEFAULT FALSE
-├── composto              BOOLEAN DEFAULT FALSE  ← marcado se precisar desmontar
-├── ID_conversao_padrao   INT FK → conversao_unidade NULL  ← auto-preenche entrada
+├── composto              BOOLEAN DEFAULT FALSE
+├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
+├── ID_conversao_padrao   INT FK NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
@@ -342,29 +343,17 @@ estoque (saldo real — controle de quantidade)
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
 
-```
-lote (agrupamento para sugestão FIFO — 1 lote = 1 produto, sem reserva de estoque)
-├── ID_lote               INT PK auto_increment
-├── ID_produto            INT FK NOT NULL
-├── codigo_lote           VARCHAR
-├── data_validade         DATE
-├── data_criacao          DATE NOT NULL
-└── ativo                 BOOLEAN DEFAULT TRUE
-```
-
 Regras:
-- O lote **não reserva** quantidade no estoque — é apenas um marcador de sugestão
-- Ao montar uma remessa, o sistema prioriza produtos com lote de validade mais próxima (RN002 - FIFO)
-- O lote é criado manualmente pelo Jonathan quando ele identifica itens próximos ao vencimento
-- 1 lote = 1 produto (não pode misturar produtos no mesmo lote)
-- Um produto pode ter **vários lotes** simultâneos (diferentes datas de validade)
+- Produtos perecíveis possuem `data_validade` no cadastro do produto (menor validade disponível)
+- Quando faltam 90, 60, 45 e 30 dias para o vencimento, o sistema cria automaticamente uma `mensagem_mural` de alerta
+- A data de validade é controlada manualmente pelo Jonathan — ele atualiza conforme necessário
+- Produtos não perecíveis têm o campo desabilitado
 
 #### 3.7.1 Fluxo de Estoque
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
 | Entrada de mercadoria | Cria/atualiza `estoque` | `quantidade_atual += X` |
-| Criação de lote manual | Cria `lote` (opcional, separado) | Apenas registro de sugestão |
 | Cria Nota Saída | Reserva | `saldo_reservado += X` |
 | Cancelamento de Nota | Libera reserva | `saldo_reservado -= X` |
 | Remessa finalizada (total/parcial) | Baixa definitiva | `quantidade_atual -= X` E `saldo_reservado -= X` |
@@ -535,25 +524,38 @@ Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**.
 
 ```
 nota_saida
-├── ID_nota_saida          INT PK auto_increment
-├── ID_destinatario        INT FK NOT NULL      ← escola que solicitou
-├── data_criacao           TIMESTAMP NOT NULL
-├── status                 ENUM('ABERTA','EM_PREPARACAO','FINALIZADA','CANCELADA')
-└── observacao             TEXT
+├── ID_nota_saida           INT PK auto_increment
+├── ID_pedido_escola        INT FK NULL
+├── ID_destinatario         INT FK NOT NULL
+├── data_criacao            TIMESTAMP NOT NULL
+├── status                  ENUM(
+                              'ABERTA',
+                              'EM_ANDAMENTO',
+                              'BAIXA_TOTAL',
+                              'BAIXA_PARCIAL',
+                              'BAIXA_COM_CORTE',
+                              'CANCELADA'
+                            )
+├── observacao              TEXT
+└── ativo                   BOOLEAN DEFAULT TRUE
 
 item_nota_saida
-├── ID_item_nota_saida     INT PK auto_increment
-├── ID_nota_saida          INT FK NOT NULL
-├── ID_estoque            INT FK NOT NULL      ← lote específico que será reservado
-├── quantidade             DECIMAL NOT NULL
+├── ID_item_nota_saida      INT PK auto_increment
+├── ID_nota_saida           INT FK NOT NULL
+├── ID_estoque              INT FK NOT NULL
+├── qtd_esperada            DECIMAL NOT NULL
+├── qtd_entregue            DECIMAL NOT NULL DEFAULT 0
+└── observacao              TEXT
 ```
 
 Regras:
-- Ao criar `item_nota_saida`, o **estoque é reservado** (`saldo_reservado += quantidade`)
-- Se a nota for cancelada, a **reserva é liberada** (`saldo_reservado -= quantidade`)
-- Uma nota pode gerar **várias remessas** ao longo do tempo (se a primeira tentativa falhar)
+- Ao criar `item_nota_saida`, o **estoque é reservado** (`saldo_reservado += qtd_esperada`)
+- `qtd_entregue` é atualizado automaticamente conforme remessas e coletas são finalizadas
+- Se a nota for cancelada, a **reserva é liberada** (`saldo_reservado -= qtd_esperada`)
+- A nota pode gerar **várias remessas** e/ou **coletas**
+- Status: ABERTA (criada), EM_ANDAMENTO (entregas em curso), BAIXA_TOTAL (tudo entregue), BAIXA_PARCIAL (parte entregue, resto vai), BAIXA_COM_CORTE (parte entregue, resto não vai), CANCELADA (nada entregue)
 
-#### 3.11.2 Remessa (Tentativa de Entrega)
+#### 3.11.2 Remessa (Entrega via Rota)
 
 ```
 remessa
@@ -583,7 +585,34 @@ item_remessa
 ├── quantidade_entregue    DECIMAL
 ```
 
-#### 3.11.3 Rota × Remessa (N:N com ordem)
+Regras:
+- Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
+- Remessa PENDENTE pode ser realocada em outra rota
+
+#### 3.11.3 Coleta (Retirada Direta na Escola)
+
+Representa retirada presencial por urgência — sem rota, sem condutor, sem veículo.
+
+```
+coleta
+├── ID_coleta               INT PK auto_increment
+├── ID_nota_saida           INT FK NOT NULL
+├── ID_destinatario         INT FK NOT NULL
+├── data_criacao            TIMESTAMP NOT NULL
+└── observacao              TEXT
+
+item_coleta
+├── ID_item_coleta          INT PK auto_increment
+├── ID_coleta               INT FK NOT NULL
+├── ID_estoque              INT FK NOT NULL
+├── quantidade              DECIMAL NOT NULL
+```
+
+Regras:
+- Chegou e pegou — sem agendamento, sem status
+- Ao registrar, `item_nota_saida.qtd_entregue` é atualizado e o estoque dá baixa
+
+#### 3.11.4 Rota × Remessa (N:N com ordem)
 
 ```
 rota_remessa
@@ -674,7 +703,7 @@ Regras:
 - Ao confirmar a entrada, o sistema:
   1. Cria/atualiza `estoque` com `quantidade_atual += quantidade_convertida`
   2. Cria `movimentacao_estoque` tipo `ENTRADA`
-- O lote **não é criado automaticamente** na entrada — é criado manualmente depois pelo Jonathan
+- `data_validade` (quando aplicável) é atualizada manualmente no cadastro do produto pelo Jonathan
 
 ---
 
@@ -792,7 +821,7 @@ Não é uma tabela — é uma funcionalidade de consulta. Os relatórios previst
 | ID | Regra | Prioridade |
 |----|-------|-----------|
 | RN001 | **Bloqueio por Falta de Estoque:** Uma remessa não pode ser liberada com status "Saiu para Entrega" se o produto não possuir `saldo_disponivel` suficiente | Essencial |
-| RN002 | **Saída Prioritária FIFO/PEPS:** Ao alocar produtos perecíveis a uma remessa, selecionar obrigatoriamente o lote com data de validade mais próxima | Essencial |
+| RN002 | **Alerta de Validade:** O sistema deve notificar automaticamente no mural de mensagens quando produtos perecíveis estiverem a 90, 60, 45 e 30 dias do vencimento, com base na `data_validade` do cadastro do produto | Essencial |
 | RN003 | **Pendência em Entrega Parcial:** Baixa parcial gera registro automático de pendência vinculado ao destinatário | Essencial |
 | RN004 | **Imutabilidade de Histórico:** Entradas confirmadas e baixas finalizadas não podem ser excluídas — apenas estornadas via ajuste com justificativa | Essencial |
 | RN005 | **Aprovação de Ajuste de Inventário:** Diferenças detectadas em inventário não geram ajuste automático — toda alteração no saldo precisa de aprovação manual de usuário com permissão `inventario.aprovar_ajuste` | Essencial |

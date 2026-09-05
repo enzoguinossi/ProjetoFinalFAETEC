@@ -33,7 +33,7 @@ projeto-final-faetec/
 | ID | Regra |
 |----|-------|
 | RN001 | Bloqueio por falta de estoque |
-| RN002 | Saída prioritária FIFO/PEPS para perecíveis |
+| RN002 | Alerta de validade no mural para perecíveis |
 | RN003 | Pendência automática em entrega parcial |
 | RN004 | Imutabilidade de histórico confirmado |
 

@@ -274,6 +274,7 @@ entity "produto" as produto {
   foto_url : VARCHAR
   * perecivel : BOOLEAN
   * composto : BOOLEAN
+  data_validade : DATE
   ID_conversao_padrao : INT <<FK>>
   * ativo : BOOLEAN
 }
@@ -299,20 +300,6 @@ entity "estoque" as estoque {
   * saldo_reservado : DECIMAL
     * data_entrada : DATE
     * ativo : BOOLEAN
-}
-
-' =========================================================
-' LOTE (sugestao FIFO)
-' =========================================================
-
-entity "lote" as lote {
-  * ID_lote : INT <<PK>>
-  --
-  * ID_produto : INT <<FK>>
-  codigo_lote : VARCHAR
-  data_validade : DATE
-  * data_criacao : DATE
-  * ativo : BOOLEAN
 }
 
 ' =========================================================
@@ -680,7 +667,6 @@ fornecedor ||--o{ forn_email
 ' Produto / Estoque
 conv ||--o{ produto
 produto ||--o{ estoque
-produto ||--o{ lote
 produto ||--o{ insumo
 produto ||--o{ item_nota_entrada
 estoque ||--o{ item_nota
