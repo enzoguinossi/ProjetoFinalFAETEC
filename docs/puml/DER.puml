@@ -148,10 +148,12 @@ enum TipoMovimentacao {
   RESERVA
   LIBERACAO_RESERVA
   AJUSTE_INVENTARIO
-  DESMONTAGEM
-}
+    DESMONTAGEM
+    CORRECAO_ENTRADA
+    CORRECAO_SAIDA
+  }
 
-enum StatusVeiculo {
+  enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
   EM_ROTA
@@ -318,9 +320,10 @@ entity "movimentacao_estoque" as mov {
   reserva_anterior : DECIMAL
   reserva_posterior : DECIMAL
   ID_nota_saida : INT <<FK>>
-  ID_remessa : INT <<FK>>
-  * data_hora : TIMESTAMP
-  observacao : TEXT
+    ID_remessa : INT <<FK>>
+    ID_nota_entrada : INT <<FK>>
+    * data_hora : TIMESTAMP
+    observacao : TEXT
 }
 
 ' =========================================================
