@@ -376,18 +376,61 @@ movimentacao_estoque
                             'RESERVA',
                             'LIBERACAO_RESERVA',
                             'AJUSTE_INVENTARIO',
-                            'DESMONTAGEM'
+                            'DESMONTAGEM',
+                            'CORRECAO_ENTRADA',
+                            'CORRECAO_SAIDA'
                           )
 ├── quantidade            DECIMAL NOT NULL
 ├── saldo_anterior        DECIMAL                 ← snapshot para auditoria
 ├── saldo_posterior       DECIMAL                 ← snapshot para auditoria
 ├── reserva_anterior      DECIMAL                 ← snapshot do saldo_reservado
 ├── reserva_posterior     DECIMAL                 ← snapshot do saldo_reservado
-├── ID_nota_saida         INT FK NULL             ← se mov for referente a uma nota
+├── ID_nota_entrada       INT FK NULL             ← 🆕 se mov for referente a uma nota de entrada
+├── ID_nota_saida         INT FK NULL             ← se mov for referente a uma nota de saída
 ├── ID_remessa            INT FK NULL             ← se mov for referente a remessa
 ├── data_hora             TIMESTAMP NOT NULL
 └── observacao            TEXT
 ```
+
+#### 3.8.1 Correção de Notas (Regra de Editabilidade)
+
+Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e uma `movimentacao_estoque` corretiva.
+
+**Fluxo de correção de Nota Entrada:**
+```
+Usuário edita item_nota_entrada.quantidade de 10 para 15
+  ↓
+1. registro_auditoria: { entidade: 'ItemNotaEntrada',
+     dados_anteriores: {quantidade: 10},
+     dados_novos: {quantidade: 15} }
+  ↓
+2. movimentacao_estoque: { tipo: CORRECAO_ENTRADA,
+     ID_nota_entrada, ID_estoque,
+     quantidade: +5,
+     saldo_anterior: 10, saldo_posterior: 15 }
+  ↓
+3. estoque.quantidade_atual += 5
+```
+
+**Fluxo de correção de Nota Saída:**
+```
+Usuário edita item_nota_saida.qtd_esperada de 20 para 15
+  ↓
+1. registro_auditoria captura antes/depois
+  ↓
+2. movimentacao_estoque: { tipo: CORRECAO_SAIDA,
+     ID_nota_saida, ID_estoque,
+     quantidade: -5,
+     saldo_reservado_anterior: 20, saldo_reservado_posterior: 15 }
+  ↓
+3. estoque.saldo_reservado -= 5
+```
+
+Regras:
+- `registro_auditoria` sempre captura snapshots antes/depois em JSON
+- `movimentacao_estoque` calcula a diferença e aplica ao saldo automaticamente
+- Se o item editado já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
+- Itens com `qtd_entregue > 0` não podem ter `qtd_esperada` reduzida para menos do que já foi entregue
 
 ---
 
