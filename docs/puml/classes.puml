@@ -196,13 +196,14 @@ package "Produtos e Estoque" as Produtos {
   }
 
   class Produto {
-    + ID_produto: Integer
-    + descricao: String
-    + foto_url: String
-    + perecivel: Boolean
-    + composto: Boolean
-    + ativo: Boolean
-  }
+      + ID_produto: Integer
+      + descricao: String
+      + foto_url: String
+      + perecivel: Boolean
+      + composto: Boolean
+      + data_validade: Date
+      + ativo: Boolean
+    }
 
   class ProdutoInsumo {
     + ID_produto_insumo: Integer
@@ -218,16 +219,8 @@ package "Produtos e Estoque" as Produtos {
       + ativo: Boolean
     }
 
-    class Lote {
-      + ID_lote: Integer
-      + codigo_lote: String
-      + data_validade: Date
-      + data_criacao: Date
-      + ativo: Boolean
-    }
-
-  class MovimentacaoEstoque {
-    + ID_movimentacao: Integer
+    class MovimentacaoEstoque {
+      + ID_movimentacao: Integer
     + tipo: Enum
     + quantidade: Decimal
     + saldo_anterior: Decimal
@@ -265,7 +258,6 @@ package "Produtos e Estoque" as Produtos {
 }
 
 Produto "1" --> "0..*" Estoque : estocado em >
-Produto "1" --> "0..*" Lote : agrupado em >
 Produto "1" --> "0..*" ProdutoInsumo : pai de >
 Produto "1" <-- "*" ProdutoInsumo : filho de >
 Produto "0..1" --> "1" ConversaoUnidade : conversão padrão >
