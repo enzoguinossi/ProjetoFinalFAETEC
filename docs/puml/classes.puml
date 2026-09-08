@@ -221,15 +221,6 @@ package "Produtos e Estoque" as Produtos {
       + ativo: Boolean
     }
 
-    class MovimentacaoEstoque {
-          + ID_movimentacao: Integer
-          + quantidade: Decimal
-          + saldo_anterior: Decimal
-          + saldo_posterior: Decimal
-          + data_hora: Timestamp
-          + observacao: Text
-        }
-
   class Inventario {
       + ID_inventario: Integer
       + data_inicio: Date
@@ -441,16 +432,6 @@ package "Acessos" as Acessos {
     + nome: String
     + descricao: Text
     + ativo: Boolean
-  }
-
-  class RegistroAuditoria {
-    + ID_registro_auditoria: Integer
-    + data_hora: Timestamp
-    + acao: String
-    + entidade: String
-    + ID_entidade_afetada: Integer
-    + dados_anteriores: JSON
-    + dados_novos: JSON
   }
 
   class MensagemMural {

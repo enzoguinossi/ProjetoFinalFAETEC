@@ -289,11 +289,11 @@ entity "estoque" as estoque {
   * ID_estoque : INT <<PK>>
   --
   * ID_produto : INT <<FK>>
-  * quantidade_atual : DECIMAL
-  * saldo_reservado : DECIMAL
+    * quantidade_atual : DECIMAL
+    * saldo_reservado : DECIMAL
     * data_entrada : DATE
     * ativo : BOOLEAN
-}
+  }
 
 ' =========================================================
 ' MOVIMENTACAO DE ESTOQUE
@@ -307,11 +307,26 @@ entity "movimentacao_estoque" as mov {
   * quantidade : DECIMAL
   saldo_anterior : DECIMAL
   saldo_posterior : DECIMAL
-  reserva_anterior : DECIMAL
-  reserva_posterior : DECIMAL
   ID_nota_saida : INT <<FK>>
   ID_remessa : INT <<FK>>
   ID_nota_entrada : INT <<FK>>
+  * data_hora : TIMESTAMP
+  observacao : TEXT
+}
+
+' =========================================================
+' RESERVA DE ESTOQUE (Auditoria Contabil)
+' =========================================================
+
+entity "reserva_estoque" as reserva {
+  * ID_reserva_estoque : INT <<PK>>
+  --
+  * ID_estoque : INT <<FK>>
+  * ID_nota_saida : INT <<FK>>
+  * ID_usuario : INT <<FK>>
+  * quantidade : DECIMAL
+  saldo_anterior : DECIMAL
+  saldo_posterior : DECIMAL
   * data_hora : TIMESTAMP
   observacao : TEXT
 }
@@ -667,6 +682,7 @@ produto ||--o{ item_nota_entrada
 estoque ||--o{ item_nota
 estoque ||--o{ item_rem
 estoque ||--o{ mov
+estoque ||--o{ reserva
 estoque ||--o{ item_inv
 estoque ||--o{ ajuste_inv
 inventario ||--|{ item_inv
@@ -690,6 +706,7 @@ destinatario ||--o{ nota
 nota ||--|{ item_nota
 nota ||--o{ remessa
 nota ||--o{ coleta
+nota ||--o{ reserva
 remessa ||--|{ item_rem
 coleta ||--|{ item_coleta
 condutor ||--o{ remessa
