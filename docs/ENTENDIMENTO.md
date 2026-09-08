@@ -364,32 +364,38 @@ Regras:
 
 ### 3.8 Bloco: Movimentação de Estoque
 
+Registro de auditoria de toda alteração no saldo do estoque. **Não possui tipo próprio** — o tipo é inferido pelas FKs e pelo tipo da nota origem.
+
 ```
 movimentacao_estoque
 ├── ID_movimentacao       INT PK auto_increment
 ├── ID_estoque            INT FK NOT NULL
 ├── ID_usuario            INT FK NOT NULL
-├── tipo                  ENUM(
-                            'ENTRADA',
-                            'SAIDA',
-                            'RESERVA',
-                            'LIBERACAO_RESERVA',
-                            'AJUSTE_INVENTARIO',
-                            'DESMONTAGEM',
-                            'CORRECAO_ENTRADA',
-                            'CORRECAO_SAIDA'
-                          )
-├── quantidade            DECIMAL NOT NULL
-├── saldo_anterior        DECIMAL                 ← snapshot para auditoria
-├── saldo_posterior       DECIMAL                 ← snapshot para auditoria
-├── reserva_anterior      DECIMAL                 ← snapshot do saldo_reservado
-├── reserva_posterior     DECIMAL                 ← snapshot do saldo_reservado
-├── ID_nota_entrada       INT FK NULL             ← 🆕 se mov for referente a uma nota de entrada
-├── ID_nota_saida         INT FK NULL             ← se mov for referente a uma nota de saída
-├── ID_remessa            INT FK NULL             ← se mov for referente a remessa
+├── quantidade            DECIMAL NOT NULL         ← positivo = entrada, negativo = saída
+├── saldo_anterior        DECIMAL                  ← snapshot do quantidade_atual antes
+├── saldo_posterior       DECIMAL                  ← snapshot do quantidade_atual depois
+├── reserva_anterior      DECIMAL                  ← snapshot do saldo_reservado antes
+├── reserva_posterior     DECIMAL                  ← snapshot do saldo_reservado depois
+├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
+├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída
+├── ID_remessa            INT FK NULL              ← veio de uma remessa
 ├── data_hora             TIMESTAMP NOT NULL
 └── observacao            TEXT
 ```
+
+**Como o tipo é inferido na consulta:**
+
+| FKs preenchidas | Tipo inferido |
+|----------------|---------------|
+| `ID_nota_entrada` + nota_entrada.tipo = 'ENTRADA' | Entrada de mercadoria |
+| `ID_nota_entrada` + nota_entrada.tipo = 'DESMONTAGEM' | Entrada de insumos |
+| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + `ID_remessa` | Saída por entrega |
+| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + sem `ID_remessa` com qtd > 0 | Reserva |
+| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + sem `ID_remessa` com qtd < 0 | Liberação de reserva |
+| `ID_nota_saida` + nota_saida.tipo = 'CONSUMO_INTERNO' | Baixa por consumo |
+| `ID_nota_saida` + nota_saida.tipo = 'AVARIA' | Baixa por avaria |
+| `ID_nota_saida` + nota_saida.tipo = 'DESMONTAGEM' | Baixa do produto composto |
+| Nenhuma (apenas dados anteriores/posteriores diferentes) | Ajuste de inventário |
 
 #### 3.8.1 Correção de Notas (Regra de Editabilidade)
 
@@ -570,6 +576,7 @@ nota_saida
 ├── ID_pedido_escola        INT FK NULL
 ├── ID_destinatario         INT FK NOT NULL
 ├── data_criacao            TIMESTAMP NOT NULL
+├── tipo                    ENUM('SAIDA','DESMONTAGEM','CONSUMO_INTERNO','AVARIA')
 ├── status                  ENUM(
                               'ABERTA',
                               'EM_ANDAMENTO',
@@ -718,6 +725,7 @@ nota_entrada
 ├── ID_nota_entrada       INT PK auto_increment
 ├── ID_fornecedor         INT FK → fornecedor NULL  ← opcional
 ├── data_criacao          TIMESTAMP NOT NULL
+├── tipo                  ENUM('ENTRADA','DESMONTAGEM')
 ├── data_recebimento      DATE
 ├── observacao            TEXT
 └── ativo                 BOOLEAN DEFAULT TRUE

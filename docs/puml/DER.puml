@@ -144,18 +144,7 @@ enum StatusRemessa {
   FINALIZADO_PARCIAL
 }
 
-enum TipoMovimentacao {
-  ENTRADA
-  SAIDA
-  RESERVA
-  LIBERACAO_RESERVA
-  AJUSTE_INVENTARIO
-    DESMONTAGEM
-    CORRECAO_ENTRADA
-    CORRECAO_SAIDA
-  }
-
-  enum StatusVeiculo {
+enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
   EM_ROTA
@@ -315,17 +304,16 @@ entity "movimentacao_estoque" as mov {
   --
   * ID_estoque : INT <<FK>>
   * ID_usuario : INT <<FK>>
-  * tipo : TipoMovimentacao
   * quantidade : DECIMAL
   saldo_anterior : DECIMAL
   saldo_posterior : DECIMAL
   reserva_anterior : DECIMAL
   reserva_posterior : DECIMAL
   ID_nota_saida : INT <<FK>>
-    ID_remessa : INT <<FK>>
-    ID_nota_entrada : INT <<FK>>
-    * data_hora : TIMESTAMP
-    observacao : TEXT
+  ID_remessa : INT <<FK>>
+  ID_nota_entrada : INT <<FK>>
+  * data_hora : TIMESTAMP
+  observacao : TEXT
 }
 
 ' =========================================================
@@ -408,6 +396,7 @@ entity "nota_saida" as nota {
   ID_pedido_escola : INT <<FK>>
   * ID_destinatario : INT <<FK>>
   * data_criacao : TIMESTAMP
+  * tipo : ENUM(SAIDA, DESMONTAGEM, CONSUMO_INTERNO, AVARIA)
   * status : ENUM(ABERTA, EM_ANDAMENTO, BAIXA_TOTAL, BAIXA_PARCIAL, BAIXA_COM_CORTE, CANCELADA)
   observacao : TEXT
   * ativo : BOOLEAN
@@ -532,6 +521,7 @@ entity "nota_entrada" as nota_entrada {
   --
   ID_fornecedor : INT <<FK>>
   * data_criacao : TIMESTAMP
+  * tipo : ENUM(ENTRADA, DESMONTAGEM)
   data_recebimento : DATE
   observacao : TEXT
   * ativo : BOOLEAN

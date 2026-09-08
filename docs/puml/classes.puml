@@ -222,14 +222,13 @@ package "Produtos e Estoque" as Produtos {
     }
 
     class MovimentacaoEstoque {
-      + ID_movimentacao: Integer
-    + tipo: Enum
-    + quantidade: Decimal
-    + saldo_anterior: Decimal
-    + saldo_posterior: Decimal
-    + data_hora: Timestamp
-    + observacao: Text
-  }
+          + ID_movimentacao: Integer
+          + quantidade: Decimal
+          + saldo_anterior: Decimal
+          + saldo_posterior: Decimal
+          + data_hora: Timestamp
+          + observacao: Text
+        }
 
   class Inventario {
       + ID_inventario: Integer
@@ -292,21 +291,22 @@ package "Logística" as Logistica {
     }
 
     class NotaSaida {
-      + ID_nota_saida: Integer
-      + ID_pedido_escola: Integer
-      + data_criacao: Timestamp
-      + status: Enum
-      + observacao: Text
-      + ativo: Boolean
-    }
+          + ID_nota_saida: Integer
+          + ID_pedido_escola: Integer
+          + data_criacao: Timestamp
+          + tipo: Enum
+          + status: Enum
+          + observacao: Text
+          + ativo: Boolean
+        }
 
-    class ItemNotaSaida {
-      + ID_item_nota_saida: Integer
-      + qtd_esperada: Decimal
-      + qtd_entregue: Decimal
-    }
+        class ItemNotaSaida {
+          + ID_item_nota_saida: Integer
+          + qtd_esperada: Decimal
+          + qtd_entregue: Decimal
+        }
 
-  class Remessa {
+      class Remessa {
       + ID_remessa: Integer
       + data_criacao: Timestamp
       + status: Enum
@@ -402,6 +402,7 @@ package "Nota de Entrada" as NotaEntrada {
   class NotaEntrada {
     + ID_nota_entrada: Integer
     + data_criacao: Timestamp
+    + tipo: Enum
     + data_recebimento: Date
     + observacao: Text
     + ativo: Boolean
