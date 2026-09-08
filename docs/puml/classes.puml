@@ -84,11 +84,13 @@ package "Funcionários" as Funcionarios {
   }
 
   class Usuario {
-    + ID_usuario: Integer
-    + login: String
-    + senha_hash: String
-    + ativo: Boolean
-  }
+      + ID_usuario: Integer
+      + login: String
+      + senha_hash: String
+      + super_admin: Boolean
+      + ultimo_acesso: Timestamp
+      + ativo: Boolean
+    }
 
   class Condutor {
     + ID_condutor: Integer
@@ -460,8 +462,8 @@ package "Acessos" as Acessos {
   }
 }
 
-Usuario "*" --> "*" Perfil : pertence a >
-Perfil "*" --> "*" Permissao : concede >
+Usuario "*" --> "*" Permissao : possui >
+Perfil "*" --> "*" Permissao : template >
 Usuario "1" --> "*" RegistroAuditoria : realiza >
 Usuario "1" --> "*" MensagemMural : publica >
 
