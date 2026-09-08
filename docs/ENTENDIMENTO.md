@@ -9,14 +9,14 @@
 
 ### 1.1 O Problema
 
-O galpão da Secretaria Municipal de Educação (SME) de Teresópolis, gerido pelo Serviço de Material, controla a distribuição de materiais de higiene, limpeza, papelaria e didáticos para **105 a 108 escolas e creches municipais**.
+O galpão logístico controla a distribuição de materiais de higiene, limpeza, papelaria e didáticos para **105 a 108 escolas e creches municipais**.
 
 Atualmente, o fluxo é manual:
 
-1. **Jonathan** (operador do galpão) conta o estoque **na mão** (papel + Excel) e envia para a Secretaria
-2. A **Secretaria** informa as escolas sobre os produtos disponíveis
-3. As **escolas** fazem suas solicitações (pedidos) e enviam para a Secretaria
-4. A **Secretaria** repassa os pedidos em **papel (físico)** para o Jonathan
+1. **Jonathan** (operador do galpão) conta o estoque **na mão** (papel + Excel) e envia para a administração
+2. A **administração** informa as escolas sobre os produtos disponíveis
+3. As **escolas** fazem suas solicitações (pedidos) e enviam para a administração
+4. A **administração** repassa os pedidos em **papel (físico)** para o Jonathan
 5. Jonathan recebe um "bolo" de pedidos, separa os produtos manualmente e realiza as entregas
 6. O acompanhamento é feito via **Trello** + **fotos no celular** + **planilhas avulsas**
 
@@ -35,12 +35,11 @@ Um sistema web que centraliza:
 
 ### 1.3 Perfis de Usuário
 
-| Perfil | Pessoa | Acesso |
-|--------|--------|--------|
-| **Administrador / Chefe** | Felipe | Completo: config, usuários, auditoria, relatórios gerenciais |
-| **Operador do Galpão** | Jonathan | Recebimento, conferência (leitor código de barras), montagem de remessas, kanban |
-| **Auxiliar Administrativo** | "Menina da Baixa" | Baixa de notas, consumo interno, inventário, documentos fiscais |
-| **Funcionários Cadastrados** | Demais colaboradores | Sem login no sistema (apenas cadastro para alocação em rotas) |
+| Perfil | Pessoa | Acesso | Permissões |
+|--------|--------|--------|------------|
+| **Super Admin** | Felipe | Completo: config, usuários, auditoria, relatórios gerenciais | Flag `super_admin` — burla toda checagem |
+| **Operador do Galpão** | Jonathan | Recebimento, conferência (leitor código de barras), montagem de remessas, kanban | Perfil "Operador" aplicado + individuais |
+| **Auxiliar Administrativo** | "Menina da Baixa" | Baixa de notas, consumo interno, inventário, documentos fiscais | Perfil "Auxiliar" aplicado + individuais |
 
 ### 1.4 Stack Tecnológica
 
@@ -107,7 +106,7 @@ Valores iniciais de nome:
   - EAN12           → código de barras de 12 dígitos
   - EAN13           → código de barras de 13 dígitos
   - COD_FORNECEDOR  → código que o fornecedor usa para o produto
-  - COD_ESCOLA       → código da SME para cada escola
+  - COD_ESCOLA       → código da escola/creche
   - MATRICULA        → matrícula funcional do funcionário
 ```
 
@@ -138,7 +137,7 @@ pessoa_fisica
 pessoa_juridica
 ├── ID_pessoa_juridica  INT PK auto_increment
 ├── razao_social        VARCHAR NOT NULL
-├── cnpj                VARCHAR UNIQUE NULL  ← opcional (prefeitura nem sempre fornece)
+├── cnpj                VARCHAR UNIQUE NULL  ← opcional (nem sempre fornecido)
 └── ativo               BOOLEAN DEFAULT TRUE
 ```
 
@@ -536,7 +535,7 @@ Regras:
 
 #### 3.11.0 Pedido da Escola (Solicitação)
 
-Representa o pedido que chega em **papel** da Secretaria e é registrado no sistema. Ainda não reserva estoque — é apenas a solicitação.
+Representa o pedido que chega em **papel** da administração e é registrado no sistema. Ainda não reserva estoque — é apenas a solicitação.
 
 ```
 pedido_escola
@@ -780,7 +779,43 @@ anexo
 
 ---
 
-### 3.15 Bloco: Acessos (Perfil, Permissão, Auditoria)
+### 3.15 Bloco: Perfil e Permissões
+
+#### 3.15.1 Permissões (Seed Fixo)
+
+As permissões são **fixas e pré-definidas** no sistema — o administrador não pode criar novas. Cada permissão segue a nomenclatura `entidade.acao` (ex: `produto.criar`, `estoque.ver_saldo`).
+
+```
+permissao
+├── ID_permissao           INT PK auto_increment
+├── nome                   VARCHAR NOT NULL UNIQUE   ← ex: "produto.criar"
+├── descricao              TEXT
+└── ativo                  BOOLEAN DEFAULT TRUE
+```
+
+Permissões do MVP:
+
+| Entidade | Ações CRUD |
+|----------|-----------|
+| `usuario` | criar, alterar, consultar, desativar |
+| `funcionario` | criar, alterar, consultar, desativar |
+| `destinatario` | criar, alterar, consultar, desativar |
+| `fornecedor` | criar, alterar, consultar, desativar |
+| `condutor` | criar, alterar, consultar, desativar |
+| `veiculo` | criar, alterar, consultar, desativar |
+| `produto` | criar, alterar, consultar, desativar |
+| `estoque` | entrada, saida, ver_saldo |
+| `nota_entrada` | criar, alterar, consultar, cancelar |
+| `nota_saida` | criar, alterar, consultar, cancelar |
+| `remessa` | criar, alterar_status, finalizar |
+| `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
+| `relatorio` | gerar |
+| `perfil` | criar, alterar, consultar, desativar |
+| `mural` | criar, alterar, excluir |
+
+#### 3.15.2 Perfil (Template)
+
+Perfil é um **template** de permissões. Pode ser aplicado a um usuário para copiar as permissões do perfil para o usuário. **Não mantém vínculo** entre perfil e usuário após a aplicação.
 
 ```
 perfil
@@ -789,22 +824,75 @@ perfil
 ├── descricao              TEXT
 └── ativo                  BOOLEAN DEFAULT TRUE
 
-permissao
-├── ID_permissao           INT PK auto_increment
-├── nome                   VARCHAR NOT NULL UNIQUE
-├── descricao              TEXT
-└── ativo                  BOOLEAN DEFAULT TRUE
-
-usuario_perfil
-├── ID_usuario             INT FK
-├── ID_perfil              INT FK
-├── PRIMARY KEY (ID_usuario, ID_perfil)
-
-perfil_permissao
+perfil_permissao           ← N:N template → permissões
 ├── ID_perfil              INT FK
 ├── ID_permissao           INT FK
-├── PRIMARY KEY (ID_perfil, ID_permissao)
+└── PRIMARY KEY (ID_perfil, ID_permissao)
 ```
+
+Regras:
+- Perfis podem ser **criados, alterados e excluídos** livremente pelo admin
+- Alterar um perfil **não afeta** usuários que já tiveram o perfil aplicado anteriormente
+- **Não há auditoria** de alterações em perfis
+
+#### 3.15.3 Super Admin
+
+O Super Admin é um usuário especial, não um perfil.
+
+- Criado no **primeiro startup** do sistema — o sistema solicita a criação do funcionário e do usuário admin
+- Possui a flag `super_admin` no registro de `usuario`, invisível na interface
+- **Burla toda checagem de permissão** automaticamente — qualquer middleware de verificação deixa passar
+- Não aparece no menu de configuração de permissões
+- Pode haver **apenas um** usuário Super Admin
+
+```
+usuario (atualizado)
+├── ID_usuario             INT PK auto_increment
+├── ID_funcionario         INT FK UNIQUE NOT NULL
+├── login                  VARCHAR NOT NULL UNIQUE
+├── senha_hash             VARCHAR NOT NULL
+├── super_admin            BOOLEAN DEFAULT FALSE   ← flag invisível, burla permissões
+├── ultimo_acesso          TIMESTAMP NULL
+└── ativo                  BOOLEAN DEFAULT TRUE
+```
+
+#### 3.15.4 Permissões do Usuário Individual
+
+Cada usuário pode ter permissões individuais (concedidas diretamente ou copiadas de um perfil-template).
+
+```
+usuario_permissao
+├── ID_usuario             INT FK
+├── ID_permissao           INT FK
+├── PRIMARY KEY (ID_usuario, ID_permissao)
+```
+
+#### 3.15.5 Fluxo de Aplicação de Template
+
+```
+Admin seleciona perfil "Operador" → clica "Aplicar a João"
+  ↓
+Sistema copia TODAS as permissões do perfil para usuario_permissao do João
+  ↓
+❌ Nenhum vínculo persiste entre João e o perfil
+✅ João ganhou as permissões
+🔧 Admin pode adicionar/remover permissões individuais depois
+```
+
+Regras:
+- Um usuário pode ter permissões de **múltiplos perfis** aplicados (aplicar perfil #1, depois perfil #2 → acumula)
+- Um usuário também pode ter permissões **individuais** adicionadas manualmente
+- Toda alteração em `usuario_permissao` (conceder/remover) é registrada em `registro_auditoria`
+
+#### 3.15.6 Entidades sem Proteção de Permissão
+
+As seguintes entidades **não exigem permissão** para acesso, pois são dados operacionais ou de suporte:
+
+- `conversao_unidade` — livre
+- `tipo_codigo` — livre
+- `rota`, `percurso` — livre
+- `endereco` — vinculado à entidade que o possui
+- `telefone`, `email` — vinculado à entidade que os possui
 
 ---
 

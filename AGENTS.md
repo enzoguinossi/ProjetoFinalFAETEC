@@ -25,6 +25,7 @@ projeto-final-faetec/
 
 - **DB**: snake_case, IDs auto-increment (`ID_entidade`)
 - **TypeScript**: camelCase, interfaces em `shared/types/`
+- **Permissões**: nomenclatura `entidade.acao` (ex: `produto.criar`). Fixas e pré-definidas. Perfis são templates. Super Admin com flag `super_admin` no usuário.
 - **Soft delete**: campo `ativo: Boolean` em toda entidade de cadastro
 - **Hard delete proibido**: nada é excluído fisicamente, apenas desativado
 

@@ -105,6 +105,8 @@ entity "usuario" as usuario {
   * ID_funcionario : INT <<FK, UK>>
   * login : VARCHAR <<UK>>
   * senha_hash : VARCHAR
+  * super_admin : BOOLEAN <<DEF FALSE>>
+  ultimo_acesso : TIMESTAMP
   * ativo : BOOLEAN
 }
 
@@ -587,9 +589,9 @@ entity "permissao" as permissao {
   * ativo : BOOLEAN
 }
 
-entity "usuario_perfil" as user_perfil {
+entity "usuario_permissao" as usuario_permissao {
   * ID_usuario : INT <<PK, FK>>
-  * ID_perfil : INT <<PK, FK>>
+  * ID_permissao : INT <<PK, FK>>
 }
 
 entity "perfil_permissao" as perfil_perm {
@@ -719,8 +721,8 @@ conv ||--o{ item_nota_entrada
 remessa ||--o{ anexo
 
 ' Acessos / Auditoria
-usuario ||--o{ user_perfil
-perfil ||--o{ user_perfil
+usuario ||--o{ usuario_permissao
+permissao ||--o{ usuario_permissao
 perfil ||--o{ perfil_perm
 permissao ||--o{ perfil_perm
 usuario ||--o{ auditoria

@@ -1,6 +1,6 @@
 # Projeto Final FAETEC — Nexus
 
-Sistema de Controle de Estoque e Logística de Remessas para o galpão da Secretaria Municipal de Educação (SME) de Teresópolis.
+Sistema de Controle de Estoque e Logística de Remessas para um galpão logístico.
 
 ## Stack
 
