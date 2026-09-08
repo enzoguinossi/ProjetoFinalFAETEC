@@ -331,13 +331,10 @@ estoque (saldo real — controle de quantidade)
 ├── ID_estoque            INT PK auto_increment
 ├── ID_produto            INT FK NOT NULL
 ├── quantidade_atual      DECIMAL NOT NULL          ← saldo físico real no galpão
-├── saldo_reservado       DECIMAL NOT NULL DEFAULT 0 ← comprometido em notas abertas
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
-```
 
-**Cálculo importante (não armazenado, calculado em tempo real):**
-
+**Cálculo do saldo disponível (não armazenado, calculado em tempo real):**
 ```
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
@@ -352,11 +349,10 @@ Regras:
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
-| Entrada de mercadoria | Cria/atualiza `estoque` | `quantidade_atual += X` |
-| Cria Nota Saída | Reserva | `saldo_reservado += X` |
-| Cancelamento de Nota | Libera reserva | `saldo_reservado -= X` |
-| Remessa finalizada (total/parcial) | Baixa definitiva | `quantidade_atual -= X` E `saldo_reservado -= X` |
-| Remessa pendente | Reserva permanece | Aguarda nova tentativa |
+| Entrada de mercadoria | Cria `movimentacao_estoque` ENTRADA | `quantidade_atual += X` |
+| Cria Nota Saída | Cria `reserva_estoque` | `saldo_reservado += X` |
+| Cancelamento de Nota | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
+| Remessa finalizada (total/parcial) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
 | Desmontagem de composto | Baixa pai + entrada filhos | Vide 3.6.2 |
 | Ajuste de inventário | Acerto manual | `quantidade_atual = novo_valor` |
 
@@ -374,10 +370,8 @@ movimentacao_estoque
 ├── quantidade            DECIMAL NOT NULL         ← positivo = entrada, negativo = saída
 ├── saldo_anterior        DECIMAL                  ← snapshot do quantidade_atual antes
 ├── saldo_posterior       DECIMAL                  ← snapshot do quantidade_atual depois
-├── reserva_anterior      DECIMAL                  ← snapshot do saldo_reservado antes
-├── reserva_posterior     DECIMAL                  ← snapshot do saldo_reservado depois
 ├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
-├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída
+├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída (apenas baixas reais)
 ├── ID_remessa            INT FK NULL              ← veio de uma remessa
 ├── data_hora             TIMESTAMP NOT NULL
 └── observacao            TEXT
@@ -390,18 +384,38 @@ movimentacao_estoque
 | `ID_nota_entrada` + nota_entrada.tipo = 'ENTRADA' | Entrada de mercadoria |
 | `ID_nota_entrada` + nota_entrada.tipo = 'DESMONTAGEM' | Entrada de insumos |
 | `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + `ID_remessa` | Saída por entrega |
-| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + sem `ID_remessa` com qtd > 0 | Reserva |
-| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + sem `ID_remessa` com qtd < 0 | Liberação de reserva |
 | `ID_nota_saida` + nota_saida.tipo = 'CONSUMO_INTERNO' | Baixa por consumo |
 | `ID_nota_saida` + nota_saida.tipo = 'AVARIA' | Baixa por avaria |
 | `ID_nota_saida` + nota_saida.tipo = 'DESMONTAGEM' | Baixa do produto composto |
 | Nenhuma (apenas dados anteriores/posteriores diferentes) | Ajuste de inventário |
 
-#### 3.8.1 Correção de Notas (Regra de Editabilidade)
+#### 3.8.1 Reserva de Estoque (Auditoria Contábil)
+
+Registra cada alteração no `saldo_reservado` do estoque — reservas e liberações.
+
+```
+reserva_estoque
+├── ID_reserva_estoque     INT PK auto_increment
+├── ID_estoque             INT FK NOT NULL
+├── ID_nota_saida          INT FK NOT NULL
+├── ID_usuario             INT FK NOT NULL
+├── quantidade             DECIMAL NOT NULL         ← positiva = reservou, negativa = liberou
+├── saldo_anterior         DECIMAL                  ← snapshot do saldo_reservado antes
+├── saldo_posterior        DECIMAL                  ← snapshot do saldo_reservado depois
+├── data_hora              TIMESTAMP NOT NULL
+└── observacao             TEXT
+```
+
+Regras:
+- **Reservar:** cria nota saída → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
+- **Liberar:** cancela nota ou remessa finalizada → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`
+- A consulta de saldo disponível usa `saldo_disponivel = quantidade_atual - saldo_reservado` (`saldo_reservado` está no `estoque`, atualizado em tempo real)
+- A `reserva_estoque` é a trilha de auditoria para conferência posterior
+
+#### 3.8.2 Correção de Notas (Regra de Editabilidade)
 
 Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e uma `movimentacao_estoque` corretiva.
 
-**Fluxo de correção de Nota Entrada:**
 ```
 Usuário edita item_nota_entrada.quantidade de 10 para 15
   ↓
@@ -409,7 +423,7 @@ Usuário edita item_nota_entrada.quantidade de 10 para 15
      dados_anteriores: {quantidade: 10},
      dados_novos: {quantidade: 15} }
   ↓
-2. movimentacao_estoque: { tipo: CORRECAO_ENTRADA,
+2. movimentacao_estoque: {
      ID_nota_entrada, ID_estoque,
      quantidade: +5,
      saldo_anterior: 10, saldo_posterior: 15 }
@@ -423,19 +437,19 @@ Usuário edita item_nota_saida.qtd_esperada de 20 para 15
   ↓
 1. registro_auditoria captura antes/depois
   ↓
-2. movimentacao_estoque: { tipo: CORRECAO_SAIDA,
+2. reserva_estoque: {
      ID_nota_saida, ID_estoque,
      quantidade: -5,
-     saldo_reservado_anterior: 20, saldo_reservado_posterior: 15 }
+     saldo_anterior: 20, saldo_posterior: 15 }
   ↓
 3. estoque.saldo_reservado -= 5
 ```
 
 Regras:
 - `registro_auditoria` sempre captura snapshots antes/depois em JSON
-- `movimentacao_estoque` calcula a diferença e aplica ao saldo automaticamente
+- Correção em nota de entrada: gera `movimentacao_estoque` (altera `quantidade_atual`)
+- Correção em nota de saída: gera `reserva_estoque` (altera `saldo_reservado`)
 - Se o item editado já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
-- Itens com `qtd_entregue > 0` não podem ter `qtd_esperada` reduzida para menos do que já foi entregue
 
 ---
 
