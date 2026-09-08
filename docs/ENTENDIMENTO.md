@@ -874,14 +874,14 @@ Admin seleciona perfil "Operador" → clica "Aplicar a João"
   ↓
 Sistema copia TODAS as permissões do perfil para usuario_permissao do João
   ↓
-❌ Nenhum vínculo persiste entre João e o perfil
-✅ João ganhou as permissões
+Se João já tinha permissões anteriores, elas são SUBSTITUÍDAS
+✅ João agora tem exatamente as permissões do perfil "Operador"
 🔧 Admin pode adicionar/remover permissões individuais depois
 ```
 
 Regras:
-- Um usuário pode ter permissões de **múltiplos perfis** aplicados (aplicar perfil #1, depois perfil #2 → acumula)
-- Um usuário também pode ter permissões **individuais** adicionadas manualmente
+- Aplicar um perfil **substitui completamente** as permissões atuais do usuário
+- Após aplicar o perfil, o admin pode **adicionar ou remover** permissões individuais manualmente
 - Toda alteração em `usuario_permissao` (conceder/remover) é registrada em `registro_auditoria`
 
 #### 3.15.6 Entidades sem Proteção de Permissão
