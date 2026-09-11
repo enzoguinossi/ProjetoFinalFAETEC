@@ -435,13 +435,14 @@ package "Acessos" as Acessos {
   }
 
   class MensagemMural {
-    + ID_mensagem_mural: Integer
-    + titulo: String
-    + conteudo: Text
-    + data_publicacao: Timestamp
-    + data_expiracao: Timestamp
-    + ativo: Boolean
-  }
+      + ID_mensagem_mural: Integer
+      + titulo: String
+      + conteudo: Text
+      + data_publicacao: Timestamp
+      + data_expiracao: Timestamp
+      + automatica: Boolean
+      + ativo: Boolean
+    }
 }
 
 Usuario "*" --> "*" Permissao : possui >

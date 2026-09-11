@@ -47,6 +47,6 @@
 
 | ID | Título | Descrição | Prioridade |
 |----|--------|-----------|------------|
-| RF023 | Relatórios de Movimentação | O sistema deve gerar relatórios periódicos (diários, mensais e consolidados semestrais) com filtros por período, produto, escola, motorista e veículo. | Essencial |
+| RF023 | Relatórios de Movimentação | O sistema deve gerar relatórios periódicos (diários, mensais e consolidados semestrais) com filtros por período, produto, escola, motorista e veículo. Deve incluir uma listagem simplificada de todos os produtos com descrição e foto. Formatos: PDF e CSV/XLSX. | Essencial |
 | RF024 | Exportação de Dados | O sistema deve permitir a visualização e exportação de relatórios em formato de planilha para conferência. | Importante |
 | RF025 | Importação de NF-e (XML) | O sistema deve oferecer suporte ao pré-cadastro e entrada automatizada de produtos por meio da leitura do arquivo XML da Nota Fiscal Eletrônica. | Desejável |
