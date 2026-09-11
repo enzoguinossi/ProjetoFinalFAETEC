@@ -37,7 +37,7 @@
 |----|--------|-----------|------------|
 | RF017a | Nota de Entrada | O sistema deve permitir o registro de entrada de mercadorias com ou sem chave de acesso NF-e vinculada. Fornecedor opcional. Itens com conversão de unidade. Ao confirmar, aumenta o campo quantidade_atual do estoque. Não cria lote automaticamente. | Essencial |
 | RF017b | Nota de Saída | O sistema deve permitir que o operador transcreva pedidos recebidos em papel para o sistema, gerando uma nota de saída que reserva o estoque. Ao criar, saldo_reservado é incrementado. | Essencial |
-| RF018 | Quadro Kanban de Remessas | O sistema deve gerenciar visualmente o fluxo das entregas pelos status: EM_PREPARACAO, PRONTO_PARA_ENTREGA, EM_PERCURSO, PENDENTE, FINALIZADO_TOTAL e FINALIZADO_PARCIAL. | Essencial |
+| RF018 | Quadro Kanban de Remessas | O sistema deve gerenciar visualmente o fluxo das entregas pelos status: EM_PREPARACAO, PRONTO_PARA_ENTREGA, EM_PERCURSO, PENDENTE, FINALIZADO_TOTAL e FINALIZADO_PARCIAL. | Importante |
 | RF019 | Assistente de Remessa | O sistema deve validar saldo disponível (quantidade_atual - saldo_reservado) antes de liberar uma remessa. | Essencial |
 | RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à remessa. | Essencial |
 | RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que remessas não entregues (PENDENTE) sejam adicionadas em uma nova rota. Retiradas diretas de urgência no galpão devem ser registradas como remessa com flag de urgente. Dando uma baixa parcial na remessa. | Essencial |

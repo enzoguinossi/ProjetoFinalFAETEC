@@ -1,0 +1,665 @@
+@startuml
+skinparam linetype ortho
+hide circle
+skinparam shadowing false
+skinparam entity {
+  BackgroundColor White
+  BorderColor Black
+}
+
+' =========================================================
+' CODIGOS PERSONALIZADOS
+' =========================================================
+
+entity "tipo_codigo" as tipo_codigo {
+  * ID_tipo_codigo : INT <<PK>>
+  --
+  * nome : VARCHAR <<UK>>
+  descricao : VARCHAR
+  * ativo : BOOLEAN
+}
+
+entity "produto_codigo" as produto_codigo {
+  * ID_produto_codigo : INT <<PK>>
+  --
+  * ID_produto : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+entity "destinatario_codigo" as dest_codigo {
+  * ID_destinatario_codigo : INT <<PK>>
+  --
+  * ID_destinatario : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+entity "fornecedor_codigo" as forn_codigo {
+  * ID_fornecedor_codigo : INT <<PK>>
+  --
+  * ID_fornecedor : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+entity "funcionario_codigo" as func_codigo {
+  * ID_funcionario_codigo : INT <<PK>>
+  --
+  * ID_funcionario : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+entity "condutor_codigo" as cond_codigo {
+  * ID_condutor_codigo : INT <<PK>>
+  --
+  * ID_condutor : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+entity "veiculo_codigo" as veic_codigo {
+  * ID_veiculo_codigo : INT <<PK>>
+  --
+  * ID_veiculo : INT <<FK>>
+  * ID_tipo_codigo : INT <<FK>>
+  * codigo : VARCHAR <<UK>>
+}
+
+' =========================================================
+' PESSOAS
+' =========================================================
+
+entity "pessoa_fisica" as pf {
+  * ID_pessoa_fisica : INT <<PK>>
+  --
+  * nome : VARCHAR
+  cpf : VARCHAR <<UK>>
+  * ativo : BOOLEAN
+}
+
+entity "pessoa_juridica" as pj {
+  * ID_pessoa_juridica : INT <<PK>>
+  --
+  * razao_social : VARCHAR
+  cnpj : VARCHAR <<UK>>
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' FUNCIONARIOS / USUARIOS / CONDUTORES
+' =========================================================
+
+entity "funcionario" as funcionario {
+  * ID_funcionario : INT <<PK>>
+  --
+  * ID_pessoa_fisica : INT <<FK, UK>>
+  cargo : VARCHAR
+  * ativo : BOOLEAN
+}
+
+entity "usuario" as usuario {
+  * ID_usuario : INT <<PK>>
+  --
+  * ID_funcionario : INT <<FK, UK>>
+  * login : VARCHAR <<UK>>
+  * senha_hash : VARCHAR
+  * ativo : BOOLEAN
+}
+
+entity "condutor" as condutor {
+  * ID_condutor : INT <<PK>>
+  --
+  * ID_funcionario : INT <<FK, UK>>
+  numero_cnh : VARCHAR
+  categoria_cnh : VARCHAR
+  validade_cnh : DATE
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' ENUMS
+' =========================================================
+
+enum TipoDestinatario {
+  ESCOLA
+  CRECHE
+}
+
+enum TipoTelefone {
+  CELULAR
+  FIXO
+  COMERCIAL
+}
+
+enum StatusInventario {
+  ABERTO
+  EM_CONTAGEM
+  FINALIZADO
+}
+
+enum StatusNotaSaida {
+  ABERTA
+  EM_PREPARACAO
+  FINALIZADA
+  CANCELADA
+}
+
+enum StatusRemessa {
+  EM_PREPARACAO
+  PRONTO_PARA_ENTREGA
+  EM_PERCURSO
+  PENDENTE
+  FINALIZADO_TOTAL
+  FINALIZADO_PARCIAL
+}
+
+enum TipoMovimentacao {
+  ENTRADA
+  SAIDA
+  RESERVA
+  LIBERACAO_RESERVA
+  AJUSTE_INVENTARIO
+  CONSUMO_INTERNO
+  AVARIA
+  DESMONTAGEM
+}
+
+enum TipoDocumento {
+  NOTA_ENTRADA
+  NOTA_SAIDA
+}
+
+enum StatusVeiculo {
+  DISPONIVEL
+  INDISPONIVEL
+  EM_ROTA
+}
+
+' =========================================================
+' FORNECEDORES / DESTINATARIOS
+' =========================================================
+
+entity "fornecedor" as fornecedor {
+  * ID_fornecedor : INT <<PK>>
+  --
+  * ID_pessoa_juridica : INT <<FK, UK>>
+  contato : VARCHAR
+  ID_endereco : INT <<FK>>
+  * ativo : BOOLEAN
+}
+
+entity "destinatario" as destinatario {
+  * ID_destinatario : INT <<PK>>
+  --
+  * ID_pessoa_juridica : INT <<FK, UK>>
+  * tipo_destinatario : TipoDestinatario
+  * ID_endereco : INT <<FK>>
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' ENDERECO
+' =========================================================
+
+entity "endereco" as endereco {
+  * ID_endereco : INT <<PK>>
+  --
+  * logradouro : VARCHAR
+  numero : VARCHAR
+  complemento : VARCHAR
+  bairro : VARCHAR
+  * cidade : VARCHAR
+  cep : VARCHAR
+  latitude : DECIMAL
+  longitude : DECIMAL
+}
+
+' =========================================================
+' CONTATO
+' =========================================================
+
+entity "funcionario_telefone" as func_tel {
+  * ID_funcionario_telefone : INT <<PK>>
+  --
+  * ID_funcionario : INT <<FK>>
+  * numero : VARCHAR <<UK>>
+  * tipo : TipoTelefone
+  principal : BOOLEAN
+  * ativo : BOOLEAN
+}
+
+entity "destinatario_telefone" as dest_tel {
+  * ID_destinatario_telefone : INT <<PK>>
+  --
+  * ID_destinatario : INT <<FK>>
+  * numero : VARCHAR <<UK>>
+  * tipo : TipoTelefone
+  principal : BOOLEAN
+  * ativo : BOOLEAN
+}
+
+entity "fornecedor_telefone" as forn_tel {
+  * ID_fornecedor_telefone : INT <<PK>>
+  --
+  * ID_fornecedor : INT <<FK>>
+  * numero : VARCHAR <<UK>>
+  * tipo : TipoTelefone
+  principal : BOOLEAN
+  * ativo : BOOLEAN
+}
+
+entity "funcionario_email" as func_email {
+  * ID_funcionario_email : INT <<PK>>
+  --
+  * ID_funcionario : INT <<FK>>
+  * endereco : VARCHAR <<UK>>
+  principal : BOOLEAN
+}
+
+entity "destinatario_email" as dest_email {
+  * ID_destinatario_email : INT <<PK>>
+  --
+  * ID_destinatario : INT <<FK>>
+  * endereco : VARCHAR <<UK>>
+  principal : BOOLEAN
+}
+
+entity "fornecedor_email" as forn_email {
+  * ID_fornecedor_email : INT <<PK>>
+  --
+  * ID_fornecedor : INT <<FK>>
+  * endereco : VARCHAR <<UK>>
+  principal : BOOLEAN
+}
+
+' =========================================================
+' PRODUTOS E CONVERSAO
+' =========================================================
+
+entity "conversao_unidade" as conv {
+  * ID_conversao : INT <<PK>>
+  --
+  * nome : VARCHAR <<UK>>
+  * fator : DECIMAL
+  descricao : VARCHAR
+  * ativo : BOOLEAN
+}
+
+entity "produto" as produto {
+  * ID_produto : INT <<PK>>
+  --
+  * descricao : VARCHAR
+  foto_url : VARCHAR
+  * perecivel : BOOLEAN
+  * composto : BOOLEAN
+  ID_conversao_padrao : INT <<FK>>
+  * ativo : BOOLEAN
+}
+
+entity "produto_insumo" as insumo {
+  * ID_produto_insumo : INT <<PK>>
+  --
+  * ID_produto_pai : INT <<FK>>
+  * ID_produto_filho : INT <<FK>>
+  * quantidade : DECIMAL
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' LOTE / ESTOQUE
+' =========================================================
+
+entity "lote_produto" as lote {
+  * ID_lote_produto : INT <<PK>>
+  --
+  * ID_produto : INT <<FK>>
+  codigo_lote : VARCHAR
+  * quantidade_atual : DECIMAL
+  * saldo_reservado : DECIMAL
+  quantidade_minima : DECIMAL
+  quantidade_maxima : DECIMAL
+  quantidade_critica : DECIMAL
+  data_validade : DATE
+  * data_entrada : DATE
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' MOVIMENTACAO DE ESTOQUE
+' =========================================================
+
+entity "movimentacao_estoque" as mov {
+  * ID_movimentacao : INT <<PK>>
+  --
+  * ID_lote_produto : INT <<FK>>
+  * ID_usuario : INT <<FK>>
+  * tipo : TipoMovimentacao
+  * quantidade : DECIMAL
+  saldo_anterior : DECIMAL
+  saldo_posterior : DECIMAL
+  reserva_anterior : DECIMAL
+  reserva_posterior : DECIMAL
+  ID_nota_saida : INT <<FK>>
+  ID_remessa : INT <<FK>>
+  * data_hora : TIMESTAMP
+  observacao : TEXT
+}
+
+' =========================================================
+' INVENTARIO
+' =========================================================
+
+entity "inventario" as inventario {
+  * ID_inventario : INT <<PK>>
+  --
+  * data_inicio : DATE
+  data_fim : DATE
+  * status : StatusInventario
+  observacao : TEXT
+}
+
+entity "item_inventario" as item_inv {
+  * ID_item_inventario : INT <<PK>>
+  --
+  * ID_inventario : INT <<FK>>
+  * ID_lote_produto : INT <<FK>>
+  * quantidade_sistema : DECIMAL
+  * quantidade_contada : DECIMAL
+  * diferenca : DECIMAL
+  observacao : TEXT
+}
+
+' =========================================================
+' NOTA SAIDA
+' =========================================================
+
+entity "nota_saida" as nota {
+  * ID_nota_saida : INT <<PK>>
+  --
+  * ID_destinatario : INT <<FK>>
+  * data_criacao : TIMESTAMP
+  * status : StatusNotaSaida
+  observacao : TEXT
+}
+
+entity "item_nota_saida" as item_nota {
+  * ID_item_nota_saida : INT <<PK>>
+  --
+  * ID_nota_saida : INT <<FK>>
+  * ID_lote_produto : INT <<FK>>
+  * quantidade : DECIMAL
+}
+
+' =========================================================
+' REMESSA
+' =========================================================
+
+entity "remessa" as remessa {
+  * ID_remessa : INT <<PK>>
+  --
+  * ID_nota_saida : INT <<FK>>
+  * ID_destinatario : INT <<FK>>
+  * data_criacao : TIMESTAMP
+  * status : StatusRemessa
+  ID_condutor : INT <<FK>>
+  ID_veiculo : INT <<FK>>
+  * urgente : BOOLEAN
+  observacao : TEXT
+}
+
+entity "item_remessa" as item_rem {
+  * ID_item_remessa : INT <<PK>>
+  --
+  * ID_remessa : INT <<FK>>
+  * ID_lote_produto : INT <<FK>>
+  * quantidade_solicitada : DECIMAL
+  quantidade_separada : DECIMAL
+  quantidade_entregue : DECIMAL
+}
+
+' =========================================================
+' PERCURSO / ROTA
+' =========================================================
+
+entity "percurso" as percurso {
+  * ID_percurso : INT <<PK>>
+  --
+  * nome : VARCHAR
+  descricao : TEXT
+  * ativo : BOOLEAN
+}
+
+entity "percurso_destinatario" as perc_dest {
+  * ID_percurso : INT <<PK, FK>>
+  * ID_destinatario : INT <<PK, FK>>
+  --
+  * ordem_visita : INT
+}
+
+entity "rota" as rota {
+  * ID_rota : INT <<PK>>
+  --
+  * data_criacao : TIMESTAMP
+  data_prevista : DATE
+  ID_percurso : INT <<FK>>
+  observacao : TEXT
+  * ativo : BOOLEAN
+}
+
+entity "rota_remessa" as rota_rem {
+  * ID_rota_remessa : INT <<PK>>
+  --
+  * ID_rota : INT <<FK>>
+  * ID_remessa : INT <<FK>>
+  * ordem_visita : INT
+  * data_adicao : TIMESTAMP
+}
+
+' =========================================================
+' VEICULO
+' =========================================================
+
+entity "veiculo" as veiculo {
+  * ID_veiculo : INT <<PK>>
+  --
+  * placa : VARCHAR <<UK>>
+  modelo : VARCHAR
+  capacidade : DECIMAL
+  * status : StatusVeiculo
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' DOCUMENTO FISCAL
+' =========================================================
+
+entity "documento_fiscal" as doc {
+  * ID_documento_fiscal : INT <<PK>>
+  --
+  ID_fornecedor : INT <<FK>>
+  * tipo : TipoDocumento
+  numero : VARCHAR
+  data_emissao : DATE
+  data_recebimento : DATE
+  arquivo_url : VARCHAR
+  observacao : TEXT
+  * ativo : BOOLEAN
+}
+
+entity "item_documento" as item_doc {
+  * ID_item_documento : INT <<PK>>
+  --
+  * ID_documento_fiscal : INT <<FK>>
+  * ID_produto : INT <<FK>>
+  ID_conversao : INT <<FK>>
+  * quantidade : DECIMAL
+  * quantidade_convertida : DECIMAL
+  observacao : TEXT
+}
+
+' =========================================================
+' ANEXOS
+' =========================================================
+
+entity "anexo" as anexo {
+  * ID_anexo : INT <<PK>>
+  --
+  * nome_arquivo : VARCHAR
+  * url : VARCHAR
+  tipo_mime : VARCHAR
+  * data_upload : TIMESTAMP
+  ID_remessa : INT <<FK>>
+  ID_documento_fiscal : INT <<FK>>
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' ACESSOS
+' =========================================================
+
+entity "perfil" as perfil {
+  * ID_perfil : INT <<PK>>
+  --
+  * nome : VARCHAR <<UK>>
+  descricao : TEXT
+  * ativo : BOOLEAN
+}
+
+entity "permissao" as permissao {
+  * ID_permissao : INT <<PK>>
+  --
+  * nome : VARCHAR <<UK>>
+  descricao : TEXT
+  * ativo : BOOLEAN
+}
+
+entity "usuario_perfil" as user_perfil {
+  * ID_usuario : INT <<PK, FK>>
+  * ID_perfil : INT <<PK, FK>>
+}
+
+entity "perfil_permissao" as perfil_perm {
+  * ID_perfil : INT <<PK, FK>>
+  * ID_permissao : INT <<PK, FK>>
+}
+
+' =========================================================
+' AUDITORIA
+' =========================================================
+
+entity "registro_auditoria" as auditoria {
+  * ID_registro_auditoria : INT <<PK>>
+  --
+  * ID_usuario : INT <<FK>>
+  * data_hora : TIMESTAMP
+  * acao : VARCHAR
+  * entidade : VARCHAR
+  ID_entidade_afetada : INT
+  dados_anteriores : JSON
+  dados_novos : JSON
+}
+
+' =========================================================
+' MURAL
+' =========================================================
+
+entity "mensagem_mural" as mural {
+  * ID_mensagem_mural : INT <<PK>>
+  --
+  * ID_usuario : INT <<FK>>
+  titulo : VARCHAR
+  * conteudo : TEXT
+  * data_publicacao : TIMESTAMP
+  data_expiracao : TIMESTAMP
+  * ativo : BOOLEAN
+}
+
+' =========================================================
+' RELACIONAMENTOS
+' =========================================================
+
+' Codigos
+tipo_codigo ||--o{ produto_codigo
+tipo_codigo ||--o{ dest_codigo
+tipo_codigo ||--o{ forn_codigo
+tipo_codigo ||--o{ func_codigo
+tipo_codigo ||--o{ cond_codigo
+tipo_codigo ||--o{ veic_codigo
+
+produto ||--o{ produto_codigo
+destinatario ||--o{ dest_codigo
+fornecedor ||--o{ forn_codigo
+funcionario ||--o{ func_codigo
+condutor ||--o{ cond_codigo
+veiculo ||--o{ veic_codigo
+
+' Pessoas
+pf ||--|| funcionario
+funcionario ||--o| usuario
+funcionario ||--o| condutor
+
+pj ||--|| fornecedor
+pj ||--|| destinatario
+
+' Endereco
+endereco ||--|| destinatario
+endereco ||--o| fornecedor
+
+' Contato
+funcionario ||--o{ func_tel
+funcionario ||--o{ func_email
+destinatario ||--o{ dest_tel
+destinatario ||--o{ dest_email
+fornecedor ||--o{ forn_tel
+fornecedor ||--o{ forn_email
+
+' Produto / Estoque
+conv ||--o{ produto
+produto ||--o{ lote
+produto ||--o{ insumo
+produto ||--o{ item_doc
+lote ||--o{ item_nota
+lote ||--o{ item_rem
+lote ||--o{ mov
+lote ||--o{ item_inv
+
+' Insumo auto-relacionamento
+insumo "0..*" --> "1" produto : "pai"
+insumo "0..*" --> "1" produto : "filho"
+
+' Nota Saida / Remessa
+destinatario ||--o{ nota
+nota ||--|{ item_nota
+nota ||--o{ remessa
+remessa ||--|{ item_rem
+condutor ||--o{ remessa
+veiculo ||--o{ remessa
+
+' Percurso / Rota
+percurso ||--|{ perc_dest
+destinatario ||--o{ perc_dest
+percurso ||--o{ rota
+rota ||--o{ rota_rem
+remessa ||--o{ rota_rem
+
+' Documento Fiscal
+fornecedor ||--o{ doc
+doc ||--|{ item_doc
+conv ||--o{ item_doc
+
+' Anexos
+remessa ||--o{ anexo
+doc ||--o{ anexo
+
+' Acessos / Auditoria
+usuario ||--o{ user_perfil
+perfil ||--o{ user_perfil
+perfil ||--o{ perfil_perm
+permissao ||--o{ perfil_perm
+usuario ||--o{ auditoria
+usuario ||--o{ mov
+usuario ||--o{ mural
+
+@enduml
