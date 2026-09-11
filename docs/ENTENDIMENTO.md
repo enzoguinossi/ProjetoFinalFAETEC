@@ -334,8 +334,7 @@ estoque (saldo real — controle de quantidade)
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 
-**Cálculo do saldo disponível (não armazenado, calculado em tempo real):**
-```
+*Cálculo do saldo disponível:*
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
 
