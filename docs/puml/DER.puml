@@ -632,6 +632,7 @@ entity "mensagem_mural" as mural {
   * conteudo : TEXT
   * data_publicacao : TIMESTAMP
   data_expiracao : TIMESTAMP
+  * automatica : BOOLEAN
   * ativo : BOOLEAN
 }
 

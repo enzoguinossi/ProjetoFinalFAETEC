@@ -940,32 +940,39 @@ Regra crítica:
 
 ### 3.17 Bloco: Mural de Mensagens
 
+Área de avisos na tela inicial. Pode conter mensagens **automáticas** (alertas do sistema) e **manuais** (publicadas por usuários com permissão).
+
 ```
 mensagem_mural
 ├── ID_mensagem_mural      INT PK auto_increment
-├── ID_usuario             INT FK NOT NULL    ← quem publicou
+├── ID_usuario             INT FK NOT NULL    ← quem publicou (NULL se automática do sistema?)
 ├── titulo                 VARCHAR
 ├── conteudo               TEXT NOT NULL
 ├── data_publicacao        TIMESTAMP NOT NULL
 ├── data_expiracao         TIMESTAMP NULL
+├── automatica             BOOLEAN DEFAULT FALSE  ← TRUE = gerado pelo sistema
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
----
+Regras:
+- Mensagens automáticas: geradas por **triggers/rotinas de análise**, como alertas de validade (RN002)
+- Mensagens manuais: exigem permissão `mural.criar`
+- A lógica de geração automática deve ser reutilizável para futuros alertas
+- A data de expiração controla quando a mensagem some do mural
 
-### 3.18 Bloco: Relatórios (Conceitual)
+### 3.18 Bloco: Relatórios (Consultas)
 
-Não é uma tabela — é uma funcionalidade de consulta. Os relatórios previstos:
+Não é uma tabela — é funcionalidade de consulta e exportação.
 
-| Relatório | Filtros |
-|-----------|---------|
-| Movimentação de Estoque | Período, produto, tipo de movimentação |
-| Expedições por Período | Data, rota, destinatário, condutor |
-| Entregas por Instituição | Destinatário, período, status |
-| Produtos Próximos ao Vencimento | Dias para vencer, lote |
-| Níveis de Estoque (mínimo/crítico) | Produto, localização |
-| Auditoria | Usuário, período, entidade, ação |
-| Consolidado Semestral | Movimentações agregadas (6 em 6 meses) |
+| Relatório | Filtros | Formato |
+|-----------|---------|---------|
+| Movimentação de Estoque | Período, produto, tipo de movimentação | PDF, CSV/XLSX |
+| Expedições por Período | Data, rota, destinatário, condutor | PDF, CSV/XLSX |
+| Entregas por Instituição | Destinatário, período, status | PDF, CSV/XLSX |
+| Produtos Próximos ao Vencimento | Dias para vencer | PDF |
+| **Listagem Simplificada de Produtos** | — | PDF, CSV/XLSX |
+| Auditoria | Usuário, período, entidade, ação | CSV/XLSX |
+| Consolidado Semestral | Movimentações agregadas (6 em 6 meses) | PDF, CSV/XLSX |
 
 ---
 
