@@ -1,0 +1,91 @@
+@startuml
+skinparam activityDiamondBackgroundColor White
+skinparam activityBorderColor Black
+skinparam shadowing false
+left to right direction
+title Fluxo Atual — Operação do Galpão (AS-IS)
+
+' =========================================================
+' MAPEAMENTO (cadastro de escolas)
+' =========================================================
+start
+:Recebimento de documentação física em papel da administração;
+
+:Contagem e conferência manual dos produtos;
+
+:Registro fotográfico da conferência;
+
+:Anexação das fotos no Trello;
+
+:Validação da conferência;
+
+:Mapeamento da demanda de entregas
+(identificação da lista de 105 a 108 escolas);
+
+:Levantamento e validação dos endereços
+(busca e confirmação da localização);
+
+:Consolidação da base de dados
+(cadastro de endereços);
+
+' =========================================================
+' SOLICITAÇÃO E PREPARAÇÃO
+' =========================================================
+:Solicitação/autorização do transporte;
+
+:Disponibilização da demanda/item ao motorista;
+
+:Recebimento de instrução e início do percurso;
+
+:Execução da rota pré-determinada;
+
+' =========================================================
+' ENTREGA
+' =========================================================
+:Conclusão do transporte no destino;
+
+' =========================================================
+' ATRASO / PENDÊNCIA
+' =========================================================
+if (Entrega realizada com sucesso?) then (sim)
+  :Finalização normal;
+else (não)
+  :Identificação de entregas não realizadas
+  (ao fim do expediente);
+
+  :Conferência das notas fiscais do dia anterior
+  (Jonathan analisa os registros no Trello);
+
+  :Registro das pendências no Trello
+  (equipe adiciona itens não entregues);
+
+  :Transição para o expediente seguinte;
+endif
+
+' =========================================================
+' RETIRADA DE URGÊNCIA
+' =========================================================
+:Identificação de demanda urgente;
+
+:Conferência da nota fiscal pronta;
+
+:Retirada direta do material no galpão
+(pelo solicitante);
+
+:Atualização do status no Trello;
+
+' =========================================================
+' RELATÓRIO SEMESTRAL
+' =========================================================
+:Recebimento de documentação física;
+
+:Processamento e registro manual de dados
+(sem sistema digital);
+
+:Elaboração e consolidação do relatório semestral
+(Jonathan compila o histórico de 6 meses);
+
+:Arquivamento e fechamento do período;
+
+stop
+@enduml
