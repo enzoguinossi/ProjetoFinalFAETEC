@@ -2,37 +2,85 @@
 skinparam shadowing false
 title Fluxo Atual - Operacao do Galpao (AS-IS)
 
+|Jonathan|
 start
+:Mapeamento das escolas
+(105 a 108 escolas no Trello);
 
-:Mapeamento das escolas;
-:Contagem e conferencia manual dos produtos;
-:Registro fotografico da conferencia;
+:Contagem e conferencia manual
+dos produtos;
+
+:Registro fotografico da
+conferencia (celular);
+
+|Jonathan|
 :Anexacao das fotos no Trello;
+
 :Validacao da conferencia;
+
 :Solicitacao do transporte;
 
 if (Rota definida?) then (sim)
-  :Disponibilizacao da demanda ao motorista;
+
+  |Motorista|
+  :Disponibilizacao da demanda
+  ao motorista;
+
   :Inicio do percurso;
-  :Execucao da rota pre-determinada;
+
+  :Execucao da rota
+  pre-determinada;
+
   :Conclusao do transporte;
-  
-  if (Entrega realizada?) then (sim)
+
+  if (Entrega realizada com
+  sucesso?) then (sim)
+    |Jonathan|
     :Finalizacao normal;
   else (nao)
-    :Identificacao de entregas nao realizadas;
-    :Conferencia das notas fiscais do dia anterior;
-    :Registro das pendencias no Trello;
-    :Transicao para o expediente seguinte;
+    |Jonathan|
+    :Identificacao de entregas
+    nao realizadas;
+
+    :Conferencia das notas
+    fiscais do dia anterior;
+
+    |Equipe|
+    :Registro das pendencias
+    no Trello;
+
+    :Transicao para o
+    expediente seguinte;
   endif
-  
+
 else (nao)
-  :Retirada direta do material no galpao;
-  :Atualizacao do status no Trello;
+  |Solicitante|
+  :Identificacao de demanda
+  urgente;
+
+  :Retirada direta do material
+  no galpao;
+
+  |Jonathan|
+  :Atualizacao do status
+  no Trello;
 endif
 
-:Elaboracao do relatorio semestral;
-:Arquivamento e fechamento do periodo;
+  |Jonathan|
+:Elaboracao do relatorio
+semestral (papel);
+
+:Arquivamento e fechamento
+do periodo;
 
 stop
+
+legend right
+  **Sistemas utilizados:**
+  * Trello (Kanban)
+  * Papel (docs fisicos)
+  * Planilha Excel
+  * Celular (fotos)
+  * Papel (relatorios)
+endlegend
 @enduml
