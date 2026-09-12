@@ -1,0 +1,952 @@
+// ═══════════════════════════════════════════════════════════════
+//  Nexus — Prisma Schema
+//  Gerado a partir de docs/ENTENDIMENTO.md, DER.puml e classes.puml
+//  Convenções: snake_case, IDs auto-increment INT, soft delete
+// ═══════════════════════════════════════════════════════════════
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  ENUMS
+// ───────────────────────────────────────────────────────────────
+
+enum TipoDestinatario {
+  ESCOLA
+  CRECHE
+}
+
+enum TipoTelefone {
+  CELULAR
+  FIXO
+  COMERCIAL
+}
+
+enum TipoNotaSaida {
+  SAIDA
+  DESMONTAGEM
+  CONSUMO_INTERNO
+  AVARIA
+}
+
+enum StatusNotaSaida {
+  ABERTA
+  EM_ANDAMENTO
+  BAIXA_TOTAL
+  BAIXA_PARCIAL
+  BAIXA_COM_CORTE
+  CANCELADA
+}
+
+enum StatusRemessa {
+  EM_PREPARACAO
+  PRONTO_PARA_ENTREGA
+  EM_PERCURSO
+  PENDENTE
+  FINALIZADO_TOTAL
+  FINALIZADO_PARCIAL
+}
+
+enum StatusVeiculo {
+  DISPONIVEL
+  INDISPONIVEL
+  EM_ROTA
+}
+
+enum StatusPedido {
+  PENDENTE
+  CONFIRMADO
+  RECUSADO
+}
+
+enum TipoNotaEntrada {
+  ENTRADA
+  DESMONTAGEM
+}
+
+enum StatusInventario {
+  ABERTO
+  EM_CONTAGEM
+  AGUARDANDO_APROVACAO
+  FINALIZADO
+}
+
+enum StatusAjuste {
+  PENDENTE
+  APROVADO
+  REJEITADO
+}
+
+// ───────────────────────────────────────────────────────────────
+//  CÓDIGOS PERSONALIZADOS
+// ───────────────────────────────────────────────────────────────
+
+model TipoCodigo {
+  id_tipo_codigo  Int     @id @default(autoincrement()) @map("ID_tipo_codigo")
+  nome            String  @unique @map("nome")
+  descricao       String? @map("descricao")
+  ativo           Boolean @default(true) @map("ativo")
+
+  produtoCodigos     ProdutoCodigo[]
+  destinatarioCodigos DestinatarioCodigo[]
+  fornecedorCodigos   FornecedorCodigo[]
+  funcionarioCodigos  FuncionarioCodigo[]
+  condutorCodigos     CondutorCodigo[]
+  veiculoCodigos      VeiculoCodigo[]
+
+  @@map("tipo_codigo")
+}
+
+model ProdutoCodigo {
+  id_produto_codigo Int  @id @default(autoincrement()) @map("ID_produto_codigo")
+  id_produto        Int  @map("ID_produto")
+  id_tipo_codigo    Int  @map("ID_tipo_codigo")
+  codigo            String @unique @map("codigo")
+
+  produto     Produto   @relation(fields: [id_produto], references: [id_produto])
+  tipoCodigo  TipoCodigo @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("produto_codigo")
+}
+
+model DestinatarioCodigo {
+  id_destinatario_codigo Int  @id @default(autoincrement()) @map("ID_destinatario_codigo")
+  id_destinatario        Int  @map("ID_destinatario")
+  id_tipo_codigo         Int  @map("ID_tipo_codigo")
+  codigo                 String @unique @map("codigo")
+
+  destinatario Destinatario @relation(fields: [id_destinatario], references: [id_destinatario])
+  tipoCodigo   TipoCodigo   @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("destinatario_codigo")
+}
+
+model FornecedorCodigo {
+  id_fornecedor_codigo Int  @id @default(autoincrement()) @map("ID_fornecedor_codigo")
+  id_fornecedor        Int  @map("ID_fornecedor")
+  id_tipo_codigo       Int  @map("ID_tipo_codigo")
+  codigo               String @unique @map("codigo")
+
+  fornecedor Fornecedor @relation(fields: [id_fornecedor], references: [id_fornecedor])
+  tipoCodigo TipoCodigo @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("fornecedor_codigo")
+}
+
+model FuncionarioCodigo {
+  id_funcionario_codigo Int  @id @default(autoincrement()) @map("ID_funcionario_codigo")
+  id_funcionario        Int  @map("ID_funcionario")
+  id_tipo_codigo        Int  @map("ID_tipo_codigo")
+  codigo                String @unique @map("codigo")
+
+  funcionario Funcionario @relation(fields: [id_funcionario], references: [id_funcionario])
+  tipoCodigo  TipoCodigo  @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("funcionario_codigo")
+}
+
+model CondutorCodigo {
+  id_condutor_codigo Int  @id @default(autoincrement()) @map("ID_condutor_codigo")
+  id_condutor        Int  @map("ID_condutor")
+  id_tipo_codigo     Int  @map("ID_tipo_codigo")
+  codigo             String @unique @map("codigo")
+
+  condutor  Condutor  @relation(fields: [id_condutor], references: [id_condutor])
+  tipoCodigo TipoCodigo @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("condutor_codigo")
+}
+
+model VeiculoCodigo {
+  id_veiculo_codigo Int  @id @default(autoincrement()) @map("ID_veiculo_codigo")
+  id_veiculo        Int  @map("ID_veiculo")
+  id_tipo_codigo    Int  @map("ID_tipo_codigo")
+  codigo            String @unique @map("codigo")
+
+  veiculo   Veiculo   @relation(fields: [id_veiculo], references: [id_veiculo])
+  tipoCodigo TipoCodigo @relation(fields: [id_tipo_codigo], references: [id_tipo_codigo])
+
+  @@map("veiculo_codigo")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  PESSOAS
+// ───────────────────────────────────────────────────────────────
+
+model PessoaFisica {
+  id_pessoa_fisica Int     @id @default(autoincrement()) @map("ID_pessoa_fisica")
+  nome             String  @map("nome")
+  cpf              String? @unique @map("cpf")
+  ativo            Boolean @default(true) @map("ativo")
+
+  funcionario Funcionario?
+
+  @@map("pessoa_fisica")
+}
+
+model PessoaJuridica {
+  id_pessoa_juridica Int     @id @default(autoincrement()) @map("ID_pessoa_juridica")
+  razao_social       String  @map("razao_social")
+  cnpj               String? @unique @map("cnpj")
+  ativo              Boolean @default(true) @map("ativo")
+
+  fornecedor   Fornecedor?
+  destinatario Destinatario?
+
+  @@map("pessoa_juridica")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  FUNCIONÁRIOS / USUÁRIOS / CONDUTORES
+// ───────────────────────────────────────────────────────────────
+
+model Funcionario {
+  id_funcionario   Int     @id @default(autoincrement()) @map("ID_funcionario")
+  id_pessoa_fisica Int     @unique @map("ID_pessoa_fisica")
+  cargo            String? @map("cargo")
+  ativo            Boolean @default(true) @map("ativo")
+
+  pessoaFisica       PessoaFisica                           @relation(fields: [id_pessoa_fisica], references: [id_pessoa_fisica])
+  usuario            Usuario?
+  condutor           Condutor?
+  funcionarioCodigos FuncionarioCodigo[]
+  telefones          FuncionarioTelefone[]
+  emails             FuncionarioEmail[]
+  contagens          ContagemInventario[]
+
+  @@map("funcionario")
+}
+
+model Usuario {
+  id_usuario     Int       @id @default(autoincrement()) @map("ID_usuario")
+  id_funcionario Int       @unique @map("ID_funcionario")
+  login          String    @unique @map("login")
+  senha_hash     String    @map("senha_hash")
+  super_admin    Boolean   @default(false) @map("super_admin")
+  ultimo_acesso  DateTime? @map("ultimo_acesso") @db.Timestamp(0)
+  ativo          Boolean   @default(true) @map("ativo")
+
+  funcionario Funcionario @relation(fields: [id_funcionario], references: [id_funcionario])
+
+  permissoes               UsuarioPermissao[]
+  inventariosAbertos       Inventario[]       @relation("usuario_abertura")
+  inventariosAprovados     Inventario[]       @relation("usuario_aprovacao")
+  ajustesAprovados         AjusteInventario[] @relation("ajuste_usuario_aprovacao")
+  movimentacoes            MovimentacaoEstoque[]
+  reservas                 ReservaEstoque[]
+  registrosAuditoria       RegistroAuditoria[]
+  mensagensMural           MensagemMural[]
+
+  @@map("usuario")
+}
+
+model Condutor {
+  id_condutor   Int      @id @default(autoincrement()) @map("ID_condutor")
+  id_funcionario Int     @unique @map("ID_funcionario")
+  numero_cnh    String?  @map("numero_cnh")
+  categoria_cnh String?  @map("categoria_cnh")
+  validade_cnh  DateTime? @map("validade_cnh") @db.Date
+  ativo         Boolean  @default(true) @map("ativo")
+
+  funcionario       Funcionario      @relation(fields: [id_funcionario], references: [id_funcionario])
+  condutorCodigos   CondutorCodigo[]
+  remessas          Remessa[]
+
+  @@map("condutor")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  FORNECEDORES / DESTINATÁRIOS
+// ───────────────────────────────────────────────────────────────
+
+model Fornecedor {
+  id_fornecedor       Int     @id @default(autoincrement()) @map("ID_fornecedor")
+  id_pessoa_juridica  Int     @unique @map("ID_pessoa_juridica")
+  contato             String? @map("contato")
+  id_endereco         Int?    @map("ID_endereco")
+  ativo               Boolean @default(true) @map("ativo")
+
+  pessoaJuridica     PessoaJuridica       @relation(fields: [id_pessoa_juridica], references: [id_pessoa_juridica])
+  endereco           Endereco?            @relation(fields: [id_endereco], references: [id_endereco])
+  fornecedorCodigos  FornecedorCodigo[]
+  telefones          FornecedorTelefone[]
+  emails             FornecedorEmail[]
+  notasEntrada       NotaEntrada[]
+
+  @@map("fornecedor")
+}
+
+model Destinatario {
+  id_destinatario      Int               @id @default(autoincrement()) @map("ID_destinatario")
+  id_pessoa_juridica   Int               @unique @map("ID_pessoa_juridica")
+  tipo_destinatario    TipoDestinatario  @map("tipo_destinatario")
+  id_endereco          Int               @map("ID_endereco")
+  ativo                Boolean           @default(true) @map("ativo")
+
+  pessoaJuridica        PessoaJuridica        @relation(fields: [id_pessoa_juridica], references: [id_pessoa_juridica])
+  endereco              Endereco              @relation(fields: [id_endereco], references: [id_endereco])
+  destinatarioCodigos   DestinatarioCodigo[]
+  telefones             DestinatarioTelefone[]
+  emails                DestinatarioEmail[]
+  percursos             PercursoDestinatario[]
+  pedidos               PedidoEscola[]
+  notasSaida            NotaSaida[]
+  remessas              Remessa[]
+  coletas               Coleta[]
+
+  @@map("destinatario")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  ENDEREÇO
+// ───────────────────────────────────────────────────────────────
+
+model Endereco {
+  id_endereco  Int     @id @default(autoincrement()) @map("ID_endereco")
+  logradouro   String  @map("logradouro")
+  numero       String? @map("numero")
+  complemento  String? @map("complemento")
+  bairro       String? @map("bairro")
+  cidade       String  @map("cidade")
+  cep          String? @map("cep")
+  latitude     Float?  @map("latitude")
+  longitude    Float?  @map("longitude")
+
+  destinatarios Destinatario[]
+  fornecedores  Fornecedor[]
+
+  @@map("endereco")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  CONTATO (TELEFONE / EMAIL)
+// ───────────────────────────────────────────────────────────────
+
+model FuncionarioTelefone {
+  id_funcionario_telefone Int           @id @default(autoincrement()) @map("ID_funcionario_telefone")
+  id_funcionario          Int           @map("ID_funcionario")
+  numero                  String        @unique @map("numero")
+  tipo                    TipoTelefone  @map("tipo")
+  principal               Boolean       @default(false) @map("principal")
+  ativo                   Boolean       @default(true) @map("ativo")
+
+  funcionario Funcionario @relation(fields: [id_funcionario], references: [id_funcionario])
+
+  @@map("funcionario_telefone")
+}
+
+model DestinatarioTelefone {
+  id_destinatario_telefone Int          @id @default(autoincrement()) @map("ID_destinatario_telefone")
+  id_destinatario          Int          @map("ID_destinatario")
+  numero                   String       @unique @map("numero")
+  tipo                     TipoTelefone @map("tipo")
+  principal                Boolean      @default(false) @map("principal")
+  ativo                    Boolean      @default(true) @map("ativo")
+
+  destinatario Destinatario @relation(fields: [id_destinatario], references: [id_destinatario])
+
+  @@map("destinatario_telefone")
+}
+
+model FornecedorTelefone {
+  id_fornecedor_telefone Int          @id @default(autoincrement()) @map("ID_fornecedor_telefone")
+  id_fornecedor          Int          @map("ID_fornecedor")
+  numero                 String       @unique @map("numero")
+  tipo                   TipoTelefone @map("tipo")
+  principal              Boolean      @default(false) @map("principal")
+  ativo                  Boolean      @default(true) @map("ativo")
+
+  fornecedor Fornecedor @relation(fields: [id_fornecedor], references: [id_fornecedor])
+
+  @@map("fornecedor_telefone")
+}
+
+model FuncionarioEmail {
+  id_funcionario_email Int     @id @default(autoincrement()) @map("ID_funcionario_email")
+  id_funcionario       Int     @map("ID_funcionario")
+  endereco             String  @unique @map("endereco")
+  principal            Boolean @default(false) @map("principal")
+
+  funcionario Funcionario @relation(fields: [id_funcionario], references: [id_funcionario])
+
+  @@map("funcionario_email")
+}
+
+model DestinatarioEmail {
+  id_destinatario_email Int     @id @default(autoincrement()) @map("ID_destinatario_email")
+  id_destinatario       Int     @map("ID_destinatario")
+  endereco              String  @unique @map("endereco")
+  principal             Boolean @default(false) @map("principal")
+
+  destinatario Destinatario @relation(fields: [id_destinatario], references: [id_destinatario])
+
+  @@map("destinatario_email")
+}
+
+model FornecedorEmail {
+  id_fornecedor_email Int     @id @default(autoincrement()) @map("ID_fornecedor_email")
+  id_fornecedor       Int     @map("ID_fornecedor")
+  endereco            String  @unique @map("endereco")
+  principal           Boolean @default(false) @map("principal")
+
+  fornecedor Fornecedor @relation(fields: [id_fornecedor], references: [id_fornecedor])
+
+  @@map("fornecedor_email")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  PRODUTOS / CONVERSÃO / INSUMO
+// ───────────────────────────────────────────────────────────────
+
+model ConversaoUnidade {
+  id_conversao Int     @id @default(autoincrement()) @map("ID_conversao")
+  nome         String  @unique @map("nome")
+  fator        Float   @map("fator")
+  descricao    String? @map("descricao")
+  ativo        Boolean @default(true) @map("ativo")
+
+  produtos            Produto[]
+  itensNotaEntrada    ItemNotaEntrada[]
+
+  @@map("conversao_unidade")
+}
+
+model Produto {
+  id_produto          Int       @id @default(autoincrement()) @map("ID_produto")
+  descricao           String    @map("descricao")
+  foto_url            String?   @map("foto_url")
+  perecivel           Boolean   @default(false) @map("perecivel")
+  composto            Boolean   @default(false) @map("composto")
+  data_validade       DateTime? @map("data_validade") @db.Date
+  id_conversao_padrao Int?      @map("ID_conversao_padrao")
+  ativo               Boolean   @default(true) @map("ativo")
+
+  conversaoPadrao      ConversaoUnidade?  @relation(fields: [id_conversao_padrao], references: [id_conversao])
+  produtoCodigos       ProdutoCodigo[]
+  estoques             Estoque[]
+  insumosPai           ProdutoInsumo[]    @relation("produto_pai")
+  insumosFilho         ProdutoInsumo[]    @relation("produto_filho")
+  itensPedido          ItemPedidoEscola[]
+  itensNotaEntrada     ItemNotaEntrada[]
+
+  @@map("produto")
+}
+
+model ProdutoInsumo {
+  id_produto_insumo Int     @id @default(autoincrement()) @map("ID_produto_insumo")
+  id_produto_pai    Int     @map("ID_produto_pai")
+  id_produto_filho  Int     @map("ID_produto_filho")
+  quantidade        Float   @map("quantidade")
+  ativo             Boolean @default(true) @map("ativo")
+
+  produtoPai   Produto @relation("produto_pai", fields: [id_produto_pai], references: [id_produto])
+  produtoFilho Produto @relation("produto_filho", fields: [id_produto_filho], references: [id_produto])
+
+  @@map("produto_insumo")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  ESTOQUE
+// ───────────────────────────────────────────────────────────────
+
+model Estoque {
+  id_estoque       Int     @id @default(autoincrement()) @map("ID_estoque")
+  id_produto       Int     @map("ID_produto")
+  quantidade_atual Float   @map("quantidade_atual")
+  saldo_reservado  Float   @default(0) @map("saldo_reservado")
+  data_entrada     DateTime @map("data_entrada") @db.Date
+  ativo            Boolean @default(true) @map("ativo")
+
+  produto           Produto               @relation(fields: [id_produto], references: [id_produto])
+  movimentacoes     MovimentacaoEstoque[]
+  reservas          ReservaEstoque[]
+  itensNotaSaida    ItemNotaSaida[]
+  itensRemessa      ItemRemessa[]
+  itensColeta       ItemColeta[]
+  itensInventario   ItemInventario[]
+  ajustesInventario AjusteInventario[]
+
+  @@map("estoque")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  MOVIMENTAÇÃO DE ESTOQUE (AUDITORIA)
+// ───────────────────────────────────────────────────────────────
+
+model MovimentacaoEstoque {
+  id_movimentacao  Int       @id @default(autoincrement()) @map("ID_movimentacao")
+  id_estoque       Int       @map("ID_estoque")
+  id_usuario       Int       @map("ID_usuario")
+  quantidade       Float     @map("quantidade")
+  saldo_anterior   Float?    @map("saldo_anterior")
+  saldo_posterior  Float?    @map("saldo_posterior")
+  id_nota_saida    Int?      @map("ID_nota_saida")
+  id_remessa       Int?      @map("ID_remessa")
+  id_nota_entrada  Int?      @map("ID_nota_entrada")
+  data_hora        DateTime  @map("data_hora") @db.Timestamp(0)
+  observacao       String?   @map("observacao") @db.Text
+
+  estoque    Estoque    @relation(fields: [id_estoque], references: [id_estoque])
+  usuario    Usuario    @relation(fields: [id_usuario], references: [id_usuario])
+  notaSaida  NotaSaida? @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  remessa    Remessa?   @relation(fields: [id_remessa], references: [id_remessa])
+  notaEntrada NotaEntrada? @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
+
+  @@map("movimentacao_estoque")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  RESERVA DE ESTOQUE (AUDITORIA CONTÁBIL)
+// ───────────────────────────────────────────────────────────────
+
+model ReservaEstoque {
+  id_reserva_estoque Int       @id @default(autoincrement()) @map("ID_reserva_estoque")
+  id_estoque         Int       @map("ID_estoque")
+  id_nota_saida      Int       @map("ID_nota_saida")
+  id_usuario         Int       @map("ID_usuario")
+  quantidade         Float     @map("quantidade")
+  saldo_anterior     Float?    @map("saldo_anterior")
+  saldo_posterior    Float?    @map("saldo_posterior")
+  data_hora          DateTime  @map("data_hora") @db.Timestamp(0)
+  observacao         String?   @map("observacao") @db.Text
+
+  estoque   Estoque   @relation(fields: [id_estoque], references: [id_estoque])
+  notaSaida NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  usuario   Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("reserva_estoque")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  INVENTÁRIO
+// ───────────────────────────────────────────────────────────────
+
+model Inventario {
+  id_inventario         Int               @id @default(autoincrement()) @map("ID_inventario")
+  data_inicio           DateTime          @map("data_inicio") @db.Date
+  data_fim              DateTime?         @map("data_fim") @db.Date
+  contagem_cega         Boolean           @default(false) @map("contagem_cega")
+  status                StatusInventario  @map("status")
+  id_usuario_abertura   Int               @map("ID_usuario_abertura")
+  id_usuario_aprovacao  Int?              @map("ID_usuario_aprovacao")
+  observacao            String?           @map("observacao") @db.Text
+
+  usuarioAbertura   Usuario             @relation("usuario_abertura", fields: [id_usuario_abertura], references: [id_usuario])
+  usuarioAprovacao  Usuario?            @relation("usuario_aprovacao", fields: [id_usuario_aprovacao], references: [id_usuario])
+  itens             ItemInventario[]
+  ajustes           AjusteInventario[]
+
+  @@map("inventario")
+}
+
+model ItemInventario {
+  id_item_inventario  Int     @id @default(autoincrement()) @map("ID_item_inventario")
+  id_inventario       Int     @map("ID_inventario")
+  id_estoque          Int     @map("ID_estoque")
+  quantidade_sistema  Float   @map("quantidade_sistema")
+  observacao          String? @map("observacao") @db.Text
+
+  inventario   Inventario           @relation(fields: [id_inventario], references: [id_inventario])
+  estoque      Estoque              @relation(fields: [id_estoque], references: [id_estoque])
+  contagens    ContagemInventario[]
+
+  @@map("item_inventario")
+}
+
+model ContagemInventario {
+  id_contagem_inventario Int       @id @default(autoincrement()) @map("ID_contagem_inventario")
+  id_item_inventario     Int       @map("ID_item_inventario")
+  id_funcionario         Int       @map("ID_funcionario")
+  quantidade_contada     Float     @map("quantidade_contada")
+  data_contagem          DateTime  @map("data_contagem") @db.Timestamp(0)
+  observacao             String?   @map("observacao") @db.Text
+
+  itemInventario ItemInventario @relation(fields: [id_item_inventario], references: [id_item_inventario])
+  funcionario    Funcionario    @relation(fields: [id_funcionario], references: [id_funcionario])
+
+  @@map("contagem_inventario")
+}
+
+model AjusteInventario {
+  id_ajuste_inventario  Int            @id @default(autoincrement()) @map("ID_ajuste_inventario")
+  id_inventario         Int            @map("ID_inventario")
+  id_estoque            Int            @map("ID_estoque")
+  diferenca             Float          @map("diferenca")
+  status                StatusAjuste   @map("status")
+  id_usuario_aprovacao  Int?           @map("ID_usuario_aprovacao")
+  data_aprovacao        DateTime?      @map("data_aprovacao") @db.Timestamp(0)
+  justificativa         String?        @map("justificativa") @db.Text
+
+  inventario      Inventario @relation(fields: [id_inventario], references: [id_inventario])
+  estoque         Estoque    @relation(fields: [id_estoque], references: [id_estoque])
+  usuarioAprovacao Usuario?  @relation("ajuste_usuario_aprovacao", fields: [id_usuario_aprovacao], references: [id_usuario])
+
+  @@map("ajuste_inventario")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  PEDIDO ESCOLA
+// ───────────────────────────────────────────────────────────────
+
+model PedidoEscola {
+  id_pedido_escola Int            @id @default(autoincrement()) @map("ID_pedido_escola")
+  id_destinatario  Int            @map("ID_destinatario")
+  data_criacao     DateTime       @map("data_criacao") @db.Timestamp(0)
+  status           StatusPedido   @map("status")
+  observacao       String?        @map("observacao") @db.Text
+  ativo            Boolean        @default(true) @map("ativo")
+
+  destinatario Destinatario     @relation(fields: [id_destinatario], references: [id_destinatario])
+  itens        ItemPedidoEscola[]
+  notaSaida    NotaSaida?
+
+  @@map("pedido_escola")
+}
+
+model ItemPedidoEscola {
+  id_item_pedido_escola Int    @id @default(autoincrement()) @map("ID_item_pedido_escola")
+  id_pedido_escola      Int    @map("ID_pedido_escola")
+  id_produto            Int    @map("ID_produto")
+  quantidade            Float  @map("quantidade")
+  observacao            String? @map("observacao") @db.Text
+
+  pedidoEscola PedidoEscola @relation(fields: [id_pedido_escola], references: [id_pedido_escola])
+  produto      Produto      @relation(fields: [id_produto], references: [id_produto])
+
+  @@map("item_pedido_escola")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  NOTA SAÍDA / REMESSA / COLETA
+// ───────────────────────────────────────────────────────────────
+
+model NotaSaida {
+  id_nota_saida     Int             @id @default(autoincrement()) @map("ID_nota_saida")
+  id_pedido_escola  Int?            @unique @map("ID_pedido_escola")
+  id_destinatario   Int             @map("ID_destinatario")
+  data_criacao      DateTime        @map("data_criacao") @db.Timestamp(0)
+  tipo              TipoNotaSaida   @map("tipo")
+  status            StatusNotaSaida @map("status")
+  observacao        String?         @map("observacao") @db.Text
+  ativo             Boolean         @default(true) @map("ativo")
+
+  pedidoEscola  PedidoEscola?        @relation(fields: [id_pedido_escola], references: [id_pedido_escola])
+  destinatario  Destinatario         @relation(fields: [id_destinatario], references: [id_destinatario])
+  itens         ItemNotaSaida[]
+  remessas      Remessa[]
+  coletas       Coleta[]
+  reservas      ReservaEstoque[]
+  movimentacoes MovimentacaoEstoque[]
+
+  @@map("nota_saida")
+}
+
+model ItemNotaSaida {
+  id_item_nota_saida Int    @id @default(autoincrement()) @map("ID_item_nota_saida")
+  id_nota_saida      Int    @map("ID_nota_saida")
+  id_estoque         Int    @map("ID_estoque")
+  qtd_esperada       Float  @map("qtd_esperada")
+  qtd_entregue       Float  @default(0) @map("qtd_entregue")
+  observacao         String? @map("observacao") @db.Text
+
+  notaSaida NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  estoque   Estoque   @relation(fields: [id_estoque], references: [id_estoque])
+
+  @@map("item_nota_saida")
+}
+
+model Remessa {
+  id_remessa      Int           @id @default(autoincrement()) @map("ID_remessa")
+  id_nota_saida   Int           @map("ID_nota_saida")
+  id_destinatario Int           @map("ID_destinatario")
+  data_criacao    DateTime      @map("data_criacao") @db.Timestamp(0)
+  status          StatusRemessa @map("status")
+  id_condutor     Int?          @map("ID_condutor")
+  id_veiculo      Int?          @map("ID_veiculo")
+  urgente         Boolean       @default(false) @map("urgente")
+  observacao      String?       @map("observacao") @db.Text
+
+  notaSaida      NotaSaida             @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  destinatario   Destinatario          @relation(fields: [id_destinatario], references: [id_destinatario])
+  condutor       Condutor?             @relation(fields: [id_condutor], references: [id_condutor])
+  veiculo        Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo])
+  itens          ItemRemessa[]
+  rotas          RotaRemessa[]
+  movimentacoes  MovimentacaoEstoque[]
+  anexos         Anexo[]
+
+  @@map("remessa")
+}
+
+model ItemRemessa {
+  id_item_remessa        Int    @id @default(autoincrement()) @map("ID_item_remessa")
+  id_remessa             Int    @map("ID_remessa")
+  id_estoque             Int    @map("ID_estoque")
+  quantidade_solicitada  Float  @map("quantidade_solicitada")
+  quantidade_separada    Float? @map("quantidade_separada")
+  quantidade_entregue    Float? @map("quantidade_entregue")
+
+  remessa Remessa @relation(fields: [id_remessa], references: [id_remessa])
+  estoque Estoque @relation(fields: [id_estoque], references: [id_estoque])
+
+  @@map("item_remessa")
+}
+
+model Coleta {
+  id_coleta      Int      @id @default(autoincrement()) @map("ID_coleta")
+  id_nota_saida  Int      @map("ID_nota_saida")
+  id_destinatario Int     @map("ID_destinatario")
+  data_criacao   DateTime @map("data_criacao") @db.Timestamp(0)
+  observacao     String?  @map("observacao") @db.Text
+
+  notaSaida    NotaSaida    @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  destinatario Destinatario @relation(fields: [id_destinatario], references: [id_destinatario])
+  itens        ItemColeta[]
+
+  @@map("coleta")
+}
+
+model ItemColeta {
+  id_item_coleta Int   @id @default(autoincrement()) @map("ID_item_coleta")
+  id_coleta      Int   @map("ID_coleta")
+  id_estoque     Int   @map("ID_estoque")
+  quantidade     Float @map("quantidade")
+
+  coleta  Coleta  @relation(fields: [id_coleta], references: [id_coleta])
+  estoque Estoque @relation(fields: [id_estoque], references: [id_estoque])
+
+  @@map("item_coleta")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  PERCURSO / ROTA
+// ───────────────────────────────────────────────────────────────
+
+model Percurso {
+  id_percurso Int     @id @default(autoincrement()) @map("ID_percurso")
+  nome        String  @map("nome")
+  descricao   String? @map("descricao") @db.Text
+  ativo       Boolean @default(true) @map("ativo")
+
+  destinatarios PercursoDestinatario[]
+  rotas         Rota[]
+
+  @@map("percurso")
+}
+
+model PercursoDestinatario {
+  id_percurso      Int @map("ID_percurso")
+  id_destinatario  Int @map("ID_destinatario")
+  ordem_visita     Int @map("ordem_visita")
+
+  percurso     Percurso     @relation(fields: [id_percurso], references: [id_percurso])
+  destinatario Destinatario @relation(fields: [id_destinatario], references: [id_destinatario])
+
+  @@id([id_percurso, id_destinatario])
+  @@map("percurso_destinatario")
+}
+
+model Rota {
+  id_rota        Int       @id @default(autoincrement()) @map("ID_rota")
+  data_criacao   DateTime  @map("data_criacao") @db.Timestamp(0)
+  data_prevista  DateTime? @map("data_prevista") @db.Date
+  id_percurso    Int?      @map("ID_percurso")
+  observacao     String?   @map("observacao") @db.Text
+  ativo          Boolean   @default(true) @map("ativo")
+
+  percurso Percurso?    @relation(fields: [id_percurso], references: [id_percurso])
+  remessas RotaRemessa[]
+
+  @@map("rota")
+}
+
+model RotaRemessa {
+  id_rota_remessa Int       @id @default(autoincrement()) @map("ID_rota_remessa")
+  id_rota         Int       @map("ID_rota")
+  id_remessa      Int       @map("ID_remessa")
+  ordem_visita    Int       @map("ordem_visita")
+  data_adicao     DateTime  @map("data_adicao") @db.Timestamp(0)
+
+  rota    Rota    @relation(fields: [id_rota], references: [id_rota])
+  remessa Remessa @relation(fields: [id_remessa], references: [id_remessa])
+
+  @@map("rota_remessa")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  VEÍCULO
+// ───────────────────────────────────────────────────────────────
+
+model Veiculo {
+  id_veiculo  Int           @id @default(autoincrement()) @map("ID_veiculo")
+  placa       String        @unique @map("placa")
+  modelo      String?       @map("modelo")
+  capacidade  Float?        @map("capacidade")
+  status      StatusVeiculo @map("status")
+  ativo       Boolean       @default(true) @map("ativo")
+
+  veiculoCodigos VeiculoCodigo[]
+  remessas       Remessa[]
+
+  @@map("veiculo")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  NOTA DE ENTRADA
+// ───────────────────────────────────────────────────────────────
+
+model NotaEntrada {
+  id_nota_entrada  Int             @id @default(autoincrement()) @map("ID_nota_entrada")
+  id_fornecedor    Int?            @map("ID_fornecedor")
+  data_criacao     DateTime        @map("data_criacao") @db.Timestamp(0)
+  tipo             TipoNotaEntrada @map("tipo")
+  data_recebimento DateTime?       @map("data_recebimento") @db.Date
+  observacao       String?         @map("observacao") @db.Text
+  ativo            Boolean         @default(true) @map("ativo")
+
+  fornecedor      Fornecedor?           @relation(fields: [id_fornecedor], references: [id_fornecedor])
+  chavesAcesso    NotaEntradaChaveAcesso[]
+  itens           ItemNotaEntrada[]
+  movimentacoes   MovimentacaoEstoque[]
+
+  @@map("nota_entrada")
+}
+
+model NotaEntradaChaveAcesso {
+  id_nota_entrada Int    @map("ID_nota_entrada")
+  chave_acesso    String @unique @map("chave_acesso")
+
+  notaEntrada NotaEntrada @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
+
+  @@id([id_nota_entrada, chave_acesso])
+  @@map("nota_entrada_chave_acesso")
+}
+
+model ItemNotaEntrada {
+  id_item_nota_entrada  Int    @id @default(autoincrement()) @map("ID_item_nota_entrada")
+  id_nota_entrada       Int    @map("ID_nota_entrada")
+  id_produto            Int    @map("ID_produto")
+  id_conversao          Int?   @map("ID_conversao")
+  quantidade            Float  @map("quantidade")
+  quantidade_convertida Float  @map("quantidade_convertida")
+  observacao            String? @map("observacao") @db.Text
+
+  notaEntrada     NotaEntrada     @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
+  produto         Produto         @relation(fields: [id_produto], references: [id_produto])
+  conversao       ConversaoUnidade? @relation(fields: [id_conversao], references: [id_conversao])
+
+  @@map("item_nota_entrada")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  ANEXOS
+// ───────────────────────────────────────────────────────────────
+
+model Anexo {
+  id_anexo          Int      @id @default(autoincrement()) @map("ID_anexo")
+  nome_arquivo      String   @map("nome_arquivo")
+  url               String   @map("url")
+  tipo_mime         String?  @map("tipo_mime")
+  data_upload       DateTime @map("data_upload") @db.Timestamp(0)
+  id_remessa        Int?     @map("ID_remessa")
+  id_documento_fiscal Int?   @map("ID_documento_fiscal")
+  ativo             Boolean  @default(true) @map("ativo")
+
+  remessa Remessa? @relation(fields: [id_remessa], references: [id_remessa])
+
+  @@map("anexo")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  PERMISSÕES E PERFIS
+// ───────────────────────────────────────────────────────────────
+
+model Permissao {
+  id_permissao Int     @id @default(autoincrement()) @map("ID_permissao")
+  nome         String  @unique @map("nome")
+  descricao    String? @map("descricao") @db.Text
+  ativo        Boolean @default(true) @map("ativo")
+
+  usuarioPermissoes UsuarioPermissao[]
+  perfilPermissoes  PerfilPermissao[]
+
+  @@map("permissao")
+}
+
+model Perfil {
+  id_perfil  Int     @id @default(autoincrement()) @map("ID_perfil")
+  nome       String  @unique @map("nome")
+  descricao  String? @map("descricao") @db.Text
+  ativo      Boolean @default(true) @map("ativo")
+
+  permissoes PerfilPermissao[]
+
+  @@map("perfil")
+}
+
+model PerfilPermissao {
+  id_perfil    Int @map("ID_perfil")
+  id_permissao Int @map("ID_permissao")
+
+  perfil    Perfil    @relation(fields: [id_perfil], references: [id_perfil])
+  permissao Permissao @relation(fields: [id_permissao], references: [id_permissao])
+
+  @@id([id_perfil, id_permissao])
+  @@map("perfil_permissao")
+}
+
+model UsuarioPermissao {
+  id_usuario    Int @map("ID_usuario")
+  id_permissao  Int @map("ID_permissao")
+
+  usuario   Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+  permissao Permissao @relation(fields: [id_permissao], references: [id_permissao])
+
+  @@id([id_usuario, id_permissao])
+  @@map("usuario_permissao")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  AUDITORIA
+// ───────────────────────────────────────────────────────────────
+
+model RegistroAuditoria {
+  id_registro_auditoria Int       @id @default(autoincrement()) @map("ID_registro_auditoria")
+  id_usuario            Int       @map("ID_usuario")
+  data_hora             DateTime  @map("data_hora") @db.Timestamp(0)
+  acao                  String    @map("acao")
+  entidade              String    @map("entidade")
+  id_entidade_afetada   Int?      @map("ID_entidade_afetada")
+  dados_anteriores      String?   @map("dados_anteriores") @db.Json
+  dados_novos           String?   @map("dados_novos") @db.Json
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("registro_auditoria")
+}
+
+// ───────────────────────────────────────────────────────────────
+//  MURAL DE MENSAGENS
+// ───────────────────────────────────────────────────────────────
+
+model MensagemMural {
+  id_mensagem_mural Int       @id @default(autoincrement()) @map("ID_mensagem_mural")
+  id_usuario        Int       @map("ID_usuario")
+  titulo            String?   @map("titulo")
+  conteudo          String    @map("conteudo") @db.Text
+  data_publicacao   DateTime  @map("data_publicacao") @db.Timestamp(0)
+  data_expiracao    DateTime? @map("data_expiracao") @db.Timestamp(0)
+  automatica        Boolean   @default(false) @map("automatica")
+  ativo             Boolean   @default(true) @map("ativo")
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
+
+  @@map("mensagem_mural")
+}
