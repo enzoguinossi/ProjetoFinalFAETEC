@@ -5,13 +5,11 @@
 // ═══════════════════════════════════════════════════════════════
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearch"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -924,8 +922,8 @@ model RegistroAuditoria {
   acao                  String    @map("acao")
   entidade              String    @map("entidade")
   id_entidade_afetada   Int?      @map("ID_entidade_afetada")
-  dados_anteriores      String?   @map("dados_anteriores") @db.Json
-  dados_novos           String?   @map("dados_novos") @db.Json
+  dados_anteriores      Json?   @map("dados_anteriores") @db.Json
+  dados_novos           Json?   @map("dados_novos") @db.Json
 
   usuario Usuario @relation(fields: [id_usuario], references: [id_usuario])
 
