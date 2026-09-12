@@ -1,0 +1,49 @@
+@startuml
+skinparam shadowing false
+title Entrega Escolar
+
+|Jonathan|
+start
+:Recebe pedidos em
+papel das escolas;
+
+:Organiza pedidos
+por rota do dia;
+
+:Disponibiliza itens
+separados ao motorista;
+
+|Motorista|
+:Recebe instrucao
+de percurso;
+
+:Carrega mercadorias
+no veiculo;
+
+:Executa rota
+pre-determinada;
+
+:Realiza entrega
+na escola;
+
+if (Escola recebeu
+tudo?) then (sim)
+  :Obtem assinatura
+  do recebimento;
+  :Entrega concluida
+  com sucesso;
+else (nao/parcial)
+  :Registra quantidade
+  nao entregue;
+  :Retorna material
+  nao entregue ao galpao;
+endif
+
+|Ferramentas|
+note right
+  Sistemas: Papel, Trello,
+  Planilha, Celular
+endnote
+
+stop
+@enduml

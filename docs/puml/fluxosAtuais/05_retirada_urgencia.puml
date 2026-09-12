@@ -1,0 +1,41 @@
+@startuml
+skinparam shadowing false
+title Retirada de Urgencia
+
+|Solicitante|
+start
+:Identifica necessidade
+urgente de item;
+
+:Verifica disponibilidade
+com o galpao;
+
+:Solicita autorizacao
+para retirada direta;
+
+|Jonathan|
+:Confere nota fiscal
+do item solicitado;
+
+:Localiza item
+no estoque fisico;
+
+|Solicitante|
+:Retira material
+diretamente no galpao;
+
+|Jonathan|
+:Atualiza status
+da retirada no Trello;
+
+:Regisa baixa manual
+na planilha de estoque;
+
+|Ferramentas|
+note right
+  Sistemas: Papel, Trello,
+  Planilha Excel
+endnote
+
+stop
+@enduml

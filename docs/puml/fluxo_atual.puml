@@ -1,86 +1,38 @@
 @startuml
 skinparam shadowing false
-title Fluxo Atual - Operacao do Galpao (AS-IS)
+title Fluxo Atual - Visao Geral
 
 |Jonathan|
 start
-:Mapeamento das escolas
-(105 a 108 escolas no Trello);
+:Mapeamento de escolas
+(01_mapeamento.puml);
 
-:Contagem e conferencia manual
-dos produtos;
+:Conferencia de produtos
+(02_conferencia.puml);
 
-:Registro fotografico da
-conferencia (celular);
-
-|Jonathan|
-:Anexacao das fotos no Trello;
-
-:Validacao da conferencia;
-
-:Solicitacao do transporte;
-
-if (Rota definida?) then (sim)
-
-  |Motorista|
-  :Disponibilizacao da demanda
-  ao motorista;
-
-  :Inicio do percurso;
-
-  :Execucao da rota
-  pre-determinada;
-
-  :Conclusao do transporte;
-
-  if (Entrega realizada com
-  sucesso?) then (sim)
-    |Jonathan|
-    :Finalizacao normal;
-  else (nao)
-    |Jonathan|
-    :Identificacao de entregas
-    nao realizadas;
-
-    :Conferencia das notas
-    fiscais do dia anterior;
-
-    |Equipe|
-    :Registro das pendencias
-    no Trello;
-
-    :Transicao para o
-    expediente seguinte;
+if (Entrega programada?) then (sim)
+  :Entrega escolar
+  (03_entrega.puml);
+  
+  if (Houve falha?) then (sim)
+    :Gestao de pendencias
+    (04_pendencia.puml);
   endif
-
+  
 else (nao)
-  |Solicitante|
-  :Identificacao de demanda
-  urgente;
-
-  :Retirada direta do material
-  no galpao;
-
-  |Jonathan|
-  :Atualizacao do status
-  no Trello;
+  :Retirada de urgencia
+  (05_retirada_urgencia.puml);
 endif
 
-  |Jonathan|
-:Elaboracao do relatorio
-semestral (papel);
-
-:Arquivamento e fechamento
-do periodo;
+:Relatorio semestral
+(06_relatorio.puml);
 
 stop
 
 legend right
-  **Sistemas utilizados:**
-  * Trello (Kanban)
-  * Papel (docs fisicos)
-  * Planilha Excel
-  * Celular (fotos)
-  * Papel (relatorios)
+  **Sistemas:** Papel, Trello,
+  Planilha Excel, Celular
+  **Atores:** Jonathan,
+  Motorista, Equipe, Solicitante
 endlegend
 @enduml

@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+title Mapeamento de Escolas
+
+|Jonathan|
+start
+:Recebe lista de escolas
+em papel da administracao;
+
+:Registra cada escola
+no Trello manualmente;
+
+:Identifica 105 a 108
+escolas/creches municipais;
+
+:Levanta enderecos
+de cada unidade;
+
+:Valida localizacao
+com o solicitante;
+
+:Consolida cadastro
+de enderecos no Trello;
+
+|Ferramentas|
+note right
+  Sistemas: Papel, Trello, Telefone
+endnote
+
+stop
+@enduml
