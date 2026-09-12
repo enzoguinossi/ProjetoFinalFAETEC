@@ -13,8 +13,10 @@ import base64
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import urllib.request
 import zlib
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -25,8 +27,43 @@ DOCS = ROOT / "docs"
 BUILD = DOCS / "build"
 IMAGES = BUILD / "images"
 FLUXOS = DOCS / "puml" / "fluxosAtuais"
-
+CACHE = ROOT / ".cache"
+PLANTUML_JAR = CACHE / "plantuml.jar"
+PLANTUML_URL = "https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar"
 PLANTUML_SERVER = "https://www.plantuml.com/plantuml"
+
+# ── java / plantuml setup ──────────────────────────────────────
+
+def _find_java() -> str | None:
+    """Locate java executable."""
+    for candidate in ["java", "java.exe"]:
+        path = shutil.which(candidate)
+        if path:
+            return path
+    # Check common install dirs
+    for prog in [
+        r"C:\Program Files\Eclipse Adoptium\jre-*\bin\java.exe",
+        r"C:\Program Files\Java\*\bin\java.exe",
+    ]:
+        matches = sorted(Path(prog.split("\\")[0]).glob(prog.split("\\")[1]))
+        if matches:
+            return str(matches[-1])
+    return None
+
+def _ensure_plantuml_jar() -> Path | None:
+    """Download plantuml.jar if missing. Returns path or None."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    if PLANTUML_JAR.exists():
+        return PLANTUML_JAR
+    print("  Downloading plantuml.jar...")
+    try:
+        urllib.request.urlretrieve(PLANTUML_URL, PLANTUML_JAR)
+        return PLANTUML_JAR
+    except Exception as e:
+        print(f"  ⚠  Could not download plantuml.jar: {e}")
+        return None
+
+HAS_LOCAL_PLANTUML = _find_java() is not None and _ensure_plantuml_jar() is not None
 
 # ── helpers ──────────────────────────────────────────────────────
 
@@ -46,57 +83,64 @@ def _check_network() -> bool:
     except Exception:
         return False
 
-def puml_validate_local(text: str) -> tuple[bool, str]:
-    """Basic local validation: check @startuml/@enduml balance, no bare > or < outside strings."""
-    lines = text.split('\n')
-    starts = sum(1 for l in lines if l.strip().startswith('@startuml'))
-    ends = sum(1 for l in lines if l.strip().startswith('@enduml'))
-    if starts != ends:
-        return False, f"Unbalanced @startuml/@enduml: {starts} start, {ends} end"
-    if starts == 0:
-        return False, "Missing @startuml"
-    # Check for common PlantUML syntax issues
-    for i, line in enumerate(lines, 1):
-        s = line.strip()
-        # Skip comments, empty lines, and skinparam
-        if not s or s.startswith('\'') or s.startswith('skinparam') or s.startswith('@') or s.startswith('legend') or s.startswith('endlegend'):
-            continue
-        # Line must be valid activity/class/entity syntax
-        if s.startswith('|'):
-            continue  # swimlane
-    return True, ""
-
 NETWORK_AVAIL = _check_network()
 
-def puml_validate(text: str) -> tuple[bool, str]:
-    """Validate PUML syntax - uses remote API if available, otherwise local."""
-    if NETWORK_AVAIL:
+def puml_validate_local(text: str) -> tuple[bool, str]:
+    """Local validation via plantuml.jar --check syntax, or basic check if jar not available."""
+    if HAS_LOCAL_PLANTUML:
         try:
-            encoded = puml_encode(text)
-            url = f"{PLANTUML_SERVER}/png/{encoded}"
-            resp = urlopen(url, timeout=15)
-            data = resp.read()
-            if data[:4] == b'\x89PNG':
+            proc = subprocess.run(
+                [_find_java(), "-jar", str(PLANTUML_JAR), "-checkyntax", "-stdin"],
+                input=text, capture_output=True, text=True, timeout=30
+            )
+            if proc.returncode == 0:
                 return True, ""
-            body = data.decode("utf-8", errors="replace")
-            if "error" in body.lower() or "exception" in body.lower():
-                return False, body[:500]
-            return True, ""
-        except URLError as e:
-            return False, f"Network error: {e.reason}"
+            return False, proc.stderr or proc.stdout
+        except subprocess.TimeoutExpired:
+            return False, "java timeout"
         except Exception as e:
             return False, str(e)
     else:
-        # Fallback to local validation
-        return puml_validate_local(text)
+        # Basic check: @startuml / @enduml balance
+        lines = text.split('\n')
+        starts = sum(1 for l in lines if l.strip().startswith('@startuml'))
+        ends = sum(1 for l in lines if l.strip().startswith('@enduml'))
+        if starts != ends:
+            return False, f"Unbalanced @startuml/@enduml: {starts} start, {ends} end"
+        if starts == 0:
+            return False, "Missing @startuml"
+        return True, ""
+
+def _puml_render_local(text: str, output_path: Path, fmt: str = "svg") -> bool:
+    """Render via local plantuml.jar."""
+    try:
+        proc = subprocess.run(
+            [_find_java(), "-jar", str(PLANTUML_JAR), "-t" + fmt, "-pipe", "-o", str(output_path.parent)],
+            input=text, capture_output=True, text=True, timeout=60
+        )
+        # plantuml.jar with -p outputs filename on stdout
+        if proc.returncode == 0:
+            expected = output_path.parent / output_path.name
+            if expected.exists():
+                shutil.move(str(expected), str(output_path))
+                return True
+        return False
+    except Exception:
+        return False
+
+def puml_validate(text: str) -> tuple[bool, str]:
+    """Validate PUML syntax - uses local plantuml.jar if available, else basic check."""
+    return puml_validate_local(text)
 
 def puml_render_to_svg(text: str, output_path: Path) -> bool:
-    """Render PUML to SVG and save to file."""
+    """Render PUML to SVG — uses local jar if available, else remote API."""
+    if HAS_LOCAL_PLANTUML:
+        return _puml_render_local(text, output_path, "svg")
+    # Fallback: remote API
     try:
         encoded = puml_encode(text)
         url = f"{PLANTUML_SERVER}/svg/{encoded}"
-        req = Request(url)
-        resp = urlopen(req, timeout=30)
+        resp = urlopen(url, timeout=30)
         svg = resp.read()
         output_path.write_bytes(svg)
         return True
