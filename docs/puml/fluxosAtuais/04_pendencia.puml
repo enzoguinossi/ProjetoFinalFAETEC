@@ -8,22 +8,11 @@ start
 nao realizadas
 ao fim do expediente;
 
-:Confere notas fiscais
+:Confere notas
 do dia anterior;
 
 :Separa itens que
 nao foram entregues;
-
-if (Motivo conhecido?) then (sim)
-  :Ausencia na escola;
-  :Escola recusou;
-  :Acesso negado;
-  :Falta de espaco;
-else (nao)
-  :Erro de rota;
-  :Item faltando
-  no carregamento;
-endif
 
 |Equipe|
 :Registra pendencia
@@ -36,11 +25,10 @@ rota do dia seguinte;
 para o expediente
 seguinte;
 
-|Ferramentas|
-note right
+legend right
   Sistemas: Trello,
   Papel, Planilha
-endnote
+endlegend
 
 stop
 @enduml

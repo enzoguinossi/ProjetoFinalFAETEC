@@ -22,10 +22,9 @@ com o solicitante;
 :Consolida cadastro
 de enderecos no Trello;
 
-|Ferramentas|
-note right
+legend right
   Sistemas: Papel, Trello, Telefone
-endnote
+endlegend
 
 stop
 @enduml
