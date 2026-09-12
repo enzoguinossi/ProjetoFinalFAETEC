@@ -172,25 +172,58 @@ def puml_render_to_svg(text: str, output_path: Path) -> bool:
         return False
 
 def md_to_pdf(md_path: Path, pdf_path: Path) -> bool:
-    """Convert markdown to PDF using md-to-pdf (node) if available,
-    otherwise by rendering via PlantUML's text output as a fallback."""
-    # Try md-to-pdf (node CLI) first
+    """Convert markdown to PDF using weasyprint + markdown."""
+    # Read markdown first (needed even in fallback)
     try:
-        subprocess.run(
-            ["npx", "md-to-pdf", str(md_path), str(pdf_path)],
-            capture_output=True, timeout=60, check=False
-        )
-        if pdf_path.exists() and pdf_path.stat().st_size > 0:
-            return True
-    except FileNotFoundError:
-        pass
+        md_content = md_path.read_text(encoding="utf-8")
+    except Exception:
+        return False
     
-    # Fallback: copy as text (not ideal, but preserves content)
-    print(f"  ⚠  md-to-pdf not available, copying {md_path.name} as text")
-    content = md_path.read_text(encoding="utf-8")
-    txt_path = pdf_path.with_suffix(".txt")
-    txt_path.write_text(content, encoding="utf-8")
-    return False
+    try:
+        import markdown
+        from weasyprint import HTML
+        
+        # Convert markdown to HTML
+        html = markdown.markdown(md_content, extensions=[
+            'tables', 'fenced_code', 'codehilite', 'nl2br', 'sane_lists'
+        ])
+        
+        # Wrap in full HTML with basic styling
+        full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {{ font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.5; margin: 2.5cm; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 9pt; }}
+  th, td {{ border: 1px solid #ccc; padding: 6px 8px; text-align: left; }}
+  th {{ background: #f0f0f0; }}
+  code {{ background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-size: 9pt; }}
+  pre code {{ display: block; padding: 12px; overflow-x: auto; }}
+  h1 {{ font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 6px; }}
+  h2 {{ font-size: 14pt; margin-top: 1.2em; }}
+  h3 {{ font-size: 12pt; }}
+  ul, ol {{ margin: 0.5em 0; }}
+  li {{ margin: 0.2em 0; }}
+</style>
+</head>
+<body>
+{html}
+</body>
+</html>"""
+        
+        # Generate PDF
+        HTML(string=full_html).write_pdf(str(pdf_path))
+        return True
+    except ImportError as e:
+        print(f"  ⚠  Missing dependency: {e}. Install with: uv pip install markdown weasyprint")
+        # Fallback: copy as text
+        txt_path = pdf_path.with_suffix(".txt")
+        txt_path.write_text(md_content, encoding="utf-8")
+        return False
+    except Exception as e:
+        print(f"  ⚠  PDF generation failed: {e}")
+        return False
 
 # ── validation ───────────────────────────────────────────────────
 
