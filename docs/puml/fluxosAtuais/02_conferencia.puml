@@ -32,11 +32,10 @@ if (Diverge da NF?) then (sim)
   :Avisa administracao;
 endif
 
-|Ferramentas|
-note right
+legend right
   Sistemas: Papel, Celular,
   Trello, Excel
-endnote
+endlegend
 
 stop
 @enduml

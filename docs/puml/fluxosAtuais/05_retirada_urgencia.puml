@@ -14,7 +14,7 @@ com o galpao;
 para retirada direta;
 
 |Jonathan|
-:Confere nota fiscal
+:Confere nota
 do item solicitado;
 
 :Localiza item
@@ -31,11 +31,10 @@ da retirada no Trello;
 :Regisa baixa manual
 na planilha de estoque;
 
-|Ferramentas|
-note right
+legend right
   Sistemas: Papel, Trello,
   Planilha Excel
-endnote
+endlegend
 
 stop
 @enduml

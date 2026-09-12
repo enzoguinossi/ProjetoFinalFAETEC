@@ -24,8 +24,8 @@ else (nao)
   (05_retirada_urgencia.puml);
 endif
 
-:Relatorio semestral
-(06_relatorio.puml);
+:Levantamento de estoque
+(06_levantamento_estoque.puml);
 
 stop
 

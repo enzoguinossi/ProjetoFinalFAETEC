@@ -1,0 +1,50 @@
+@startuml
+skinparam shadowing false
+title Levantamento de Estoque
+
+|Administracao|
+start
+:Solicita levantamento
+de estoque ao galpao;
+
+|Jonathan|
+:Recebe solicitacao
+da administracao;
+
+:Conta manualmente os
+itens disponiveis
+no estoque fisico;
+
+:Confere dados na
+planilha Excel;
+
+:Verifica produtos
+proximos ao vencimento;
+
+:Compila lista de
+itens disponiveis
+para distribuicao;
+
+:Elabora relatorio
+em papel;
+
+|Administracao|
+:Recebe relatorio
+do galpao;
+
+:Informa escolas
+sobre os produtos
+disponiveis;
+
+:Aguarda pedidos
+das escolas;
+
+legend right
+  Sistemas: Papel,
+  Planilha Excel
+  **Atores:** Jonathan,
+  Administracao
+endlegend
+
+stop
+@enduml

@@ -39,11 +39,10 @@ else (nao/parcial)
   nao entregue ao galpao;
 endif
 
-|Ferramentas|
-note right
+legend right
   Sistemas: Papel, Trello,
   Planilha, Celular
-endnote
+endlegend
 
 stop
 @enduml
