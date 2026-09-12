@@ -1,0 +1,49 @@
+name: Build Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'scripts/build_docs.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/**'
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Java (for PlantUML)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+          npm install -g md-to-pdf
+
+      - name: Validate PUML syntax
+        run: python3 scripts/build_docs.py --validate-only
+
+      - name: Build documentation
+        run: python3 scripts/build_docs.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-docs
+          path: docs/build/
+          retention-days: 30
