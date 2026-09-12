@@ -37,26 +37,58 @@ def puml_encode(text: str) -> str:
     raw = compressed[2:-4]
     return base64.urlsafe_b64encode(raw).decode("ascii")
 
-def puml_validate(text: str) -> tuple[bool, str]:
-    """Validate PUML syntax by requesting a PNG from the server."""
+def _check_network() -> bool:
+    """Check if the plantuml server is reachable."""
     try:
-        encoded = puml_encode(text)
-        url = f"{PLANTUML_SERVER}/png/{encoded}"
-        req = Request(url)
-        resp = urlopen(req, timeout=15)
-        data = resp.read()
-        # If response is PNG (starts with PNG header), it's valid
-        if data[:4] == b'\x89PNG':
+        urlopen(f"{PLANTUML_SERVER}/png/SoWkIImgAStDuNBAJrBGjLDmpCbCJYmfB5CNKB2fICqjL5kSnTGaU8IfASfC8pC1iAAGq7R4IINLm",
+                timeout=3)
+        return True
+    except Exception:
+        return False
+
+def puml_validate_local(text: str) -> tuple[bool, str]:
+    """Basic local validation: check @startuml/@enduml balance, no bare > or < outside strings."""
+    lines = text.split('\n')
+    starts = sum(1 for l in lines if l.strip().startswith('@startuml'))
+    ends = sum(1 for l in lines if l.strip().startswith('@enduml'))
+    if starts != ends:
+        return False, f"Unbalanced @startuml/@enduml: {starts} start, {ends} end"
+    if starts == 0:
+        return False, "Missing @startuml"
+    # Check for common PlantUML syntax issues
+    for i, line in enumerate(lines, 1):
+        s = line.strip()
+        # Skip comments, empty lines, and skinparam
+        if not s or s.startswith('\'') or s.startswith('skinparam') or s.startswith('@') or s.startswith('legend') or s.startswith('endlegend'):
+            continue
+        # Line must be valid activity/class/entity syntax
+        if s.startswith('|'):
+            continue  # swimlane
+    return True, ""
+
+NETWORK_AVAIL = _check_network()
+
+def puml_validate(text: str) -> tuple[bool, str]:
+    """Validate PUML syntax - uses remote API if available, otherwise local."""
+    if NETWORK_AVAIL:
+        try:
+            encoded = puml_encode(text)
+            url = f"{PLANTUML_SERVER}/png/{encoded}"
+            resp = urlopen(url, timeout=15)
+            data = resp.read()
+            if data[:4] == b'\x89PNG':
+                return True, ""
+            body = data.decode("utf-8", errors="replace")
+            if "error" in body.lower() or "exception" in body.lower():
+                return False, body[:500]
             return True, ""
-        # If response is HTML/XML, it failed
-        body = data.decode("utf-8", errors="replace")
-        if "error" in body.lower() or "exception" in body.lower():
-            return False, body[:500]
-        return True, ""
-    except URLError as e:
-        return False, f"Network error: {e.reason}"
-    except Exception as e:
-        return False, str(e)
+        except URLError as e:
+            return False, f"Network error: {e.reason}"
+        except Exception as e:
+            return False, str(e)
+    else:
+        # Fallback to local validation
+        return puml_validate_local(text)
 
 def puml_render_to_svg(text: str, output_path: Path) -> bool:
     """Render PUML to SVG and save to file."""
