@@ -979,7 +979,7 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 
 | ID | Regra | Prioridade |
 |----|-------|-----------|
-| RN001 | **Bloqueio por Falta de Estoque:** Uma remessa não pode ser liberada com status "Saiu para Entrega" se o produto não possuir `saldo_disponivel` suficiente | Essencial |
+| RN001 | **Alerta de Saldo Insuficiente:** Ao tentar criar ou liberar uma remessa com estoque insuficiente, o sistema deve **avisar** o usuário sobre a falta de saldo, mas **permitir que o fluxo continue**. Um bloqueio poderia atrasar a rotina operacional caso o estoque esteja desatualizado. | Essencial |
 | RN002 | **Alerta de Validade:** O sistema deve notificar automaticamente no mural de mensagens quando produtos perecíveis estiverem a 90, 60, 45 e 30 dias do vencimento, com base na `data_validade` do cadastro do produto | Essencial |
 | RN003 | **Pendência em Entrega Parcial:** Baixa parcial gera registro automático de pendência vinculado ao destinatário | Essencial |
 | RN004 | **Imutabilidade de Histórico:** Entradas confirmadas e baixas finalizadas não podem ser excluídas — apenas estornadas via ajuste com justificativa | Essencial |
