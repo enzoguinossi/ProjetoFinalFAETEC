@@ -14,3 +14,4 @@ docs/build/
 __pycache__/
 .cache/
 __pycache__/
+.env
