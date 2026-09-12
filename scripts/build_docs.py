@@ -101,7 +101,7 @@ def puml_validate_local(text: str) -> tuple[bool, str]:
             # Pipe to plantuml.jar; don't decode output (it's PNG binary)
             proc = subprocess.run(
                 [_find_java(), "-jar", str(PLANTUML_JAR), "-pipe", "-tpng"],
-                input=text, capture_output=True, timeout=30
+                input=text.encode("utf-8"), capture_output=True, timeout=30
             )
             if proc.returncode == 0:
                 return True, ""
@@ -124,20 +124,31 @@ def puml_validate_local(text: str) -> tuple[bool, str]:
         return True, ""
 
 def _puml_render_local(text: str, output_path: Path, fmt: str = "svg") -> bool:
-    """Render via local plantuml.jar."""
+    """Render via local plantuml.jar using temp file."""
+    import tempfile
     try:
+        # Write PUML to temp file
+        with tempfile.NamedTemporaryFile(suffix=".puml", mode="w", delete=False) as f:
+            f.write(text)
+            temp_puml = Path(f.name)
+        
+        # Render to output directory
         proc = subprocess.run(
-            [_find_java(), "-jar", str(PLANTUML_JAR), "-t" + fmt, "-pipe", "-o", str(output_path.parent)],
-            input=text, capture_output=True, text=True, timeout=60
+            [_find_java(), "-jar", str(PLANTUML_JAR), "-t" + fmt, "-o", str(output_path.parent), str(temp_puml)],
+            capture_output=True, timeout=60
         )
-        # plantuml.jar with -p outputs filename on stdout
-        if proc.returncode == 0:
-            expected = output_path.parent / output_path.name
-            if expected.exists():
-                shutil.move(str(expected), str(output_path))
-                return True
+        temp_puml.unlink(missing_ok=True)
+        
+        # The output file name is based on the input file name
+        expected = output_path.parent / temp_puml.with_suffix(f".{fmt}").name
+        # But we want it with output_path's name
+        if expected.exists():
+            import shutil
+            shutil.move(str(expected), str(output_path))
+            return True
         return False
-    except Exception:
+    except Exception as e:
+        print(f"  ⚠  Render error: {e}")
         return False
 
 def puml_validate(text: str) -> tuple[bool, str]:
