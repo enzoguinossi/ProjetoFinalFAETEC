@@ -1,0 +1,42 @@
+@startuml
+skinparam shadowing false
+title Conferencia de Produtos
+
+|Jonathan|
+start
+:Recebe mercadorias
+do fornecedor;
+
+:Contagem manual de
+cada item recebido;
+
+if (Produto perecivel?) then (sim)
+  :Verifica data de
+  validade manualmente;
+  :Anota validade mais
+  proxima no caderno;
+endif
+
+:Registra conferencia
+com fotos do celular;
+
+:Faz upload das fotos
+no Trello;
+
+:Valida quantidades
+na planilha Excel;
+
+if (Diverge da NF?) then (sim)
+  :Anota divergencia
+  manualmente;
+  :Avisa administracao;
+endif
+
+|Ferramentas|
+note right
+  Sistemas: Papel, Celular,
+  Trello, Excel
+endnote
+
+stop
+@enduml

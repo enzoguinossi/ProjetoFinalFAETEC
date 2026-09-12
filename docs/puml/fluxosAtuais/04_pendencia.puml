@@ -1,0 +1,46 @@
+@startuml
+skinparam shadowing false
+title Gestao de Pendencias
+
+|Jonathan|
+start
+:Identifica entregas
+nao realizadas
+ao fim do expediente;
+
+:Confere notas fiscais
+do dia anterior;
+
+:Separa itens que
+nao foram entregues;
+
+if (Motivo conhecido?) then (sim)
+  :Ausencia na escola;
+  :Escola recusou;
+  :Acesso negado;
+  :Falta de espaco;
+else (nao)
+  :Erro de rota;
+  :Item faltando
+  no carregamento;
+endif
+
+|Equipe|
+:Registra pendencia
+no cartao do Trello;
+:Adiciona item a
+rota do dia seguinte;
+
+|Jonathan|
+:Transita pendencias
+para o expediente
+seguinte;
+
+|Ferramentas|
+note right
+  Sistemas: Trello,
+  Papel, Planilha
+endnote
+
+stop
+@enduml
