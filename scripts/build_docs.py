@@ -172,40 +172,52 @@ def puml_render_to_svg(text: str, output_path: Path) -> bool:
         return False
 
 def md_to_pdf(md_path: Path, pdf_path: Path) -> bool:
-    """Convert markdown to PDF using fpdf2 (pure Python, Unicode via Arial)."""
+    """Convert markdown to PDF. Uses markdown-pdf (best tables), then fallbacks."""
     try:
         md_content = md_path.read_text(encoding="utf-8")
     except Exception:
         return False
-    
-    # Try weasyprint first (better quality)
+
+    # ── Primary: markdown-pdf (handles tables, UTF-8, CSS, TOC) ──
+    try:
+        from markdown_pdf import MarkdownPdf, Section
+
+        pdf = MarkdownPdf()
+        pdf.add_section(Section(md_content))
+        pdf.save(str(pdf_path))
+        return True
+    except Exception:
+        pass
+
+    # ── Fallback 1: weasyprint ──
     try:
         import markdown
         from weasyprint import HTML
+
         html = markdown.markdown(md_content, extensions=['tables', 'fenced_code', 'codehilite', 'nl2br'])
         full_html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>body{{font:11pt 'Segoe UI',Arial,sans-serif;line-height:1.5;margin:2.5cm}}
+<style>
+body{{font:11pt 'Segoe UI',Arial,sans-serif;line-height:1.5;margin:2.5cm}}
 table{{border-collapse:collapse;width:100%;margin:1em 0;font-size:9pt}}
-th,td{{border:1px solid #ccc;padding:6px 8px}}
-th{{background:#f0f0f0}}code{{background:#f5f5f5;padding:2px 5px;font-size:9pt}}
-pre code{{display:block;padding:12px;overflow-x:auto}}
-h1{{font-size:18pt}}</style></head><body>{html}</body></html>"""
+th,td{{border:1px solid #bbb;padding:6px 8px}}th{{background:#f0f0f0}}
+code{{background:#f5f5f5;padding:2px 5px;font-size:9pt}}
+pre code{{display:block;padding:12px}}h1{{font-size:18pt}}</style></head><body>{html}</body></html>"""
         HTML(string=full_html).write_pdf(str(pdf_path))
         return True
     except Exception:
         pass
-    
-    # Fallback: fpdf2 with Arial (Unicode-safe)
+
+    # ── Fallback 2: fpdf2 (pure Python, no native deps) ──
     try:
         from fpdf import FPDF
-        
-        fonts_dir = "C:/Windows/Fonts"
+
         pdf = FPDF()
+        fonts_dir = "C:/Windows/Fonts"
         pdf.add_font("A", "", f"{fonts_dir}/arial.ttf")
         pdf.add_font("A", "B", f"{fonts_dir}/arialbd.ttf")
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        
+
         lines = md_content.split('\n')
         in_code = False
         for line in lines:
@@ -241,7 +253,7 @@ h1{{font-size:18pt}}</style></head><body>{html}</body></html>"""
             else:
                 pdf.set_font("A", "", 9)
                 pdf.multi_cell(0, 4.5, sl)
-        
+
         pdf.output(str(pdf_path))
         return True
     except Exception as e:
