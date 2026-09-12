@@ -40,14 +40,17 @@ def _find_java() -> str | None:
         path = shutil.which(candidate)
         if path:
             return path
-    # Check common install dirs
-    for prog in [
-        r"C:\Program Files\Eclipse Adoptium\jre-*\bin\java.exe",
-        r"C:\Program Files\Java\*\bin\java.exe",
+    # Check common install dirs (Windows)
+    for base in [
+        Path("C:/Program Files/Eclipse Adoptium"),
+        Path("C:/Program Files/Java"),
+        Path("C:/Program Files (x86)/Java"),
     ]:
-        matches = sorted(Path(prog.split("\\")[0]).glob(prog.split("\\")[1]))
-        if matches:
-            return str(matches[-1])
+        if base.exists():
+            for jre_dir in base.iterdir():
+                java_exe = jre_dir / "bin" / "java.exe"
+                if java_exe.exists():
+                    return str(java_exe)
     return None
 
 def _ensure_plantuml_jar() -> Path | None:
@@ -63,7 +66,13 @@ def _ensure_plantuml_jar() -> Path | None:
         print(f"  ⚠  Could not download plantuml.jar: {e}")
         return None
 
-HAS_LOCAL_PLANTUML = _find_java() is not None and _ensure_plantuml_jar() is not None
+def _has_local_plantuml() -> bool:
+    """Check if local PlantUML (java + jar) is available."""
+    java = _find_java()
+    if java is None:
+        return False
+    jar = _ensure_plantuml_jar()
+    return jar is not None
 
 # ── helpers ──────────────────────────────────────────────────────
 
@@ -86,16 +95,19 @@ def _check_network() -> bool:
 NETWORK_AVAIL = _check_network()
 
 def puml_validate_local(text: str) -> tuple[bool, str]:
-    """Local validation via plantuml.jar --check syntax, or basic check if jar not available."""
-    if HAS_LOCAL_PLANTUML:
+    """Local validation via plantuml.jar pipe, or basic check if jar not available."""
+    if _has_local_plantuml():
         try:
+            # Pipe to plantuml.jar; don't decode output (it's PNG binary)
             proc = subprocess.run(
-                [_find_java(), "-jar", str(PLANTUML_JAR), "-checkyntax", "-stdin"],
-                input=text, capture_output=True, text=True, timeout=30
+                [_find_java(), "-jar", str(PLANTUML_JAR), "-pipe", "-tpng"],
+                input=text, capture_output=True, timeout=30
             )
             if proc.returncode == 0:
                 return True, ""
-            return False, proc.stderr or proc.stdout
+            # stderr contains error details
+            error = proc.stderr.decode("utf-8", errors="replace").strip()
+            return False, error if error else "Syntax error"
         except subprocess.TimeoutExpired:
             return False, "java timeout"
         except Exception as e:
@@ -134,7 +146,7 @@ def puml_validate(text: str) -> tuple[bool, str]:
 
 def puml_render_to_svg(text: str, output_path: Path) -> bool:
     """Render PUML to SVG — uses local jar if available, else remote API."""
-    if HAS_LOCAL_PLANTUML:
+    if _has_local_plantuml():
         return _puml_render_local(text, output_path, "svg")
     # Fallback: remote API
     try:
