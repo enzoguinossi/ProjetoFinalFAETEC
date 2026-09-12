@@ -172,57 +172,82 @@ def puml_render_to_svg(text: str, output_path: Path) -> bool:
         return False
 
 def md_to_pdf(md_path: Path, pdf_path: Path) -> bool:
-    """Convert markdown to PDF using weasyprint + markdown."""
-    # Read markdown first (needed even in fallback)
+    """Convert markdown to PDF using fpdf2 (pure Python, Unicode via Arial)."""
     try:
         md_content = md_path.read_text(encoding="utf-8")
     except Exception:
         return False
     
+    # Try weasyprint first (better quality)
     try:
         import markdown
         from weasyprint import HTML
-        
-        # Convert markdown to HTML
-        html = markdown.markdown(md_content, extensions=[
-            'tables', 'fenced_code', 'codehilite', 'nl2br', 'sane_lists'
-        ])
-        
-        # Wrap in full HTML with basic styling
-        full_html = f"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-  body {{ font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.5; margin: 2.5cm; }}
-  table {{ border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 9pt; }}
-  th, td {{ border: 1px solid #ccc; padding: 6px 8px; text-align: left; }}
-  th {{ background: #f0f0f0; }}
-  code {{ background: #f5f5f5; padding: 2px 5px; border-radius: 3px; font-size: 9pt; }}
-  pre code {{ display: block; padding: 12px; overflow-x: auto; }}
-  h1 {{ font-size: 18pt; border-bottom: 2px solid #333; padding-bottom: 6px; }}
-  h2 {{ font-size: 14pt; margin-top: 1.2em; }}
-  h3 {{ font-size: 12pt; }}
-  ul, ol {{ margin: 0.5em 0; }}
-  li {{ margin: 0.2em 0; }}
-</style>
-</head>
-<body>
-{html}
-</body>
-</html>"""
-        
-        # Generate PDF
+        html = markdown.markdown(md_content, extensions=['tables', 'fenced_code', 'codehilite', 'nl2br'])
+        full_html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>body{{font:11pt 'Segoe UI',Arial,sans-serif;line-height:1.5;margin:2.5cm}}
+table{{border-collapse:collapse;width:100%;margin:1em 0;font-size:9pt}}
+th,td{{border:1px solid #ccc;padding:6px 8px}}
+th{{background:#f0f0f0}}code{{background:#f5f5f5;padding:2px 5px;font-size:9pt}}
+pre code{{display:block;padding:12px;overflow-x:auto}}
+h1{{font-size:18pt}}</style></head><body>{html}</body></html>"""
         HTML(string=full_html).write_pdf(str(pdf_path))
         return True
-    except ImportError as e:
-        print(f"  ⚠  Missing dependency: {e}. Install with: uv pip install markdown weasyprint")
-        # Fallback: copy as text
+    except Exception:
+        pass
+    
+    # Fallback: fpdf2 with Arial (Unicode-safe)
+    try:
+        from fpdf import FPDF
+        
+        fonts_dir = "C:/Windows/Fonts"
+        pdf = FPDF()
+        pdf.add_font("A", "", f"{fonts_dir}/arial.ttf")
+        pdf.add_font("A", "B", f"{fonts_dir}/arialbd.ttf")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+        
+        lines = md_content.split('\n')
+        in_code = False
+        for line in lines:
+            sl = line.strip()
+            if sl.startswith('```'):
+                in_code = not in_code
+                continue
+            if in_code:
+                pdf.set_font("A", "", 8)
+                pdf.multi_cell(0, 4, line)
+                continue
+            if sl == '':
+                pdf.set_x(pdf.l_margin)
+                pdf.ln(2)
+                continue
+            pdf.set_x(pdf.l_margin)
+            if sl.startswith('# ') and not sl.startswith('## '):
+                pdf.set_font("A", "B", 12)
+                pdf.multi_cell(0, 7, sl[2:])
+            elif sl.startswith('## '):
+                pdf.set_font("A", "B", 10)
+                pdf.multi_cell(0, 6, sl[3:])
+            elif sl.startswith('|---') or sl.startswith('|---'):
+                continue
+            elif sl.startswith('|'):
+                pdf.set_font("A", "", 8)
+                cells = [c.strip() for c in sl.split('|')[1:-1]]
+                if cells:
+                    pdf.multi_cell(0, 4, ' | '.join(cells))
+            elif sl.startswith('- ') or sl.startswith('* '):
+                pdf.set_font("A", "", 9)
+                pdf.multi_cell(0, 5, '  ' + sl)
+            else:
+                pdf.set_font("A", "", 9)
+                pdf.multi_cell(0, 4.5, sl)
+        
+        pdf.output(str(pdf_path))
+        return True
+    except Exception as e:
+        print(f"  ⚠  PDF failed ({e}), saving as TXT")
         txt_path = pdf_path.with_suffix(".txt")
         txt_path.write_text(md_content, encoding="utf-8")
-        return False
-    except Exception as e:
-        print(f"  ⚠  PDF generation failed: {e}")
         return False
 
 # ── validation ───────────────────────────────────────────────────
