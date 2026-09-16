@@ -48,7 +48,7 @@ Um sistema web que centraliza:
 | **Stack** | Next.js 14+ (App Router) — Full Stack |
 | **ORM** | Prisma 7 |
 | **Banco de Dados** | MySQL |
-| **Autenticação** | NextAuth.js |
+| **Autenticação** | Better Auth |
 | **Versionamento** | GitHub |
 
 ---
