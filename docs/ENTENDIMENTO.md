@@ -45,34 +45,43 @@ Um sistema web que centraliza:
 
 | Camada | Tecnologia |
 |--------|-----------|
-| **Backend** | TypeScript + Node (API REST) |
-| **Frontend** | TypeScript + React (Web) |
+| **Stack** | Next.js 14+ (App Router) — Full Stack |
+| **ORM** | Prisma 7 |
 | **Banco de Dados** | MySQL |
+| **Autenticação** | NextAuth.js |
 | **Versionamento** | GitHub |
-| **Compartilhado** | Pasta `shared/` com tipos e funções auxiliares |
 
 ---
 
-## 2. Estrutura do Monorepo
+## 2. Estrutura do Projeto
 
 ```
 projeto-final-faetec/
-├── backend/           # API REST (TypeScript + Node)
-├── frontend/          # Interface web (TypeScript + React)
-├── shared/            # Tipos e funções compartilhadas
-│   └── types/
-│       ├── pessoal.ts
-│       ├── produto.ts
-│       ├── remessa.ts
-│       ├── rota.ts
-│       ├── acesso.ts
-│       └── ...
-├── docs/              # Documentação e diagramas
+├── src/
+│   ├── app/
+│   │   ├── api/           # Route Handlers (API)
+│   │   ├── (auth)/        # Login e autenticação
+│   │   ├── (dashboard)/   # Páginas protegidas do sistema
+│   │   ├── layout.tsx     # Layout raiz
+│   │   └── page.tsx       # Página inicial
+│   ├── components/        # Componentes React reutilizáveis
+│   ├── dao/               # Data Access Objects (Prisma queries)
+│   ├── services/          # Lógica de negócio
+│   ├── lib/               # Utilitários e helpers
+│   └── types/             # Interfaces e tipos TypeScript
+├── prisma/
+│   ├── schema.prisma      # Modelo de dados (54 entidades)
+│   ├── seed.ts            # Seed inicial
+│   └── migrations/        # Migrações do banco
+├── prisma.config.ts       # Configuração do Prisma 7
+├── docs/                  # Documentação e diagramas
 │   ├── ENTENDIMENTO.md
 │   └── puml/
-│       ├── classes.puml     # Diagrama de classes conceitual
-│       └── DER.puml         # Diagrama Entidade-Relacionamento
-├── package.json       # Monorepo root
+│       ├── classes.puml   # Diagrama de classes conceitual
+│       └── DER.puml       # Diagrama Entidade-Relacionamento
+├── public/                # Arquivos estáticos
+├── next.config.ts         # Configuração do Next.js
+├── package.json
 └── tsconfig.json
 ```
 
@@ -975,24 +984,7 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 
 ---
 
-## 4. Regras de Negócio (Consolidadas)
-
-| ID | Regra | Prioridade |
-|----|-------|-----------|
-| RN001 | **Alerta de Saldo Insuficiente:** Ao tentar criar ou liberar uma remessa com estoque insuficiente, o sistema deve **avisar** o usuário sobre a falta de saldo, mas **permitir que o fluxo continue**. Um bloqueio poderia atrasar a rotina operacional caso o estoque esteja desatualizado. | Essencial |
-| RN002 | **Alerta de Validade:** O sistema deve notificar automaticamente no mural de mensagens quando produtos perecíveis estiverem a 90, 60, 45 e 30 dias do vencimento, com base na `data_validade` do cadastro do produto | Essencial |
-| RN003 | **Pendência em Entrega Parcial:** Baixa parcial gera registro automático de pendência vinculado ao destinatário | Essencial |
-| RN004 | **Imutabilidade de Histórico:** Entradas confirmadas e baixas finalizadas não podem ser excluídas — apenas estornadas via ajuste com justificativa | Essencial |
-| RN005 | **Aprovação de Ajuste de Inventário:** Diferenças detectadas em inventário não geram ajuste automático — toda alteração no saldo precisa de aprovação manual de usuário com permissão `inventario.aprovar_ajuste` | Essencial |
-
----
-
-## 5. Requisitos Não Funcionais (Consolidados)
-
-| ID | Requisito | Categoria | Prioridade |
-|----|-----------|-----------|------------|
-| RNF001 | **Arquitetura Desktop Web:** Aplicação web conectada a SGBD MySQL | Arquitetura | Essencial |
-| RNF002 | **Desempenho:** Busca por código de barras ou Kanban < 2 segundos em rede local | Desempenho | Essencial |
-| RNF003 | **Usabilidade:** Interface simples e intuitiva para operadores de almoxarifado | Usabilidade | Essencial |
-| RNF004 | **Segurança/Perfis:** Acesso filtrado dinamicamente conforme perfil autenticado | Segurança | Essencial |
-| RNF005 | **Backup/Integridade:** Consistência referencial + rotinas de backup | Confiabilidade | Essencial |
+> **Documentos relacionados:**
+> - [Requisitos Funcionais](REQUISITOS_FUNCIONAIS.md) — 25 RFs
+> - [Regras de Negócio](REGRAS_NEGOCIO.md) — 5 RNs
+> - [Requisitos Não Funcionais](REQUISITOS_NAO_FUNCIONAIS.md) — 9 RNFs
