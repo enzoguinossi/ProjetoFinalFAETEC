@@ -1,5 +1,9 @@
 export { pessoaFisicaDAO } from "./pessoa-fisica";
 export { funcionarioDAO } from "./funcionario";
+export { usuarioDAO } from "./usuario";
 export { destinatarioDAO } from "./destinatario";
+export { fornecedorDAO } from "./fornecedor";
+export { condutorDAO } from "./condutor";
+export { veiculoDAO } from "./veiculo";
 export { produtoDAO } from "./produto";
 export { estoqueDAO } from "./estoque";
