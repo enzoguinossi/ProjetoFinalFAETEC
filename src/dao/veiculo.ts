@@ -24,7 +24,7 @@ export class VeiculoDAO {
     return prisma.$transaction(async (tx) => {
       const v = await tx.veiculo.create({ data: { ...data, status: "DISPONIVEL" } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa } },
       });
       return v;
     });
@@ -35,7 +35,7 @@ export class VeiculoDAO {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id } });
       const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { status } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { status: antes.status }, dados_novos: { status: depois.status } },
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { status: antes.status }, dados_novos: { status: depois.status } },
       });
       return depois;
     });
@@ -46,7 +46,7 @@ export class VeiculoDAO {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id } });
       const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { ativo: false } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
+        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
       });
       return depois;
     });

@@ -39,13 +39,13 @@ export class FornecedorDAO {
     return prisma.$transaction(async (tx) => {
       const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", entidade: "PessoaJuridica", id_entidade_afetada: pj.id_pessoa_juridica, dados_novos: { razao_social: data.razao_social } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "PessoaJuridica", id_entidade_afetada: pj.id_pessoa_juridica, dados_novos: { razao_social: data.razao_social } },
       });
       const forn = await tx.fornecedor.create({
         data: { id_pessoa_juridica: pj.id_pessoa_juridica, contato: data.contato, id_endereco: data.id_endereco },
       });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", entidade: "Fornecedor", id_entidade_afetada: forn.id_fornecedor, dados_novos: { contato: data.contato ?? null } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: forn.id_fornecedor, dados_novos: { contato: data.contato ?? null } },
       });
       return tx.fornecedor.findUniqueOrThrow({
         where: { id_fornecedor: forn.id_fornecedor },
@@ -59,7 +59,7 @@ export class FornecedorDAO {
       const antes = await tx.fornecedor.findUniqueOrThrow({ where: { id_fornecedor: id } });
       const depois = await tx.fornecedor.update({ where: { id_fornecedor: id }, data: { ativo: false } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
+        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
       });
       return depois;
     });

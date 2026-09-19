@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 type AcaoAuditoria = "CRIAR" | "ALTERAR" | "DESATIVAR" | "EXCLUIR";
 
@@ -17,8 +17,9 @@ export async function registrarAuditoria(
       acao,
       entidade,
       id_entidade_afetada,
-      dados_anteriores: dados_anteriores ?? Prisma.JsonNull,
-      dados_novos: dados_novos ?? Prisma.JsonNull,
+      data_hora: new Date(),
+      dados_anteriores: (dados_anteriores ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      dados_novos: (dados_novos ?? Prisma.JsonNull) as Prisma.InputJsonValue,
     },
   });
 }
