@@ -51,7 +51,7 @@ export class FuncionarioDAO {
       await tx.registroAuditoria.create({
         data: {
           id_usuario,
-          acao: "CRIAR",
+          acao: "CRIAR", data_hora: new Date(),
           entidade: "PessoaFisica",
           id_entidade_afetada: pf.id_pessoa_fisica,
           dados_novos: { nome: data.nome, cpf: data.cpf ?? null },
@@ -64,7 +64,7 @@ export class FuncionarioDAO {
       await tx.registroAuditoria.create({
         data: {
           id_usuario,
-          acao: "CRIAR",
+          acao: "CRIAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE,
           id_entidade_afetada: func.id_funcionario,
           dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica },

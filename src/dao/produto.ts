@@ -40,7 +40,7 @@ export class ProdutoDAO {
         data: { ...data, data_validade: data.data_validade ? new Date(data.data_validade) : undefined },
       });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao } },
       });
       return p;
     });
@@ -58,7 +58,7 @@ export class ProdutoDAO {
         data: { ...data, data_validade: data.data_validade ? new Date(data.data_validade) : undefined },
       });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel }, dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel } },
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel }, dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel } },
       });
       return depois;
     });
@@ -69,7 +69,7 @@ export class ProdutoDAO {
       const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
       const depois = await tx.produto.update({ where: { id_produto: id }, data: { ativo: false } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
+        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
       });
       return depois;
     });

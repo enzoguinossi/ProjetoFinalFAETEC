@@ -1,0 +1,18 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "login": "admin@nexus.com",
+    "senha": "123456"
+  }
+}

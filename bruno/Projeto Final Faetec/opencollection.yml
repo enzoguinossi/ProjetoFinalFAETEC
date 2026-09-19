@@ -1,0 +1,10 @@
+opencollection: 1.0.0
+
+info:
+  name: Projeto Final Faetec
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

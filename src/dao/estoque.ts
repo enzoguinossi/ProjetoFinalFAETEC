@@ -50,6 +50,7 @@ export class EstoqueDAO {
           quantidade,
           saldo_anterior,
           saldo_posterior,
+          data_hora: new Date(),
           observacao,
         },
       }),

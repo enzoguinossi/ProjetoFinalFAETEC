@@ -33,7 +33,7 @@ export class UsuarioDAO {
       await tx.registroAuditoria.create({
         data: {
           id_usuario,
-          acao: "CRIAR",
+          acao: "CRIAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE,
           id_entidade_afetada: u.id_usuario,
           dados_novos: { login: data.login, super_admin: data.super_admin ?? false },
@@ -48,7 +48,7 @@ export class UsuarioDAO {
     return prisma.$transaction(async (tx) => {
       const u = await tx.usuario.update({ where: { id_usuario: id }, data: { senha_hash } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", entidade: AUDIT_ENTIDADE, id_entidade_afetada: id, dados_novos: { senha_alterada: true } },
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: AUDIT_ENTIDADE, id_entidade_afetada: id, dados_novos: { senha_alterada: true } },
       });
       return u;
     });
