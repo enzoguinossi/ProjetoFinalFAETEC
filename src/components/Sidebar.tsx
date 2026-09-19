@@ -3,87 +3,109 @@
 import { useState } from "react";
 import styles from "./Sidebar.module.css";
 
-type MenuItem = {
-  label: string;
-  icon: string;
-  href?: string;
-  active?: boolean;
-};
-
-const cadastrosItems: MenuItem[] = [
-  { label: "Usuários", icon: "👤" },
-  { label: "Funcionários", icon: "🏢" },
-  { label: "Destinatários", icon: "🏫" },
-  { label: "Produtos", icon: "📦" },
-  { label: "Fornecedores", icon: "🚚" },
-  { label: "Condutores", icon: "🧑‍🔧" },
-  { label: "Veículos", icon: "🚛" },
-];
-
-const navItems: MenuItem[] = [
-  { label: "Mov. Estoque", icon: "📦", active: true },
-  { label: "Pedidos", icon: "📋" },
-  { label: "Relatórios", icon: "📊" },
-];
-
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
-  const [activeItem, setActiveItem] = useState("Mov. Estoque");
+  const [activeItem, setActiveItem] = useState("Dashboard");
 
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        <div className={styles.logoText}>NEXUS</div>
-        <div className={styles.logoSub}>SISTEMA LOGÍSTICO</div>
+      {/* Logo */}
+      <div className={styles.logoArea}>
+        <img src="/logo.svg" alt="Nexus" className={styles.logo} />
       </div>
 
-      <div className={styles.divider} />
+      {/* Botões de ação */}
+      <div className={styles.buttonGroup}>
+        <button className={styles.iconBtn}>
+          <img src="/icons/actions/config.svg" alt="Config" />
+        </button>
+        <button className={styles.iconBtn}>
+          <img src="/icons/actions/sino.svg" alt="Notificações" />
+        </button>
+      </div>
 
+      {/* Menu de navegação */}
       <nav className={styles.nav}>
-        {/* Cadastros */}
+        {/* Dashboard */}
         <button
-          className={styles.sectionBtn}
-          onClick={() => setCadastrosOpen(!cadastrosOpen)}
+          className={`${styles.navItem} ${activeItem === "Dashboard" ? styles.active : ""}`}
+          onClick={() => setActiveItem("Dashboard")}
         >
-          <span className={styles.arrow}>{cadastrosOpen ? "▼" : "▶"}</span>
-          CADASTROS
+          <img src="/icons/nav/dashboard.svg" alt="" className={styles.icon} />
+          <span>Dashboard</span>
         </button>
 
-        {cadastrosOpen && (
-          <div className={styles.subItems}>
-            {cadastrosItems.map((item) => (
-              <button
-                key={item.label}
-                className={styles.subItem}
-                onClick={() => setActiveItem(item.label)}
-              >
-                {item.icon} {item.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className={styles.divider} />
-
-        {navItems.map((item) => (
+        {/* Cadastros (collapsible) */}
+        <div>
           <button
-            key={item.label}
-            className={`${styles.navItem} ${activeItem === item.label ? styles.active : ""}`}
-            onClick={() => setActiveItem(item.label)}
+            className={styles.navItem}
+            onClick={() => setCadastrosOpen(!cadastrosOpen)}
           >
-            {item.icon} {item.label}
+            <img src="/icons/nav/cadastros.svg" alt="" className={styles.icon} />
+            <span>Cadastros</span>
+            <img
+              src={cadastrosOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
+              alt=""
+              className={styles.arrow}
+            />
           </button>
-        ))}
+
+          {cadastrosOpen && (
+            <div className={styles.subItems}>
+              {[
+                { label: "Usuários", icon: "/icons/cadastros/usuario.svg" },
+                { label: "Funcionários", icon: "/icons/cadastros/funcionarios.svg" },
+                { label: "Destinatários", icon: "/icons/cadastros/escola.svg" },
+                { label: "Produtos", icon: "/icons/cadastros/produto.svg" },
+                { label: "Fornecedores", icon: "/icons/nav/dados.svg" },
+                { label: "Condutores", icon: "/icons/cadastros/funcionarios.svg" },
+                { label: "Veículos", icon: "/icons/cadastros/carro.svg" },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  className={`${styles.subItem} ${activeItem === item.label ? styles.activeSub : ""}`}
+                  onClick={() => setActiveItem(item.label)}
+                >
+                  <img src={item.icon} alt="" className={styles.subIcon} />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mov. Estoque */}
+        <button
+          className={`${styles.navItem} ${activeItem === "Mov. Estoque" ? styles.active : ""}`}
+          onClick={() => setActiveItem("Mov. Estoque")}
+        >
+          <img src="/icons/nav/estoque.svg" alt="" className={styles.icon} />
+          <span>Mov. Estoque</span>
+        </button>
+
+        {/* Pedidos */}
+        <button
+          className={`${styles.navItem} ${activeItem === "Pedidos" ? styles.active : ""}`}
+          onClick={() => setActiveItem("Pedidos")}
+        >
+          <img src="/icons/nav/dados.svg" alt="" className={styles.icon} />
+          <span>Pedidos</span>
+        </button>
+
+        {/* Relatórios */}
+        <button
+          className={`${styles.navItem} ${activeItem === "Relatórios" ? styles.active : ""}`}
+          onClick={() => setActiveItem("Relatórios")}
+        >
+          <img src="/icons/nav/estoque.svg" alt="" className={styles.icon} />
+          <span>Relatórios</span>
+        </button>
       </nav>
 
-      <div className={styles.divider} />
-
-      <div className={styles.profile}>
-        <div className={styles.avatar}>J</div>
-        <div>
-          <div className={styles.profileName}>Jonathan</div>
-          <div className={styles.profileRole}>Operador do Galpão</div>
-        </div>
+      {/* Informações do Usuário */}
+      <div className={styles.userInfo}>
+        <div className={styles.userAvatar}>J</div>
+        <span className={styles.userName}>Jonathan</span>
       </div>
     </aside>
   );
