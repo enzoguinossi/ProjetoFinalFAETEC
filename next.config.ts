@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["better-auth"],
+  serverExternalPackages: [],
   experimental: {
     typedEnv: true,
   },

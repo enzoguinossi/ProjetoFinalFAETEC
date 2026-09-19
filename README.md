@@ -9,7 +9,7 @@ Sistema de Controle de Estoque e Logística de Remessas para galpão logístico 
 | **Stack** | Next.js 14+ (App Router) — Full Stack |
 | **ORM** | Prisma 7 |
 | **Banco** | MySQL |
-| **Autenticação** | Better Auth |
+| **Autenticação** | Feita na mão (bcrypt + JWT) |
 | **Versionamento** | GitHub |
 
 ## Estrutura
