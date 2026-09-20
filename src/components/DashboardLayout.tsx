@@ -24,7 +24,7 @@ export default function DashboardLayout({
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label="Toggle sidebar"
           >
-            <img src="icons/actions/hamburguer.svg" alt="hamburguer" />
+            <img src="public/icons/actions/hamburguer.svg" alt="hamburguer"/>
           </button>
           {title && <h1 className={styles.title}>{title}</h1>}
         </header>

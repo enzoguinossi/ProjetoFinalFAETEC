@@ -15,6 +15,7 @@
   "/funcionarios/page": "/funcionarios",
   "/login/page": "/login",
   "/page": "/",
+  "/primeiro-acesso/page": "/primeiro-acesso",
   "/produtos/novo/page": "/produtos/novo",
   "/produtos/page": "/produtos",
   "/usuarios/novo/page": "/usuarios/novo",
