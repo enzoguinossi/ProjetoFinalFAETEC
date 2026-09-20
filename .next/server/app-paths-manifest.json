@@ -9,11 +9,15 @@
   "/api/veiculos/route": "app/api/veiculos/route.js",
   "/condutores/page": "app/condutores/page.js",
   "/dashboard/page": "app/dashboard/page.js",
+  "/definir-senha/page": "app/definir-senha/page.js",
   "/destinatarios/page": "app/destinatarios/page.js",
   "/fornecedores/page": "app/fornecedores/page.js",
   "/funcionarios/page": "app/funcionarios/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
+  "/produtos/novo/page": "app/produtos/novo/page.js",
   "/produtos/page": "app/produtos/page.js",
+  "/usuarios/novo/page": "app/usuarios/novo/page.js",
+  "/usuarios/page": "app/usuarios/page.js",
   "/veiculos/page": "app/veiculos/page.js"
 }

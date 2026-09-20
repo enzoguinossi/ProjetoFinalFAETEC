@@ -1,6 +1,7 @@
-import { PrismaClient, TipoDestinatario, StatusVeiculo } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import "dotenv/config";
+import bcrypt from "bcryptjs";
+import { TipoDestinatario, StatusVeiculo } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
 
 async function main() {
   console.log("🌱 Seeding Nexus...");
@@ -300,6 +301,21 @@ async function main() {
     });
   }
   console.log(`  ✅ ${veiculos.length} veículos`);
+
+  // ── Super Admin ──
+  const adminFuncionario = funcionarios[0]; // João Ruan
+  const senhaHash = await bcrypt.hash("admin", 10);
+  await prisma.usuario.upsert({
+    where: { id_funcionario: adminFuncionario.id_funcionario },
+    update: {},
+    create: {
+      id_funcionario: adminFuncionario.id_funcionario,
+      login: "admin",
+      senha_hash: senhaHash,
+      super_admin: true,
+    },
+  });
+  console.log("  ✅ Super Admin (login: admin / senha: admin)");
 
   console.log("\n✨ Seed concluído!");
 }

@@ -2,6 +2,7 @@
 
 import { produtoDAO } from "@/dao/produto";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 
 export type ProdutoItem = { id_produto: number; descricao: string };
 
@@ -58,8 +59,9 @@ export async function createProduto(formData: FormData) {
     insumos.push({ id_produto_filho: id, quantidade: qtd });
   }
 
-  // Usuário hardcoded por enquanto (Super Admin)
-  const id_usuario = 1;
+  // Usuário autenticado
+  const user = await requireUser();
+  const id_usuario = user.id_usuario;
 
   await produtoDAO.createCompleto(
     {

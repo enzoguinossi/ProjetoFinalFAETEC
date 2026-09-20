@@ -1,5 +1,72 @@
 {
-  "node": {},
+  "node": {
+    "40caf541d7866785643fdead8e981951b13ebfb167": {
+      "workers": {
+        "app/definir-senha/page": {
+          "moduleId": 60906,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/definir-senha/actions.ts",
+      "exportedName": "definirSenhaAction"
+    },
+    "408a2b1dfbded1e8c56c132eacacb943c36b47e6ad": {
+      "workers": {
+        "app/login/page": {
+          "moduleId": 40246,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/login/actions.ts",
+      "exportedName": "loginAction"
+    },
+    "40218805e2403e5b1f4c732ba8400bcd9fb3ee874f": {
+      "workers": {
+        "app/produtos/novo/page": {
+          "moduleId": 99637,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/produtos/novo/actions.ts",
+      "exportedName": "createProduto"
+    },
+    "405b20a0c367eaea6deacc2f914da03b6d4d4d3640": {
+      "workers": {
+        "app/produtos/novo/page": {
+          "moduleId": 99637,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/produtos/novo/actions.ts",
+      "exportedName": "searchProdutos"
+    },
+    "002c393bde9a23f0c81610245928f7afeb628f7b6e": {
+      "workers": {
+        "app/usuarios/novo/page": {
+          "moduleId": 40698,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/usuarios/novo/actions.ts",
+      "exportedName": "listFuncionarios"
+    },
+    "402e73559c54068eceb96984d7bd114c349427d5a2": {
+      "workers": {
+        "app/usuarios/novo/page": {
+          "moduleId": 40698,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/usuarios/novo/actions.ts",
+      "exportedName": "createUsuario"
+    }
+  },
   "edge": {},
   "encryptionKey": "GdwXNOQslnS34wDeycygz1GCxpRxWOHrWTu3t8VAozw="
 }

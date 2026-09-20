@@ -424,9 +424,11 @@ Não implemente um novo fluxo de entrega sem verificar:
 
 ---
 
-# 15. Código e arquitetura
+## 15. Código e arquitetura
 
 Prefira a arquitetura já existente no projeto.
+
+**Server Actions são o padrão para mutações e leituras da UI.** API Routes (`src/app/api/`) devem ser usadas apenas quando o endpoint precisa ser consumido por sistemas externos (webhooks, integrações) ou quando a Server Action não atende (ex: upload de arquivo grande com progresso). Nunca crie uma API Route para servir a própria interface — chame o DAO diretamente via Server Action.
 
 Quando apropriado:
 

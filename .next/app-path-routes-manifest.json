@@ -9,11 +9,15 @@
   "/api/veiculos/route": "/api/veiculos",
   "/condutores/page": "/condutores",
   "/dashboard/page": "/dashboard",
+  "/definir-senha/page": "/definir-senha",
   "/destinatarios/page": "/destinatarios",
   "/fornecedores/page": "/fornecedores",
   "/funcionarios/page": "/funcionarios",
   "/login/page": "/login",
   "/page": "/",
+  "/produtos/novo/page": "/produtos/novo",
   "/produtos/page": "/produtos",
+  "/usuarios/novo/page": "/usuarios/novo",
+  "/usuarios/page": "/usuarios",
   "/veiculos/page": "/veiculos"
 }
