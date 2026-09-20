@@ -1,3 +1,13 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { flexRender } from "@tanstack/react-table";
+import {
+  useLegacyTable,
+  getCoreRowModel,
+  getPaginationRowModel,
+} from "@tanstack/react-table/legacy";
+import type { PaginationState } from "@tanstack/react-table";
 import styles from "./DataTable.module.css";
 
 export interface Column<T> {
@@ -7,17 +17,18 @@ export interface Column<T> {
   render?: (value: T[keyof T], row: T) => React.ReactNode;
 }
 
-export interface Action {
+export interface Action<T> {
   icon: string;
   label: string;
-  onClick: (rowIndex: number) => void;
+  onClick: (row: T) => void;
 }
 
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
-  actions?: Action[];
+  actions?: Action<T>[];
   keyExtractor: (row: T, index: number) => string | number;
+  pageSize?: number;
 }
 
 export default function DataTable<T extends Record<string, unknown>>({
@@ -25,55 +36,162 @@ export default function DataTable<T extends Record<string, unknown>>({
   data,
   actions,
   keyExtractor,
+  pageSize = 10,
 }: DataTableProps<T>) {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize,
+  });
+
+  // Convert our Column[] to TanStack ColumnDef[]
+  const tanstackColumns = useMemo(
+    () =>
+      columns.map((col) => ({
+        accessorKey: col.key,
+        header: col.label,
+        cell: (info: { getValue: () => unknown; row: { original: T } }) => {
+          if (col.render) {
+            return col.render(info.getValue() as T[keyof T], info.row.original);
+          }
+          return String(info.getValue() ?? "");
+        },
+        meta: { width: col.width },
+      })),
+    [columns],
+  );
+
+  const table = useLegacyTable({
+    columns: tanstackColumns,
+    data,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onPaginationChange: setPagination,
+    state: { pagination },
+    autoResetPageIndex: false,
+  });
+
   const gridCols = columns
     .map((c) => c.width || "1fr")
     .concat(actions ? "178px" : "")
     .join(" ");
 
   return (
-    <div className={styles.scrollWrapper}>
-      <div className={styles.table}>
-        {/* Header */}
-        <div className={styles.header} style={{ gridTemplateColumns: gridCols }}>
-          {columns.map((col) => (
-            <div key={col.key} className={styles.headerCell}>
-              {col.label}
-            </div>
-          ))}
-          {actions && <div className={styles.headerCell}>Ações</div>}
-        </div>
-
-        {/* Rows */}
-        {data.map((row, idx) => (
-          <div
-            key={keyExtractor(row, idx)}
-            className={`${styles.row} ${idx % 2 === 1 ? styles.rowAlt : ""}`}
-            style={{ gridTemplateColumns: gridCols }}
-          >
-            {columns.map((col) => (
-              <div key={col.key} className={styles.cell}>
-                {col.render
-                  ? col.render(row[col.key], row)
-                  : String(row[col.key] ?? "")}
+    <div className={styles.wrapper}>
+      <div className={styles.scrollWrapper}>
+        <div className={styles.table}>
+          {/* Header */}
+          <div className={styles.header} style={{ gridTemplateColumns: gridCols }}>
+            {table.getHeaderGroups()[0]?.headers.map((header) => (
+              <div key={header.id} className={styles.headerCell}>
+                {flexRender(header.column.columnDef.header, header.getContext())}
               </div>
             ))}
-            {actions && (
-              <div className={styles.actions}>
-                {actions.map((action, i) => (
-                  <button
-                    key={i}
-                    className={styles.actionBtn}
-                    onClick={() => action.onClick(idx)}
-                    title={action.label}
-                  >
-                    <img src={action.icon} alt={action.label}/>
-                  </button>
-                ))}
-              </div>
-            )}
+            {actions && <div className={styles.headerCell}>Ações</div>}
           </div>
-        ))}
+
+          {/* Rows */}
+          {table.getRowModel().rows.length > 0 ? (
+            table.getRowModel().rows.map((row) => {
+              const original = row.original as T;
+              const key = keyExtractor(original, row.index);
+              return (
+                <div
+                  key={key}
+                  className={`${styles.row} ${row.index % 2 === 1 ? styles.rowAlt : ""}`}
+                  style={{ gridTemplateColumns: gridCols }}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <div key={cell.id} className={styles.cell}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </div>
+                  ))}
+                  {actions && (
+                    <div className={styles.actions}>
+                      {actions.map((action, i) => (
+                        <button
+                          key={i}
+                          className={styles.actionBtn}
+                          onClick={() => action.onClick(original)}
+                          title={action.label}
+                        >
+                          <img src={action.icon} alt={action.label} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className={styles.empty}>Nenhum registro encontrado.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      <div className={styles.pagination}>
+        <button
+          className={styles.pageBtn}
+          onClick={() => table.firstPage()}
+          disabled={!table.getCanPreviousPage()}
+          title="Primeira página"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M12 4L8 8L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M8 4L4 8L8 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button
+          className={styles.pageBtn}
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+          title="Página anterior"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        <span className={styles.pageInfo}>
+          Página{" "}
+          <strong>
+            {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+          </strong>
+        </span>
+
+        <button
+          className={styles.pageBtn}
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+          title="Próxima página"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button
+          className={styles.pageBtn}
+          onClick={() => table.lastPage()}
+          disabled={!table.getCanNextPage()}
+          title="Última página"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M4 4L8 8L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M8 4L12 8L8 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        <select
+          className={styles.pageSizeSelect}
+          value={table.getState().pagination.pageSize}
+          onChange={(e) => table.setPageSize(Number(e.target.value))}
+        >
+          {[5, 10, 20, 50].map((size) => (
+            <option key={size} value={size}>
+              {size} por página
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

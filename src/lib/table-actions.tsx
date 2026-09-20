@@ -1,9 +1,19 @@
 import type { Action } from "@/components/DataTable";
 
-const log = (label: string) => (i: number) => console.log(label, i);
-
-export const tableActions: Action[] = [
-  { icon: "icons/actions/editar.svg", label: "Editar", onClick: log("Edit") },
-  { icon: "icons/actions/olho.svg", label: "Visualizar", onClick: log("View") },
-  { icon: "icons/actions/lixeira.svg", label: "Excluir", onClick: log("Delete")},
+export const tableActions: Action<Record<string, unknown>>[] = [
+  {
+    icon: "/icons/actions/Editar.svg",
+    label: "Editar",
+    onClick: (row) => console.log("Edit", row),
+  },
+  {
+    icon: "/icons/actions/Olho.svg",
+    label: "Visualizar",
+    onClick: (row) => console.log("View", row),
+  },
+  {
+    icon: "/icons/actions/Lixeira.svg",
+    label: "Excluir",
+    onClick: (row) => console.log("Delete", row),
+  },
 ];
