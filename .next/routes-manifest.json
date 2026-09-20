@@ -1,6 +1,7 @@
 {
   "version": 3,
   "pages404": true,
+  "appType": "app",
   "caseSensitive": false,
   "basePath": "",
   "redirects": [
@@ -8,11 +9,13 @@
       "source": "/:path+/",
       "destination": "/:path+",
       "internal": true,
+      "priority": true,
       "statusCode": 308,
       "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
     }
   ],
   "headers": [],
+  "onMatchHeaders": [],
   "rewrites": {
     "beforeFiles": [],
     "afterFiles": [],
@@ -27,16 +30,100 @@
       "namedRegex": "^/(?:/)?$"
     },
     {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
       "page": "/_not-found",
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
+      "page": "/api/condutores",
+      "regex": "^/api/condutores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/condutores(?:/)?$"
+    },
+    {
+      "page": "/api/destinatarios",
+      "regex": "^/api/destinatarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/destinatarios(?:/)?$"
+    },
+    {
+      "page": "/api/fornecedores",
+      "regex": "^/api/fornecedores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/fornecedores(?:/)?$"
+    },
+    {
+      "page": "/api/funcionarios",
+      "regex": "^/api/funcionarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/funcionarios(?:/)?$"
+    },
+    {
+      "page": "/api/produtos",
+      "regex": "^/api/produtos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/produtos(?:/)?$"
+    },
+    {
+      "page": "/api/veiculos",
+      "regex": "^/api/veiculos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/veiculos(?:/)?$"
+    },
+    {
+      "page": "/condutores",
+      "regex": "^/condutores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/condutores(?:/)?$"
+    },
+    {
+      "page": "/dashboard",
+      "regex": "^/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard(?:/)?$"
+    },
+    {
+      "page": "/destinatarios",
+      "regex": "^/destinatarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/destinatarios(?:/)?$"
+    },
+    {
+      "page": "/fornecedores",
+      "regex": "^/fornecedores(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/fornecedores(?:/)?$"
+    },
+    {
+      "page": "/funcionarios",
+      "regex": "^/funcionarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/funcionarios(?:/)?$"
+    },
+    {
       "page": "/login",
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/produtos",
+      "regex": "^/produtos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/produtos(?:/)?$"
+    },
+    {
+      "page": "/veiculos",
+      "regex": "^/veiculos(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/veiculos(?:/)?$"
     }
   ],
   "dataRoutes": [],
@@ -47,10 +134,11 @@
     "didPostponeHeader": "x-nextjs-postponed",
     "contentTypeHeader": "text/x-component",
     "suffix": ".rsc",
-    "prefetchSuffix": ".prefetch.rsc",
     "prefetchSegmentHeader": "next-router-segment-prefetch",
     "prefetchSegmentSuffix": ".segment.rsc",
-    "prefetchSegmentDirSuffix": ".segments"
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
   },
   "rewriteHeaders": {
     "pathHeader": "x-nextjs-rewritten-path",

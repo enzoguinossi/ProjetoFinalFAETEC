@@ -1,15 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { tableActions } from "@/lib/table-actions";
-
-const data = [
-  { codigo: "000001", descricao: "Mesa Verde Professor", qtd: "20", livre: "10" },
-  { codigo: "000002", descricao: "Cadeira Verde Professor", qtd: "20", livre: "10" },
-  { codigo: "000003", descricao: "Giz Branco", qtd: "50", livre: "30" },
-];
 
 const columns = [
   { key: "codigo" as const, label: "Código", width: "1fr" },
@@ -19,10 +14,24 @@ const columns = [
 ];
 
 export default function ProdutosPage() {
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/produtos")
+      .then((r) => r.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <DashboardLayout title="Produtos">
       <SearchBar placeholder="Pesquisar produtos..." />
-      <DataTable columns={columns} data={data} actions={tableActions} keyExtractor={(r) => r.codigo} />
+      {loading ? (
+        <p style={{ padding: "1rem", color: "#697077" }}>Carregando...</p>
+      ) : (
+        <DataTable columns={columns} data={data} actions={tableActions} keyExtractor={(r) => r.codigo as string} />
+      )}
     </DashboardLayout>
   );
 }

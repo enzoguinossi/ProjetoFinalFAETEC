@@ -1,14 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { tableActions } from "@/lib/table-actions";
-
-const data = [
-  { codigo: "001", nome: "Gabriel Pereira", cnh: "SP 123456789" },
-  { codigo: "002", nome: "Thiago Almeida", cnh: "RJ 987654321" },
-];
 
 const columns = [
   { key: "codigo" as const, label: "Código", width: "1fr" },
@@ -17,10 +13,24 @@ const columns = [
 ];
 
 export default function CondutoresPage() {
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/condutores")
+      .then((r) => r.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <DashboardLayout title="Condutores">
       <SearchBar placeholder="Pesquisar condutores..." />
-      <DataTable columns={columns} data={data} actions={tableActions} keyExtractor={(r) => r.codigo} />
+      {loading ? (
+        <p style={{ padding: "1rem", color: "#697077" }}>Carregando...</p>
+      ) : (
+        <DataTable columns={columns} data={data} actions={tableActions} keyExtractor={(r) => r.codigo as string} />
+      )}
     </DashboardLayout>
   );
 }
