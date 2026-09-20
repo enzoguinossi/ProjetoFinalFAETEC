@@ -15,42 +15,44 @@ export default function LoginForm() {
   return (
     <div className={styles.wrapper}>
       <form className={styles.card} onSubmit={handleSubmit}>
-        <div className={styles.header}>
-          <div className={styles.logo}>NEXUS</div>
-          <div className={styles.logoSub}>SISTEMA LOGÍSTICO</div>
+        {/* Logo */}
+        <div className={styles.logoArea}>
+          <img src="/logo.svg" alt="Nexus" className={styles.logo} />
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>E-mail</label>
-          <input
-            className={styles.input}
-            type="email"
-            placeholder="seu@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+        {/* Form */}
+        <div className={styles.formArea}>
+          <div className={styles.field}>
+            <label className={styles.label}>Email</label>
+            <input
+              className={styles.input}
+              type="email"
+              placeholder="seu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Senha</label>
+            <input
+              className={styles.input}
+              type="password"
+              placeholder="••••••••"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              required
+            />
+          </div>
+
+          <button className={styles.button} type="submit">
+            Entrar
+          </button>
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.label}>Senha</label>
-          <input
-            className={styles.input}
-            type="password"
-            placeholder="••••••••"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            required
-          />
-        </div>
-
-        <button className={styles.button} type="submit">
-          Acessar
-        </button>
-
-        <div className={styles.forgot}>
-          <a href="#">Esqueceu a senha?</a>
-        </div>
+        {/* Versão */}
+        <div className={styles.version}>V1.0.0</div>
       </form>
     </div>
   );

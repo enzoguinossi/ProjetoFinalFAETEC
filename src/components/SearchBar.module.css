@@ -1,0 +1,78 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  height: 2.875rem;
+  padding: 0 0.6875rem;
+  box-sizing: border-box;
+}
+
+.searchWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid #c1c7cd;
+  border-radius: 8px;
+  background: #ffffff;
+  transition: border-color 0.15s;
+}
+
+.searchWrapper:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px rgba(27, 153, 86, 0.12);
+}
+
+.searchIcon {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: Inter, sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-dark);
+  height: 100%;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: #8a8f9a;
+}
+
+.novoBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--green);
+  color: #ffffff;
+  font-family: Inter, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.novoBtn:hover {
+  background: var(--green-hover);
+}
+
+.novoBtn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}

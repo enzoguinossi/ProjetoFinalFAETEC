@@ -1,11 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import styles from "./Sidebar.module.css";
+
+const cadastroItems = [
+  { label: "Usuários", path: "/usuarios", icon: "/icons/cadastros/usuario.svg" },
+  { label: "Funcionários", path: "/funcionarios", icon: "/icons/cadastros/funcionarios.svg" },
+  { label: "Destinatários", path: "/destinatarios", icon: "/icons/cadastros/escola.svg" },
+  { label: "Produtos", path: "/produtos", icon: "/icons/cadastros/produto.svg" },
+  { label: "Fornecedores", path: "/fornecedores", icon: "/icons/nav/dados.svg" },
+  { label: "Condutores", path: "/condutores", icon: "/icons/cadastros/funcionarios.svg" },
+  { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg" },
+];
+
+const navItems = [
+  { label: "Dashboard", path: "/dashboard", icon: "/icons/nav/dashboard.svg" },
+  { label: "Mov. Estoque", path: "/mov-estoque", icon: "/icons/nav/estoque.svg" },
+  { label: "Pedidos", path: "/pedidos", icon: "/icons/nav/dados.svg" },
+  { label: "Relatórios", path: "/relatorios", icon: "/icons/nav/estoque.svg" },
+];
 
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
-  const [activeItem, setActiveItem] = useState("Dashboard");
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const navigate = (path: string) => router.push(path);
+
+  const isActive = (path: string) => pathname === path;
+  const isCadastroItemActive = cadastroItems.some((i) => pathname === i.path);
 
   return (
     <aside className={styles.sidebar}>
@@ -17,28 +41,30 @@ export default function Sidebar() {
       {/* Botões de ação */}
       <div className={styles.buttonGroup}>
         <button className={styles.iconBtn}>
-          <img src="/icons/actions/config.svg" alt="Config" />
+          <img src="/icons/actions/config.svg" alt="Configurações" />
         </button>
         <button className={styles.iconBtn}>
           <img src="/icons/actions/sino.svg" alt="Notificações" />
         </button>
       </div>
 
-      {/* Menu de navegação */}
+      {/* Menu */}
       <nav className={styles.nav}>
-        {/* Dashboard */}
-        <button
-          className={`${styles.navItem} ${activeItem === "Dashboard" ? styles.active : ""}`}
-          onClick={() => setActiveItem("Dashboard")}
-        >
-          <img src="/icons/nav/dashboard.svg" alt="" className={styles.icon} />
-          <span>Dashboard</span>
-        </button>
+        {navItems.map((item) => (
+          <button
+            key={item.path}
+            className={`${styles.navItem} ${isActive(item.path) ? styles.active : ""}`}
+            onClick={() => navigate(item.path)}
+          >
+            <img src={item.icon} alt="" className={styles.icon} />
+            <span>{item.label}</span>
+          </button>
+        ))}
 
         {/* Cadastros (collapsible) */}
         <div>
           <button
-            className={styles.navItem}
+            className={`${styles.navItem} ${isCadastroItemActive ? styles.active : ""}`}
             onClick={() => setCadastrosOpen(!cadastrosOpen)}
           >
             <img src="/icons/nav/cadastros.svg" alt="" className={styles.icon} />
@@ -47,24 +73,17 @@ export default function Sidebar() {
               src={cadastrosOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
               alt=""
               className={styles.arrow}
+              style={{ transform: cadastrosOpen ? "rotate(0)" : "rotate(-90deg)" }}
             />
           </button>
 
           {cadastrosOpen && (
             <div className={styles.subItems}>
-              {[
-                { label: "Usuários", icon: "/icons/cadastros/usuario.svg" },
-                { label: "Funcionários", icon: "/icons/cadastros/funcionarios.svg" },
-                { label: "Destinatários", icon: "/icons/cadastros/escola.svg" },
-                { label: "Produtos", icon: "/icons/cadastros/produto.svg" },
-                { label: "Fornecedores", icon: "/icons/nav/dados.svg" },
-                { label: "Condutores", icon: "/icons/cadastros/funcionarios.svg" },
-                { label: "Veículos", icon: "/icons/cadastros/carro.svg" },
-              ].map((item) => (
+              {cadastroItems.map((item) => (
                 <button
-                  key={item.label}
-                  className={`${styles.subItem} ${activeItem === item.label ? styles.activeSub : ""}`}
-                  onClick={() => setActiveItem(item.label)}
+                  key={item.path}
+                  className={`${styles.subItem} ${isActive(item.path) ? styles.activeSub : ""}`}
+                  onClick={() => navigate(item.path)}
                 >
                   <img src={item.icon} alt="" className={styles.subIcon} />
                   <span>{item.label}</span>
@@ -73,33 +92,6 @@ export default function Sidebar() {
             </div>
           )}
         </div>
-
-        {/* Mov. Estoque */}
-        <button
-          className={`${styles.navItem} ${activeItem === "Mov. Estoque" ? styles.active : ""}`}
-          onClick={() => setActiveItem("Mov. Estoque")}
-        >
-          <img src="/icons/nav/estoque.svg" alt="" className={styles.icon} />
-          <span>Mov. Estoque</span>
-        </button>
-
-        {/* Pedidos */}
-        <button
-          className={`${styles.navItem} ${activeItem === "Pedidos" ? styles.active : ""}`}
-          onClick={() => setActiveItem("Pedidos")}
-        >
-          <img src="/icons/nav/dados.svg" alt="" className={styles.icon} />
-          <span>Pedidos</span>
-        </button>
-
-        {/* Relatórios */}
-        <button
-          className={`${styles.navItem} ${activeItem === "Relatórios" ? styles.active : ""}`}
-          onClick={() => setActiveItem("Relatórios")}
-        >
-          <img src="/icons/nav/estoque.svg" alt="" className={styles.icon} />
-          <span>Relatórios</span>
-        </button>
       </nav>
 
       {/* Informações do Usuário */}
