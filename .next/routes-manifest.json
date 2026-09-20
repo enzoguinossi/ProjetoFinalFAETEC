@@ -120,6 +120,12 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
+      "page": "/primeiro-acesso",
+      "regex": "^/primeiro\\-acesso(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/primeiro\\-acesso(?:/)?$"
+    },
+    {
       "page": "/produtos",
       "regex": "^/produtos(?:/)?$",
       "routeKeys": {},

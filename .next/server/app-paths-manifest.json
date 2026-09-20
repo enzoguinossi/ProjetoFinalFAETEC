@@ -15,6 +15,7 @@
   "/funcionarios/page": "app/funcionarios/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
+  "/primeiro-acesso/page": "app/primeiro-acesso/page.js",
   "/produtos/novo/page": "app/produtos/novo/page.js",
   "/produtos/page": "app/produtos/page.js",
   "/usuarios/novo/page": "app/usuarios/novo/page.js",

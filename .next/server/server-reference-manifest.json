@@ -22,6 +22,17 @@
       "filename": "src/app/login/actions.ts",
       "exportedName": "loginAction"
     },
+    "40e36f1af5b290836891cdd4c8facec29f0b9d21fc": {
+      "workers": {
+        "app/primeiro-acesso/page": {
+          "moduleId": 60406,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/primeiro-acesso/actions.ts",
+      "exportedName": "primeiroAcessoAction"
+    },
     "40218805e2403e5b1f4c732ba8400bcd9fb3ee874f": {
       "workers": {
         "app/produtos/novo/page": {
