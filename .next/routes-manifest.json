@@ -90,6 +90,12 @@
       "namedRegex": "^/dashboard(?:/)?$"
     },
     {
+      "page": "/definir-senha",
+      "regex": "^/definir\\-senha(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/definir\\-senha(?:/)?$"
+    },
+    {
       "page": "/destinatarios",
       "regex": "^/destinatarios(?:/)?$",
       "routeKeys": {},
@@ -118,6 +124,24 @@
       "regex": "^/produtos(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/produtos(?:/)?$"
+    },
+    {
+      "page": "/produtos/novo",
+      "regex": "^/produtos/novo(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/produtos/novo(?:/)?$"
+    },
+    {
+      "page": "/usuarios",
+      "regex": "^/usuarios(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/usuarios(?:/)?$"
+    },
+    {
+      "page": "/usuarios/novo",
+      "regex": "^/usuarios/novo(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/usuarios/novo(?:/)?$"
     },
     {
       "page": "/veiculos",
