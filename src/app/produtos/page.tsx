@@ -15,7 +15,7 @@ export default async function ProdutosPage() {
 
   return (
     <DashboardLayout title="Produtos">
-      <SearchBar placeholder="Pesquisar produtos..." />
+      <SearchBar placeholder="Pesquisar produtos..." novoHref="/produtos/novo" />
       <DataTable columns={columns} data={rows} idField="codigo" />
     </DashboardLayout>
   );

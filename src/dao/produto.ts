@@ -46,6 +46,52 @@ export class ProdutoDAO {
     });
   }
 
+  async createCompleto(
+    data: {
+      descricao: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
+      data_validade?: string; id_conversao_padrao?: number;
+      codigos?: { id_tipo_codigo: number; codigo: string }[];
+      insumos?: { id_produto_filho: number; quantidade: number }[];
+    },
+    id_usuario: number,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const p = await tx.produto.create({
+        data: {
+          descricao: data.descricao,
+          foto_url: data.foto_url,
+          perecivel: data.perecivel ?? false,
+          composto: data.composto ?? false,
+          data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
+          id_conversao_padrao: data.id_conversao_padrao,
+        },
+      });
+
+      await tx.registroAuditoria.create({
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao } },
+      });
+
+      // Códigos personalizados
+      for (const c of data.codigos ?? []) {
+        await tx.produtoCodigo.create({
+          data: { id_produto: p.id_produto, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
+
+      // Insumos (BOM)
+      for (const ins of data.insumos ?? []) {
+        await tx.produtoInsumo.create({
+          data: { id_produto_pai: p.id_produto, id_produto_filho: ins.id_produto_filho, quantidade: ins.quantidade },
+        });
+      }
+
+      return tx.produto.findUniqueOrThrow({
+        where: { id_produto: p.id_produto },
+        include: { conversaoPadrao: true, produtoCodigos: { include: { tipoCodigo: true } }, insumosPai: { include: { produtoFilho: true } } },
+      });
+    });
+  }
+
   async update(
     id: number,
     data: { descricao?: string; foto_url?: string; perecivel?: boolean; data_validade?: string },

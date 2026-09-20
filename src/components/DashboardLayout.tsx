@@ -24,9 +24,7 @@ export default function DashboardLayout({
             onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label="Toggle sidebar"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M4 6H20M4 12H20M4 18H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <img src="icons/actions/hamburguer.svg" alt="hamburguer" />
           </button>
           {title && <h1 className={styles.title}>{title}</h1>}
         </header>
