@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "./SearchBar.module.css";
 
 interface SearchBarProps {

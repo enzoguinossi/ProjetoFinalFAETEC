@@ -11,6 +11,26 @@ import {
 } from "@tanstack/react-table";
 import styles from "./DataTable.module.css";
 
+/* ── Ações padrão (placeholder) ── */
+
+const defaultActions: Action<Record<string, unknown>>[] = [
+  {
+    icon: "/icons/actions/Editar.svg",
+    label: "Editar",
+    onClick: (row) => console.log("Edit", row),
+  },
+  {
+    icon: "/icons/actions/Olho.svg",
+    label: "Visualizar",
+    onClick: (row) => console.log("View", row),
+  },
+  {
+    icon: "/icons/actions/Lixeira.svg",
+    label: "Excluir",
+    onClick: (row) => console.log("Delete", row),
+  },
+];
+
 /* ── Features (fora do componente = referência estável) ── */
 
 const features = tableFeatures({
@@ -37,7 +57,8 @@ interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
   actions?: Action<T>[];
-  keyExtractor: (row: T, index: number) => string | number;
+  /** Campo usado como React key (ex: "codigo", "placa"). Padrão: índice da linha. */
+  idField?: keyof T & string;
   pageSize?: number;
 }
 
@@ -46,8 +67,8 @@ interface DataTableProps<T> {
 export default function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
-  actions,
-  keyExtractor,
+  actions = defaultActions as Action<T>[],
+  idField,
   pageSize = 10,
 }: DataTableProps<T>) {
   const [pagination, setPagination] = useState<PaginationState>({
@@ -115,7 +136,9 @@ export default function DataTable<T extends Record<string, unknown>>({
           {table.getRowModel().rows.length > 0 ? (
             table.getRowModel().rows.map((row) => {
               const original = row.original as T;
-              const key = keyExtractor(original, row.index);
+              const key = idField
+                ? (original[idField] as string | number)
+                : row.index;
               return (
                 <div
                   key={key}
