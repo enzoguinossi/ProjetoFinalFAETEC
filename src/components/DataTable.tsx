@@ -1,14 +1,24 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { flexRender } from "@tanstack/react-table";
 import {
-  useLegacyTable,
-  getCoreRowModel,
-  getPaginationRowModel,
-} from "@tanstack/react-table/legacy";
-import type { PaginationState } from "@tanstack/react-table";
+  useTable,
+  tableFeatures,
+  rowPaginationFeature,
+  createPaginatedRowModel,
+  type ColumnDef,
+  type PaginationState,
+} from "@tanstack/react-table";
 import styles from "./DataTable.module.css";
+
+/* ── Features (fora do componente = referência estável) ── */
+
+const features = tableFeatures({
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+});
+
+/* ── Tipos públicos ── */
 
 export interface Column<T> {
   key: keyof T & string;
@@ -31,6 +41,8 @@ interface DataTableProps<T> {
   pageSize?: number;
 }
 
+/* ── Componente ── */
+
 export default function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
@@ -43,32 +55,39 @@ export default function DataTable<T extends Record<string, unknown>>({
     pageSize,
   });
 
-  // Convert our Column[] to TanStack ColumnDef[]
   const tanstackColumns = useMemo(
     () =>
-      columns.map((col) => ({
-        accessorKey: col.key,
-        header: col.label,
-        cell: (info: { getValue: () => unknown; row: { original: T } }) => {
-          if (col.render) {
-            return col.render(info.getValue() as T[keyof T], info.row.original);
-          }
-          return String(info.getValue() ?? "");
-        },
-        meta: { width: col.width },
-      })),
+      columns.map(
+        (col) =>
+          ({
+            accessorKey: col.key,
+            header: col.label,
+            cell: (info: { getValue: () => unknown; row: { original: T } }) => {
+              if (col.render) {
+                return col.render(
+                  info.getValue() as T[keyof T],
+                  info.row.original,
+                );
+              }
+              return String(info.getValue() ?? "");
+            },
+            meta: { width: col.width },
+          }) satisfies ColumnDef<typeof features, T>,
+      ),
     [columns],
   );
 
-  const table = useLegacyTable({
-    columns: tanstackColumns,
-    data,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    onPaginationChange: setPagination,
-    state: { pagination },
-    autoResetPageIndex: false,
-  });
+  const table = useTable(
+    {
+      features,
+      columns: tanstackColumns,
+      data,
+      state: { pagination },
+      onPaginationChange: setPagination,
+      autoResetPageIndex: false,
+    },
+    (state) => ({ pagination: state.pagination }),
+  );
 
   const gridCols = columns
     .map((c) => c.width || "1fr")
@@ -80,10 +99,13 @@ export default function DataTable<T extends Record<string, unknown>>({
       <div className={styles.scrollWrapper}>
         <div className={styles.table}>
           {/* Header */}
-          <div className={styles.header} style={{ gridTemplateColumns: gridCols }}>
+          <div
+            className={styles.header}
+            style={{ gridTemplateColumns: gridCols }}
+          >
             {table.getHeaderGroups()[0]?.headers.map((header) => (
               <div key={header.id} className={styles.headerCell}>
-                {flexRender(header.column.columnDef.header, header.getContext())}
+                <table.FlexRender header={header} />
               </div>
             ))}
             {actions && <div className={styles.headerCell}>Ações</div>}
@@ -100,9 +122,9 @@ export default function DataTable<T extends Record<string, unknown>>({
                   className={`${styles.row} ${row.index % 2 === 1 ? styles.rowAlt : ""}`}
                   style={{ gridTemplateColumns: gridCols }}
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <div key={cell.id} className={styles.cell}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <table.FlexRender cell={cell} />
                     </div>
                   ))}
                   {actions && (
@@ -136,9 +158,26 @@ export default function DataTable<T extends Record<string, unknown>>({
           disabled={!table.getCanPreviousPage()}
           title="Primeira página"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M12 4L8 8L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M8 4L4 8L8 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M12 4L8 8L12 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M8 4L4 8L8 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <button
@@ -147,15 +186,27 @@ export default function DataTable<T extends Record<string, unknown>>({
           disabled={!table.getCanPreviousPage()}
           title="Página anterior"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M10 4L6 8L10 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
 
         <span className={styles.pageInfo}>
           Página{" "}
           <strong>
-            {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+            {table.state.pagination.pageIndex + 1} de{" "}
+            {table.getPageCount()}
           </strong>
         </span>
 
@@ -165,8 +216,19 @@ export default function DataTable<T extends Record<string, unknown>>({
           disabled={!table.getCanNextPage()}
           title="Próxima página"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M6 4L10 8L6 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <button
@@ -175,15 +237,32 @@ export default function DataTable<T extends Record<string, unknown>>({
           disabled={!table.getCanNextPage()}
           title="Última página"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M4 4L8 8L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M8 4L12 8L8 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M4 4L8 8L4 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M8 4L12 8L8 12"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
 
         <select
           className={styles.pageSizeSelect}
-          value={table.getState().pagination.pageSize}
+          value={table.state.pagination.pageSize}
           onChange={(e) => table.setPageSize(Number(e.target.value))}
         >
           {[5, 10, 20, 50].map((size) => (
