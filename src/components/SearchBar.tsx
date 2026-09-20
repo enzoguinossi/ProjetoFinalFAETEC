@@ -22,13 +22,13 @@ export default function SearchBar({
         {novoLabel}
       </button>
       <div className={styles.searchWrapper}>
-        <img src="/icons/actions/search.svg" alt="" className={styles.searchIcon} />
         <input
           className={styles.input}
           type="text"
           placeholder={placeholder}
           onChange={(e) => onSearch?.(e.target.value)}
         />
+        <img src="/icons/actions/Lupa.svg" alt="" className={styles.searchIcon} />
       </div>
     </div>
   );
