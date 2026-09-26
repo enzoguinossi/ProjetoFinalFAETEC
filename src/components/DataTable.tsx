@@ -158,6 +158,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                           className={styles.actionBtn}
                           onClick={() => action.onClick(original)}
                           title={action.label}
+                          type="button"
                         >
                           <img src={action.icon} alt={action.label} />
                         </button>
@@ -180,6 +181,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           onClick={() => table.firstPage()}
           disabled={!table.getCanPreviousPage()}
           title="Primeira página"
+          type="button"
         >
           <svg
             width="16"
@@ -208,6 +210,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
           title="Página anterior"
+          type="button"
         >
           <svg
             width="16"
@@ -238,6 +241,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
           title="Próxima página"
+          type="button"
         >
           <svg
             width="16"
@@ -259,6 +263,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           onClick={() => table.lastPage()}
           disabled={!table.getCanNextPage()}
           title="Última página"
+          type="button"
         >
           <svg
             width="16"
