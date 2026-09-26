@@ -120,3 +120,48 @@ Para uma solicitação de desenvolvimento, o fluxo esperado é:
 `Solicitação → Consultar Jira → Identificar issue → Ler escopo → Inspecionar código/docs → Implementar → Validar → Atualizar Jira → Registrar worklog`
 
 O Jira deve acompanhar o trabalho realizado, enquanto o repositório continua sendo a memória técnica persistente do projeto.
+
+### Smart Commits (link automático entre GitHub e Jira)
+
+O repositório utiliza o **GitHub for Atlassian** app para integrar commits, branches e pull requests às tasks do Jira automaticamente.
+
+#### Formato da mensagem de commit
+
+Todo commit relacionado a uma task **deve** incluir a chave do issue no início da mensagem:
+
+```text
+KAN-123: descrição do que foi feito
+```
+
+#### Smart Commit (ações avançadas)
+
+O Smart Commit permite executar ações no Jira diretamente da mensagem de commit:
+
+| Ação | Formato | Exemplo |
+|------|---------|---------|
+| Comentar no issue | `KEY #comment <texto>` | `KAN-123 #comment ajuste no cálculo do frete` |
+| Registrar worklog | `KEY #time <duração>` | `KAN-123 #time 2h 30m` |
+| Transicionar para concluído | `KEY #resolve` ou `KEY #close` | `KAN-123 #resolve` |
+| Combinar ações | `KEY #comment <texto> #time <duração>` | `KAN-123 #comment finalizado #time 1h` |
+
+#### Regras
+
+1. **Sempre** incluir a chave do Jira no commit message quando o commit implementar, corrigir ou estiver relacionado a uma task.
+2. **Usar a chave no início da mensagem**: `KAN-139: feat: busca priorizada na listagem de produtos`
+3. **Branch names** também devem conter a chave quando possível: `KAN-139-modulo-produtos`
+4. **Não associar commits a issues errados** apenas por similaridade superficial — confirmar a chave correta antes de commitar.
+5. Após finalizar uma implementação, registrar o resumo no Jira via comentário e worklog, conforme as permissões disponíveis no MCP.
+6. Usar `#resolve` ou `#close` **somente** quando os critérios de aceite da task forem efetivamente atendidos — não automaticamente após qualquer alteração de código.
+
+#### Como o link aparece no Jira
+
+Após o push, o GitHub for Atlassian app processa os Smart Commits e:
+
+- Adiciona o commit à **development panel** do issue no Jira
+- Atualiza o **status** se `#resolve` foi usado
+- Adiciona **comentário** se `#comment` foi usado
+- Registra **worklog** se `#time` foi usado
+
+#### Configuração
+
+A integração GitHub ↔ Jira foi configurada através do app **GitHub for Atlassian** disponível no marketplace do Atlassian. A organização `enzoguinossi/ProjetoFinalFAETEC` está conectada ao site `projeto-final.atlassian.net` com escopo de leitura e escrita nos repositórios do projeto.
