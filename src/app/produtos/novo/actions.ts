@@ -8,18 +8,77 @@ export type ProdutoItem = { id_produto: number; descricao: string };
 
 export async function searchProdutos(query: string) {
   if (query.length < 2) return [];
-  return prisma.produto.findMany({
-    where: {
-      ativo: true,
-      OR: [
-        { descricao: { contains: query } },
-        { produtoCodigos: { some: { codigo: { contains: query } } } },
-      ],
-    },
-    select: { id_produto: true, descricao: true },
-    take: 20,
-    orderBy: { descricao: "asc" },
-  });
+
+  const take = 20;
+
+  const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
+    prisma.produto.findMany({
+      where: {
+        ativo: true,
+        produtoCodigos: { some: { codigo: { equals: query } } },
+      },
+      select: { id_produto: true, descricao: true },
+      take,
+      orderBy: { descricao: "asc" },
+    }),
+    prisma.produto.findMany({
+      where: {
+        ativo: true,
+        produtoCodigos: { some: { codigo: { startsWith: query } } },
+        NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+      },
+      select: { id_produto: true, descricao: true },
+      take,
+      orderBy: { descricao: "asc" },
+    }),
+    prisma.produto.findMany({
+      where: {
+        ativo: true,
+        produtoCodigos: { some: { codigo: { contains: query } } },
+        NOT: {
+          OR: [
+            { produtoCodigos: { some: { codigo: { equals: query } } } },
+            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+          ],
+        },
+      },
+      select: { id_produto: true, descricao: true },
+      take,
+      orderBy: { descricao: "asc" },
+    }),
+    prisma.produto.findMany({
+      where: {
+        ativo: true,
+        descricao: { contains: query },
+        NOT: {
+          OR: [
+            { produtoCodigos: { some: { codigo: { equals: query } } } },
+            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+            { produtoCodigos: { some: { codigo: { contains: query } } } },
+          ],
+        },
+      },
+      select: { id_produto: true, descricao: true },
+      take,
+      orderBy: { descricao: "asc" },
+    }),
+  ]);
+
+  const seen = new Set<number>();
+  const results: { id_produto: number; descricao: string }[] = [];
+
+  for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
+    for (const p of batch) {
+      if (!seen.has(p.id_produto)) {
+        seen.add(p.id_produto);
+        results.push(p);
+        if (results.length >= take) break;
+      }
+    }
+    if (results.length >= take) break;
+  }
+
+  return results.slice(0, take);
 }
 
 export async function createProduto(formData: FormData) {
