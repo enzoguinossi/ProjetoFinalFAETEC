@@ -10,12 +10,14 @@
 
 .dialog {
   background: #ffffff;
-  border-radius: 1.25rem;
+  border-top: 13px solid #1b9956;
+  border-radius: 26px;
   width: 728px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
 
 .header {
@@ -28,9 +30,12 @@
 
 .title {
   font-family: "SF Pro", "Segoe UI", sans-serif;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 590;
+  letter-spacing: -0.028125rem;
+  line-height: 1.5625rem;
   margin: 0;
+  color: #1e1e1e;
 }
 
 .closeBtn {
@@ -52,5 +57,5 @@
 
 .body {
   overflow-y: auto;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 32px;
 }
