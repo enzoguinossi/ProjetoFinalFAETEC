@@ -48,6 +48,26 @@
   gap: 5px;
 }
 
+.flagsRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.checkboxCol {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dateCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 200px;
+}
+
 .checkboxLabel {
   display: flex;
   align-items: center;
