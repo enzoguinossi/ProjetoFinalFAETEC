@@ -43,13 +43,13 @@
 /* ── Cancel (outlined) ── */
 
 .cancel {
-  background: #ffffff;
-  color: #1e1e1e;
-  border-color: #d9d9d9;
+  background: #FF383C;
+  color: white;
+  border-color: #FF383C;
 }
 
 .cancel:hover {
-  background: #f2f4f8;
+  background: #ff0000;
 }
 
 /* ── Ghost (transparent, green text) ── */
