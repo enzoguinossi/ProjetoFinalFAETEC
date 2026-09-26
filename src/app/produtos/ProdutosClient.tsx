@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import ProdutoForm from "./novo/ProdutoForm";
 import type { Column } from "@/components/DataTable";
 import { searchProdutosList, type ProdutoListRow } from "./actions";
+import { getProduto, deleteProduto } from "./novo/actions";
+import type { ProdutoFormData } from "./novo/actions";
 
 interface Props {
   rows: ProdutoListRow[];
@@ -21,9 +24,16 @@ const columns: Column<ProdutoListRow>[] = [
   { key: "livre", label: "Qtd. Livre", width: "1fr" },
 ];
 
+type ModalMode = "create" | "edit" | "view" | null;
+
 export default function ProdutosClient({ rows: initialRows, conversoes, tiposCodigo }: Props) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [formData, setFormData] = useState<ProdutoFormData | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProdutoListRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
 
   useEffect(() => {
@@ -41,30 +51,140 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
     searchProdutosList(value).then(setRows).catch(() => setRows(initialRows));
   }
 
+  async function openEdit(id: number) {
+    setSelectedId(id);
+    const data = await getProduto(id);
+    setFormData(data);
+    setModalMode("edit");
+  }
+
+  async function openView(id: number) {
+    setSelectedId(id);
+    const data = await getProduto(id);
+    setFormData(data);
+    setModalMode("view");
+  }
+
+  function closeModal() {
+    setModalMode(null);
+    setSelectedId(null);
+    setFormData(null);
+  }
+
+  function handleSuccess() {
+    closeModal();
+    window.location.reload();
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      const result = await deleteProduto(deleteTarget.id_produto);
+      if (result.error) {
+        setDeleteError(result.error);
+      } else {
+        setDeleteTarget(null);
+        window.location.reload();
+      }
+    } catch {
+      setDeleteError("Erro ao excluir. Tente novamente.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const actions = [
+    {
+      icon: "/icons/actions/Olho.svg",
+      label: "Visualizar",
+      onClick: (row: ProdutoListRow) => openView(row.id_produto),
+    },
+    {
+      icon: "/icons/actions/Editar.svg",
+      label: "Editar",
+      onClick: (row: ProdutoListRow) => openEdit(row.id_produto),
+    },
+    {
+      icon: "/icons/actions/Lixeira.svg",
+      label: "Excluir",
+      onClick: (row: ProdutoListRow) => {
+        setDeleteTarget(row);
+        setDeleteError("");
+      },
+    },
+  ];
+
   return (
     <>
       <SearchBar
         placeholder="Pesquisar produtos..."
-        onNew={() => setModalOpen(true)}
+        onNew={() => setModalMode("create")}
         onSearch={handleSearch}
       />
-      <DataTable columns={columns} data={rows} idField="codigo" />
+      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
       <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        open={modalMode === "create"}
+        onClose={closeModal}
         width="728px"
       >
         <ProdutoForm
           conversoes={conversoes}
           tiposCodigo={tiposCodigo}
-          onSuccess={() => {
-            setModalOpen(false);
-            window.location.reload();
-          }}
-          onCancel={() => setModalOpen(false)}
+          mode="create"
+          onSuccess={handleSuccess}
+          onCancel={closeModal}
         />
       </Modal>
+
+      <Modal
+        open={modalMode === "edit" && formData !== null}
+        onClose={closeModal}
+        width="728px"
+      >
+        {formData && (
+          <ProdutoForm
+            conversoes={conversoes}
+            tiposCodigo={tiposCodigo}
+            mode="edit"
+            initialData={formData}
+            onSuccess={handleSuccess}
+            onCancel={closeModal}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={modalMode === "view" && formData !== null}
+        onClose={closeModal}
+        width="728px"
+      >
+        {formData && (
+          <ProdutoForm
+            conversoes={conversoes}
+            tiposCodigo={tiposCodigo}
+            mode="view"
+            initialData={formData}
+            onCancel={closeModal}
+          />
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onConfirm={handleDelete}
+        title="Excluir produto"
+        message={
+          deleteError
+            ? deleteError
+            : `Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`
+        }
+        confirmLabel={deleteError ? "OK" : "Excluir"}
+        loading={deleting}
+      />
     </>
   );
 }

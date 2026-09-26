@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 
 export type ProdutoListRow = {
+  id_produto: number;
   codigo: string;
   descricao: string;
   qtd: string;
@@ -83,6 +84,7 @@ export async function searchProdutosList(query: string): Promise<ProdutoListRow[
     const qtd = p.estoques.reduce((s, e) => s + Number(e.quantidade_atual), 0);
     const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
     return {
+      id_produto: p.id_produto,
       codigo: String(p.id_produto).padStart(6, "0"),
       descricao: p.descricao,
       qtd: String(qtd),
