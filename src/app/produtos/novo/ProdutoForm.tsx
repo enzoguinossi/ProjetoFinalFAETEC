@@ -184,66 +184,41 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
           </select>
         </div>
 
-        <div className={styles.checkboxRow}>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" name="perecivel" checked={perecivel} onChange={(e) => setPerecivel(e.target.checked)} />
-            Perecível
-          </label>
-          <label className={styles.checkboxLabel}>
-            <input type="checkbox" name="composto" checked={composto} onChange={(e) => setComposto(e.target.checked)} />
-            Composto
-          </label>
-        </div>
-
-        {perecivel && (
-          <div className={styles.field}>
-            <label className={styles.label}>Validade</label>
-            <input className={styles.input} type="date" name="data_validade" />
+        {/* Flags + Data lado a lado */}
+        <div className={styles.flagsRow}>
+          <div className={styles.checkboxCol}>
+            <label className={styles.checkboxLabel}>
+              <input type="checkbox" name="perecivel" checked={perecivel} onChange={(e) => setPerecivel(e.target.checked)} />
+              Perecível
+            </label>
+            <label className={styles.checkboxLabel}>
+              <input type="checkbox" name="composto" checked={composto} onChange={(e) => setComposto(e.target.checked)} />
+              Composto
+            </label>
           </div>
-        )}
-
-        {/* ── Insumos ── */}
-        {composto && (
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>Insumos</h3>
-              <Button
-              label="Novo"
-              iconLeft={
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              }
-              onClick={iniciarNovoInsumo}
-            />
+          {perecivel && (
+            <div className={styles.dateCol}>
+              <label className={styles.label}>Validade</label>
+              <input className={styles.input} type="date" name="data_validade" />
             </div>
-            <DataTable columns={insumoColumns} data={insumos} actions={insumoActions} idField="descricao" pageSize={5} />
-            {/* hidden inputs for insumos */}
-            {insumos.map((ins, i) => (
-              <div key={`hi-${i}`} style={{ display: "none" }}>
-                <input name="insumo_produto" value={ins.id} readOnly />
-                <input name="insumo_qtd" value={ins.qtd} readOnly />
-              </div>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
 
         {/* ── Códigos Personalizados ── */}
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <h3 className={styles.sectionTitle}>Códigos Personalizados</h3>
             <Button
-                          label="Novo"
-                          iconLeft={
-                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                              <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                          }
-                          onClick={iniciarNovoCodigo}
-                        />
+              label="Novo"
+              iconLeft={
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              }
+              onClick={iniciarNovoCodigo}
+            />
           </div>
 
-          {/* Inline editor for current code */}
           {editandoCod !== null && (
             <div className={styles.inlineEditor}>
               <select
@@ -276,7 +251,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
 
           <DataTable columns={codigoColumns} data={codigos} actions={codigoActions} idField="valor" pageSize={5} />
 
-          {/* hidden inputs for submit */}
           {codigos.map((c, i) => (
             <div key={`hc-${i}`} style={{ display: "none" }}>
               <input name="codigo_tipo" value={c.tipo} readOnly />
@@ -284,6 +258,31 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
             </div>
           ))}
         </div>
+
+        {/* ── Insumos ── */}
+        {composto && (
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.sectionTitle}>Insumos</h3>
+              <Button
+                label="Novo"
+                iconLeft={
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                }
+                onClick={iniciarNovoInsumo}
+              />
+            </div>
+            <DataTable columns={insumoColumns} data={insumos} actions={insumoActions} idField="descricao" pageSize={5} />
+            {insumos.map((ins, i) => (
+              <div key={`hi-${i}`} style={{ display: "none" }}>
+                <input name="insumo_produto" value={ins.id} readOnly />
+                <input name="insumo_qtd" value={ins.qtd} readOnly />
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Foto */}
         <div className={styles.field}>
