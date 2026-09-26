@@ -3,6 +3,8 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { condutorDAO } from "@/dao/condutor";
 
+export const dynamic = "force-dynamic";
+
 export default async function CondutoresPage() {
   const { data } = await condutorDAO.list();
 

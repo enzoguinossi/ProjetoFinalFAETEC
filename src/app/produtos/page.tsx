@@ -3,6 +3,8 @@ import ProdutosClient from "./ProdutosClient";
 import { produtoDAO } from "@/dao/produto";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProdutosPage() {
   const [listResult, conversoes, tiposCodigo] = await Promise.all([
     produtoDAO.list(),
