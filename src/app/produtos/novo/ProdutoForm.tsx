@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createProduto } from "./actions";
+import { createProduto, searchProdutos } from "./actions";
 import DataTable from "@/components/DataTable";
-import BuscarProduto from "@/components/BuscarProduto";
+import SearchEntityModal from "@/components/SearchEntityModal";
 import CodigoForm from "@/components/CodigoForm";
 import Button from "@/components/Button";
 import styles from "./ProdutoForm.module.css";
@@ -271,10 +271,13 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
         </div>
       </form>
 
-      <BuscarProduto
+      <SearchEntityModal
         open={buscandoIdx !== null}
         onClose={() => { setBuscandoIdx(null); setEditandoIns(null); }}
         onSelect={onSelectInsumo}
+        searchAction={searchProdutos}
+        getItemId={(item) => item.id_produto}
+        getItemLabel={(item) => item.descricao}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
       />
 
