@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createProduto } from "./actions";
 import DataTable from "@/components/DataTable";
 import BuscarProduto from "@/components/BuscarProduto";
+import CodigoForm from "@/components/CodigoForm";
 import Button from "@/components/Button";
 import styles from "./ProdutoForm.module.css";
 
@@ -49,9 +50,8 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
   const [composto, setComposto] = useState(false);
 
   const [codigos, setCodigos] = useState<CodigoEntry[]>([]);
-  const [editandoCod, setEditandoCod] = useState<number | null>(null);
-  const [novoTipo, setNovoTipo] = useState("DIGITACAO");
-  const [novoValor, setNovoValor] = useState("");
+  const [codigoModalOpen, setCodigoModalOpen] = useState(false);
+  const [codigoEditandoIdx, setCodigoEditandoIdx] = useState<number | null>(null);
 
   const [insumos, setInsumos] = useState<InsumoEntry[]>([]);
   const [editandoIns, setEditandoIns] = useState<number | null>(null);
@@ -60,33 +60,28 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
   // ── Códigos ──
 
   function iniciarNovoCodigo() {
-    setNovoTipo("DIGITACAO");
-    setNovoValor("");
-    setEditandoCod(codigos.length);
+    setCodigoEditandoIdx(null);
+    setCodigoModalOpen(true);
   }
 
-  function confirmarCodigo() {
-    if (!novoValor.trim()) return;
-    const next = [...codigos];
-    if (editandoCod !== null && editandoCod < codigos.length) {
-      next[editandoCod] = { tipo: novoTipo, valor: novoValor };
+  function confirmarCodigo(tipo: string, valor: string) {
+    if (codigoEditandoIdx !== null && codigoEditandoIdx < codigos.length) {
+      const next = [...codigos];
+      next[codigoEditandoIdx] = { tipo, valor };
+      setCodigos(next);
     } else {
-      next.push({ tipo: novoTipo, valor: novoValor });
+      setCodigos([...codigos, { tipo, valor }]);
     }
-    setCodigos(next);
-    setEditandoCod(null);
-    setNovoValor("");
+    setCodigoModalOpen(false);
   }
 
   function editarCodigo(i: number) {
-    setNovoTipo(codigos[i].tipo);
-    setNovoValor(codigos[i].valor);
-    setEditandoCod(i);
+    setCodigoEditandoIdx(i);
+    setCodigoModalOpen(true);
   }
 
   function removerCodigo(i: number) {
     setCodigos(codigos.filter((_, idx) => idx !== i));
-    if (editandoCod === i) setEditandoCod(null);
   }
 
   const codigoActions = [
@@ -175,7 +170,7 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
 
         {/* Unidade + Checkboxes */}
         <div className={styles.field}>
-          <label className={styles.label}>Unidade Padrão</label>
+          <label className={styles.label}>Unidade Padrão de Entrada</label>
           <select className={styles.select} name="id_conversao">
             <option value="">Selecione...</option>
             {conversoes.map((c) => (
@@ -218,36 +213,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
               onClick={iniciarNovoCodigo}
             />
           </div>
-
-          {editandoCod !== null && (
-            <div className={styles.inlineEditor}>
-              <select
-                className={`${styles.select} ${styles.codeSelect}`}
-                value={novoTipo}
-                onChange={(e) => setNovoTipo(e.target.value)}
-              >
-                {tiposCodigo.map((t) => (
-                  <option key={t.id_tipo_codigo} value={t.nome}>{t.nome}</option>
-                ))}
-              </select>
-              <input
-                className={styles.input}
-                placeholder="Valor do código"
-                value={novoValor}
-                onChange={(e) => setNovoValor(e.target.value)}
-              />
-              <button type="button" className={styles.confirmBtn} onClick={confirmarCodigo} disabled={!novoValor.trim()}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8L6 11L13 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <button type="button" className={styles.cancelSmallBtn} onClick={() => setEditandoCod(null)}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-          )}
 
           <DataTable columns={codigoColumns} data={codigos} actions={codigoActions} idField="valor" pageSize={5} />
 
@@ -311,6 +276,16 @@ export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCanc
         onClose={() => { setBuscandoIdx(null); setEditandoIns(null); }}
         onSelect={onSelectInsumo}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
+      />
+
+      <CodigoForm
+        open={codigoModalOpen}
+        onClose={() => setCodigoModalOpen(false)}
+        onConfirm={confirmarCodigo}
+        tiposCodigo={tiposCodigo}
+        initialTipo={codigoEditandoIdx !== null ? codigos[codigoEditandoIdx]?.tipo : "DIGITACAO"}
+        initialValor={codigoEditandoIdx !== null ? codigos[codigoEditandoIdx]?.valor : ""}
+        editing={codigoEditandoIdx !== null}
       />
     </>
   );

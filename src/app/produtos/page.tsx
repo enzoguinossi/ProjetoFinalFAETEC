@@ -10,8 +10,8 @@ export default async function ProdutosPage() {
     prisma.tipoCodigo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
   ]);
 
-  const rows = listResult.data.map((p, i) => ({
-    codigo: String(i + 1).padStart(6, "0"),
+  const rows = listResult.data.map((p) => ({
+    codigo: String(p.id_produto).padStart(6, "0"),
     descricao: p.descricao,
     qtd: "0",
     livre: "0",

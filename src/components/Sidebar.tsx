@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { getUserInfo } from "@/app/actions/user";
+import { logoutAction } from "@/app/login/actions";
 import styles from "./Sidebar.module.css";
 
 const cadastroItems = [
@@ -23,8 +25,34 @@ const navItems = [
 
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [user, setUser] = useState<{ nome: string; login: string; super_admin: boolean } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
+
+  useEffect(() => {
+    getUserInfo().then(setUser);
+  }, []);
+
+  // Fecha o menu ao clicar fora
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [userMenuOpen]);
+
+  async function handleLogout() {
+    await logoutAction();
+    router.push("/login");
+  }
+
+  const initial = user?.nome?.charAt(0).toUpperCase() ?? "?";
 
   const navigate = (path: string) => router.push(path);
 
@@ -95,9 +123,31 @@ export default function Sidebar() {
       </nav>
 
       {/* Informações do Usuário */}
-      <div className={styles.userInfo}>
-        <div className={styles.userAvatar}>J</div>
-        <span className={styles.userName}>Jonathan</span>
+      <div className={styles.userSection} ref={menuRef}>
+        <button
+          className={styles.userInfo}
+          onClick={() => setUserMenuOpen(!userMenuOpen)}
+        >
+          <div className={styles.userAvatar}>{initial}</div>
+          <span className={styles.userName}>{user?.nome ?? "Carregando..."}</span>
+        </button>
+
+        {userMenuOpen && (
+          <div className={styles.dropdown}>
+            <div className={styles.dropdownHeader}>
+              <span className={styles.dropdownName}>{user?.nome}</span>
+              <span className={styles.dropdownLogin}>{user?.login}</span>
+              {user?.super_admin && <span className={styles.badge}>Admin</span>}
+            </div>
+            <hr className={styles.divider} />
+            <button className={styles.dropdownItem} onClick={handleLogout}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Sair
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
