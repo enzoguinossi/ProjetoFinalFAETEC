@@ -35,8 +35,8 @@
     },
     "40218805e2403e5b1f4c732ba8400bcd9fb3ee874f": {
       "workers": {
-        "app/produtos/novo/page": {
-          "moduleId": 99637,
+        "app/produtos/page": {
+          "moduleId": 85071,
           "async": false,
           "codeHash": null
         }
@@ -46,8 +46,8 @@
     },
     "405b20a0c367eaea6deacc2f914da03b6d4d4d3640": {
       "workers": {
-        "app/produtos/novo/page": {
-          "moduleId": 99637,
+        "app/produtos/page": {
+          "moduleId": 85071,
           "async": false,
           "codeHash": null
         }

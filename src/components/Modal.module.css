@@ -1,0 +1,56 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background: #ffffff;
+  border-radius: 1.25rem;
+  width: 728px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: "SF Pro", "Segoe UI", sans-serif;
+  font-size: 1.125rem;
+  font-weight: 590;
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  color: #21272a;
+}
+
+.closeBtn:hover {
+  background: #f2f4f8;
+}
+
+.body {
+  overflow-y: auto;
+  padding: 1rem 1.25rem 1.25rem;
+}

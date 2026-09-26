@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createProduto } from "./actions";
 import BuscarProduto from "@/components/BuscarProduto";
 import styles from "./ProdutoForm.module.css";
@@ -16,7 +15,7 @@ interface TipoCodigo {
   nome: string;
 }
 
-interface ProdutoItem {
+export interface ProdutoItem {
   id_produto: number;
   descricao: string;
 }
@@ -24,25 +23,23 @@ interface ProdutoItem {
 interface Props {
   conversoes: Conversao[];
   tiposCodigo: TipoCodigo[];
-  produtos: ProdutoItem[];
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 type CodigoEntry = { tipo: string; valor: string };
 type InsumoEntry = { id: number; descricao: string; qtd: string };
 
-export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
-  const router = useRouter();
+export default function ProdutoForm({ conversoes, tiposCodigo, onSuccess, onCancel }: Props) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [perecivel, setPerecivel] = useState(false);
   const [composto, setComposto] = useState(false);
 
-  // Códigos personalizados
   const [codigos, setCodigos] = useState<CodigoEntry[]>([
     { tipo: "DIGITACAO", valor: "" },
   ]);
 
-  // Insumos
   const [insumos, setInsumos] = useState<InsumoEntry[]>([]);
   const [buscandoIdx, setBuscandoIdx] = useState<number | null>(null);
 
@@ -57,7 +54,7 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
       if (result.error) {
         setError(result.error);
       } else {
-        router.push("/produtos");
+        onSuccess?.();
       }
     } catch {
       setError("Erro ao salvar. Tente novamente.");
@@ -109,13 +106,11 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
       <form className={styles.form} onSubmit={handleSubmit}>
         {error && <div className={styles.error}>{error}</div>}
 
-        {/* Descrição */}
         <div className={styles.field}>
           <label className={styles.label}>Descrição</label>
           <input className={styles.input} name="descricao" required />
         </div>
 
-        {/* Unidade + Checkboxes */}
         <div className={styles.field}>
           <label className={styles.label}>Unidade Padrão</label>
           <select className={styles.select} name="id_conversao">
@@ -149,7 +144,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
           </label>
         </div>
 
-        {/* Data de validade (condicional) */}
         {perecivel && (
           <div className={styles.conditional}>
             <div className={styles.field}>
@@ -159,7 +153,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
           </div>
         )}
 
-        {/* Insumos / BOM (condicional) */}
         {composto && (
           <div className={styles.conditional}>
             <div className={styles.section}>
@@ -169,12 +162,12 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
                   <div className={styles.insumoField}>
                     <input
                       className={styles.input}
-                      name={`insumo_produto`}
+                      name="insumo_produto"
                       value={ins.descricao}
                       placeholder="Selecione um produto..."
                       readOnly
                     />
-                    <input type="hidden" name={`insumo_produto`} value={ins.id} />
+                    <input type="hidden" name="insumo_produto" value={ins.id} />
                     <button
                       type="button"
                       className={styles.locateBtn}
@@ -189,7 +182,7 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
                   </div>
                   <input
                     className={`${styles.input} ${styles.insumoQtd}`}
-                    name={`insumo_qtd`}
+                    name="insumo_qtd"
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -219,7 +212,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
           </div>
         )}
 
-        {/* Códigos Personalizados */}
         <div className={styles.section}>
           <h3 className={styles.sectionTitle}>Códigos Personalizados</h3>
           {codigos.map((c, i) => (
@@ -265,7 +257,6 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
           </button>
         </div>
 
-        {/* Foto */}
         <div className={styles.field}>
           <label className={styles.label}>Foto</label>
           <div className={styles.fotoRow}>
@@ -280,13 +271,8 @@ export default function ProdutoForm({ conversoes, tiposCodigo }: Props) {
           </div>
         </div>
 
-        {/* Ações */}
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.cancelBtn}
-            onClick={() => router.back()}
-          >
+          <button type="button" className={styles.cancelBtn} onClick={onCancel}>
             Cancelar
           </button>
           <button type="submit" className={styles.saveBtn} disabled={saving}>

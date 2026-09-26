@@ -50,6 +50,8 @@ Um sistema web que centraliza:
 | **Banco de Dados** | MySQL |
 | **Autenticação** | Feita na mão (bcrypt + JWT) |
 | **Versionamento** | GitHub |
+| **Gráficos** | Chart.js |
+
 
 ---
 
