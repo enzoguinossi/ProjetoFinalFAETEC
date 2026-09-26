@@ -12,12 +12,16 @@ export default async function ProdutosPage() {
     prisma.tipoCodigo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
   ]);
 
-  const rows = listResult.data.map((p) => ({
-    codigo: String(p.id_produto).padStart(6, "0"),
-    descricao: p.descricao,
-    qtd: "0",
-    livre: "0",
-  }));
+  const rows = listResult.data.map((p) => {
+    const qtd = p.estoques.reduce((s, e) => s + Number(e.quantidade_atual), 0);
+    const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
+    return {
+      codigo: String(p.id_produto).padStart(6, "0"),
+      descricao: p.descricao,
+      qtd: String(qtd),
+      livre: String(qtd - reservado),
+    };
+  });
 
   return (
     <DashboardLayout title="Produtos">
