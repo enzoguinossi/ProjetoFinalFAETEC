@@ -41,7 +41,6 @@ export default function ProdutosClient({ rows, conversoes, tiposCodigo }: Props)
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Cadastro de Produto"
         width="728px"
       >
         <ProdutoForm
