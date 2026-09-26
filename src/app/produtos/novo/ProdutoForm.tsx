@@ -355,6 +355,7 @@ export default function ProdutoForm({
       />
 
       <CodigoForm
+        key={codigoEditandoIdx ?? "novo"}
         open={codigoModalOpen}
         onClose={() => setCodigoModalOpen(false)}
         onConfirm={confirmarCodigo}
