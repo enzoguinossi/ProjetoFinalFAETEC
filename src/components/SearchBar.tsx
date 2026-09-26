@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
+import Button from "@/components/Button";
 import styles from "./SearchBar.module.css";
 
 interface SearchBarProps {
@@ -22,19 +22,25 @@ export default function SearchBar({
   return (
     <div className={styles.container}>
       {novoHref ? (
-        <Link href={novoHref} className={styles.novoBtn}>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          {novoLabel}
-        </Link>
+        <Button
+          label={novoLabel}
+          href={novoHref}
+          iconLeft={
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          }
+        />
       ) : (
-        <button className={styles.novoBtn} onClick={onNew}>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          {novoLabel}
-        </button>
+        <Button
+          label={novoLabel}
+          onClick={onNew}
+          iconLeft={
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          }
+        />
       )}
       <div className={styles.searchWrapper}>
         <input
