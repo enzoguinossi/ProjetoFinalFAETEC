@@ -31,17 +31,22 @@ export default function CodigoForm({
   const [tipo, setTipo] = useState(initialTipo);
   const [valor, setValor] = useState(initialValor);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleConfirm() {
     if (!valor.trim()) return;
     onConfirm(tipo, valor.trim());
     setValor("");
     setTipo("DIGITACAO");
   }
 
+  function handleClose() {
+    setValor("");
+    setTipo("DIGITACAO");
+    onClose();
+  }
+
   return (
-    <Modal open={open} onClose={onClose} width="480px">
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <Modal open={open} onClose={handleClose} width="480px">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>
             Tipo de código
@@ -69,6 +74,7 @@ export default function CodigoForm({
             autoFocus
             value={valor}
             onChange={(e) => setValor(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder="Valor do código"
             style={{
               height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
@@ -79,10 +85,10 @@ export default function CodigoForm({
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
-          <Button label="Cancelar" variant="cancel" onClick={onClose} />
-          <Button label={editing ? "Atualizar" : "Adicionar"} variant="primary" type="submit" disabled={!valor.trim()} />
+          <Button label="Cancelar" variant="cancel" onClick={handleClose} />
+          <Button label={editing ? "Atualizar" : "Adicionar"} variant="primary" onClick={handleConfirm} disabled={!valor.trim()} />
         </div>
-      </form>
+      </div>
     </Modal>
   );
 }
