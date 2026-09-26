@@ -1,5 +1,117 @@
 {
   "node": {
+    "002878a12e4ed163071a683da2bdda0771aa06ae6b": {
+      "workers": {
+        "app/condutores/page": {
+          "moduleId": 15633,
+          "async": false,
+          "codeHash": null
+        },
+        "app/dashboard/page": {
+          "moduleId": 6643,
+          "async": false,
+          "codeHash": null
+        },
+        "app/destinatarios/page": {
+          "moduleId": 87618,
+          "async": false,
+          "codeHash": null
+        },
+        "app/fornecedores/page": {
+          "moduleId": 23548,
+          "async": false,
+          "codeHash": null
+        },
+        "app/funcionarios/page": {
+          "moduleId": 90857,
+          "async": false,
+          "codeHash": null
+        },
+        "app/primeiro-acesso/page": {
+          "moduleId": 82717,
+          "async": false,
+          "codeHash": null
+        },
+        "app/produtos/page": {
+          "moduleId": 6895,
+          "async": false,
+          "codeHash": null
+        },
+        "app/usuarios/novo/page": {
+          "moduleId": 46704,
+          "async": false,
+          "codeHash": null
+        },
+        "app/usuarios/page": {
+          "moduleId": 6354,
+          "async": false,
+          "codeHash": null
+        },
+        "app/veiculos/page": {
+          "moduleId": 30551,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/actions/user.ts",
+      "exportedName": "getUserInfo"
+    },
+    "00e4367e85cdac19f521632fa535356f9110617847": {
+      "workers": {
+        "app/condutores/page": {
+          "moduleId": 15633,
+          "async": false,
+          "codeHash": null
+        },
+        "app/dashboard/page": {
+          "moduleId": 6643,
+          "async": false,
+          "codeHash": null
+        },
+        "app/destinatarios/page": {
+          "moduleId": 87618,
+          "async": false,
+          "codeHash": null
+        },
+        "app/fornecedores/page": {
+          "moduleId": 23548,
+          "async": false,
+          "codeHash": null
+        },
+        "app/funcionarios/page": {
+          "moduleId": 90857,
+          "async": false,
+          "codeHash": null
+        },
+        "app/primeiro-acesso/page": {
+          "moduleId": 82717,
+          "async": false,
+          "codeHash": null
+        },
+        "app/produtos/page": {
+          "moduleId": 6895,
+          "async": false,
+          "codeHash": null
+        },
+        "app/usuarios/novo/page": {
+          "moduleId": 46704,
+          "async": false,
+          "codeHash": null
+        },
+        "app/usuarios/page": {
+          "moduleId": 6354,
+          "async": false,
+          "codeHash": null
+        },
+        "app/veiculos/page": {
+          "moduleId": 30551,
+          "async": false,
+          "codeHash": null
+        }
+      },
+      "filename": "src/app/login/actions.ts",
+      "exportedName": "logoutAction"
+    },
     "40caf541d7866785643fdead8e981951b13ebfb167": {
       "workers": {
         "app/definir-senha/page": {
@@ -25,7 +137,7 @@
     "40e36f1af5b290836891cdd4c8facec29f0b9d21fc": {
       "workers": {
         "app/primeiro-acesso/page": {
-          "moduleId": 60406,
+          "moduleId": 82717,
           "async": false,
           "codeHash": null
         }
@@ -36,7 +148,7 @@
     "40218805e2403e5b1f4c732ba8400bcd9fb3ee874f": {
       "workers": {
         "app/produtos/page": {
-          "moduleId": 85071,
+          "moduleId": 6895,
           "async": false,
           "codeHash": null
         }
@@ -47,7 +159,7 @@
     "405b20a0c367eaea6deacc2f914da03b6d4d4d3640": {
       "workers": {
         "app/produtos/page": {
-          "moduleId": 85071,
+          "moduleId": 6895,
           "async": false,
           "codeHash": null
         }
@@ -58,7 +170,7 @@
     "002c393bde9a23f0c81610245928f7afeb628f7b6e": {
       "workers": {
         "app/usuarios/novo/page": {
-          "moduleId": 40698,
+          "moduleId": 46704,
           "async": false,
           "codeHash": null
         }
@@ -69,7 +181,7 @@
     "402e73559c54068eceb96984d7bd114c349427d5a2": {
       "workers": {
         "app/usuarios/novo/page": {
-          "moduleId": 40698,
+          "moduleId": 46704,
           "async": false,
           "codeHash": null
         }

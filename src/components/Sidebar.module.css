@@ -176,3 +176,100 @@
   font-size: 0.75rem;
   color: #000000;
 }
+
+/* ── User section (wrapper for info + dropdown) ── */
+
+.userSection {
+  position: relative;
+  width: 100%;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-light);
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+/* ── Dropdown ── */
+
+.dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 0.5rem;
+  background: #ffffff;
+  border: 1px solid #dde1e6;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 100;
+}
+
+.dropdownHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.75rem;
+}
+
+.dropdownName {
+  font-family: Inter, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #21272a;
+}
+
+.dropdownLogin {
+  font-family: Inter, sans-serif;
+  font-size: 0.75rem;
+  color: #697077;
+}
+
+.badge {
+  font-family: Inter, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #1b9956;
+  background: rgba(27, 153, 86, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #e2e2e2;
+  margin: 0;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  font-size: 0.8125rem;
+  color: #da1e28;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.dropdownItem:hover {
+  background: #fff1f0;
+}

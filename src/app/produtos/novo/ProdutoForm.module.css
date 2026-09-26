@@ -117,58 +117,6 @@
   margin: 0;
 }
 
-.inlineEditor {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-  border: 1px solid #1b9956;
-  border-radius: 8px;
-  background: #f2fcf6;
-}
-
-.codeSelect {
-  width: 140px;
-  flex-shrink: 0;
-}
-
-.confirmBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  border-radius: 6px;
-  background: #1b9956;
-  cursor: pointer;
-  color: #ffffff;
-  flex-shrink: 0;
-}
-
-.confirmBtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.cancelSmallBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  color: #697077;
-  flex-shrink: 0;
-}
-
-.cancelSmallBtn:hover {
-  background: #f2f4f8;
-}
-
 /* ── Foto ── */
 
 .fotoRow {
