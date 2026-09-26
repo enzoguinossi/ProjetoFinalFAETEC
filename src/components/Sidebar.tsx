@@ -6,6 +6,21 @@ import { getUserInfo } from "@/app/actions/user";
 import { logoutAction } from "@/app/login/actions";
 import styles from "./Sidebar.module.css";
 
+// Cache o módulo para evitar recarregar a cada navegação
+let cachedUser: { id_usuario: number; nome: string; login: string; super_admin: boolean } | null = null;
+let cachePromise: Promise<typeof cachedUser> | null = null;
+
+function loadUser() {
+  if (cachedUser) return Promise.resolve(cachedUser);
+  if (cachePromise) return cachePromise;
+  cachePromise = (getUserInfo() as Promise<typeof cachedUser>).then((u) => {
+    cachedUser = u;
+    cachePromise = null;
+    return u;
+  });
+  return cachePromise;
+}
+
 const cadastroItems = [
   { label: "Usuários", path: "/usuarios", icon: "/icons/cadastros/usuario.svg" },
   { label: "Funcionários", path: "/funcionarios", icon: "/icons/cadastros/funcionarios.svg" },
@@ -26,13 +41,13 @@ const navItems = [
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<{ nome: string; login: string; super_admin: boolean } | null>(null);
+  const [user, setUser] = useState<typeof cachedUser>(cachedUser);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    getUserInfo().then(setUser);
+    loadUser().then((u) => { if (u) setUser(u); });
   }, []);
 
   // Fecha o menu ao clicar fora
@@ -48,6 +63,8 @@ export default function Sidebar() {
   }, [userMenuOpen]);
 
   async function handleLogout() {
+    cachedUser = null;
+    cachePromise = null;
     await logoutAction();
     router.push("/login");
   }

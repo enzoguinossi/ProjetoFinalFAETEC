@@ -3,6 +3,8 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { veiculoDAO } from "@/dao/veiculo";
 
+export const dynamic = "force-dynamic";
+
 export default async function VeiculosPage() {
   const { data } = await veiculoDAO.list();
 

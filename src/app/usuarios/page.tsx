@@ -3,6 +3,8 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export default async function UsuariosPage() {
   const data = await prisma.usuario.findMany({
     where: { ativo: true },

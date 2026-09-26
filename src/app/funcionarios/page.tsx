@@ -3,6 +3,8 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import { funcionarioDAO } from "@/dao/funcionario";
 
+export const dynamic = "force-dynamic";
+
 export default async function FuncionariosPage() {
   const { data } = await funcionarioDAO.list();
 
