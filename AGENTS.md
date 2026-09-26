@@ -684,9 +684,34 @@ Se uma informação importante precisar continuar válida entre sessões, ela de
 
 Não dependa da memória da sessão para preservar conhecimento essencial do projeto.
 
-### Jira
+### Integração GitHub + Jira (Smart Commits)
 
-As regras de integração com o Jira estão documentadas em `docs/agents/JIRA.md`.
+Para que os commits apareçam linkados às tasks no Jira, toda mensagem de commit deve incluir a **chave do issue** correspondente no formato:
+
+```text
+KAN-123: descrição do que foi feito
+```
+
+Ou, para ações avançadas via **Smart Commit**:
+
+```text
+KAN-123 #comment ajuste no cálculo do frete #time 2h 30m
+```
+
+- `KAN-123` — chave do issue (obrigatória em todo commit relacionado a uma task)
+- `#comment <texto>` — adiciona um comentário ao issue (opcional)
+- `#time <duração>` — registra worklog no Jira (opcional, ex: `1h`, `30m`, `2h 30m`)
+- `#resolve` ou `#close` — faz a transição do issue para concluído (usar somente quando os critérios de aceite forem atendidos)
+
+### Regras
+
+1. **Sempre incluir a chave do Jira** no commit message quando o commit implementar, corrigir ou estiver relacionado a uma task.
+2. **Usar a chave no início da mensagem**: `KAN-139: feat: busca priorizada na listagem de produtos`
+3. **Branch names** também devem conter a chave quando possível: `KAN-139-modulo-produtos`
+4. **Não associar commits a issues errados** apenas por similaridade superficial.
+5. Após finalizar uma implementação, registrar o resumo no Jira via comentário e worklog.
+
+As regras completas de integração com o Jira estão em `docs/agents/JIRA.md`.
 
 Quando o MCP do Jira estiver disponível, seguir essas regras antes de
 iniciar alterações significativas e ao finalizar o trabalho.
