@@ -180,19 +180,7 @@ export default function ProdutoForm({
       <form className={styles.form} onSubmit={handleSubmit}>
         {error && <div className={styles.error}>{error}</div>}
 
-        {isEdit && (
-          <div className={styles.flagsRow}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                name="ativo"
-                checked={ativo}
-                onChange={(e) => setAtivo(e.target.checked)}
-              />
-              Ativo
-            </label>
-          </div>
-        )}
+
 
         {/* Descrição */}
         <div className={styles.field}>
@@ -224,6 +212,20 @@ export default function ProdutoForm({
             ))}
           </select>
         </div>
+
+        {isEdit && (
+            <div className={styles.flagsRow}>
+              <label className={styles.checkboxLabel}>
+                <input
+                    type="checkbox"
+                    name="ativo"
+                    checked={ativo}
+                    onChange={(e) => setAtivo(e.target.checked)}
+                />
+                Ativo
+              </label>
+            </div>
+        )}
 
         {/* Flags + Data lado a lado */}
         <div className={styles.flagsRow}>
