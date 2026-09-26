@@ -67,10 +67,12 @@ interface DataTableProps<T> {
 export default function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
-  actions = defaultActions as Action<T>[],
+  actions,
   idField,
   pageSize = 10,
 }: DataTableProps<T>) {
+  const resolvedActions = actions ?? (defaultActions as Action<T>[]);
+
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize,
@@ -112,7 +114,7 @@ export default function DataTable<T extends Record<string, unknown>>({
 
   const gridCols = columns
     .map((c) => c.width || "1fr")
-    .concat(actions ? "178px" : "")
+    .concat(actions !== undefined ? "178px" : "")
     .join(" ");
 
   return (
@@ -129,7 +131,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                 <table.FlexRender header={header} />
               </div>
             ))}
-            {actions && <div className={styles.headerCell}>Ações</div>}
+            {actions !== undefined && <div className={styles.headerCell}>Ações</div>}
           </div>
 
           {/* Rows */}
@@ -150,9 +152,9 @@ export default function DataTable<T extends Record<string, unknown>>({
                       <table.FlexRender cell={cell} />
                     </div>
                   ))}
-                  {actions && (
+                  {actions !== undefined && (
                     <div className={styles.actions}>
-                      {actions.map((action, i) => (
+                      {resolvedActions.map((action, i) => (
                         <button
                           key={i}
                           className={styles.actionBtn}
