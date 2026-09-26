@@ -36,7 +36,7 @@ export default function Modal({ open, onClose, title, children, width }: ModalPr
         {title && (
           <div className={styles.header}>
             <h2 className={styles.title}>{title}</h2>
-            <button className={styles.closeBtn} onClick={onClose}>
+            <button className={styles.closeBtn} onClick={onClose} type="button">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
