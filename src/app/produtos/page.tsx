@@ -1,12 +1,16 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import SearchBar from "@/components/SearchBar";
-import DataTable from "@/components/DataTable";
+import ProdutosClient from "./ProdutosClient";
 import { produtoDAO } from "@/dao/produto";
+import { prisma } from "@/lib/prisma";
 
 export default async function ProdutosPage() {
-  const { data } = await produtoDAO.list();
+  const [listResult, conversoes, tiposCodigo] = await Promise.all([
+    produtoDAO.list(),
+    prisma.conversaoUnidade.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    prisma.tipoCodigo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+  ]);
 
-  const rows = data.map((p, i) => ({
+  const rows = listResult.data.map((p, i) => ({
     codigo: String(i + 1).padStart(6, "0"),
     descricao: p.descricao,
     qtd: "0",
@@ -15,15 +19,7 @@ export default async function ProdutosPage() {
 
   return (
     <DashboardLayout title="Produtos">
-      <SearchBar placeholder="Pesquisar produtos..." novoHref="/produtos/novo" />
-      <DataTable columns={columns} data={rows} idField="codigo" />
+      <ProdutosClient rows={rows} conversoes={conversoes} tiposCodigo={tiposCodigo} />
     </DashboardLayout>
   );
 }
-
-const columns = [
-  { key: "codigo" as const, label: "Código", width: "1fr" },
-  { key: "descricao" as const, label: "Descrição", width: "2fr" },
-  { key: "qtd" as const, label: "Quantidade", width: "1fr" },
-  { key: "livre" as const, label: "Qtd. Livre", width: "1fr" },
-];
