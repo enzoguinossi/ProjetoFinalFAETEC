@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createProduto, updateProduto, searchProdutos } from "./actions";
+import { createProduto, updateProduto, getProduto, searchProdutos } from "./actions";
 import type { ProdutoFormData } from "./actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import CodigoForm from "@/components/CodigoForm";
+import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import styles from "./ProdutoForm.module.css";
 
@@ -41,11 +42,6 @@ const codigoColumns = [
   { key: "valor" as const, label: "Código", width: "2fr" },
 ];
 
-const insumoColumns = [
-  { key: "descricao" as const, label: "Produto", width: "3fr" },
-  { key: "qtd" as const, label: "Quantidade", width: "1fr" },
-];
-
 export default function ProdutoForm({
   conversoes, tiposCodigo, mode = "create", initialData,
   onSuccess, onCancel,
@@ -70,6 +66,38 @@ export default function ProdutoForm({
   );
   const [editandoIns, setEditandoIns] = useState<number | null>(null);
   const [buscandoIdx, setBuscandoIdx] = useState<number | null>(null);
+
+  const [insumoViewOpen, setInsumoViewOpen] = useState(false);
+  const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
+
+  const editable = !isView;
+
+  const insumoColumns: import("@/components/DataTable").Column<InsumoEntry>[] = [
+    { key: "descricao", label: "Produto", width: "3fr" },
+    {
+      key: "qtd", label: "Quantidade", width: "1fr",
+      render: editable ? (value: string | number, row: InsumoEntry) => (
+        <input
+          type="number"
+          min="0"
+          step="any"
+          value={String(value)}
+          onChange={(e) => {
+            const i = insumos.findIndex((ins) => ins.id === row.id && ins.descricao === row.descricao);
+            if (i < 0) return;
+            const next = [...insumos];
+            next[i] = { ...next[i], qtd: e.target.value };
+            setInsumos(next);
+          }}
+          style={{
+            width: "100%", height: 28, border: "1px solid #d9d9d9", borderRadius: 6,
+            padding: "0 8px", fontFamily: "Inter,sans-serif", fontSize: "0.875rem",
+            outline: "none", boxSizing: "border-box",
+          }}
+        />
+      ) : undefined,
+    },
+  ];
 
   // ── Códigos ──
 
@@ -140,15 +168,31 @@ export default function ProdutoForm({
     setBuscandoIdx(null);
   }
 
-  const insumoActions = isView ? undefined : [
+  async function visualizarInsumo(id_produto: number) {
+    const data = await getProduto(id_produto);
+    if (data) {
+      setInsumoViewData(data);
+      setInsumoViewOpen(true);
+    }
+  }
+
+  const insumoActions = [
     {
+      icon: "/icons/actions/Olho.svg",
+      label: "Visualizar",
+      onClick: (row: Record<string, unknown>) => {
+        const i = insumos.findIndex((ins) => ins.descricao === row.descricao);
+        if (i >= 0 && insumos[i].id > 0) visualizarInsumo(insumos[i].id);
+      },
+    },
+    ...(editable ? [{
       icon: "/icons/actions/Lixeira.svg",
       label: "Excluir",
       onClick: (row: Record<string, unknown>) => {
         const i = insumos.findIndex((ins) => ins.descricao === row.descricao);
         if (i >= 0) removerInsumo(i);
       },
-    },
+    }] : []),
   ];
 
   // ── Submit ──
@@ -364,6 +408,58 @@ export default function ProdutoForm({
         initialValor={codigoEditandoIdx !== null ? codigos[codigoEditandoIdx]?.valor : ""}
         editing={codigoEditandoIdx !== null}
       />
+
+      <Modal
+        open={insumoViewOpen && insumoViewData !== null}
+        onClose={() => { setInsumoViewOpen(false); setInsumoViewData(null); }}
+        width="520px"
+      >
+        {insumoViewData && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div>
+              <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Descrição</strong>
+              <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.descricao}</p>
+            </div>
+            <div>
+              <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Unidade Padrão</strong>
+              <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>
+                {conversoes.find((c) => c.id_conversao === insumoViewData.id_conversao_padrao)?.nome ?? "—"}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "1.5rem" }}>
+              <div>
+                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Perecível</strong>
+                <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.perecivel ? "Sim" : "Não"}</p>
+              </div>
+              <div>
+                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Composto</strong>
+                <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.composto ? "Sim" : "Não"}</p>
+              </div>
+              {insumoViewData.perecivel && insumoViewData.data_validade && (
+                <div>
+                  <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Validade</strong>
+                  <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.data_validade}</p>
+                </div>
+              )}
+            </div>
+            {insumoViewData.codigos.length > 0 && (
+              <div>
+                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Códigos</strong>
+                <ul style={{ margin: "4px 0 0", paddingLeft: "1.25rem" }}>
+                  {insumoViewData.codigos.map((c, i) => (
+                    <li key={i} style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#21272a" }}>
+                      {c.tipo}: {c.valor}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "4px" }}>
+              <Button label="Fechar" variant="cancel" onClick={() => { setInsumoViewOpen(false); setInsumoViewData(null); }} />
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
