@@ -30,6 +30,7 @@ export class ProdutoDAO {
         conversaoPadrao: true,
         produtoCodigos: { include: { tipoCodigo: true } },
         estoques: { where: { ativo: true } },
+        insumosPai: { include: { produtoFilho: true } },
       },
     });
   }
@@ -113,6 +114,97 @@ export class ProdutoDAO {
         data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel }, dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel } },
       });
       return depois;
+    });
+  }
+
+  async updateCompleto(
+    id: number,
+    data: {
+      descricao?: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
+      data_validade?: string; id_conversao_padrao?: number; ativo?: boolean;
+      codigos?: { id_tipo_codigo: number; codigo: string }[];
+      insumos?: { id_produto_filho: number; quantidade: number }[];
+    },
+    id_usuario: number,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
+
+      const depois = await tx.produto.update({
+        where: { id_produto: id },
+        data: {
+          descricao: data.descricao,
+          foto_url: data.foto_url,
+          perecivel: data.perecivel ?? false,
+          composto: data.composto ?? false,
+          data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
+          id_conversao_padrao: data.id_conversao_padrao,
+          ativo: data.ativo ?? true,
+        },
+      });
+
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto",
+          id_entidade_afetada: id,
+          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo },
+          dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo },
+        },
+      });
+
+      // Substitui códigos personalizados
+      await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
+      for (const c of data.codigos ?? []) {
+        await tx.produtoCodigo.create({
+          data: { id_produto: id, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
+
+      // Substitui insumos
+      await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
+      for (const ins of data.insumos ?? []) {
+        await tx.produtoInsumo.create({
+          data: { id_produto_pai: id, id_produto_filho: ins.id_produto_filho, quantidade: ins.quantidade },
+        });
+      }
+
+      return tx.produto.findUniqueOrThrow({
+        where: { id_produto: id },
+        include: { conversaoPadrao: true, produtoCodigos: { include: { tipoCodigo: true } }, insumosPai: { include: { produtoFilho: true } } },
+      });
+    });
+  }
+
+  async verificarRelacionamentos(id: number) {
+    const [estoque, itensNotaSaida, itensNotaEntrada, itensRemessa, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
+      prisma.estoque.count({ where: { id_produto: id } }),
+      prisma.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
+      prisma.itemNotaEntrada.count({ where: { id_produto: id } }),
+      prisma.itemRemessa.count({ where: { estoque: { id_produto: id } } }),
+      prisma.itemPedidoEscola.count({ where: { id_produto: id } }),
+      prisma.itemColeta.count({ where: { estoque: { id_produto: id } } }),
+      prisma.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
+      prisma.produtoInsumo.count({ where: { id_produto_filho: id } }),
+    ]);
+
+    const vinculos: string[] = [];
+    if (estoque > 0) vinculos.push(`${estoque} registro(s) de estoque`);
+    if (itensNotaSaida > 0) vinculos.push(`${itensNotaSaida} item(ns) de nota de saída`);
+    if (itensNotaEntrada > 0) vinculos.push(`${itensNotaEntrada} item(ns) de nota de entrada`);
+    if (itensRemessa > 0) vinculos.push(`${itensRemessa} item(ns) de remessa`);
+    if (itensPedido > 0) vinculos.push(`${itensPedido} pedido(s) de escola`);
+    if (itensColeta > 0) vinculos.push(`${itensColeta} item(ns) de coleta`);
+    if (movimentacoes > 0) vinculos.push(`${movimentacoes} movimentação(ões) de estoque`);
+    if (insumosFilho > 0) vinculos.push(`${insumosFilho} produto(s) composto(s) que o utilizam como insumo`);
+
+    return { podeExcluir: vinculos.length === 0, vinculos };
+  }
+
+  async hardDelete(id: number) {
+    await prisma.$transaction(async (tx) => {
+      await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
+      await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
+      await tx.produto.delete({ where: { id_produto: id } });
     });
   }
 
