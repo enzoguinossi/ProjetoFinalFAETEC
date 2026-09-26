@@ -9,7 +9,13 @@ export class ProdutoDAO {
     const [data, total] = await Promise.all([
       prisma.produto.findMany({
         skip, take, where,
-        include: { conversaoPadrao: true },
+        include: {
+          conversaoPadrao: true,
+          estoques: {
+            where: { ativo: true },
+            select: { quantidade_atual: true, saldo_reservado: true },
+          },
+        },
         orderBy: { descricao: "asc" },
       }),
       prisma.produto.count({ where }),
