@@ -39,6 +39,7 @@ function createPrisma() {
       connectionLimit: 10,
       idleTimeout: 180,
       minDelayValidation: 1500,
+      allowPublicKeyRetrieval: true,
     },
     { useTextProtocol: true },
   );
