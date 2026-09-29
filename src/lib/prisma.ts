@@ -25,21 +25,24 @@ function createPrisma() {
 
   const parsed = parseMysqlUrl(url);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const adapter = new PrismaMariaDb(
-        {
-            host: parsed.host,
-            port: parsed.port,
-            user: parsed.user,
-            password: parsed.password,
-            database: parsed.database,
-            connectTimeout: 30000,
-            acquireTimeout: 30000,
-            connectionLimit: 10,
-        },
-        { useTextProtocol: true },
-    );
-    return new PrismaClient({ adapter });
+  // idleTimeout recicla conexões ociosas após 3 min (evita pool leak em hot-reload)
+  // acquireTimeout reduzido para falhar rápido em vez de travar 30s
+  const adapter = new PrismaMariaDb(
+    {
+      host: parsed.host,
+      port: parsed.port,
+      user: parsed.user,
+      password: parsed.password,
+      database: parsed.database,
+      connectTimeout: 10000,
+      acquireTimeout: 5000,
+      connectionLimit: 10,
+      idleTimeout: 180,
+      minDelayValidation: 1500,
+    },
+    { useTextProtocol: true },
+  );
+  return new PrismaClient({ adapter });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrisma();
