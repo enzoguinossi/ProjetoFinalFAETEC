@@ -25,7 +25,6 @@ export default async function UsuariosPage() {
     codigo: String(i + 1).padStart(3, "0"),
     login: u.login,
     nome: u.funcionario.pessoaFisica.nome,
-    admin: u.super_admin ? "Sim" : "Não",
   }));
 
   return (

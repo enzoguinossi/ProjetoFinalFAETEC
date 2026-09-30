@@ -27,7 +27,6 @@ const cadastroItems = [
   { label: "Destinatários", path: "/destinatarios", icon: "/icons/cadastros/escola.svg" },
   { label: "Produtos", path: "/produtos", icon: "/icons/cadastros/produto.svg" },
   { label: "Fornecedores", path: "/fornecedores", icon: "/icons/nav/dados.svg" },
-  { label: "Condutores", path: "/condutores", icon: "/icons/cadastros/funcionarios.svg" },
   { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg" },
 ];
 

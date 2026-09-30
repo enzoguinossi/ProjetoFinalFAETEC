@@ -5,31 +5,30 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import UsuarioForm from "./novo/UsuarioForm";
+import FuncionarioForm from "./novo/FuncionarioForm";
 import type { Column } from "@/components/DataTable";
-import { searchUsuariosList, type UsuarioListRow } from "./actions";
-import { getUsuario, deleteUsuario } from "./novo/actions";
-import type { UsuarioFormData } from "./novo/actions";
+import { searchFuncionariosList, type FuncionarioListRow } from "./actions";
+import { getFuncionario, deleteFuncionario } from "./novo/actions";
+import type { FuncionarioFormData } from "./novo/actions";
 
 interface Props {
-  rows: UsuarioListRow[];
-  funcionarios: { id_funcionario: number; pessoaFisica: { nome: string } }[];
+  rows: FuncionarioListRow[];
 }
 
-const columns: Column<UsuarioListRow>[] = [
+const columns: Column<FuncionarioListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
   { key: "nome", label: "Nome", width: "3fr" },
-  { key: "login", label: "Login", width: "2fr" },
+  { key: "cargo", label: "Cargo", width: "2fr" },
+  { key: "condutor", label: "Condutor", width: "1fr" },
 ];
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function UsuariosClient({ rows: initialRows, funcionarios }: Props) {
+export default function FuncionariosClient({ rows: initialRows }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [formData, setFormData] = useState<UsuarioFormData | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UsuarioListRow | null>(null);
+  const [formData, setFormData] = useState<FuncionarioFormData | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FuncionarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
@@ -46,26 +45,18 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
       setRows(initialRows);
       return;
     }
-    searchUsuariosList(value).then(setRows).catch(() => setRows(initialRows));
+    searchFuncionariosList(value).then(setRows).catch(() => setRows(initialRows));
   }
 
-  async function openEdit(id: number) {
-    setSelectedId(id);
-    const data = await getUsuario(id);
+  async function openModal(id: number | null, mode: "edit" | "view") {
+    if (id === null) { setModalMode("create"); return; }
+    const data = await getFuncionario(id);
     setFormData(data);
-    setModalMode("edit");
-  }
-
-  async function openView(id: number) {
-    setSelectedId(id);
-    const data = await getUsuario(id);
-    setFormData(data);
-    setModalMode("view");
+    setModalMode(mode);
   }
 
   function closeModal() {
     setModalMode(null);
-    setSelectedId(null);
     setFormData(null);
   }
 
@@ -79,13 +70,9 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
     setDeleting(true);
     setDeleteError("");
     try {
-      const result = await deleteUsuario(deleteTarget.id_usuario);
-      if (result.error) {
-        setDeleteError(result.error);
-      } else {
-        setDeleteTarget(null);
-        window.location.reload();
-      }
+      await deleteFuncionario(deleteTarget.id_funcionario);
+      setDeleteTarget(null);
+      window.location.reload();
     } catch {
       setDeleteError("Erro ao excluir. Tente novamente.");
     } finally {
@@ -97,17 +84,17 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
     {
       icon: "/icons/actions/Olho.svg",
       label: "Visualizar",
-      onClick: (row: UsuarioListRow) => openView(row.id_usuario),
+      onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "view"),
     },
     {
       icon: "/icons/actions/Editar.svg",
       label: "Editar",
-      onClick: (row: UsuarioListRow) => openEdit(row.id_usuario),
+      onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "edit"),
     },
     {
       icon: "/icons/actions/Lixeira.svg",
       label: "Excluir",
-      onClick: (row: UsuarioListRow) => {
+      onClick: (row: FuncionarioListRow) => {
         setDeleteTarget(row);
         setDeleteError("");
       },
@@ -117,25 +104,19 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
   return (
     <>
       <SearchBar
-        placeholder="Pesquisar usuários..."
+        placeholder="Pesquisar funcionários..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
-        <UsuarioForm
-          funcionarios={funcionarios}
-          mode="create"
-          onSuccess={handleSuccess}
-          onCancel={closeModal}
-        />
+        <FuncionarioForm mode="create" onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
       <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
         {formData && (
-          <UsuarioForm
-            funcionarios={funcionarios}
+          <FuncionarioForm
             mode="edit"
             initialData={formData}
             onSuccess={handleSuccess}
@@ -146,12 +127,7 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
 
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
         {formData && (
-          <UsuarioForm
-            funcionarios={funcionarios}
-            mode="view"
-            initialData={formData}
-            onCancel={closeModal}
-          />
+          <FuncionarioForm mode="view" initialData={formData} onCancel={closeModal} />
         )}
       </Modal>
 
@@ -159,7 +135,7 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
         open={deleteTarget !== null}
         onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
         onConfirm={handleDelete}
-        title="Excluir usuário"
+        title="Excluir funcionário"
         message={
           deleteError
             ? deleteError

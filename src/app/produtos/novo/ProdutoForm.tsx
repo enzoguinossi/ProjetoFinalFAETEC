@@ -412,52 +412,16 @@ export default function ProdutoForm({
       <Modal
         open={insumoViewOpen && insumoViewData !== null}
         onClose={() => { setInsumoViewOpen(false); setInsumoViewData(null); }}
-        width="520px"
+        width="728px"
       >
         {insumoViewData && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <div>
-              <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Descrição</strong>
-              <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.descricao}</p>
-            </div>
-            <div>
-              <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Unidade Padrão</strong>
-              <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>
-                {conversoes.find((c) => c.id_conversao === insumoViewData.id_conversao_padrao)?.nome ?? "—"}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "1.5rem" }}>
-              <div>
-                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Perecível</strong>
-                <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.perecivel ? "Sim" : "Não"}</p>
-              </div>
-              <div>
-                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Composto</strong>
-                <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.composto ? "Sim" : "Não"}</p>
-              </div>
-              {insumoViewData.perecivel && insumoViewData.data_validade && (
-                <div>
-                  <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Validade</strong>
-                  <p style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: "2px 0 0" }}>{insumoViewData.data_validade}</p>
-                </div>
-              )}
-            </div>
-            {insumoViewData.codigos.length > 0 && (
-              <div>
-                <strong style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#697077" }}>Códigos</strong>
-                <ul style={{ margin: "4px 0 0", paddingLeft: "1.25rem" }}>
-                  {insumoViewData.codigos.map((c, i) => (
-                    <li key={i} style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#21272a" }}>
-                      {c.tipo}: {c.valor}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "4px" }}>
-              <Button label="Fechar" variant="cancel" onClick={() => { setInsumoViewOpen(false); setInsumoViewData(null); }} />
-            </div>
-          </div>
+          <ProdutoForm
+            conversoes={conversoes}
+            tiposCodigo={tiposCodigo}
+            mode="view"
+            initialData={insumoViewData}
+            onCancel={() => { setInsumoViewOpen(false); setInsumoViewData(null); }}
+          />
         )}
       </Modal>
     </>
