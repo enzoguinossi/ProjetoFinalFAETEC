@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run db:generate && npm run db:push && npm run db:seed && npm run build:next",
+    "build:next": "next build",
     "start": "next start",
     "lint": "next lint",
+    "env:generate": "cp .env.example .env",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",

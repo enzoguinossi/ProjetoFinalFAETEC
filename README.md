@@ -53,14 +53,29 @@ projeto-final-faetec/
 # Instalar dependências
 npm install
 
-# Configurar banco
-cp .env.example .env   # editar credenciais MySQL
-npx prisma db push     # criar tabelas
-npx prisma generate    # gerar client
+# Gerar .env com URL MySQL do Docker Compose
+npm run env:generate
 
-# Iniciar dev
+# Subir banco MySQL 8.0 + aplicação
+docker compose up --build
+
+# Modo desenvolvimento (sem Docker)
+npm run db:generate
+npm run db:push
 npm run dev
 ```
+
+## Docker Compose
+
+- `docker-compose.yml` sobe:
+  - `mysql:8.0` (serviço `mysql`);
+  - aplicação Next.js (serviço `app`).
+- O script `docker/mysql/init/01-create-nexus.sql` cria o banco `Nexus` na inicialização do MySQL.
+- O comando de build da aplicação executa:
+  - geração do Prisma Client;
+  - criação/atualização das tabelas;
+  - seed do banco;
+  - build do Next.js.
 
 ## Equipe
 
