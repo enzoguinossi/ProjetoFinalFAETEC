@@ -29,7 +29,6 @@ export default function UsuarioForm({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [login, setLogin] = useState(initialData?.login ?? "");
-  const [superAdmin, setSuperAdmin] = useState(initialData?.super_admin ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [idFuncionario, setIdFuncionario] = useState(initialData?.id_funcionario ?? null);
 
@@ -101,22 +100,6 @@ export default function UsuarioForm({
           readOnly={isView}
         />
       </div>
-
-      {isEdit && (
-        <label className={styles.checkboxLabel}>
-          <input type="checkbox" name="super_admin" checked={superAdmin} onChange={(e) => setSuperAdmin(e.target.checked)} />
-          Super Admin
-        </label>
-      )}
-
-      {isView && (
-        <div className={styles.field}>
-          <label className={styles.label}>Super Admin</label>
-          <p className={styles.input} style={{ lineHeight: "2.5", padding: "0 0.75rem" }}>
-            {initialData?.super_admin ? "Sim" : "Não"}
-          </p>
-        </div>
-      )}
 
       <div className={styles.actions}>
         {isView ? (
