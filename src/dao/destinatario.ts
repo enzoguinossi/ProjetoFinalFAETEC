@@ -33,22 +33,16 @@ export class DestinatarioDAO {
     });
   }
 
-  /**
-   * Cria Destinatario + PessoaJuridica + Endereco em transação.
-   */
   async create(
     data: {
-      razao_social: string;
-      cnpj?: string;
+      razao_social: string; cnpj?: string;
       tipo_destinatario: "ESCOLA" | "CRECHE";
       endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; cep?: string; latitude?: number; longitude?: number };
     },
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
-      const pj = await tx.pessoaJuridica.create({
-        data: { razao_social: data.razao_social, cnpj: data.cnpj },
-      });
+      const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
       await tx.registroAuditoria.create({
         data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "PessoaJuridica", id_entidade_afetada: pj.id_pessoa_juridica, dados_novos: { razao_social: data.razao_social } },
       });
@@ -64,6 +58,85 @@ export class DestinatarioDAO {
       return tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: dest.id_destinatario },
         include: { pessoaJuridica: true, endereco: true },
+      });
+    });
+  }
+
+  async update(
+    id: number,
+    data: {
+      razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE";
+      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
+    },
+    id_usuario: number,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const antes = await tx.destinatario.findUniqueOrThrow({
+        where: { id_destinatario: id },
+        include: { pessoaJuridica: true, endereco: true },
+      });
+
+      if (data.razao_social !== undefined || data.cnpj !== undefined) {
+        await tx.pessoaJuridica.update({
+          where: { id_pessoa_juridica: antes.id_pessoa_juridica },
+          data: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, cnpj: data.cnpj ?? antes.pessoaJuridica.cnpj },
+        });
+      }
+
+      if (data.endereco) {
+        const endData: any = {};
+        for (const [k, v] of Object.entries(data.endereco)) {
+          if (v !== undefined) endData[k] = v;
+        }
+        if (Object.keys(endData).length > 0) {
+          await tx.endereco.update({ where: { id_endereco: antes.id_endereco }, data: endData });
+        }
+      }
+
+      const depois = await tx.destinatario.update({
+        where: { id_destinatario: id },
+        data: { tipo_destinatario: data.tipo_destinatario ?? antes.tipo_destinatario },
+      });
+
+      await tx.registroAuditoria.create({
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario } },
+      });
+
+      return depois;
+    });
+  }
+
+  async verificarRelacionamentos(id: number) {
+    const [notasSaida, pedidos, remessas, coletas, percursos] = await Promise.all([
+      prisma.notaSaida.count({ where: { id_destinatario: id } }),
+      prisma.pedidoEscola.count({ where: { id_destinatario: id } }),
+      prisma.remessa.count({ where: { id_destinatario: id } }),
+      prisma.coleta.count({ where: { id_destinatario: id } }),
+      prisma.percursoDestinatario.count({ where: { id_destinatario: id } }),
+    ]);
+
+    const vinculos: string[] = [];
+    if (notasSaida > 0) vinculos.push(`${notasSaida} nota(s) de saída`);
+    if (pedidos > 0) vinculos.push(`${pedidos} pedido(s)`);
+    if (remessas > 0) vinculos.push(`${remessas} remessa(s)`);
+    if (coletas > 0) vinculos.push(`${coletas} coleta(s)`);
+    if (percursos > 0) vinculos.push(`${percursos} percurso(s)`);
+
+    return { podeExcluir: vinculos.length === 0, vinculos };
+  }
+
+  async hardDelete(id: number, id_usuario: number) {
+    await prisma.$transaction(async (tx) => {
+      const d = await tx.destinatario.findUniqueOrThrow({
+        where: { id_destinatario: id },
+        include: { endereco: true },
+      });
+      await tx.destinatarioCodigo.deleteMany({ where: { id_destinatario: id } });
+      await tx.destinatario.delete({ where: { id_destinatario: id } });
+      await tx.endereco.delete({ where: { id_endereco: d.id_endereco } });
+      await tx.pessoaJuridica.delete({ where: { id_pessoa_juridica: d.id_pessoa_juridica } });
+      await tx.registroAuditoria.create({
+        data: { id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { id_destinatario: id } },
       });
     });
   }

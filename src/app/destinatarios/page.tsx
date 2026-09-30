@@ -1,27 +1,19 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import SearchBar from "@/components/SearchBar";
-import DataTable from "@/components/DataTable";
+import DestinatariosClient from "./DestinatariosClient";
 import { destinatarioDAO } from "@/dao/destinatario";
 
 export const dynamic = "force-dynamic";
 
 export default async function DestinatariosPage() {
   const { data } = await destinatarioDAO.list();
-
   const rows = data.map((d, i) => ({
+    id_destinatario: d.id_destinatario,
     codigo: String(i + 1).padStart(3, "0"),
     razao: d.pessoaJuridica.razao_social,
   }));
-
   return (
     <DashboardLayout title="Destinatários">
-      <SearchBar placeholder="Pesquisar destinatários..." />
-      <DataTable columns={columns} data={rows} idField="codigo" />
+      <DestinatariosClient rows={rows} />
     </DashboardLayout>
   );
 }
-
-const columns = [
-  { key: "codigo" as const, label: "Código", width: "1fr" },
-  { key: "razao" as const, label: "Razão Social", width: "5fr" },
-];

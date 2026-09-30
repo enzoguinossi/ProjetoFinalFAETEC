@@ -24,20 +24,39 @@ export class VeiculoDAO {
     return prisma.$transaction(async (tx) => {
       const v = await tx.veiculo.create({ data: { ...data, status: "DISPONIVEL" } });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa, modelo: data.modelo, capacidade: data.capacidade } },
       });
       return v;
     });
   }
 
-  async alterarStatus(id: number, status: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA", id_usuario: number) {
+  async update(id: number, data: { placa?: string; modelo?: string; capacidade?: number; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA" }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id } });
-      const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { status } });
+      const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { status: antes.status }, dados_novos: { status: depois.status } },
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { placa: antes.placa, modelo: antes.modelo, capacidade: antes.capacidade, status: antes.status }, dados_novos: { placa: depois.placa, modelo: depois.modelo, capacidade: depois.capacidade, status: depois.status } },
       });
       return depois;
+    });
+  }
+
+  async verificarRelacionamentos(id: number) {
+    const [remessas] = await Promise.all([
+      prisma.remessa.count({ where: { id_veiculo: id } }),
+    ]);
+    const vinculos: string[] = [];
+    if (remessas > 0) vinculos.push(`${remessas} remessa(s)`);
+    return { podeExcluir: vinculos.length === 0, vinculos };
+  }
+
+  async hardDelete(id: number, id_usuario: number) {
+    await prisma.$transaction(async (tx) => {
+      await tx.veiculoCodigo.deleteMany({ where: { id_veiculo: id } });
+      await tx.veiculo.delete({ where: { id_veiculo: id } });
+      await tx.registroAuditoria.create({
+        data: { id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { id_veiculo: id } },
+      });
     });
   }
 
