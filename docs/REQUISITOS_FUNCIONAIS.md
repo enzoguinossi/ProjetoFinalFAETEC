@@ -13,10 +13,9 @@
 | ID | Título | Descrição | Prioridade |
 |----|--------|-----------|------------|
 | RF004 | Gerenciar Destinatários | O sistema deve permitir o cadastro de 105 a 108 escolas e creches municipais. Destinatário estende Pessoa Jurídica (CNPJ opcional). Endereço em tabela separada com logradouro, número, complemento, bairro, cidade, CEP, latitude e longitude. Código da escola via código personalizado do tipo COD_ESCOLA. | Essencial |
-| RF005 | Gerenciar Funcionários | O sistema deve permitir o cadastro de funcionários, que estendem Pessoa Física (nome, CPF opcional). Um funcionário pode ou não ser Usuário (ter login). Um funcionário pode ou não ser Condutor (ter CNH). | Essencial |
+| RF005 | Gerenciar Funcionários | O sistema deve permitir o cadastro de funcionários, que estendem Pessoa Física (nome, CPF opcional). Um funcionário pode ou não ser Usuário (ter login). Um funcionário pode ser marcado como Condutor através de um checkbox no formulário. | Essencial |
 | RF006 | Gerenciar Fornecedores | O sistema deve permitir o cadastro de fornecedores, que estendem Pessoa Jurídica (CNPJ opcional). Endereço opcional em tabela separada. | Essencial |
-| RF007 | Gerenciar Condutores | O sistema deve permitir o cadastro de condutores, que estendem Funcionário em relação 1:1. Campos: número CNH, categoria CNH (A, B, C, D, E), validade CNH. | Essencial |
-| RF008 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo, capacidade e status (DISPONIVEL, INDISPONIVEL, EM_ROTA). | Essencial |
+| RF007 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo, capacidade e status (DISPONIVEL, INDISPONIVEL, EM_ROTA). | Essencial |
 | RF009 | Mural de Mensagens do Dia | O sistema deve disponibilizar um mural na tela inicial para exibição de avisos e recados diários entre a equipe, com título, conteúdo, data de publicação, data de expiração opcional e autor vinculado. | Desejável |
 
 ## Módulo 3: Controle de Estoque e Catálogo de Produtos

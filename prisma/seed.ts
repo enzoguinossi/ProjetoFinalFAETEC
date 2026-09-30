@@ -28,7 +28,7 @@ async function main() {
   // ── Permissões ──────────────────────────────────────────────────
   const permissoes = [
     ...["usuario", "funcionario", "destinatario", "fornecedor",
-      "condutor", "veiculo", "produto", "perfil",
+      "veiculo", "produto", "perfil",
     ].flatMap((e) => [`${e}.criar`, `${e}.alterar`, `${e}.consultar`, `${e}.desativar`]),
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
@@ -153,25 +153,14 @@ async function main() {
   console.log(`  ✅ ${funcionarios.length} funcionários`);
 
   // Condutores (os 3 funcionários também são condutores)
-  const condutoresData = [
-    { cnh: "SP 123456789", categoria: "B", validade: new Date("2027-05-10") },
-    { cnh: "RJ 987654321", categoria: "D", validade: new Date("2026-11-22") },
-    { cnh: "MG 456789123", categoria: "AB", validade: new Date("2028-01-15") },
-  ];
-
-  for (let i = 0; i < funcionarios.length; i++) {
+  for (const f of funcionarios) {
     await prisma.condutor.upsert({
-      where: { id_funcionario: funcionarios[i].id_funcionario },
+      where: { id_funcionario: f.id_funcionario },
       update: {},
-      create: {
-        id_funcionario: funcionarios[i].id_funcionario,
-        numero_cnh: condutoresData[i].cnh,
-        categoria_cnh: condutoresData[i].categoria,
-        validade_cnh: condutoresData[i].validade,
-      },
+      create: { id_funcionario: f.id_funcionario },
     });
   }
-  console.log(`  ✅ ${condutoresData.length} condutores`);
+  console.log(`  ✅ ${funcionarios.length} condutores`);
 
   // ── Pessoas Jurídicas → Fornecedores ──
   const pjFornecedores = [

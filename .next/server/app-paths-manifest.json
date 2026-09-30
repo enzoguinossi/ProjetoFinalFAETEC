@@ -1,13 +1,11 @@
 {
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/condutores/route": "app/api/condutores/route.js",
   "/api/destinatarios/route": "app/api/destinatarios/route.js",
   "/api/fornecedores/route": "app/api/fornecedores/route.js",
   "/api/funcionarios/route": "app/api/funcionarios/route.js",
   "/api/produtos/route": "app/api/produtos/route.js",
   "/api/veiculos/route": "app/api/veiculos/route.js",
-  "/condutores/page": "app/condutores/page.js",
   "/dashboard/page": "app/dashboard/page.js",
   "/definir-senha/page": "app/definir-senha/page.js",
   "/destinatarios/page": "app/destinatarios/page.js",
@@ -18,7 +16,6 @@
   "/primeiro-acesso/page": "app/primeiro-acesso/page.js",
   "/produtos/novo/page": "app/produtos/novo/page.js",
   "/produtos/page": "app/produtos/page.js",
-  "/usuarios/novo/page": "app/usuarios/novo/page.js",
   "/usuarios/page": "app/usuarios/page.js",
   "/veiculos/page": "app/veiculos/page.js"
 }

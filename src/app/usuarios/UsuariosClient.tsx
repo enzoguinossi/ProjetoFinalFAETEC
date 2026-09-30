@@ -18,9 +18,8 @@ interface Props {
 
 const columns: Column<UsuarioListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
-  { key: "login", label: "Login", width: "1.5fr" },
   { key: "nome", label: "Nome", width: "3fr" },
-  { key: "admin", label: "Administrador", width: "1fr" },
+  { key: "login", label: "Login", width: "2fr" },
 ];
 
 type ModalMode = "create" | "edit" | "view" | null;

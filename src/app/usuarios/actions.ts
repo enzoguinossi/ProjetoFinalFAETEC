@@ -7,7 +7,6 @@ export type UsuarioListRow = {
   codigo: string;
   login: string;
   nome: string;
-  admin: string;
 };
 
 export async function searchUsuariosList(query: string): Promise<UsuarioListRow[]> {
@@ -33,6 +32,5 @@ export async function searchUsuariosList(query: string): Promise<UsuarioListRow[
     codigo: String(i + 1).padStart(3, "0"),
     login: u.login,
     nome: u.funcionario.pessoaFisica.nome,
-    admin: u.super_admin ? "Sim" : "Não",
   }));
 }

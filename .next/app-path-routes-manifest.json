@@ -1,13 +1,11 @@
 {
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
-  "/api/condutores/route": "/api/condutores",
   "/api/destinatarios/route": "/api/destinatarios",
   "/api/fornecedores/route": "/api/fornecedores",
   "/api/funcionarios/route": "/api/funcionarios",
   "/api/produtos/route": "/api/produtos",
   "/api/veiculos/route": "/api/veiculos",
-  "/condutores/page": "/condutores",
   "/dashboard/page": "/dashboard",
   "/definir-senha/page": "/definir-senha",
   "/destinatarios/page": "/destinatarios",
@@ -18,7 +16,6 @@
   "/primeiro-acesso/page": "/primeiro-acesso",
   "/produtos/novo/page": "/produtos/novo",
   "/produtos/page": "/produtos",
-  "/usuarios/novo/page": "/usuarios/novo",
   "/usuarios/page": "/usuarios",
   "/veiculos/page": "/veiculos"
 }

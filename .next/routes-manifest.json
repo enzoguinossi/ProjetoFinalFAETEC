@@ -42,12 +42,6 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
-      "page": "/api/condutores",
-      "regex": "^/api/condutores(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/condutores(?:/)?$"
-    },
-    {
       "page": "/api/destinatarios",
       "regex": "^/api/destinatarios(?:/)?$",
       "routeKeys": {},
@@ -76,12 +70,6 @@
       "regex": "^/api/veiculos(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/api/veiculos(?:/)?$"
-    },
-    {
-      "page": "/condutores",
-      "regex": "^/condutores(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/condutores(?:/)?$"
     },
     {
       "page": "/dashboard",
@@ -142,12 +130,6 @@
       "regex": "^/usuarios(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/usuarios(?:/)?$"
-    },
-    {
-      "page": "/usuarios/novo",
-      "regex": "^/usuarios/novo(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/usuarios/novo(?:/)?$"
     },
     {
       "page": "/veiculos",

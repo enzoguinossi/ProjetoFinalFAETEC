@@ -8,6 +8,9 @@ Usage:
     python scripts/build-docs.py --validate-only  # Only validate syntax
     python scripts/build-docs.py --skip-puml      # Skip PlantUML rendering
 """
+import io
+import sys
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 import argparse
 import base64
 import json
@@ -280,9 +283,9 @@ def validate_all_puml() -> int:
         text = pf.read_text(encoding="utf-8")
         ok, msg = puml_validate(text)
         if ok:
-            print(f"  ✓ {rel}")
+            print(f"  [OK] {rel}")
         else:
-            print(f"  ✗ {rel}")
+            print(f"  [ERRO] {rel}")
             print(f"    Error: {msg[:200]}")
             errors += 1
     

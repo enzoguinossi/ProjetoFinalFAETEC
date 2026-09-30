@@ -183,15 +183,12 @@ Regras:
 - Nem todo funcionário é usuário (ex: motorista só aparece nas remessas, sem login)
 - FK 1:1 para Funcionario — um funcionário pode ter no máximo um usuário
 
-#### 3.3.3 Condutor (1:1 com Funcionário — opcional)
+#### 3.3.3 Condutor (1:1 com Funcionário — marcador)
 
 ```
 condutor
 ├── ID_condutor         INT PK auto_increment
 ├── ID_funcionario      INT FK UNIQUE NOT NULL  ← só pode ser funcionário
-├── numero_cnh          VARCHAR
-├── categoria_cnh       VARCHAR
-├── validade_cnh        DATE
 └── ativo               BOOLEAN DEFAULT TRUE
 ```
 

@@ -160,9 +160,6 @@ model Usuario {
 model Condutor {
   id_condutor     Int              @id @default(autoincrement()) @map("ID_condutor")
   id_funcionario  Int              @unique @map("ID_funcionario")
-  numero_cnh      String?          @map("numero_cnh")
-  categoria_cnh   String?          @map("categoria_cnh")
-  validade_cnh    DateTime?        @map("validade_cnh") @db.Date
   ativo           Boolean          @default(true) @map("ativo")
   funcionario     Funcionario      @relation(fields: [id_funcionario], references: [id_funcionario])
   condutorCodigos CondutorCodigo[]

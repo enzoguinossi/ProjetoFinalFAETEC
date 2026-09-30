@@ -14,7 +14,7 @@ export class FuncionarioDAO {
         include: {
           pessoaFisica: { select: { id_pessoa_fisica: true, nome: true, cpf: true } },
           usuario: { select: { id_usuario: true, login: true, ativo: true } },
-          condutor: { select: { id_condutor: true, numero_cnh: true } },
+          condutor: { select: { id_condutor: true, ativo: true } },
         },
         orderBy: { id_funcionario: "desc" },
       }),
@@ -37,11 +37,8 @@ export class FuncionarioDAO {
     });
   }
 
-  /**
-   * Cria Funcionario + PessoaFisica em transação, com auditoria.
-   */
   async create(
-    data: { nome: string; cpf?: string; cargo?: string },
+    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean },
     id_usuario: number,
   ) {
     const result = await prisma.$transaction(async (tx) => {
@@ -50,8 +47,7 @@ export class FuncionarioDAO {
       });
       await tx.registroAuditoria.create({
         data: {
-          id_usuario,
-          acao: "CRIAR", data_hora: new Date(),
+          id_usuario, acao: "CRIAR", data_hora: new Date(),
           entidade: "PessoaFisica",
           id_entidade_afetada: pf.id_pessoa_fisica,
           dados_novos: { nome: data.nome, cpf: data.cpf ?? null },
@@ -63,32 +59,75 @@ export class FuncionarioDAO {
       });
       await tx.registroAuditoria.create({
         data: {
-          id_usuario,
-          acao: "CRIAR", data_hora: new Date(),
+          id_usuario, acao: "CRIAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE,
           id_entidade_afetada: func.id_funcionario,
-          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica },
+          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false },
         },
       });
 
+      if (data.condutor) {
+        await tx.condutor.create({ data: { id_funcionario: func.id_funcionario } });
+      }
+
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: func.id_funcionario },
-        include: { pessoaFisica: true },
+        include: { pessoaFisica: true, condutor: true },
       });
     });
     return result;
   }
 
-  async update(id: number, data: { cargo?: string }, id_usuario: number) {
-    const antes = await prisma.funcionario.findUniqueOrThrow({ where: { id_funcionario: id } });
-    const depois = await prisma.funcionario.update({ where: { id_funcionario: id }, data });
-    if (JSON.stringify(antes) !== JSON.stringify(depois)) {
-      await registrarAuditoria(id_usuario, "ALTERAR", AUDIT_ENTIDADE, id,
-        { cargo: antes.cargo },
-        { cargo: depois.cargo },
-      );
-    }
-    return depois;
+  async update(
+    id: number,
+    data: { nome?: string; cargo?: string; condutor?: boolean },
+    id_usuario: number,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const antes = await tx.funcionario.findUniqueOrThrow({
+        where: { id_funcionario: id },
+        include: { pessoaFisica: true, condutor: true },
+      });
+
+      if (data.nome !== undefined) {
+        await tx.pessoaFisica.update({
+          where: { id_pessoa_fisica: antes.id_pessoa_fisica },
+          data: { nome: data.nome },
+        });
+      }
+
+      const depois = await tx.funcionario.update({
+        where: { id_funcionario: id },
+        data: { cargo: data.cargo },
+      });
+
+      // Gerencia condutor
+      const eraCondutor = antes.condutor?.ativo ?? false;
+      if (data.condutor === true && !eraCondutor) {
+        const existente = await tx.condutor.findUnique({ where: { id_funcionario: id } });
+        if (existente) {
+          if (!existente.ativo) await tx.condutor.update({ where: { id_funcionario: id }, data: { ativo: true } });
+        } else {
+          await tx.condutor.create({ data: { id_funcionario: id } });
+        }
+      } else if (data.condutor === false && eraCondutor) {
+        await tx.condutor.updateMany({ where: { id_funcionario: id }, data: { ativo: false } });
+      }
+
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario, acao: "ALTERAR", data_hora: new Date(),
+          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
+          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: eraCondutor },
+          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: data.condutor ?? eraCondutor },
+        },
+      });
+
+      return tx.funcionario.findUniqueOrThrow({
+        where: { id_funcionario: id },
+        include: { pessoaFisica: true, condutor: true },
+      });
+    });
   }
 
   async softDelete(id: number, id_usuario: number) {
