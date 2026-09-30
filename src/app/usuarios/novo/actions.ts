@@ -61,11 +61,10 @@ export async function updateUsuario(formData: FormData) {
 
   const user = await requireUser();
   const ativo = formData.get("ativo") !== "off";
-  const super_admin = formData.get("super_admin") === "on";
 
   await usuarioDAO.update(
     id,
-    { login: login.trim(), ativo, super_admin },
+    { login: login.trim(), ativo },
     user.id_usuario,
   );
 
