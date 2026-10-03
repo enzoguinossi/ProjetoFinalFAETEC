@@ -692,16 +692,16 @@ Para que os commits apareçam linkados às tasks no Jira, toda mensagem de commi
 KAN-123: descrição do que foi feito
 ```
 
-Ou, para ações avançadas via **Smart Commit**:
+Ou, para ações via **Smart Commit**:
 
 ```text
-KAN-123 #comment ajuste no cálculo do frete #time 2h 30m
+KAN-123 #comment ajuste no cálculo do frete
 ```
 
 - `KAN-123` — chave do issue (obrigatória em todo commit relacionado a uma task)
 - `#comment <texto>` — adiciona um comentário ao issue (opcional)
-- `#time <duração>` — registra worklog no Jira (opcional, ex: `1h`, `30m`, `2h 30m`)
 - `#resolve` ou `#close` — faz a transição do issue para concluído (usar somente quando os critérios de aceite forem atendidos)
+- **`#time` não é suportado** — não registrar horas por comentário.
 
 ### Regras
 
@@ -709,7 +709,8 @@ KAN-123 #comment ajuste no cálculo do frete #time 2h 30m
 2. **Usar a chave no início da mensagem**: `KAN-139: feat: busca priorizada na listagem de produtos`
 3. **Branch names** também devem conter a chave quando possível: `KAN-139-modulo-produtos`
 4. **Não associar commits a issues errados** apenas por similaridade superficial.
-5. Após finalizar uma implementação, registrar o resumo no Jira via comentário e worklog.
+5. **Nunca comentar em uma task sem antes propor o conteúdo ao usuário e obter aprovação.** Nenhum comentário deve ser publicado automaticamente.
+6. **Registrar tempo apenas via worklog do MCP** (`addOrEditJiraIssueWorklog`), nunca por comentário ou `#time`.
 
 As regras completas de integração com o Jira estão em `docs/agents/JIRA.md`.
 
