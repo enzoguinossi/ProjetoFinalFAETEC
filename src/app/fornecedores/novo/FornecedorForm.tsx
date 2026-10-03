@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { createFornecedor, updateFornecedor } from "./actions";
+import { createFornecedor, updateFornecedor, buscarCep } from "./actions";
 import type { FornecedorFormData } from "./actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
+import EnderecoFields from "@/components/EnderecoFields";
 import Button from "@/components/Button";
 
 interface Props {
@@ -113,161 +114,22 @@ export default function FornecedorForm({
       <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0.25rem 0" }} />
       <p style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#616161", margin: 0 }}>Endereço (opcional)</p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Logradouro</label>
-        {isView ? (
-          <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-            {initialData?.endereco?.logradouro ?? "—"}
-          </p>
-        ) : (
-          <input
-            name="logradouro"
-            defaultValue={initialData?.endereco?.logradouro ?? undefined}
-            readOnly={isView}
-            style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: "12px" }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Número</label>
-          {isView ? (
-            <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-              {initialData?.endereco?.numero ?? "—"}
-            </p>
-          ) : (
-            <input
-              name="numero"
-              defaultValue={initialData?.endereco?.numero ?? undefined}
-              readOnly={isView}
-              style={{
-                height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-                fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-              }}
-            />
-          )}
-        </div>
-        <div style={{ flex: 2, display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Complemento</label>
-          {isView ? (
-            <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-              {initialData?.endereco?.complemento ?? "—"}
-            </p>
-          ) : (
-            <input
-              name="complemento"
-              defaultValue={initialData?.endereco?.complemento ?? undefined}
-              readOnly={isView}
-              style={{
-                height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-                fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Bairro</label>
-        {isView ? (
-          <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-            {initialData?.endereco?.bairro ?? "—"}
-          </p>
-        ) : (
-          <input
-            name="bairro"
-            defaultValue={initialData?.endereco?.bairro ?? undefined}
-            readOnly={isView}
-            style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Cidade</label>
-        {isView ? (
-          <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-            {initialData?.endereco?.cidade ?? "—"}
-          </p>
-        ) : (
-          <input
-            name="cidade"
-            defaultValue={initialData?.endereco?.cidade ?? undefined}
-            readOnly={isView}
-            style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>CEP</label>
-        {isView ? (
-          <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-            {initialData?.endereco?.cep ?? "—"}
-          </p>
-        ) : (
-          <input
-            name="cep"
-            defaultValue={initialData?.endereco?.cep ?? undefined}
-            readOnly={isView}
-            style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: "12px" }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Latitude</label>
-          {isView ? (
-            <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-              {initialData?.endereco?.latitude ?? "—"}
-            </p>
-          ) : (
-            <input
-              name="latitude"
-              type="number" step="any"
-              defaultValue={initialData?.endereco?.latitude ?? undefined}
-              readOnly={isView}
-              style={{
-                height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-                fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-              }}
-            />
-          )}
-        </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Longitude</label>
-          {isView ? (
-            <p style={{ height: 40, padding: "0 16px", lineHeight: "2.5", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#21272a", margin: 0 }}>
-              {initialData?.endereco?.longitude ?? "—"}
-            </p>
-          ) : (
-            <input
-              name="longitude"
-              type="number" step="any"
-              defaultValue={initialData?.endereco?.longitude ?? undefined}
-              readOnly={isView}
-              style={{
-                height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-                fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none",
-              }}
-            />
-          )}
-        </div>
-      </div>
+      <EnderecoFields
+        disabled={isView}
+        showCoords
+        onLookup={buscarCep}
+        initial={initialData?.endereco ? {
+          logradouro: initialData.endereco.logradouro,
+          numero: initialData.endereco.numero,
+          complemento: initialData.endereco.complemento,
+          bairro: initialData.endereco.bairro,
+          cidade: initialData.endereco.cidade,
+          uf: initialData.endereco.uf,
+          cep: initialData.endereco.cep,
+          latitude: initialData.endereco.latitude != null ? String(initialData.endereco.latitude) : "",
+          longitude: initialData.endereco.longitude != null ? String(initialData.endereco.longitude) : "",
+        } : null}
+      />
 
       <CodigosSection
         tiposCodigo={tiposCodigo}

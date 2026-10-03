@@ -2,9 +2,18 @@
 
 import { fornecedorDAO } from "@/dao/fornecedor";
 import { codigoService } from "@/services/codigo";
+import { cepService } from "@/services/cep";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+
+export async function buscarCep(cep: string) {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["fornecedor.criar", "fornecedor.alterar"]))) {
+    return { error: "Sem permissão." };
+  }
+  return cepService.buscarEnderecoPorCep(cep);
+}
 
 export type FornecedorFormData = {
   id_fornecedor: number;
@@ -18,6 +27,7 @@ export type FornecedorFormData = {
     complemento: string | null;
     bairro: string | null;
     cidade: string;
+    uf: string | null;
     cep: string | null;
     latitude: number | null;
     longitude: number | null;
@@ -42,6 +52,7 @@ export async function createFornecedor(formData: FormData) {
     complemento: (formData.get("complemento") as string) || undefined,
     bairro: (formData.get("bairro") as string) || undefined,
     cidade: formData.get("cidade") as string,
+    uf: (formData.get("uf") as string) || undefined,
     cep: (formData.get("cep") as string) || undefined,
     latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
     longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
@@ -76,6 +87,7 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
       complemento: f.endereco.complemento,
       bairro: f.endereco.bairro,
       cidade: f.endereco.cidade,
+      uf: f.endereco.uf,
       cep: f.endereco.cep,
       latitude: f.endereco.latitude,
       longitude: f.endereco.longitude,
@@ -109,6 +121,7 @@ export async function updateFornecedor(formData: FormData) {
       complemento: (formData.get("complemento") as string) || undefined,
       bairro: (formData.get("bairro") as string) || undefined,
       cidade: (formData.get("cidade") as string) || undefined,
+      uf: (formData.get("uf") as string) || undefined,
       cep: (formData.get("cep") as string) || undefined,
       latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
       longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,

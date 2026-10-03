@@ -46,7 +46,7 @@ export class FornecedorDAO {
   async create(
     data: {
       razao_social: string; cnpj?: string; contato?: string;
-      endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; cep?: string; latitude?: number; longitude?: number };
+      endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     },
     id_usuario: number,
@@ -87,7 +87,7 @@ export class FornecedorDAO {
     id: number,
     data: {
       razao_social?: string; cnpj?: string; contato?: string; ativo?: boolean;
-      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
+      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     },
     id_usuario: number,
