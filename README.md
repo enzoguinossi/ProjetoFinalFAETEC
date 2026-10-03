@@ -62,6 +62,41 @@ npx prisma generate    # gerar client
 npm run dev
 ```
 
+## Docker
+
+Sobe a aplicação + MySQL sem precisar configurar nada localmente:
+
+```bash
+# Defina o segredo dos JWT (obrigatório)
+export JWT_SECRET="um-segredo-forte-e-unico"
+
+docker compose up --build
+```
+
+Acesse em `http://localhost:3000`.
+
+- O Compose monta a `DATABASE_URL` automaticamente a partir das variáveis `MYSQL_*`.
+- Para usar um banco externo/gerenciado (ex.: Coolify), defina `DATABASE_URL` no
+  ambiente — ela tem precedência sobre as variáveis do serviço `mysql`.
+- Variáveis disponíveis (com defaults): `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`,
+  `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `APP_PORT`, `JWT_SECRET` (obrigatória).
+
+Na primeira subida é preciso aplicar o schema no banco (a imagem de runtime é enxuta
+e não inclui a CLI do Prisma). Faça isso a partir da máquina host:
+
+```bash
+# com os serviços no ar (docker compose up -d)
+DATABASE_URL="mysql://nexus:nexus_password@localhost:3306/Nexus" \
+  npx prisma db push
+
+# opcional: popular com dados de desenvolvimento
+DATABASE_URL="mysql://nexus:nexus_password@localhost:3306/Nexus" \
+  npm run db:seed
+```
+
+> O `.env` é apenas para desenvolvimento local; em Docker/Coolify as variáveis são
+> injetadas pelo ambiente e não devem ser comitadas.
+
 ## Equipe
 
 Projeto Final — FAETEC Teresópolis, Técnico em Informática 2026.
