@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+import type { CodigoInput } from "@/lib/codigo";
 
 const AUDIT_ENTIDADE = "Funcionario";
 
@@ -57,7 +58,7 @@ export class FuncionarioDAO {
   }
 
   async create(
-    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean },
+    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] },
     id_usuario: number,
   ) {
     const result = await prisma.$transaction(async (tx) => {
@@ -80,12 +81,18 @@ export class FuncionarioDAO {
           condutor: data.condutor ?? false,
         },
       });
+      for (const c of data.codigos ?? []) {
+        await tx.funcionarioCodigo.create({
+          data: { id_funcionario: func.id_funcionario, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
+
       await tx.registroAuditoria.create({
         data: {
           id_usuario, acao: "CRIAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE,
           id_entidade_afetada: func.id_funcionario,
-          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false },
+          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [] },
         },
       });
 
@@ -99,13 +106,13 @@ export class FuncionarioDAO {
 
   async update(
     id: number,
-    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean },
+    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] },
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
-        include: { pessoaFisica: true },
+        include: { pessoaFisica: true, funcionarioCodigos: true },
       });
 
       if (data.nome !== undefined) {
@@ -135,12 +142,21 @@ export class FuncionarioDAO {
         },
       });
 
+      if (data.codigos !== undefined) {
+        await tx.funcionarioCodigo.deleteMany({ where: { id_funcionario: id } });
+        for (const c of data.codigos) {
+          await tx.funcionarioCodigo.create({
+            data: { id_funcionario: id, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+          });
+        }
+      }
+
       await tx.registroAuditoria.create({
         data: {
           id_usuario, acao: "ALTERAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo },
-          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo },
+          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
         },
       });
 

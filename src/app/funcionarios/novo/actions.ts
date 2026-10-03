@@ -2,6 +2,7 @@
 
 import { requireUser } from "@/lib/auth";
 import { funcionarioDAO } from "@/dao/funcionario";
+import { codigoService } from "@/services/codigo";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
 
@@ -12,6 +13,7 @@ export type FuncionarioFormData = {
   cargo: string | null;
   condutor: boolean;
   ativo: boolean;
+  codigos: { tipo: string; valor: string }[];
 };
 
 export async function createFuncionario(formData: FormData) {
@@ -21,12 +23,16 @@ export async function createFuncionario(formData: FormData) {
   const nome = formData.get("nome") as string;
   if (!nome?.trim()) return { error: "Nome é obrigatório" };
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await funcionarioDAO.create(
     {
       nome: nome.trim(),
       cpf: (formData.get("cpf") as string) || undefined,
       cargo: (formData.get("cargo") as string) || undefined,
       condutor: formData.get("condutor") === "on",
+      codigos: codigoResult.codigos,
     },
     user.id_usuario,
   );
@@ -47,6 +53,7 @@ export async function getFuncionario(id: number): Promise<FuncionarioFormData | 
     cargo: f.cargo,
     condutor: f.condutor,
     ativo: f.ativo,
+    codigos: f.funcionarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
   };
 }
 
@@ -64,6 +71,9 @@ export async function updateFuncionario(formData: FormData) {
     return { error: "Sem permissão para desativar." };
   }
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   try {
     await funcionarioDAO.update(
       id,
@@ -72,6 +82,7 @@ export async function updateFuncionario(formData: FormData) {
         cargo: (formData.get("cargo") as string) || undefined,
         condutor: formData.get("condutor") === "on",
         ativo,
+        codigos: codigoResult.codigos,
       },
       user.id_usuario,
     );
