@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { validarCodigo } from "@/lib/codigo";
 
 interface TipoCodigo {
   id_tipo_codigo: number;
@@ -24,23 +25,37 @@ export default function CodigoForm({
   onClose,
   onConfirm,
   tiposCodigo,
-  initialTipo = "DIGITACAO",
+  initialTipo,
   initialValor = "",
   editing,
 }: CodigoFormProps) {
-  const [tipo, setTipo] = useState(initialTipo);
+  const padrao = tiposCodigo.some((t) => t.nome === "DIGITACAO")
+    ? "DIGITACAO"
+    : (tiposCodigo[0]?.nome ?? "");
+
+  const [tipo, setTipo] = useState(initialTipo ?? padrao);
   const [valor, setValor] = useState(initialValor);
+  const [erro, setErro] = useState("");
+
+  const ehEan = tipo === "EAN12" || tipo === "EAN13";
+  const maxLength = tipo === "EAN12" ? 12 : tipo === "EAN13" ? 13 : undefined;
 
   function handleConfirm() {
-    if (!valor.trim()) return;
-    onConfirm(tipo, valor.trim());
+    const res = validarCodigo(tipo, valor);
+    if (!res.ok) {
+      setErro(res.erro);
+      return;
+    }
+    onConfirm(tipo, res.valor);
     setValor("");
-    setTipo("DIGITACAO");
+    setTipo(padrao);
+    setErro("");
   }
 
   function handleClose() {
     setValor("");
-    setTipo("DIGITACAO");
+    setTipo(padrao);
+    setErro("");
     onClose();
   }
 
@@ -53,7 +68,7 @@ export default function CodigoForm({
           </label>
           <select
             value={tipo}
-            onChange={(e) => setTipo(e.target.value)}
+            onChange={(e) => { setTipo(e.target.value); setErro(""); }}
             style={{
               height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
               borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
@@ -73,15 +88,26 @@ export default function CodigoForm({
           <input
             autoFocus
             value={valor}
-            onChange={(e) => setValor(e.target.value)}
+            inputMode={ehEan ? "numeric" : "text"}
+            maxLength={maxLength}
+            onChange={(e) => {
+              const v = ehEan ? e.target.value.replace(/\D/g, "") : e.target.value;
+              setValor(v);
+              setErro("");
+            }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
-            placeholder="Valor do código"
+            placeholder={ehEan ? `${maxLength} dígitos` : "Valor do código"}
             style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
+              height: 40, padding: "0 16px", border: `1px solid ${erro ? "#ff383c" : "#d9d9d9"}`,
               borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
               outline: "none",
             }}
           />
+          {erro && (
+            <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>
+              {erro}
+            </span>
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>

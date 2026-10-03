@@ -1,7 +1,7 @@
 "use server";
 
 import { produtoDAO } from "@/dao/produto";
-import { tipoCodigoDAO } from "@/dao/tipo-codigo";
+import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -50,16 +50,9 @@ export async function createProduto(formData: FormData) {
     : undefined;
 
   // Códigos personalizados
-  const codigos: { id_tipo_codigo: number; codigo: string }[] = [];
-  const nomesTipos = formData.getAll("codigo_tipo") as string[];
-  const valoresCodigos = formData.getAll("codigo_valor") as string[];
-  for (let i = 0; i < nomesTipos.length; i++) {
-    const nomeTipo = nomesTipos[i];
-    const valor = valoresCodigos[i]?.trim();
-    if (!valor) continue;
-    const tipo = await tipoCodigoDAO.getByNome(nomeTipo);
-    if (tipo) codigos.push({ id_tipo_codigo: tipo.id_tipo_codigo, codigo: valor });
-  }
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("PRODUTO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+  const codigos = codigoResult.codigos;
 
   // Insumos (BOM)
   const insumos: { id_produto_filho: number; quantidade: number }[] = [];
@@ -143,16 +136,9 @@ export async function updateProduto(formData: FormData) {
     ? (formData.get("data_validade") as string) || undefined
     : undefined;
 
-  const codigos: { id_tipo_codigo: number; codigo: string }[] = [];
-  const nomesTipos = formData.getAll("codigo_tipo") as string[];
-  const valoresCodigos = formData.getAll("codigo_valor") as string[];
-  for (let i = 0; i < nomesTipos.length; i++) {
-    const nomeTipo = nomesTipos[i];
-    const valor = valoresCodigos[i]?.trim();
-    if (!valor) continue;
-    const tipo = await tipoCodigoDAO.getByNome(nomeTipo);
-    if (tipo) codigos.push({ id_tipo_codigo: tipo.id_tipo_codigo, codigo: valor });
-  }
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("PRODUTO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+  const codigos = codigoResult.codigos;
 
   const insumos: { id_produto_filho: number; quantidade: number }[] = [];
   const idsFilho = formData.getAll("insumo_produto") as string[];

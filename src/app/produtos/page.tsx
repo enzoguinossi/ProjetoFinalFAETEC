@@ -15,7 +15,7 @@ export default async function ProdutosPage() {
   const [listResult, conversoes, tiposCodigo] = await Promise.all([
     produtoDAO.list(),
     conversaoUnidadeDAO.list(),
-    tipoCodigoDAO.list(),
+    tipoCodigoDAO.listParaEntidade("PRODUTO"),
   ]);
 
   const rows = listResult.data.map((p) => {

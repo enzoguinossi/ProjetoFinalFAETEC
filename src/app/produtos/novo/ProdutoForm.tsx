@@ -5,7 +5,7 @@ import { createProduto, updateProduto, getProduto, searchProdutos } from "./acti
 import type { ProdutoFormData } from "./actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
-import CodigoForm from "@/components/CodigoForm";
+import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import styles from "./ProdutoForm.module.css";
@@ -35,13 +35,7 @@ interface Props {
   onCancel?: () => void;
 }
 
-type CodigoEntry = { tipo: string; valor: string };
 type InsumoEntry = { id: number; descricao: string; qtd: string };
-
-const codigoColumns = [
-  { key: "tipo" as const, label: "Tipo", width: "1.5fr" },
-  { key: "valor" as const, label: "Código", width: "2fr" },
-];
 
 export default function ProdutoForm({
   conversoes, tiposCodigo, mode = "create", initialData, canDeactivate = true,
@@ -59,8 +53,6 @@ export default function ProdutoForm({
   const [idConversao, setIdConversao] = useState(initialData?.id_conversao_padrao ?? null);
 
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
-  const [codigoModalOpen, setCodigoModalOpen] = useState(false);
-  const [codigoEditandoIdx, setCodigoEditandoIdx] = useState<number | null>(null);
 
   const [insumos, setInsumos] = useState<InsumoEntry[]>(
     initialData?.insumos.map((i) => ({ id: i.id, descricao: i.descricao, qtd: String(i.qtd) })) ?? [],
@@ -97,52 +89,6 @@ export default function ProdutoForm({
           }}
         />
       ) : undefined,
-    },
-  ];
-
-  // ── Códigos ──
-
-  function iniciarNovoCodigo() {
-    setCodigoEditandoIdx(null);
-    setCodigoModalOpen(true);
-  }
-
-  function confirmarCodigo(tipo: string, valor: string) {
-    if (codigoEditandoIdx !== null && codigoEditandoIdx < codigos.length) {
-      const next = [...codigos];
-      next[codigoEditandoIdx] = { tipo, valor };
-      setCodigos(next);
-    } else {
-      setCodigos([...codigos, { tipo, valor }]);
-    }
-    setCodigoModalOpen(false);
-  }
-
-  function editarCodigo(i: number) {
-    setCodigoEditandoIdx(i);
-    setCodigoModalOpen(true);
-  }
-
-  function removerCodigo(i: number) {
-    setCodigos(codigos.filter((_, idx) => idx !== i));
-  }
-
-  const codigoActions = isView ? undefined : [
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: Record<string, unknown>) => {
-        const i = codigos.findIndex((c) => c.valor === row.valor && c.tipo === row.tipo);
-        if (i >= 0) editarCodigo(i);
-      },
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: Record<string, unknown>) => {
-        const i = codigos.findIndex((c) => c.valor === row.valor && c.tipo === row.tipo);
-        if (i >= 0) removerCodigo(i);
-      },
     },
   ];
 
@@ -300,31 +246,12 @@ export default function ProdutoForm({
         </div>
 
         {/* ── Códigos Personalizados ── */}
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Códigos Personalizados</h3>
-            {!isView && (
-              <Button
-                label="Novo"
-                iconLeft={
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                }
-                onClick={iniciarNovoCodigo}
-              />
-            )}
-          </div>
-
-          <DataTable columns={codigoColumns} data={codigos} actions={codigoActions} idField="valor" pageSize={5} />
-
-          {codigos.map((c, i) => (
-            <div key={`hc-${i}`} style={{ display: "none" }}>
-              <input name="codigo_tipo" value={c.tipo} readOnly />
-              <input name="codigo_valor" value={c.valor} readOnly />
-            </div>
-          ))}
-        </div>
+        <CodigosSection
+          tiposCodigo={tiposCodigo}
+          value={codigos}
+          onChange={setCodigos}
+          disabled={isView}
+        />
 
         {/* ── Insumos ── */}
         {composto && (
@@ -398,17 +325,6 @@ export default function ProdutoForm({
         getItemId={(item) => item.id_produto}
         getItemLabel={(item) => item.descricao}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
-      />
-
-      <CodigoForm
-        key={codigoEditandoIdx ?? "novo"}
-        open={codigoModalOpen}
-        onClose={() => setCodigoModalOpen(false)}
-        onConfirm={confirmarCodigo}
-        tiposCodigo={tiposCodigo}
-        initialTipo={codigoEditandoIdx !== null ? codigos[codigoEditandoIdx]?.tipo : "DIGITACAO"}
-        initialValor={codigoEditandoIdx !== null ? codigos[codigoEditandoIdx]?.valor : ""}
-        editing={codigoEditandoIdx !== null}
       />
 
       <Modal

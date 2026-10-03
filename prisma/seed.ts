@@ -9,9 +9,9 @@ async function main() {
   // ── Tipos de Código ──────────────────────────────────────────────
   const tiposCodigo = [
     { nome: "DIGITACAO", descricao: "Apelido livre para digitação rápida" },
-    { nome: "EAN12", descricao: "Código de barras de 12 dígitos" },
-    { nome: "EAN13", descricao: "Código de barras de 13 dígitos" },
-    { nome: "COD_FORNECEDOR", descricao: "Código usado pelo fornecedor" },
+    { nome: "EAN12", descricao: "GTIN-12 / UPC-A — 12 dígitos numéricos" },
+    { nome: "EAN13", descricao: "GTIN-13 / EAN-13 — 13 dígitos numéricos" },
+    { nome: "COD_FORNECEDOR", descricao: "Código do produto no fornecedor" },
     { nome: "COD_ESCOLA", descricao: "Código da escola/creche" },
     { nome: "MATRICULA", descricao: "Matrícula funcional do funcionário" },
   ];
@@ -19,7 +19,7 @@ async function main() {
   for (const tc of tiposCodigo) {
     await prisma.tipoCodigo.upsert({
       where: { nome: tc.nome },
-      update: {},
+      update: { descricao: tc.descricao, ativo: true },
       create: tc,
     });
   }

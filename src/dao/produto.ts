@@ -232,7 +232,7 @@ export class ProdutoDAO {
       });
 
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
       });
 
       // Códigos personalizados
@@ -285,7 +285,10 @@ export class ProdutoDAO {
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
-      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
+      const antes = await tx.produto.findUniqueOrThrow({
+        where: { id_produto: id },
+        include: { produtoCodigos: true },
+      });
 
       const depois = await tx.produto.update({
         where: { id_produto: id },
@@ -304,8 +307,8 @@ export class ProdutoDAO {
         data: {
           id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto",
           id_entidade_afetada: id,
-          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo },
-          dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo },
+          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo, codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+          dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
         },
       });
 
