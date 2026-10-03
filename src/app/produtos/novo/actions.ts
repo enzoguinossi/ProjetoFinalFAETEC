@@ -1,8 +1,10 @@
 "use server";
 
 import { produtoDAO } from "@/dao/produto";
-import { prisma } from "@/lib/prisma";
+import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { requireUser } from "@/lib/auth";
+import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
+import { EntidadeComVinculosError } from "@/dao/_errors";
 
 export type ProdutoItem = { id_produto: number; descricao: string };
 
@@ -22,79 +24,18 @@ export type ProdutoFormData = {
 export async function searchProdutos(query: string) {
   if (query.length < 2) return [];
 
-  const take = 20;
-
-  const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
-    prisma.produto.findMany({
-      where: {
-        ativo: true,
-        produtoCodigos: { some: { codigo: { equals: query } } },
-      },
-      select: { id_produto: true, descricao: true },
-      take,
-      orderBy: { descricao: "asc" },
-    }),
-    prisma.produto.findMany({
-      where: {
-        ativo: true,
-        produtoCodigos: { some: { codigo: { startsWith: query } } },
-        NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
-      },
-      select: { id_produto: true, descricao: true },
-      take,
-      orderBy: { descricao: "asc" },
-    }),
-    prisma.produto.findMany({
-      where: {
-        ativo: true,
-        produtoCodigos: { some: { codigo: { contains: query } } },
-        NOT: {
-          OR: [
-            { produtoCodigos: { some: { codigo: { equals: query } } } },
-            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-          ],
-        },
-      },
-      select: { id_produto: true, descricao: true },
-      take,
-      orderBy: { descricao: "asc" },
-    }),
-    prisma.produto.findMany({
-      where: {
-        ativo: true,
-        descricao: { contains: query },
-        NOT: {
-          OR: [
-            { produtoCodigos: { some: { codigo: { equals: query } } } },
-            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-            { produtoCodigos: { some: { codigo: { contains: query } } } },
-          ],
-        },
-      },
-      select: { id_produto: true, descricao: true },
-      take,
-      orderBy: { descricao: "asc" },
-    }),
-  ]);
-
-  const seen = new Set<number>();
-  const results: { id_produto: number; descricao: string }[] = [];
-
-  for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
-    for (const p of batch) {
-      if (!seen.has(p.id_produto)) {
-        seen.add(p.id_produto);
-        results.push(p);
-        if (results.length >= take) break;
-      }
-    }
-    if (results.length >= take) break;
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["produto.listar", "produto.criar", "produto.alterar"]))) {
+    return [];
   }
 
-  return results.slice(0, take);
+  return produtoDAO.searchPriorizado(query);
 }
 
 export async function createProduto(formData: FormData) {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "produto.criar"))) return { error: "Sem permissão." };
+
   const descricao = formData.get("descricao") as string;
   if (!descricao?.trim()) return { error: "Descrição é obrigatória" };
 
@@ -116,7 +57,7 @@ export async function createProduto(formData: FormData) {
     const nomeTipo = nomesTipos[i];
     const valor = valoresCodigos[i]?.trim();
     if (!valor) continue;
-    const tipo = await prisma.tipoCodigo.findUnique({ where: { nome: nomeTipo } });
+    const tipo = await tipoCodigoDAO.getByNome(nomeTipo);
     if (tipo) codigos.push({ id_tipo_codigo: tipo.id_tipo_codigo, codigo: valor });
   }
 
@@ -131,8 +72,6 @@ export async function createProduto(formData: FormData) {
     insumos.push({ id_produto_filho: id, quantidade: qtd });
   }
 
-  // Usuário autenticado
-  const user = await requireUser();
   const id_usuario = user.id_usuario;
 
   await produtoDAO.createCompleto(
@@ -153,6 +92,9 @@ export async function createProduto(formData: FormData) {
 }
 
 export async function getProduto(id: number): Promise<ProdutoFormData | null> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["produto.consultar", "produto.alterar"]))) return null;
+
   const p = await produtoDAO.getById(id);
   if (!p) return null;
 
@@ -185,10 +127,14 @@ export async function updateProduto(formData: FormData) {
   if (!descricao?.trim()) return { error: "Descrição é obrigatória" };
 
   const user = await requireUser();
+  if (!(await usuarioPode(user, "produto.alterar"))) return { error: "Sem permissão." };
 
   const perecivel = formData.get("perecivel") === "on";
   const composto = formData.get("composto") === "on";
-  const ativo = formData.get("ativo") !== "off";
+  const ativo = formData.get("ativo") === "on";
+  if (!ativo && !(await usuarioPode(user, "produto.desativar"))) {
+    return { error: "Sem permissão para desativar." };
+  }
   const foto_url = (formData.get("foto_url") as string) || undefined;
   const id_conversao = formData.get("id_conversao")
     ? Number(formData.get("id_conversao"))
@@ -204,7 +150,7 @@ export async function updateProduto(formData: FormData) {
     const nomeTipo = nomesTipos[i];
     const valor = valoresCodigos[i]?.trim();
     if (!valor) continue;
-    const tipo = await prisma.tipoCodigo.findUnique({ where: { nome: nomeTipo } });
+    const tipo = await tipoCodigoDAO.getByNome(nomeTipo);
     if (tipo) codigos.push({ id_tipo_codigo: tipo.id_tipo_codigo, codigo: valor });
   }
 
@@ -239,14 +185,20 @@ export async function updateProduto(formData: FormData) {
 
 export async function deleteProduto(id: number) {
   const user = await requireUser();
-  const { podeExcluir, vinculos } = await produtoDAO.verificarRelacionamentos(id);
+  if (!(await usuarioPode(user, "produto.excluir"))) return { error: "Sem permissão." };
 
+  const { podeExcluir, vinculos } = await produtoDAO.verificarRelacionamentos(id);
   if (!podeExcluir) {
     return {
       error: `Não é possível excluir este produto pois ele possui vínculos com: ${vinculos.join(", ")}.`,
     };
   }
 
-  await produtoDAO.hardDelete(id);
+  try {
+    await produtoDAO.hardDelete(id, user.id_usuario);
+  } catch (e) {
+    if (e instanceof EntidadeComVinculosError) return { error: e.message };
+    throw e;
+  }
   return { success: true };
 }

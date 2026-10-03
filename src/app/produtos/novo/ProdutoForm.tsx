@@ -30,6 +30,7 @@ interface Props {
   tiposCodigo: TipoCodigo[];
   mode?: "create" | "edit" | "view";
   initialData?: ProdutoFormData;
+  canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -43,7 +44,7 @@ const codigoColumns = [
 ];
 
 export default function ProdutoForm({
-  conversoes, tiposCodigo, mode = "create", initialData,
+  conversoes, tiposCodigo, mode = "create", initialData, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
   const isView = mode === "view";
@@ -264,6 +265,7 @@ export default function ProdutoForm({
                     type="checkbox"
                     name="ativo"
                     checked={ativo}
+                    disabled={!canDeactivate}
                     onChange={(e) => setAtivo(e.target.checked)}
                 />
                 Ativo

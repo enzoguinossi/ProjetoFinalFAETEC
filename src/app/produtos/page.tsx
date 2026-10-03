@@ -1,15 +1,21 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import ProdutosClient from "./ProdutosClient";
 import { produtoDAO } from "@/dao/produto";
-import { prisma } from "@/lib/prisma";
+import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
+import { tipoCodigoDAO } from "@/dao/tipo-codigo";
+import { redirect } from "next/navigation";
+import { resolverPermissoes } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProdutosPage() {
+  const perms = await resolverPermissoes("produto");
+  if (!perms.canList) redirect("/dashboard");
+
   const [listResult, conversoes, tiposCodigo] = await Promise.all([
     produtoDAO.list(),
-    prisma.conversaoUnidade.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
-    prisma.tipoCodigo.findMany({ where: { ativo: true }, orderBy: { nome: "asc" } }),
+    conversaoUnidadeDAO.list(),
+    tipoCodigoDAO.list(),
   ]);
 
   const rows = listResult.data.map((p) => {
@@ -26,7 +32,7 @@ export default async function ProdutosPage() {
 
   return (
     <DashboardLayout title="Produtos">
-      <ProdutosClient rows={rows} conversoes={conversoes} tiposCodigo={tiposCodigo} />
+      <ProdutosClient rows={rows} conversoes={conversoes} tiposCodigo={tiposCodigo} perms={perms} />
     </DashboardLayout>
   );
 }

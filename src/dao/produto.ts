@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+
+type Db = Prisma.TransactionClient;
 
 export class ProdutoDAO {
   async list(params: PaginationParams & { search?: string } = {}) {
@@ -21,6 +25,159 @@ export class ProdutoDAO {
       prisma.produto.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
+  }
+
+  async searchPriorizado(
+    query: string,
+    take = 20,
+  ): Promise<{ id_produto: number; descricao: string }[]> {
+    const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
+      prisma.produto.findMany({
+        where: { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
+        select: { id_produto: true, descricao: true },
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          produtoCodigos: { some: { codigo: { startsWith: query } } },
+          NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+        },
+        select: { id_produto: true, descricao: true },
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          produtoCodigos: { some: { codigo: { contains: query } } },
+          NOT: {
+            OR: [
+              { produtoCodigos: { some: { codigo: { equals: query } } } },
+              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+            ],
+          },
+        },
+        select: { id_produto: true, descricao: true },
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          descricao: { contains: query },
+          NOT: {
+            OR: [
+              { produtoCodigos: { some: { codigo: { equals: query } } } },
+              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+              { produtoCodigos: { some: { codigo: { contains: query } } } },
+            ],
+          },
+        },
+        select: { id_produto: true, descricao: true },
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+    ]);
+
+    const seen = new Set<number>();
+    const results: { id_produto: number; descricao: string }[] = [];
+    for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
+      for (const p of batch) {
+        if (!seen.has(p.id_produto)) {
+          seen.add(p.id_produto);
+          results.push(p);
+          if (results.length >= take) break;
+        }
+      }
+      if (results.length >= take) break;
+    }
+    return results.slice(0, take);
+  }
+
+  async searchPriorizadoComEstoque(
+    query: string,
+    take = 50,
+  ): Promise<
+    {
+      id_produto: number;
+      descricao: string;
+      estoques: { quantidade_atual: number; saldo_reservado: number }[];
+    }[]
+  > {
+    const select = {
+      id_produto: true,
+      descricao: true,
+      estoques: {
+        where: { ativo: true },
+        select: { quantidade_atual: true, saldo_reservado: true },
+      },
+    } as const;
+
+    const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
+      prisma.produto.findMany({
+        where: { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
+        select,
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          produtoCodigos: { some: { codigo: { startsWith: query } } },
+          NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+        },
+        select,
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          produtoCodigos: { some: { codigo: { contains: query } } },
+          NOT: {
+            OR: [
+              { produtoCodigos: { some: { codigo: { equals: query } } } },
+              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+            ],
+          },
+        },
+        select,
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+      prisma.produto.findMany({
+        where: {
+          ativo: true,
+          descricao: { contains: query },
+          NOT: {
+            OR: [
+              { produtoCodigos: { some: { codigo: { equals: query } } } },
+              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+              { produtoCodigos: { some: { codigo: { contains: query } } } },
+            ],
+          },
+        },
+        select,
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+    ]);
+
+    const seen = new Set<number>();
+    const results: (typeof exactCode)[number][] = [];
+    for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
+      for (const p of batch) {
+        if (!seen.has(p.id_produto)) {
+          seen.add(p.id_produto);
+          results.push(p);
+          if (results.length >= take) break;
+        }
+      }
+      if (results.length >= take) break;
+    }
+    return results.slice(0, take);
   }
 
   async getById(id: number) {
@@ -175,16 +332,16 @@ export class ProdutoDAO {
     });
   }
 
-  async verificarRelacionamentos(id: number) {
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
     const [estoque, itensNotaSaida, itensNotaEntrada, itensRemessa, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
-      prisma.estoque.count({ where: { id_produto: id } }),
-      prisma.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
-      prisma.itemNotaEntrada.count({ where: { id_produto: id } }),
-      prisma.itemRemessa.count({ where: { estoque: { id_produto: id } } }),
-      prisma.itemPedidoEscola.count({ where: { id_produto: id } }),
-      prisma.itemColeta.count({ where: { estoque: { id_produto: id } } }),
-      prisma.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
-      prisma.produtoInsumo.count({ where: { id_produto_filho: id } }),
+      client.estoque.count({ where: { id_produto: id } }),
+      client.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
+      client.itemNotaEntrada.count({ where: { id_produto: id } }),
+      client.itemRemessa.count({ where: { estoque: { id_produto: id } } }),
+      client.itemPedidoEscola.count({ where: { id_produto: id } }),
+      client.itemColeta.count({ where: { estoque: { id_produto: id } } }),
+      client.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
+      client.produtoInsumo.count({ where: { id_produto_filho: id } }),
     ]);
 
     const vinculos: string[] = [];
@@ -200,11 +357,24 @@ export class ProdutoDAO {
     return { podeExcluir: vinculos.length === 0, vinculos };
   }
 
-  async hardDelete(id: number) {
+  async hardDelete(id: number, id_usuario: number) {
     await prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError("este produto", vinculos);
+
+      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
+
       await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
       await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
       await tx.produto.delete({ where: { id_produto: id } });
+
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Produto",
+          id_entidade_afetada: id,
+          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto },
+        },
+      });
     });
   }
 
