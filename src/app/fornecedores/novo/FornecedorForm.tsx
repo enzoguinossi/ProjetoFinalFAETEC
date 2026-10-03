@@ -8,12 +8,13 @@ import Button from "@/components/Button";
 interface Props {
   mode?: "create" | "edit" | "view";
   initialData?: FornecedorFormData;
+  canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
 export default function FornecedorForm({
-  mode = "create", initialData,
+  mode = "create", initialData, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
   const isView = mode === "view";
@@ -49,7 +50,7 @@ export default function FornecedorForm({
 
       {isEdit && (
         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#21272a", cursor: "pointer" }}>
-          <input type="checkbox" name="ativo" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} style={{ accentColor: "#1b9956" }} />
+          <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} style={{ accentColor: "#1b9956" }} />
           Ativo
         </label>
       )}
