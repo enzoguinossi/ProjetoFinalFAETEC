@@ -133,9 +133,9 @@ export default function ContatosSection({
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 20, height: "100%", minHeight: 0 }}>
       {/* Emails */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h3 style={sectionTitle}>E-mails</h3>
           {!disabled && (
@@ -143,7 +143,9 @@ export default function ContatosSection({
               onClick={() => { setEmailIdx(null); setEmailModal(true); }} />
           )}
         </div>
-        <DataTable columns={emailColumns} data={emails} actions={emailActions} idField="endereco" pageSize={5} />
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+          <DataTable columns={emailColumns} data={emails} actions={emailActions} idField="endereco" pageSize={5} />
+        </div>
         {emails.map((e, i) => (
           <div key={`he-${i}`} style={{ display: "none" }}>
             <input name="email_endereco" value={e.endereco} readOnly />
@@ -153,7 +155,7 @@ export default function ContatosSection({
       </div>
 
       {/* Telefones */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <h3 style={sectionTitle}>Telefones</h3>
           {!disabled && (
@@ -161,7 +163,9 @@ export default function ContatosSection({
               onClick={() => { setTelIdx(null); setTelModal(true); }} />
           )}
         </div>
-        <DataTable columns={telefoneColumns} data={telefones} actions={telActions} idField="numero" pageSize={5} />
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+          <DataTable columns={telefoneColumns} data={telefones} actions={telActions} idField="numero" pageSize={5} />
+        </div>
         {telefones.map((t, i) => (
           <div key={`ht-${i}`} style={{ display: "none" }}>
             <input name="telefone_numero" value={t.numero} readOnly />
