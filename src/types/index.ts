@@ -99,6 +99,7 @@ export const enderecoSelect = {
   complemento: true,
   bairro: true,
   cidade: true,
+  uf: true,
   cep: true,
   latitude: true,
   longitude: true,

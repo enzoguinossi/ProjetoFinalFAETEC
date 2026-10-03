@@ -190,6 +190,7 @@ model Endereco {
   complemento   String?        @map("complemento")
   bairro        String?        @map("bairro")
   cidade        String         @map("cidade")
+  uf            String?        @db.Char(2) @map("uf")
   cep           String?        @map("cep")
   latitude      Float?         @map("latitude")
   longitude     Float?         @map("longitude")

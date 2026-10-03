@@ -51,7 +51,7 @@ export class DestinatarioDAO {
     data: {
       razao_social: string; cnpj?: string;
       tipo_destinatario: "ESCOLA" | "CRECHE";
-      endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; cep?: string; latitude?: number; longitude?: number };
+      endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     },
     id_usuario: number,
@@ -87,7 +87,7 @@ export class DestinatarioDAO {
     id: number,
     data: {
       razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
-      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
+      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     },
     id_usuario: number,

@@ -2,9 +2,18 @@
 
 import { destinatarioDAO } from "@/dao/destinatario";
 import { codigoService } from "@/services/codigo";
+import { cepService } from "@/services/cep";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+
+export async function buscarCep(cep: string) {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["destinatario.criar", "destinatario.alterar"]))) {
+    return { error: "Sem permissão." };
+  }
+  return cepService.buscarEnderecoPorCep(cep);
+}
 
 export type DestinatarioFormData = {
   id_destinatario: number;
@@ -18,6 +27,7 @@ export type DestinatarioFormData = {
     complemento: string | null;
     bairro: string | null;
     cidade: string;
+    uf: string | null;
     cep: string | null;
     latitude: number | null;
     longitude: number | null;
@@ -46,6 +56,7 @@ export async function createDestinatario(formData: FormData) {
       complemento: (formData.get("complemento") as string) || undefined,
       bairro: (formData.get("bairro") as string) || undefined,
       cidade: formData.get("cidade") as string,
+      uf: (formData.get("uf") as string) || undefined,
       cep: (formData.get("cep") as string) || undefined,
       latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
       longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
@@ -73,6 +84,7 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
       complemento: d.endereco.complemento,
       bairro: d.endereco.bairro,
       cidade: d.endereco.cidade,
+      uf: d.endereco.uf,
       cep: d.endereco.cep,
       latitude: d.endereco.latitude,
       longitude: d.endereco.longitude,
@@ -106,6 +118,7 @@ export async function updateDestinatario(formData: FormData) {
       complemento: (formData.get("complemento") as string) || undefined,
       bairro: (formData.get("bairro") as string) || undefined,
       cidade: (formData.get("cidade") as string) || undefined,
+      uf: (formData.get("uf") as string) || undefined,
       cep: (formData.get("cep") as string) || undefined,
       latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
       longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
