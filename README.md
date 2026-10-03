@@ -79,7 +79,10 @@ Acesse em `http://localhost:3000`.
 - Para usar um banco externo/gerenciado (ex.: Coolify), defina `DATABASE_URL` no
   ambiente — ela tem precedência sobre as variáveis do serviço `mysql`.
 - Variáveis disponíveis (com defaults): `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`,
-  `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_PORT`, `APP_PORT`, `JWT_SECRET` (obrigatória).
+  `MYSQL_USER`, `MYSQL_PASSWORD`, `JWT_SECRET` (obrigatória).
+- As portas locais (`APP_PORT`, `MYSQL_PORT`) ficam em `docker-compose.override.yml`,
+  carregado automaticamente só no ambiente local. Em produção a aplicação apenas
+  `expose` a porta 3000 e o proxy da plataforma (Traefik no Coolify) cuida do acesso.
 
 Na primeira subida é preciso aplicar o schema no banco (a imagem de runtime é enxuta
 e não inclui a CLI do Prisma). Faça isso a partir da máquina host:

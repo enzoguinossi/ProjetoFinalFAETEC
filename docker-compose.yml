@@ -1,15 +1,14 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: nexus-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-Nexus}
-      MYSQL_USER: ${MYSQL_USER:-nexus}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-nexus_password}
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-Nexus}
+      - MYSQL_USER=${MYSQL_USER:-nexus}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-nexus_password}
+    expose:
+      - "3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
@@ -24,19 +23,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nexus-app
     restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
     environment:
-      NODE_ENV: ${NODE_ENV:-production}
-      # Se DATABASE_URL for definida (ex.: Coolify com banco gerenciado), ela é usada.
-      # Caso contrário, é montada a partir das variáveis do MySQL acima.
-      DATABASE_URL: ${DATABASE_URL:-mysql://${MYSQL_USER:-nexus}:${MYSQL_PASSWORD:-nexus_password}@mysql:3306/${MYSQL_DATABASE:-Nexus}}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET é obrigatória}
-    ports:
-      - "${APP_PORT:-3000}:3000"
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=${DATABASE_URL:-mysql://${MYSQL_USER:-nexus}:${MYSQL_PASSWORD:-nexus_password}@mysql:3306/${MYSQL_DATABASE:-Nexus}}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET é obrigatória}
+    expose:
+      - "3000"
 
 volumes:
   mysql_data:
