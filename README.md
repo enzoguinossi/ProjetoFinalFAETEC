@@ -84,6 +84,21 @@ Acesse em `http://localhost:3000`.
   carregado automaticamente só no ambiente local. Em produção a aplicação apenas
   `expose` a porta 3000 e o proxy da plataforma (Traefik no Coolify) cuida do acesso.
 
+### Conflito com MySQL local (porta 3306)
+
+Por padrão o Compose **não publica** a porta do MySQL no host, então não há conflito
+com um MySQL já rodando na 3306 — a aplicação acessa o banco pelo hostname interno
+`mysql`. Se precisar da CLI do host contra o MySQL do container, descomente o bloco
+`mysql:` no `docker-compose.override.yml` e use uma porta livre (ex.: `MYSQL_HOST_PORT=3307`).
+
+Para, em vez disso, usar o **seu MySQL local** com o app em container, aponte a
+`DATABASE_URL` para o host (Linux: use `host.docker.internal` ou o IP do host):
+
+```bash
+docker compose up --build -d app \
+  -e DATABASE_URL="mysql://root:senha@host.docker.internal:3306/nexus"
+```
+
 Na primeira subida é preciso aplicar o schema no banco (a imagem de runtime é enxuta
 e não inclui a CLI do Prisma). Faça isso a partir da máquina host:
 

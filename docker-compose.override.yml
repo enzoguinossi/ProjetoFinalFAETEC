@@ -1,10 +1,14 @@
 # Override carregado automaticamente pelo `docker compose` no ambiente local.
-# Publica as portas para acesso via localhost. Não usar em produção/Coolify.
+# Publica apenas a porta da aplicação. O MySQL não publica porta no host para
+# não conflitar com um MySQL local já rodando na 3306 — a aplicação o alcança
+# pelo hostname interno `mysql`.
 services:
-  mysql:
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
-
   app:
     ports:
       - "${APP_PORT:-3000}:3000"
+
+  # Se precisar acessar o MySQL do container a partir do host (CLI, `prisma db push`),
+  # descomente e escolha uma porta livre — ex.: 3307 quando já há MySQL na 3306.
+  # mysql:
+  #   ports:
+  #     - "${MYSQL_HOST_PORT:-3307}:3306"
