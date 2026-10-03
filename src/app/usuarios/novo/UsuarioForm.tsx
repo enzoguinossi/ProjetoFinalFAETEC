@@ -60,6 +60,21 @@ export default function UsuarioForm({
     [grupos],
   );
 
+  // Garante que o funcionário vinculado apareça nas opções, mesmo já tendo usuário.
+  const opcoesFuncionario = useMemo(() => {
+    const lista = [...funcionarios];
+    if (
+      initialData &&
+      !lista.some((f) => f.id_funcionario === initialData.id_funcionario)
+    ) {
+      lista.unshift({
+        id_funcionario: initialData.id_funcionario,
+        pessoaFisica: { nome: initialData.nome_funcionario },
+      });
+    }
+    return lista;
+  }, [funcionarios, initialData]);
+
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [login, setLogin] = useState(initialData?.login ?? "");
@@ -155,7 +170,7 @@ export default function UsuarioForm({
                 disabled={isView || isEdit}
               >
                 <option value="">Selecione...</option>
-                {funcionarios.map((f) => (
+                {opcoesFuncionario.map((f) => (
                   <option key={f.id_funcionario} value={f.id_funcionario}>
                     {f.pessoaFisica.nome}
                   </option>
