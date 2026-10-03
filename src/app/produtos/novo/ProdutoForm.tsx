@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createProduto, updateProduto, getProduto, searchProdutos } from "./actions";
 import type { ProdutoFormData } from "./actions";
 import DataTable from "@/components/DataTable";

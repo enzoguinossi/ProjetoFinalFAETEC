@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Button from "@/components/Button";
 import styles from "./SearchBar.module.css";
 

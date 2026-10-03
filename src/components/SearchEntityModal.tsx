@@ -20,7 +20,7 @@ export default function SearchEntityModal<T>({
   open,
   onClose,
   onSelect,
-  title = "Buscar",
+  title: _title = "Buscar",
   placeholder = "Pesquisar...",
   searchAction,
   excludeIds,
@@ -36,12 +36,11 @@ export default function SearchEntityModal<T>({
     if (!open) return;
     inputRef.current?.focus();
 
-    if (query.length < 2) {
-      setResults([]);
-      return;
-    }
-
     const timeout = setTimeout(async () => {
+      if (query.length < 2) {
+        setResults([]);
+        return;
+      }
       setLoading(true);
       try {
         let data = await searchAction(query);

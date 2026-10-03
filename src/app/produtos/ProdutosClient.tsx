@@ -31,7 +31,6 @@ type ModalMode = "create" | "edit" | "view" | null;
 export default function ProdutosClient({ rows: initialRows, conversoes, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [formData, setFormData] = useState<ProdutoFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProdutoListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -54,14 +53,12 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
   }
 
   async function openEdit(id: number) {
-    setSelectedId(id);
     const data = await getProduto(id);
     setFormData(data);
     setModalMode("edit");
   }
 
   async function openView(id: number) {
-    setSelectedId(id);
     const data = await getProduto(id);
     setFormData(data);
     setModalMode("view");
@@ -69,7 +66,6 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
 
   function closeModal() {
     setModalMode(null);
-    setSelectedId(null);
     setFormData(null);
   }
 

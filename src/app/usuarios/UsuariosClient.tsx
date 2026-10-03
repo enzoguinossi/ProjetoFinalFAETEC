@@ -29,7 +29,6 @@ type ModalMode = "create" | "edit" | "view" | null;
 export default function UsuariosClient({ rows: initialRows, funcionarios, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [formData, setFormData] = useState<UsuarioFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UsuarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -52,14 +51,12 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, perms 
   }
 
   async function openEdit(id: number) {
-    setSelectedId(id);
     const data = await getUsuario(id);
     setFormData(data);
     setModalMode("edit");
   }
 
   async function openView(id: number) {
-    setSelectedId(id);
     const data = await getUsuario(id);
     setFormData(data);
     setModalMode("view");
@@ -67,7 +64,6 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, perms 
 
   function closeModal() {
     setModalMode(null);
-    setSelectedId(null);
     setFormData(null);
   }
 

@@ -3,7 +3,7 @@ import { verifyToken } from "./jwt";
 import { prisma } from "./prisma";
 import type { TokenPayload } from "./jwt";
 
-export interface Session extends TokenPayload {}
+export type Session = TokenPayload;
 
 /**
  * Verifica o token e revalida o usuário no banco:
