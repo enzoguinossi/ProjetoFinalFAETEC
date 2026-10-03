@@ -50,7 +50,7 @@ A aplicação é uma aplicação web Full Stack baseada em:
 * TypeScript;
 * Prisma 7;
 * MySQL;
-* autenticação própria com BCrypt + JWT;
+* autenticação própria com BCrypt + JWT (biblioteca `jose`, HS256);
 * Git/GitHub.
 
 A estrutura conceitual esperada é:
@@ -715,3 +715,13 @@ As regras completas de integração com o Jira estão em `docs/agents/JIRA.md`.
 
 Quando o MCP do Jira estiver disponível, seguir essas regras antes de
 iniciar alterações significativas e ao finalizar o trabalho.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,14 +1,12 @@
 import { redirect } from "next/navigation";
 import LoginForm from "@/components/LoginForm";
-import { prisma } from "@/lib/prisma";
+import { usuarioDAO } from "@/dao/usuario";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   // Primeiro setup: se não existir super admin, redireciona
-  const admin = await prisma.usuario.findFirst({
-    where: { super_admin: true },
-  });
+  const admin = await usuarioDAO.getAdmin();
 
   if (!admin) {
     redirect("/primeiro-acesso");
