@@ -1,8 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
+import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
 
 const AUDIT_ENTIDADE = "Funcionario";
+
+type Db = Prisma.TransactionClient;
 
 export class FuncionarioDAO {
   async list(params: PaginationParams = {}) {
@@ -14,7 +18,6 @@ export class FuncionarioDAO {
         include: {
           pessoaFisica: { select: { id_pessoa_fisica: true, nome: true, cpf: true } },
           usuario: { select: { id_usuario: true, login: true, ativo: true } },
-          condutor: { select: { id_condutor: true, ativo: true } },
         },
         orderBy: { id_funcionario: "desc" },
       }),
@@ -29,11 +32,27 @@ export class FuncionarioDAO {
       include: {
         pessoaFisica: true,
         usuario: true,
-        condutor: true,
         telefones: { where: { ativo: true } },
         emails: true,
         funcionarioCodigos: { include: { tipoCodigo: true } },
       },
+    });
+  }
+
+  async listDisponiveisParaUsuario() {
+    return prisma.funcionario.findMany({
+      where: { ativo: true, usuario: null },
+      include: { pessoaFisica: true },
+      orderBy: { id_funcionario: "asc" },
+    });
+  }
+
+  async search(query: string, take = 50) {
+    return prisma.funcionario.findMany({
+      where: { ativo: true, pessoaFisica: { nome: { contains: query } } },
+      include: { pessoaFisica: { select: { nome: true } } },
+      take,
+      orderBy: { id_funcionario: "desc" },
     });
   }
 
@@ -55,7 +74,11 @@ export class FuncionarioDAO {
       });
 
       const func = await tx.funcionario.create({
-        data: { id_pessoa_fisica: pf.id_pessoa_fisica, cargo: data.cargo },
+        data: {
+          id_pessoa_fisica: pf.id_pessoa_fisica,
+          cargo: data.cargo,
+          condutor: data.condutor ?? false,
+        },
       });
       await tx.registroAuditoria.create({
         data: {
@@ -66,13 +89,9 @@ export class FuncionarioDAO {
         },
       });
 
-      if (data.condutor) {
-        await tx.condutor.create({ data: { id_funcionario: func.id_funcionario } });
-      }
-
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: func.id_funcionario },
-        include: { pessoaFisica: true, condutor: true },
+        include: { pessoaFisica: true },
       });
     });
     return result;
@@ -80,13 +99,13 @@ export class FuncionarioDAO {
 
   async update(
     id: number,
-    data: { nome?: string; cargo?: string; condutor?: boolean },
+    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean },
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
-        include: { pessoaFisica: true, condutor: true },
+        include: { pessoaFisica: true },
       });
 
       if (data.nome !== undefined) {
@@ -96,36 +115,76 @@ export class FuncionarioDAO {
         });
       }
 
+      // Remove a marcação de condutor apenas se ele nunca foi usado em remessa.
+      if (data.condutor === false && antes.condutor) {
+        const usos = await tx.remessa.count({ where: { id_funcionario_condutor: id } });
+        if (usos > 0) {
+          throw new EntidadeComVinculosError(
+            "Condutor",
+            [`${usos} remessa(s) utilizam este condutor`],
+          );
+        }
+      }
+
       const depois = await tx.funcionario.update({
         where: { id_funcionario: id },
-        data: { cargo: data.cargo },
+        data: {
+          cargo: data.cargo,
+          condutor: data.condutor ?? antes.condutor,
+          ativo: data.ativo ?? antes.ativo,
+        },
       });
-
-      // Gerencia condutor
-      const eraCondutor = antes.condutor?.ativo ?? false;
-      if (data.condutor === true && !eraCondutor) {
-        const existente = await tx.condutor.findUnique({ where: { id_funcionario: id } });
-        if (existente) {
-          if (!existente.ativo) await tx.condutor.update({ where: { id_funcionario: id }, data: { ativo: true } });
-        } else {
-          await tx.condutor.create({ data: { id_funcionario: id } });
-        }
-      } else if (data.condutor === false && eraCondutor) {
-        await tx.condutor.updateMany({ where: { id_funcionario: id }, data: { ativo: false } });
-      }
 
       await tx.registroAuditoria.create({
         data: {
           id_usuario, acao: "ALTERAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: eraCondutor },
-          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: data.condutor ?? eraCondutor },
+          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo },
+          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo },
         },
       });
 
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
-        include: { pessoaFisica: true, condutor: true },
+        include: { pessoaFisica: true },
+      });
+    });
+  }
+
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
+    const [usuario, contagens, remessas] = await Promise.all([
+      client.usuario.count({ where: { id_funcionario: id } }),
+      client.contagemInventario.count({ where: { id_funcionario: id } }),
+      client.remessa.count({ where: { id_funcionario_condutor: id } }),
+    ]);
+
+    const vinculos: string[] = [];
+    if (usuario > 0) vinculos.push(`${usuario} usuário(s) vinculado(s)`);
+    if (contagens > 0) vinculos.push(`${contagens} contagem(ns) de inventário`);
+    if (remessas > 0) vinculos.push(`${remessas} remessa(s) como condutor`);
+
+    return { podeExcluir: vinculos.length === 0, vinculos };
+  }
+
+  async hardDelete(id: number, id_usuario: number) {
+    return prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError(`o funcionário`, vinculos);
+
+      const func = await tx.funcionario.findUniqueOrThrow({ where: { id_funcionario: id } });
+
+      await tx.funcionarioCodigo.deleteMany({ where: { id_funcionario: id } });
+      await tx.funcionarioTelefone.deleteMany({ where: { id_funcionario: id } });
+      await tx.funcionarioEmail.deleteMany({ where: { id_funcionario: id } });
+      await tx.funcionario.delete({ where: { id_funcionario: id } });
+      await tx.pessoaFisica.delete({ where: { id_pessoa_fisica: func.id_pessoa_fisica } });
+
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario, acao: "EXCLUIR", data_hora: new Date(),
+          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
+          dados_anteriores: { id_funcionario: id, id_pessoa_fisica: func.id_pessoa_fisica },
+        },
       });
     });
   }

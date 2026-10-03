@@ -6,13 +6,15 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import FuncionarioForm from "./novo/FuncionarioForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchFuncionariosList, type FuncionarioListRow } from "./actions";
 import { getFuncionario, deleteFuncionario } from "./novo/actions";
 import type { FuncionarioFormData } from "./novo/actions";
 
 interface Props {
   rows: FuncionarioListRow[];
+  perms: PermissoesEntidade;
 }
 
 const columns: Column<FuncionarioListRow>[] = [
@@ -24,7 +26,7 @@ const columns: Column<FuncionarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function FuncionariosClient({ rows: initialRows }: Props) {
+export default function FuncionariosClient({ rows: initialRows, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<FuncionarioFormData | null>(null);
@@ -70,9 +72,13 @@ export default function FuncionariosClient({ rows: initialRows }: Props) {
     setDeleting(true);
     setDeleteError("");
     try {
-      await deleteFuncionario(deleteTarget.id_funcionario);
-      setDeleteTarget(null);
-      window.location.reload();
+      const result = await deleteFuncionario(deleteTarget.id_funcionario);
+      if (result.error) {
+        setDeleteError(result.error);
+      } else {
+        setDeleteTarget(null);
+        window.location.reload();
+      }
     } catch {
       setDeleteError("Erro ao excluir. Tente novamente.");
     } finally {
@@ -80,25 +86,31 @@ export default function FuncionariosClient({ rows: initialRows }: Props) {
     }
   }
 
-  const actions = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "view"),
-    },
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "edit"),
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: FuncionarioListRow) => {
-        setDeleteTarget(row);
-        setDeleteError("");
-      },
-    },
+  const actions: Action<FuncionarioListRow>[] = [
+    ...(perms.canView
+      ? [{
+          icon: "/icons/actions/Olho.svg",
+          label: "Visualizar",
+          onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "view"),
+        }]
+      : []),
+    ...(perms.canEdit
+      ? [{
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (row: FuncionarioListRow) => openModal(row.id_funcionario, "edit"),
+        }]
+      : []),
+    ...(perms.canDelete
+      ? [{
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (row: FuncionarioListRow) => {
+            setDeleteTarget(row);
+            setDeleteError("");
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -107,6 +119,7 @@ export default function FuncionariosClient({ rows: initialRows }: Props) {
         placeholder="Pesquisar funcionários..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
+        showNew={perms.canCreate}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
@@ -119,6 +132,7 @@ export default function FuncionariosClient({ rows: initialRows }: Props) {
           <FuncionarioForm
             mode="edit"
             initialData={formData}
+            canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
           />
