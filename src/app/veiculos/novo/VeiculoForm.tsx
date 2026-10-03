@@ -3,22 +3,25 @@
 import { useState } from "react";
 import { createVeiculo, updateVeiculo } from "./actions";
 import type { VeiculoFormData } from "./actions";
+import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Button from "@/components/Button";
 
 interface Props {
   mode?: "create" | "edit" | "view";
   initialData?: VeiculoFormData;
+  tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export default function VeiculoForm({ mode = "create", initialData, canDeactivate = true, onSuccess, onCancel }: Props) {
+export default function VeiculoForm({ mode = "create", initialData, tiposCodigo, canDeactivate = true, onSuccess, onCancel }: Props) {
   const isView = mode === "view";
   const isEdit = mode === "edit";
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [placa, setPlaca] = useState(initialData?.placa ?? "");
+  const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,6 +65,12 @@ export default function VeiculoForm({ mode = "create", initialData, canDeactivat
           <option value="EM_ROTA">Em rota</option>
         </select>
       </div>
+      <CodigosSection
+        tiposCodigo={tiposCodigo}
+        value={codigos}
+        onChange={setCodigos}
+        disabled={isView}
+      />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4 }}>
         {isView ? <Button label="Fechar" variant="cancel" onClick={onCancel} /> : <><Button label="Cancelar" variant="cancel" onClick={onCancel} /><Button label={isEdit ? "Salvar" : "Gravar"} variant="primary" type="submit" disabled={saving} /></>}
       </div>

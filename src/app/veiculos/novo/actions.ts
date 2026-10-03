@@ -1,6 +1,7 @@
 "use server";
 
 import { veiculoDAO } from "@/dao/veiculo";
+import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -12,6 +13,7 @@ export type VeiculoFormData = {
   capacidade: number | null;
   status: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA";
   ativo: boolean;
+  codigos: { tipo: string; valor: string }[];
 };
 
 export async function createVeiculo(formData: FormData) {
@@ -21,10 +23,14 @@ export async function createVeiculo(formData: FormData) {
   const placa = formData.get("placa") as string;
   if (!placa?.trim()) return { error: "Placa é obrigatória" };
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("VEICULO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await veiculoDAO.create({
     placa: placa.trim().toUpperCase(),
     modelo: (formData.get("modelo") as string) || undefined,
     capacidade: formData.get("capacidade") ? Number(formData.get("capacidade")) : undefined,
+    codigos: codigoResult.codigos,
   }, user.id_usuario);
 
   return { success: true };
@@ -43,6 +49,7 @@ export async function getVeiculo(id: number): Promise<VeiculoFormData | null> {
     capacidade: v.capacidade,
     status: v.status,
     ativo: v.ativo,
+    codigos: v.veiculoCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
   };
 }
 
@@ -58,11 +65,15 @@ export async function updateVeiculo(formData: FormData) {
     return { error: "Sem permissão para desativar." };
   }
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("VEICULO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await veiculoDAO.update(id, {
     placa: (formData.get("placa") as string)?.trim().toUpperCase(),
     modelo: (formData.get("modelo") as string) || undefined,
     capacidade: formData.get("capacidade") ? Number(formData.get("capacidade")) : undefined,
     status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA",
+    codigos: codigoResult.codigos,
   }, user.id_usuario);
 
   if (!ativo) await veiculoDAO.softDelete(id, user.id_usuario);

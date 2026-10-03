@@ -12,7 +12,7 @@ import { searchVeiculosList, type VeiculoListRow } from "./actions";
 import { getVeiculo, deleteVeiculo } from "./novo/actions";
 import type { VeiculoFormData } from "./novo/actions";
 
-interface Props { rows: VeiculoListRow[]; perms: PermissoesEntidade; }
+interface Props { rows: VeiculoListRow[]; tiposCodigo: { id_tipo_codigo: number; nome: string }[]; perms: PermissoesEntidade; }
 
 const columns: Column<VeiculoListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
@@ -23,7 +23,7 @@ const columns: Column<VeiculoListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function VeiculosClient({ rows: initialRows, perms }: Props) {
+export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<VeiculoFormData | null>(null);
@@ -67,9 +67,9 @@ export default function VeiculosClient({ rows: initialRows, perms }: Props) {
     <>
       <SearchBar placeholder="Pesquisar veículos..." onNew={() => setModalMode("create")} onSearch={handleSearch} showNew={perms.canCreate} />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
-      <Modal open={modalMode === "create"} onClose={closeModal} width="520px"><VeiculoForm mode="create" onSuccess={handleSuccess} onCancel={closeModal} /></Modal>
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} canDeactivate={perms.canDeactivate} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="view" initialData={formData} onCancel={closeModal} />}</Modal>
+      <Modal open={modalMode === "create"} onClose={closeModal} width="520px"><VeiculoForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} /></Modal>
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} tiposCodigo={tiposCodigo} canDeactivate={perms.canDeactivate} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />}</Modal>
       <ConfirmDialog open={deleteTarget !== null} onClose={() => { setDeleteTarget(null); setDeleteError(""); }} onConfirm={handleDelete} title="Excluir veículo" message={deleteError || `Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`} confirmLabel={deleteError ? "OK" : "Excluir"} loading={deleting} />
     </>
   );

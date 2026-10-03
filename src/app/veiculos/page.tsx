@@ -1,6 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import VeiculosClient from "./VeiculosClient";
 import { veiculoDAO } from "@/dao/veiculo";
+import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
 
@@ -10,7 +11,10 @@ export default async function VeiculosPage() {
   const perms = await resolverPermissoes("veiculo");
   if (!perms.canList) redirect("/dashboard");
 
-  const { data } = await veiculoDAO.list();
+  const [{ data }, tiposCodigo] = await Promise.all([
+    veiculoDAO.list(),
+    tipoCodigoDAO.listParaEntidade("VEICULO"),
+  ]);
 
   const rows = data.map((v, i) => ({
     id_veiculo: v.id_veiculo,
@@ -22,7 +26,7 @@ export default async function VeiculosPage() {
 
   return (
     <DashboardLayout title="Veículos">
-      <VeiculosClient rows={rows} perms={perms} />
+      <VeiculosClient rows={rows} tiposCodigo={tiposCodigo} perms={perms} />
     </DashboardLayout>
   );
 }

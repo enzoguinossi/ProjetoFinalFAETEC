@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
 
@@ -32,22 +33,37 @@ export class VeiculoDAO {
     });
   }
 
-  async create(data: { placa: string; modelo?: string; capacidade?: number }, id_usuario: number) {
+  async create(data: { placa: string; modelo?: string; capacidade?: number; codigos?: CodigoInput[] }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
-      const v = await tx.veiculo.create({ data: { ...data, status: "DISPONIVEL" } });
+      const v = await tx.veiculo.create({ data: { placa: data.placa, modelo: data.modelo, capacidade: data.capacidade, status: "DISPONIVEL" } });
+      for (const c of data.codigos ?? []) {
+        await tx.veiculoCodigo.create({
+          data: { id_veiculo: v.id_veiculo, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa, modelo: data.modelo, capacidade: data.capacidade } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa, modelo: data.modelo, capacidade: data.capacidade, codigos: data.codigos ?? [] } },
       });
       return v;
     });
   }
 
-  async update(id: number, data: { placa?: string; modelo?: string; capacidade?: number; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA" }, id_usuario: number) {
+  async update(id: number, data: { placa?: string; modelo?: string; capacidade?: number; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA"; codigos?: CodigoInput[] }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
-      const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id } });
-      const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data });
+      const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id }, include: { veiculoCodigos: true } });
+      const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { placa: data.placa, modelo: data.modelo, capacidade: data.capacidade, status: data.status } });
+
+      if (data.codigos !== undefined) {
+        await tx.veiculoCodigo.deleteMany({ where: { id_veiculo: id } });
+        for (const c of data.codigos) {
+          await tx.veiculoCodigo.create({
+            data: { id_veiculo: id, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+          });
+        }
+      }
+
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { placa: antes.placa, modelo: antes.modelo, capacidade: antes.capacidade, status: antes.status }, dados_novos: { placa: depois.placa, modelo: depois.modelo, capacidade: depois.capacidade, status: depois.status } },
+        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { placa: antes.placa, modelo: antes.modelo, capacidade: antes.capacidade, status: antes.status, codigos: antes.veiculoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) }, dados_novos: { placa: depois.placa, modelo: depois.modelo, capacidade: depois.capacidade, status: depois.status, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
       });
       return depois;
     });
