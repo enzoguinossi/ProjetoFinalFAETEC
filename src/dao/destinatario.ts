@@ -8,7 +8,7 @@ type Db = Prisma.TransactionClient;
 export class DestinatarioDAO {
   async list(params: PaginationParams & { search?: string } = {}) {
     const { skip, take } = buildPagination(params);
-    const where: any = { ativo: true };
+    const where: Prisma.DestinatarioWhereInput = { ativo: true };
     if (params.search) {
       where.pessoaJuridica = { razao_social: { contains: params.search } };
     }
@@ -97,9 +97,9 @@ export class DestinatarioDAO {
       }
 
       if (data.endereco) {
-        const endData: any = {};
+        const endData: Prisma.EnderecoUpdateInput = {};
         for (const [k, v] of Object.entries(data.endereco)) {
-          if (v !== undefined) endData[k] = v;
+          if (v !== undefined) (endData as Record<string, unknown>)[k] = v;
         }
         if (Object.keys(endData).length > 0) {
           await tx.endereco.update({ where: { id_endereco: antes.id_endereco }, data: endData });

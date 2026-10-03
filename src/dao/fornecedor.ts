@@ -97,15 +97,15 @@ export class FornecedorDAO {
       }
 
       if (data.endereco && antes.endereco) {
-        const endData: any = {};
+        const endData: Prisma.EnderecoUpdateInput = {};
         for (const [k, v] of Object.entries(data.endereco)) {
-          if (v !== undefined) endData[k] = v;
+          if (v !== undefined) (endData as Record<string, unknown>)[k] = v;
         }
         if (Object.keys(endData).length > 0) {
           await tx.endereco.update({ where: { id_endereco: antes.endereco.id_endereco }, data: endData });
         }
       } else if (data.endereco && !antes.endereco) {
-        const end = await tx.endereco.create({ data: data.endereco as any });
+        const end = await tx.endereco.create({ data: data.endereco as Prisma.EnderecoCreateInput });
         await tx.fornecedor.update({ where: { id_fornecedor: id }, data: { id_endereco: end.id_endereco } });
       }
 

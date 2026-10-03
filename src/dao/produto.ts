@@ -8,7 +8,7 @@ type Db = Prisma.TransactionClient;
 export class ProdutoDAO {
   async list(params: PaginationParams & { search?: string } = {}) {
     const { skip, take } = buildPagination(params);
-    const where: any = { ativo: true };
+    const where: Prisma.ProdutoWhereInput = { ativo: true };
     if (params.search) where.descricao = { contains: params.search };
     const [data, total] = await Promise.all([
       prisma.produto.findMany({

@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { buildPagination, type PaginationParams, type PaginatedResult } from "@/types";
+import { Prisma } from "@prisma/client";
+import { buildPagination, type PaginationParams } from "@/types";
 
 export class EstoqueDAO {
   async list(params: PaginationParams & { id_produto?: number } = {}) {
     const { skip, take } = buildPagination(params);
-    const where: any = { ativo: true };
+    const where: Prisma.EstoqueWhereInput = { ativo: true };
     if (params.id_produto) where.id_produto = params.id_produto;
 
     const [data, total] = await Promise.all([

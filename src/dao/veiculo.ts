@@ -8,8 +8,8 @@ type Db = Prisma.TransactionClient;
 export class VeiculoDAO {
   async list(params: PaginationParams & { status?: string } = {}) {
     const { skip, take } = buildPagination(params);
-    const where: any = { ativo: true };
-    if (params.status) where.status = params.status;
+    const where: Prisma.VeiculoWhereInput = { ativo: true };
+    if (params.status) where.status = params.status as Prisma.VeiculoWhereInput["status"];
     const [data, total] = await Promise.all([
       prisma.veiculo.findMany({ skip, take, where, orderBy: { placa: "asc" } }),
       prisma.veiculo.count({ where }),

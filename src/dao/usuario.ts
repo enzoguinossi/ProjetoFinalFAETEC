@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 
 const AUDIT_ENTIDADE = "Usuario";
