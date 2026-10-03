@@ -1,6 +1,7 @@
 "use server";
 
 import { fornecedorDAO } from "@/dao/fornecedor";
+import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -21,6 +22,7 @@ export type FornecedorFormData = {
     latitude: number | null;
     longitude: number | null;
   } | null;
+  codigos: { tipo: string; valor: string }[];
 };
 
 export async function createFornecedor(formData: FormData) {
@@ -29,6 +31,9 @@ export async function createFornecedor(formData: FormData) {
 
   const razao_social = formData.get("razao_social") as string;
   if (!razao_social?.trim()) return { error: "Razão social é obrigatória" };
+
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
 
   const logradouro = formData.get("logradouro") as string;
   const endereco = logradouro ? {
@@ -46,6 +51,7 @@ export async function createFornecedor(formData: FormData) {
     razao_social: razao_social.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     contato: (formData.get("contato") as string) || undefined,
+    codigos: codigoResult.codigos,
     endereco,
   }, user.id_usuario);
 
@@ -74,6 +80,7 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
       latitude: f.endereco.latitude,
       longitude: f.endereco.longitude,
     } : null,
+    codigos: f.fornecedorCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
   };
 }
 
@@ -87,11 +94,15 @@ export async function updateFornecedor(formData: FormData) {
     return { error: "Sem permissão para desativar." };
   }
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await fornecedorDAO.update(id, {
     razao_social: (formData.get("razao_social") as string)?.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     contato: (formData.get("contato") as string) || undefined,
     ativo,
+    codigos: codigoResult.codigos,
     endereco: {
       logradouro: (formData.get("logradouro") as string) || undefined,
       numero: (formData.get("numero") as string) || undefined,

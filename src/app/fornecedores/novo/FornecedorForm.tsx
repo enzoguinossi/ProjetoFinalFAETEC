@@ -3,18 +3,20 @@
 import { useState } from "react";
 import { createFornecedor, updateFornecedor } from "./actions";
 import type { FornecedorFormData } from "./actions";
+import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Button from "@/components/Button";
 
 interface Props {
   mode?: "create" | "edit" | "view";
   initialData?: FornecedorFormData;
+  tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
 export default function FornecedorForm({
-  mode = "create", initialData, canDeactivate = true,
+  mode = "create", initialData, tiposCodigo, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
   const isView = mode === "view";
@@ -23,6 +25,7 @@ export default function FornecedorForm({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
+  const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -265,6 +268,13 @@ export default function FornecedorForm({
           )}
         </div>
       </div>
+
+      <CodigosSection
+        tiposCodigo={tiposCodigo}
+        value={codigos}
+        onChange={setCodigos}
+        disabled={isView}
+      />
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
         {isView ? (

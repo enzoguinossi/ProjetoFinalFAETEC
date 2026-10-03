@@ -14,6 +14,7 @@ import type { FornecedorFormData } from "./novo/actions";
 
 interface Props {
   rows: FornecedorListRow[];
+  tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }
 
@@ -24,7 +25,7 @@ const columns: Column<FornecedorListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function FornecedoresClient({ rows: initialRows, perms }: Props) {
+export default function FornecedoresClient({ rows: initialRows, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<FornecedorFormData | null>(null);
@@ -122,7 +123,7 @@ export default function FornecedoresClient({ rows: initialRows, perms }: Props) 
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
-        <FornecedorForm mode="create" onSuccess={handleSuccess} onCancel={closeModal} />
+        <FornecedorForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
       <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
@@ -130,6 +131,7 @@ export default function FornecedoresClient({ rows: initialRows, perms }: Props) 
           <FornecedorForm
             mode="edit"
             initialData={formData}
+            tiposCodigo={tiposCodigo}
             canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
@@ -139,7 +141,7 @@ export default function FornecedoresClient({ rows: initialRows, perms }: Props) 
 
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
         {formData && (
-          <FornecedorForm mode="view" initialData={formData} onCancel={closeModal} />
+          <FornecedorForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
         )}
       </Modal>
 

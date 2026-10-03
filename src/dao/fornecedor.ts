@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
 
@@ -46,6 +47,7 @@ export class FornecedorDAO {
     data: {
       razao_social: string; cnpj?: string; contato?: string;
       endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; cep?: string; latitude?: number; longitude?: number };
+      codigos?: CodigoInput[];
     },
     id_usuario: number,
   ) {
@@ -65,8 +67,14 @@ export class FornecedorDAO {
         data: { id_pessoa_juridica: pj.id_pessoa_juridica, contato: data.contato, id_endereco },
       });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: forn.id_fornecedor, dados_novos: { contato: data.contato ?? null } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: forn.id_fornecedor, dados_novos: { contato: data.contato ?? null, codigos: data.codigos ?? [] } },
       });
+
+      for (const c of data.codigos ?? []) {
+        await tx.fornecedorCodigo.create({
+          data: { id_fornecedor: forn.id_fornecedor, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
 
       return tx.fornecedor.findUniqueOrThrow({
         where: { id_fornecedor: forn.id_fornecedor },
@@ -80,13 +88,14 @@ export class FornecedorDAO {
     data: {
       razao_social?: string; cnpj?: string; contato?: string; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
+      codigos?: CodigoInput[];
     },
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.fornecedor.findUniqueOrThrow({
         where: { id_fornecedor: id },
-        include: { pessoaJuridica: true, endereco: true },
+        include: { pessoaJuridica: true, endereco: true, fornecedorCodigos: true },
       });
 
       if (data.razao_social !== undefined || data.cnpj !== undefined) {
@@ -114,8 +123,17 @@ export class FornecedorDAO {
         data: { contato: data.contato ?? antes.contato, ativo: data.ativo ?? antes.ativo },
       });
 
+      if (data.codigos !== undefined) {
+        await tx.fornecedorCodigo.deleteMany({ where: { id_fornecedor: id } });
+        for (const c of data.codigos) {
+          await tx.fornecedorCodigo.create({
+            data: { id_fornecedor: id, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+          });
+        }
+      }
+
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo } },
+        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
       });
 
       return depois;
