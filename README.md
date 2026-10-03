@@ -76,13 +76,13 @@ docker compose up --build
 Acesse em `http://localhost:3000`.
 
 - O Compose monta a `DATABASE_URL` automaticamente a partir das variáveis `MYSQL_*`.
-- Para usar um banco externo/gerenciado (ex.: Coolify), defina `DATABASE_URL` no
-  ambiente — ela tem precedência sobre as variáveis do serviço `mysql`.
+- Para usar um banco externo/gerenciado, defina `DATABASE_URL` no ambiente — ela tem
+  precedência sobre as variáveis do serviço `mysql`.
 - Variáveis disponíveis (com defaults): `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`,
   `MYSQL_USER`, `MYSQL_PASSWORD`, `JWT_SECRET` (obrigatória).
-- As portas locais (`APP_PORT`, `MYSQL_PORT`) ficam em `docker-compose.override.yml`,
-  carregado automaticamente só no ambiente local. Em produção a aplicação apenas
-  `expose` a porta 3000 e o proxy da plataforma (Traefik no Coolify) cuida do acesso.
+- As portas locais (`APP_PORT`) ficam em `docker-compose.override.yml`, carregado
+  automaticamente só no ambiente local. Em produção a aplicação apenas `expose` a
+  porta 3000 e o roteamento é feito pela rede/proxy do seu ambiente Docker.
 
 ### Conflito com MySQL local (porta 3306)
 
@@ -112,8 +112,8 @@ DATABASE_URL="mysql://nexus:nexus_password@localhost:3306/Nexus" \
   npm run db:seed
 ```
 
-> O `.env` é apenas para desenvolvimento local; em Docker/Coolify as variáveis são
-> injetadas pelo ambiente e não devem ser comitadas.
+> O `.env` é apenas para desenvolvimento local; em qualquer ambiente Docker as
+> variáveis são injetadas pelo ambiente e não devem ser comitadas.
 
 ## Equipe
 
