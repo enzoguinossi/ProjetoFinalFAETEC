@@ -122,11 +122,11 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
         <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <DestinatarioForm
             mode="edit"
@@ -139,7 +139,7 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <DestinatarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
         )}

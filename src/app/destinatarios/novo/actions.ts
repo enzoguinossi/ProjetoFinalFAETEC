@@ -3,6 +3,7 @@
 import { destinatarioDAO } from "@/dao/destinatario";
 import { codigoService } from "@/services/codigo";
 import { cepService } from "@/services/cep";
+import { contatoService } from "@/services/contato";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -33,6 +34,8 @@ export type DestinatarioFormData = {
     longitude: number | null;
   };
   codigos: { tipo: string; valor: string }[];
+  emails: { endereco: string; principal: boolean }[];
+  telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
 };
 
 export async function createDestinatario(formData: FormData) {
@@ -45,11 +48,15 @@ export async function createDestinatario(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
+
   await destinatarioDAO.create({
     razao_social: razao_social.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
     codigos: codigoResult.codigos,
+    ...contatoResult.contatos,
     endereco: {
       logradouro: formData.get("logradouro") as string,
       numero: (formData.get("numero") as string) || undefined,
@@ -90,6 +97,8 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
       longitude: d.endereco.longitude,
     },
     codigos: d.destinatarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
+    emails: d.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
+    telefones: d.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })),
   };
 }
 
@@ -106,12 +115,16 @@ export async function updateDestinatario(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
+
   await destinatarioDAO.update(id, {
     razao_social: (formData.get("razao_social") as string)?.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
     ativo,
     codigos: codigoResult.codigos,
+    ...contatoResult.contatos,
     endereco: {
       logradouro: (formData.get("logradouro") as string) || undefined,
       numero: (formData.get("numero") as string) || undefined,
