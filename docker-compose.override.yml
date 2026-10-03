@@ -1,0 +1,10 @@
+# Override carregado automaticamente pelo `docker compose` no ambiente local.
+# Publica as portas para acesso via localhost. Não usar em produção/Coolify.
+services:
+  mysql:
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+
+  app:
+    ports:
+      - "${APP_PORT:-3000}:3000"
