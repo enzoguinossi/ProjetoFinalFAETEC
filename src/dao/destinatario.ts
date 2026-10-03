@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+
+type Db = Prisma.TransactionClient;
 
 export class DestinatarioDAO {
   async list(params: PaginationParams & { search?: string } = {}) {
@@ -18,6 +22,15 @@ export class DestinatarioDAO {
       prisma.destinatario.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
+  }
+
+  async search(query: string, take = 50) {
+    return prisma.destinatario.findMany({
+      where: { ativo: true, pessoaJuridica: { razao_social: { contains: query } } },
+      include: { pessoaJuridica: true },
+      take,
+      orderBy: { id_destinatario: "desc" },
+    });
   }
 
   async getById(id: number) {
@@ -65,7 +78,7 @@ export class DestinatarioDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE";
+      razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
     },
     id_usuario: number,
@@ -95,24 +108,27 @@ export class DestinatarioDAO {
 
       const depois = await tx.destinatario.update({
         where: { id_destinatario: id },
-        data: { tipo_destinatario: data.tipo_destinatario ?? antes.tipo_destinatario },
+        data: {
+          tipo_destinatario: data.tipo_destinatario ?? antes.tipo_destinatario,
+          ativo: data.ativo ?? antes.ativo,
+        },
       });
 
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario } },
+        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo } },
       });
 
       return depois;
     });
   }
 
-  async verificarRelacionamentos(id: number) {
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
     const [notasSaida, pedidos, remessas, coletas, percursos] = await Promise.all([
-      prisma.notaSaida.count({ where: { id_destinatario: id } }),
-      prisma.pedidoEscola.count({ where: { id_destinatario: id } }),
-      prisma.remessa.count({ where: { id_destinatario: id } }),
-      prisma.coleta.count({ where: { id_destinatario: id } }),
-      prisma.percursoDestinatario.count({ where: { id_destinatario: id } }),
+      client.notaSaida.count({ where: { id_destinatario: id } }),
+      client.pedidoEscola.count({ where: { id_destinatario: id } }),
+      client.remessa.count({ where: { id_destinatario: id } }),
+      client.coleta.count({ where: { id_destinatario: id } }),
+      client.percursoDestinatario.count({ where: { id_destinatario: id } }),
     ]);
 
     const vinculos: string[] = [];
@@ -127,6 +143,9 @@ export class DestinatarioDAO {
 
   async hardDelete(id: number, id_usuario: number) {
     await prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError("este destinatário", vinculos);
+
       const d = await tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: id },
         include: { endereco: true },

@@ -6,13 +6,15 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DestinatarioForm from "./novo/DestinatarioForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchDestinatariosList, type DestinatarioListRow } from "./actions";
 import { getDestinatario, deleteDestinatario } from "./novo/actions";
 import type { DestinatarioFormData } from "./novo/actions";
 
 interface Props {
   rows: DestinatarioListRow[];
+  perms: PermissoesEntidade;
 }
 
 const columns: Column<DestinatarioListRow>[] = [
@@ -22,7 +24,7 @@ const columns: Column<DestinatarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function DestinatariosClient({ rows: initialRows }: Props) {
+export default function DestinatariosClient({ rows: initialRows, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<DestinatarioFormData | null>(null);
@@ -82,25 +84,31 @@ export default function DestinatariosClient({ rows: initialRows }: Props) {
     }
   }
 
-  const actions = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "view"),
-    },
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "edit"),
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: DestinatarioListRow) => {
-        setDeleteTarget(row);
-        setDeleteError("");
-      },
-    },
+  const actions: Action<DestinatarioListRow>[] = [
+    ...(perms.canView
+      ? [{
+          icon: "/icons/actions/Olho.svg",
+          label: "Visualizar",
+          onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "view"),
+        }]
+      : []),
+    ...(perms.canEdit
+      ? [{
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "edit"),
+        }]
+      : []),
+    ...(perms.canDelete
+      ? [{
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (row: DestinatarioListRow) => {
+            setDeleteTarget(row);
+            setDeleteError("");
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -109,6 +117,7 @@ export default function DestinatariosClient({ rows: initialRows }: Props) {
         placeholder="Pesquisar destinatários..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
+        showNew={perms.canCreate}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
@@ -121,6 +130,7 @@ export default function DestinatariosClient({ rows: initialRows }: Props) {
           <DestinatarioForm
             mode="edit"
             initialData={formData}
+            canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
           />

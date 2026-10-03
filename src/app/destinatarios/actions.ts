@@ -1,5 +1,7 @@
 "use server";
-import { prisma } from "@/lib/prisma";
+import { destinatarioDAO } from "@/dao/destinatario";
+import { requireUser } from "@/lib/auth";
+import { usuarioPode } from "@/lib/permissoes";
 
 export type DestinatarioListRow = {
   id_destinatario: number;
@@ -9,11 +11,9 @@ export type DestinatarioListRow = {
 
 export async function searchDestinatariosList(query: string): Promise<DestinatarioListRow[]> {
   if (query.length < 2) return [];
-  const data = await prisma.destinatario.findMany({
-    where: { ativo: true, pessoaJuridica: { razao_social: { contains: query } } },
-    include: { pessoaJuridica: true },
-    take: 50, orderBy: { id_destinatario: "desc" },
-  });
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "destinatario.listar"))) return [];
+  const data = await destinatarioDAO.search(query);
   return data.map((d, i) => ({
     id_destinatario: d.id_destinatario,
     codigo: String(i + 1).padStart(3, "0"),
