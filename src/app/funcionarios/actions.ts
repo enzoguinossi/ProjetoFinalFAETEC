@@ -1,6 +1,8 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { funcionarioDAO } from "@/dao/funcionario";
+import { requireUser } from "@/lib/auth";
+import { usuarioPode } from "@/lib/permissoes";
 
 export type FuncionarioListRow = {
   id_funcionario: number;
@@ -13,24 +15,16 @@ export type FuncionarioListRow = {
 export async function searchFuncionariosList(query: string): Promise<FuncionarioListRow[]> {
   if (query.length < 2) return [];
 
-  const data = await prisma.funcionario.findMany({
-    where: {
-      ativo: true,
-      pessoaFisica: { nome: { contains: query } },
-    },
-    include: {
-      pessoaFisica: { select: { nome: true } },
-      condutor: { select: { id_condutor: true, ativo: true } },
-    },
-    take: 50,
-    orderBy: { id_funcionario: "desc" },
-  });
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "funcionario.listar"))) return [];
+
+  const data = await funcionarioDAO.search(query);
 
   return data.map((f, i) => ({
     id_funcionario: f.id_funcionario,
     codigo: String(i + 1).padStart(3, "0"),
     nome: f.pessoaFisica.nome,
     cargo: f.cargo ?? "",
-    condutor: f.condutor?.ativo ? "Sim" : "Não",
+    condutor: f.condutor ? "Sim" : "Não",
   }));
 }
