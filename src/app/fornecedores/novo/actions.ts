@@ -3,6 +3,7 @@
 import { fornecedorDAO } from "@/dao/fornecedor";
 import { codigoService } from "@/services/codigo";
 import { cepService } from "@/services/cep";
+import { contatoService } from "@/services/contato";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -33,6 +34,8 @@ export type FornecedorFormData = {
     longitude: number | null;
   } | null;
   codigos: { tipo: string; valor: string }[];
+  emails: { endereco: string; principal: boolean }[];
+  telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
 };
 
 export async function createFornecedor(formData: FormData) {
@@ -44,6 +47,9 @@ export async function createFornecedor(formData: FormData) {
 
   const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
+
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
 
   const logradouro = formData.get("logradouro") as string;
   const endereco = logradouro ? {
@@ -63,6 +69,7 @@ export async function createFornecedor(formData: FormData) {
     cnpj: (formData.get("cnpj") as string) || undefined,
     contato: (formData.get("contato") as string) || undefined,
     codigos: codigoResult.codigos,
+    ...contatoResult.contatos,
     endereco,
   }, user.id_usuario);
 
@@ -93,6 +100,8 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
       longitude: f.endereco.longitude,
     } : null,
     codigos: f.fornecedorCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
+    emails: f.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
+    telefones: f.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })),
   };
 }
 
@@ -109,12 +118,16 @@ export async function updateFornecedor(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
+
   await fornecedorDAO.update(id, {
     razao_social: (formData.get("razao_social") as string)?.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     contato: (formData.get("contato") as string) || undefined,
     ativo,
     codigos: codigoResult.codigos,
+    ...contatoResult.contatos,
     endereco: {
       logradouro: (formData.get("logradouro") as string) || undefined,
       numero: (formData.get("numero") as string) || undefined,

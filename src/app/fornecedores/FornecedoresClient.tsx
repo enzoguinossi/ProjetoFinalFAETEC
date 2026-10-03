@@ -122,11 +122,11 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
         <FornecedorForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <FornecedorForm
             mode="edit"
@@ -139,7 +139,7 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <FornecedorForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
         )}
