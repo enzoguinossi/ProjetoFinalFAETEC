@@ -6,13 +6,15 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import FornecedorForm from "./novo/FornecedorForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchFornecedoresList, type FornecedorListRow } from "./actions";
 import { getFornecedor, deleteFornecedor } from "./novo/actions";
 import type { FornecedorFormData } from "./novo/actions";
 
 interface Props {
   rows: FornecedorListRow[];
+  perms: PermissoesEntidade;
 }
 
 const columns: Column<FornecedorListRow>[] = [
@@ -22,7 +24,7 @@ const columns: Column<FornecedorListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function FornecedoresClient({ rows: initialRows }: Props) {
+export default function FornecedoresClient({ rows: initialRows, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<FornecedorFormData | null>(null);
@@ -68,9 +70,13 @@ export default function FornecedoresClient({ rows: initialRows }: Props) {
     setDeleting(true);
     setDeleteError("");
     try {
-      await deleteFornecedor(deleteTarget.id_fornecedor);
-      setDeleteTarget(null);
-      window.location.reload();
+      const result = await deleteFornecedor(deleteTarget.id_fornecedor);
+      if (result.error) {
+        setDeleteError(result.error);
+      } else {
+        setDeleteTarget(null);
+        window.location.reload();
+      }
     } catch {
       setDeleteError("Erro ao excluir. Tente novamente.");
     } finally {
@@ -78,25 +84,31 @@ export default function FornecedoresClient({ rows: initialRows }: Props) {
     }
   }
 
-  const actions = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "view"),
-    },
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "edit"),
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: FornecedorListRow) => {
-        setDeleteTarget(row);
-        setDeleteError("");
-      },
-    },
+  const actions: Action<FornecedorListRow>[] = [
+    ...(perms.canView
+      ? [{
+          icon: "/icons/actions/Olho.svg",
+          label: "Visualizar",
+          onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "view"),
+        }]
+      : []),
+    ...(perms.canEdit
+      ? [{
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "edit"),
+        }]
+      : []),
+    ...(perms.canDelete
+      ? [{
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (row: FornecedorListRow) => {
+            setDeleteTarget(row);
+            setDeleteError("");
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -105,6 +117,7 @@ export default function FornecedoresClient({ rows: initialRows }: Props) {
         placeholder="Pesquisar fornecedores..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
+        showNew={perms.canCreate}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
@@ -117,6 +130,7 @@ export default function FornecedoresClient({ rows: initialRows }: Props) {
           <FornecedorForm
             mode="edit"
             initialData={formData}
+            canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
           />

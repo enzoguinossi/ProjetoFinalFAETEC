@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+
+type Db = Prisma.TransactionClient;
 
 export class FornecedorDAO {
   async list(params: PaginationParams = {}) {
@@ -14,6 +18,15 @@ export class FornecedorDAO {
       prisma.fornecedor.count({ where: { ativo: true } }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
+  }
+
+  async search(query: string, take = 50) {
+    return prisma.fornecedor.findMany({
+      where: { ativo: true, pessoaJuridica: { razao_social: { contains: query } } },
+      include: { pessoaJuridica: true },
+      take,
+      orderBy: { id_fornecedor: "desc" },
+    });
   }
 
   async getById(id: number) {
@@ -65,7 +78,7 @@ export class FornecedorDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; cnpj?: string; contato?: string;
+      razao_social?: string; cnpj?: string; contato?: string; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
     },
     id_usuario: number,
@@ -98,20 +111,20 @@ export class FornecedorDAO {
 
       const depois = await tx.fornecedor.update({
         where: { id_fornecedor: id },
-        data: { contato: data.contato ?? antes.contato },
+        data: { contato: data.contato ?? antes.contato, ativo: data.ativo ?? antes.ativo },
       });
 
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato } },
+        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo } },
       });
 
       return depois;
     });
   }
 
-  async verificarRelacionamentos(id: number) {
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
     const [notasEntrada] = await Promise.all([
-      prisma.notaEntrada.count({ where: { id_fornecedor: id } }),
+      client.notaEntrada.count({ where: { id_fornecedor: id } }),
     ]);
     const vinculos: string[] = [];
     if (notasEntrada > 0) vinculos.push(`${notasEntrada} nota(s) de entrada`);
@@ -120,6 +133,9 @@ export class FornecedorDAO {
 
   async hardDelete(id: number, id_usuario: number) {
     await prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError("este fornecedor", vinculos);
+
       const f = await tx.fornecedor.findUniqueOrThrow({
         where: { id_fornecedor: id },
         include: { endereco: true },
