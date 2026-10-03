@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
 
@@ -51,6 +52,7 @@ export class DestinatarioDAO {
       razao_social: string; cnpj?: string;
       tipo_destinatario: "ESCOLA" | "CRECHE";
       endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; cep?: string; latitude?: number; longitude?: number };
+      codigos?: CodigoInput[];
     },
     id_usuario: number,
   ) {
@@ -65,8 +67,14 @@ export class DestinatarioDAO {
         data: { id_pessoa_juridica: pj.id_pessoa_juridica, tipo_destinatario: data.tipo_destinatario, id_endereco: end.id_endereco },
       });
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: dest.id_destinatario, dados_novos: { tipo: data.tipo_destinatario, id_endereco: end.id_endereco } },
+        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: dest.id_destinatario, dados_novos: { tipo: data.tipo_destinatario, id_endereco: end.id_endereco, codigos: data.codigos ?? [] } },
       });
+
+      for (const c of data.codigos ?? []) {
+        await tx.destinatarioCodigo.create({
+          data: { id_destinatario: dest.id_destinatario, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+        });
+      }
 
       return tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: dest.id_destinatario },
@@ -80,13 +88,14 @@ export class DestinatarioDAO {
     data: {
       razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; cep?: string; latitude?: number; longitude?: number };
+      codigos?: CodigoInput[];
     },
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: id },
-        include: { pessoaJuridica: true, endereco: true },
+        include: { pessoaJuridica: true, endereco: true, destinatarioCodigos: true },
       });
 
       if (data.razao_social !== undefined || data.cnpj !== undefined) {
@@ -114,8 +123,17 @@ export class DestinatarioDAO {
         },
       });
 
+      if (data.codigos !== undefined) {
+        await tx.destinatarioCodigo.deleteMany({ where: { id_destinatario: id } });
+        for (const c of data.codigos) {
+          await tx.destinatarioCodigo.create({
+            data: { id_destinatario: id, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
+          });
+        }
+      }
+
       await tx.registroAuditoria.create({
-        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo } },
+        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
       });
 
       return depois;

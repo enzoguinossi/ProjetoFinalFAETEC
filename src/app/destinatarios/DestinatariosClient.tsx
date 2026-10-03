@@ -14,6 +14,7 @@ import type { DestinatarioFormData } from "./novo/actions";
 
 interface Props {
   rows: DestinatarioListRow[];
+  tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }
 
@@ -24,7 +25,7 @@ const columns: Column<DestinatarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function DestinatariosClient({ rows: initialRows, perms }: Props) {
+export default function DestinatariosClient({ rows: initialRows, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<DestinatarioFormData | null>(null);
@@ -122,7 +123,7 @@ export default function DestinatariosClient({ rows: initialRows, perms }: Props)
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
-        <DestinatarioForm mode="create" onSuccess={handleSuccess} onCancel={closeModal} />
+        <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
       <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
@@ -130,6 +131,7 @@ export default function DestinatariosClient({ rows: initialRows, perms }: Props)
           <DestinatarioForm
             mode="edit"
             initialData={formData}
+            tiposCodigo={tiposCodigo}
             canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
@@ -139,7 +141,7 @@ export default function DestinatariosClient({ rows: initialRows, perms }: Props)
 
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
         {formData && (
-          <DestinatarioForm mode="view" initialData={formData} onCancel={closeModal} />
+          <DestinatarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
         )}
       </Modal>
 

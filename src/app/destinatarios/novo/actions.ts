@@ -1,6 +1,7 @@
 "use server";
 
 import { destinatarioDAO } from "@/dao/destinatario";
+import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
@@ -21,6 +22,7 @@ export type DestinatarioFormData = {
     latitude: number | null;
     longitude: number | null;
   };
+  codigos: { tipo: string; valor: string }[];
 };
 
 export async function createDestinatario(formData: FormData) {
@@ -30,10 +32,14 @@ export async function createDestinatario(formData: FormData) {
   const razao_social = formData.get("razao_social") as string;
   if (!razao_social?.trim()) return { error: "Razão social é obrigatória" };
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await destinatarioDAO.create({
     razao_social: razao_social.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+    codigos: codigoResult.codigos,
     endereco: {
       logradouro: formData.get("logradouro") as string,
       numero: (formData.get("numero") as string) || undefined,
@@ -71,6 +77,7 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
       latitude: d.endereco.latitude,
       longitude: d.endereco.longitude,
     },
+    codigos: d.destinatarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
   };
 }
 
@@ -84,11 +91,15 @@ export async function updateDestinatario(formData: FormData) {
     return { error: "Sem permissão para desativar." };
   }
 
+  const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
+  if ("error" in codigoResult) return { error: codigoResult.error };
+
   await destinatarioDAO.update(id, {
     razao_social: (formData.get("razao_social") as string)?.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
     ativo,
+    codigos: codigoResult.codigos,
     endereco: {
       logradouro: (formData.get("logradouro") as string) || undefined,
       numero: (formData.get("numero") as string) || undefined,
