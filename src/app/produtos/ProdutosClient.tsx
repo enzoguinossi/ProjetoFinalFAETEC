@@ -6,7 +6,8 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProdutoForm from "./novo/ProdutoForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchProdutosList, type ProdutoListRow } from "./actions";
 import { getProduto, deleteProduto } from "./novo/actions";
 import type { ProdutoFormData } from "./novo/actions";
@@ -15,6 +16,7 @@ interface Props {
   rows: ProdutoListRow[];
   conversoes: { id_conversao: number; nome: string }[];
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
+  perms: PermissoesEntidade;
 }
 
 const columns: Column<ProdutoListRow>[] = [
@@ -26,7 +28,7 @@ const columns: Column<ProdutoListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function ProdutosClient({ rows: initialRows, conversoes, tiposCodigo }: Props) {
+export default function ProdutosClient({ rows: initialRows, conversoes, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -95,25 +97,31 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
     }
   }
 
-  const actions = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: (row: ProdutoListRow) => openView(row.id_produto),
-    },
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: ProdutoListRow) => openEdit(row.id_produto),
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: ProdutoListRow) => {
-        setDeleteTarget(row);
-        setDeleteError("");
-      },
-    },
+  const actions: Action<ProdutoListRow>[] = [
+    ...(perms.canView
+      ? [{
+          icon: "/icons/actions/Olho.svg",
+          label: "Visualizar",
+          onClick: (row: ProdutoListRow) => openView(row.id_produto),
+        }]
+      : []),
+    ...(perms.canEdit
+      ? [{
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (row: ProdutoListRow) => openEdit(row.id_produto),
+        }]
+      : []),
+    ...(perms.canDelete
+      ? [{
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (row: ProdutoListRow) => {
+            setDeleteTarget(row);
+            setDeleteError("");
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -122,6 +130,7 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
         placeholder="Pesquisar produtos..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
+        showNew={perms.canCreate}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
@@ -150,6 +159,7 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
             tiposCodigo={tiposCodigo}
             mode="edit"
             initialData={formData}
+            canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
           />
