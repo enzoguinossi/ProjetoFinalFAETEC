@@ -26,10 +26,13 @@ async function main() {
   console.log("  ✅ Tipos de código");
 
   // ── Permissões ──────────────────────────────────────────────────
+  const entidadesCadastro = ["usuario", "funcionario", "destinatario", "fornecedor", "veiculo", "produto"];
+
   const permissoes = [
-    ...["usuario", "funcionario", "destinatario", "fornecedor",
-      "veiculo", "produto", "perfil",
-    ].flatMap((e) => [`${e}.criar`, `${e}.alterar`, `${e}.consultar`, `${e}.desativar`]),
+    ...[...entidadesCadastro, "perfil"].flatMap((e) => [
+      `${e}.listar`, `${e}.criar`, `${e}.alterar`, `${e}.consultar`, `${e}.desativar`,
+    ]),
+    ...entidadesCadastro.map((e) => `${e}.excluir`),
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
@@ -146,21 +149,12 @@ async function main() {
       create: {
         id_pessoa_fisica: pf[i].id_pessoa_fisica,
         cargo: cargos[i],
+        condutor: true,
       },
     });
     funcionarios.push(f);
   }
   console.log(`  ✅ ${funcionarios.length} funcionários`);
-
-  // Condutores (os 3 funcionários também são condutores)
-  for (const f of funcionarios) {
-    await prisma.condutor.upsert({
-      where: { id_funcionario: f.id_funcionario },
-      update: {},
-      create: { id_funcionario: f.id_funcionario },
-    });
-  }
-  console.log(`  ✅ ${funcionarios.length} condutores`);
 
   // ── Pessoas Jurídicas → Fornecedores ──
   const pjFornecedores = [
@@ -296,11 +290,12 @@ async function main() {
   const senhaHash = await bcrypt.hash("admin", 10);
   await prisma.usuario.upsert({
     where: { id_funcionario: adminFuncionario.id_funcionario },
-    update: {},
+    update: { login: "admin", senha_hash: senhaHash, senha_alterada_em: new Date(), super_admin: true },
     create: {
       id_funcionario: adminFuncionario.id_funcionario,
       login: "admin",
       senha_hash: senhaHash,
+      senha_alterada_em: new Date(),
       super_admin: true,
     },
   });

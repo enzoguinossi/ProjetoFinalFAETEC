@@ -1,9 +1,10 @@
 "use server";
 
-import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { usuarioDAO } from "@/dao/usuario";
 import { signToken } from "@/lib/jwt";
+import { setAuthCookie, setTempAuthCookie, clearAuthCookie } from "@/lib/cookies";
+import { registrarAuditoria } from "@/dao/_audit";
 
 export async function loginAction(formData: FormData) {
   const login = formData.get("login") as string;
@@ -11,55 +12,51 @@ export async function loginAction(formData: FormData) {
 
   if (!login || !senha) return { error: "Login e senha obrigatórios" };
 
-  const usuario = await prisma.usuario.findUnique({
-    where: { login },
-    include: { funcionario: { include: { pessoaFisica: true } } },
-  });
+  const usuario = await usuarioDAO.getByLoginComFuncionario(login);
 
-  if (!usuario || !usuario.ativo) return { error: "Usuário ou senha inválidos" };
+  if (!usuario || !usuario.ativo) {
+    return { error: "Usuário ou senha inválidos" };
+  }
 
   // Primeiro acesso — senha ainda não definida
-  if (usuario.senha_hash === "__PENDING__") {
-    // Gera um token temporário para a página de definir senha
-    const tempToken = signToken({
+  if (usuario.senha_hash === null) {
+    const tempToken = await signToken({
       id_usuario: usuario.id_usuario,
       login: usuario.login,
       super_admin: usuario.super_admin,
+      sv: usuario.senha_alterada_em?.getTime() ?? 0,
     });
-    const cookieStore = await cookies();
-    cookieStore.set("nexus_temp_token", tempToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 10, // 10 min
-    });
+    await setTempAuthCookie(tempToken);
     return { redirect: "/definir-senha" };
   }
 
   const valida = await bcrypt.compare(senha, usuario.senha_hash);
-  if (!valida) return { error: "Usuário ou senha inválidos" };
+  if (!valida) {
+    await registrarAuditoria(usuario.id_usuario, "LOGIN_FALHA", "Usuario", usuario.id_usuario, {
+      login,
+      motivo: "senha inválida",
+    });
+    return { error: "Usuário ou senha inválidos" };
+  }
 
-  const token = signToken({
+  const token = await signToken({
     id_usuario: usuario.id_usuario,
     login: usuario.login,
     super_admin: usuario.super_admin,
+    sv: usuario.senha_alterada_em?.getTime() ?? 0,
   });
 
-  const cookieStore = await cookies();
-  cookieStore.set("nexus_token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 8, // 8h
+  await usuarioDAO.registrarAcesso(usuario.id_usuario);
+
+  await setAuthCookie(token);
+  await registrarAuditoria(usuario.id_usuario, "LOGIN", "Usuario", usuario.id_usuario, {
+    login,
   });
 
   return { success: true };
 }
 
 export async function logoutAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete("nexus_token");
+  await clearAuthCookie();
   return { success: true };
 }

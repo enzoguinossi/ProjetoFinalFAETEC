@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
-type AcaoAuditoria = "CRIAR" | "ALTERAR" | "DESATIVAR" | "EXCLUIR";
+type AcaoAuditoria =
+  | "CRIAR"
+  | "ALTERAR"
+  | "DESATIVAR"
+  | "EXCLUIR"
+  | "LOGIN"
+  | "LOGIN_FALHA"
+  | "LOGOUT"
+  | "DEFINIR_SENHA";
 
 export async function registrarAuditoria(
   id_usuario: number,
