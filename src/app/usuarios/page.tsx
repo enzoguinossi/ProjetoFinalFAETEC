@@ -1,23 +1,19 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import UsuariosClient from "./UsuariosClient";
-import { prisma } from "@/lib/prisma";
+import { usuarioDAO } from "@/dao/usuario";
+import { funcionarioDAO } from "@/dao/funcionario";
+import { redirect } from "next/navigation";
+import { resolverPermissoes } from "@/lib/permissoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function UsuariosPage() {
+  const perms = await resolverPermissoes("usuario");
+  if (!perms.canList) redirect("/dashboard");
+
   const [data, funcionarios] = await Promise.all([
-    prisma.usuario.findMany({
-      where: { ativo: true },
-      include: {
-        funcionario: { include: { pessoaFisica: true } },
-      },
-      orderBy: { id_usuario: "asc" },
-    }),
-    prisma.funcionario.findMany({
-      where: { ativo: true, usuario: null },
-      include: { pessoaFisica: true },
-      orderBy: { id_funcionario: "asc" },
-    }),
+    usuarioDAO.list(),
+    funcionarioDAO.listDisponiveisParaUsuario(),
   ]);
 
   const rows = data.map((u, i) => ({
@@ -29,7 +25,7 @@ export default async function UsuariosPage() {
 
   return (
     <DashboardLayout title="Usuários">
-      <UsuariosClient rows={rows} funcionarios={funcionarios} />
+      <UsuariosClient rows={rows} funcionarios={funcionarios} perms={perms} />
     </DashboardLayout>
   );
 }

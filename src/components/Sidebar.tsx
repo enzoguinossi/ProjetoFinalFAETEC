@@ -7,7 +7,14 @@ import { logoutAction } from "@/app/login/actions";
 import styles from "./Sidebar.module.css";
 
 // Cache o módulo para evitar recarregar a cada navegação
-let cachedUser: { id_usuario: number; nome: string; login: string; super_admin: boolean } | null = null;
+type SidebarUser = {
+  id_usuario: number;
+  nome: string;
+  login: string;
+  super_admin: boolean;
+  permissoes: string[];
+};
+let cachedUser: SidebarUser | null = null;
 let cachePromise: Promise<typeof cachedUser> | null = null;
 
 function loadUser() {
@@ -22,12 +29,12 @@ function loadUser() {
 }
 
 const cadastroItems = [
-  { label: "Usuários", path: "/usuarios", icon: "/icons/cadastros/usuario.svg" },
-  { label: "Funcionários", path: "/funcionarios", icon: "/icons/cadastros/funcionarios.svg" },
-  { label: "Destinatários", path: "/destinatarios", icon: "/icons/cadastros/escola.svg" },
-  { label: "Produtos", path: "/produtos", icon: "/icons/cadastros/produto.svg" },
-  { label: "Fornecedores", path: "/fornecedores", icon: "/icons/nav/dados.svg" },
-  { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg" },
+  { label: "Usuários", path: "/usuarios", icon: "/icons/cadastros/usuario.svg", permissao: "usuario.listar" },
+  { label: "Funcionários", path: "/funcionarios", icon: "/icons/cadastros/funcionarios.svg", permissao: "funcionario.listar" },
+  { label: "Destinatários", path: "/destinatarios", icon: "/icons/cadastros/escola.svg", permissao: "destinatario.listar" },
+  { label: "Produtos", path: "/produtos", icon: "/icons/cadastros/produto.svg", permissao: "produto.listar" },
+  { label: "Fornecedores", path: "/fornecedores", icon: "/icons/nav/dados.svg", permissao: "fornecedor.listar" },
+  { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg", permissao: "veiculo.listar" },
 ];
 
 const navItems = [
@@ -74,6 +81,10 @@ export default function Sidebar() {
 
   const isActive = (path: string) => pathname === path;
   const isCadastroItemActive = cadastroItems.some((i) => pathname === i.path);
+
+  const visibleCadastroItems = user?.super_admin
+    ? cadastroItems
+    : cadastroItems.filter((i) => user?.permissoes?.includes(i.permissao));
 
   return (
     <aside className={styles.sidebar}>
@@ -123,7 +134,7 @@ export default function Sidebar() {
 
           {cadastrosOpen && (
             <div className={styles.subItems}>
-              {cadastroItems.map((item) => (
+              {visibleCadastroItems.map((item) => (
                 <button
                   key={item.path}
                   className={`${styles.subItem} ${isActive(item.path) ? styles.activeSub : ""}`}

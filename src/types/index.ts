@@ -44,6 +44,15 @@ export type StatusAjuste = (typeof STATUS_AJUSTE)[number];
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
+export type PermissoesEntidade = {
+  canList: boolean;
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canDeactivate: boolean;
+};
+
 export type PaginationParams = {
   page?: number;
   limit?: number;

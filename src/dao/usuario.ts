@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
+import { EntidadeComVinculosError } from "./_errors";
 
 const AUDIT_ENTIDADE = "Usuario";
+
+type Db = Prisma.TransactionClient;
 
 export class UsuarioDAO {
   async getById(id: number) {
@@ -24,8 +28,103 @@ export class UsuarioDAO {
     });
   }
 
+  async getByLoginComFuncionario(login: string) {
+    return prisma.usuario.findUnique({
+      where: { login },
+      include: { funcionario: { include: { pessoaFisica: true } } },
+    });
+  }
+
+  async existeLogin(login: string) {
+    return prisma.usuario.findUnique({ where: { login }, select: { id_usuario: true } });
+  }
+
+  async getAdmin() {
+    return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
+  }
+
+  async existeSuperAdmin() {
+    return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
+  }
+
+  async list() {
+    return prisma.usuario.findMany({
+      where: { ativo: true },
+      include: { funcionario: { include: { pessoaFisica: true } } },
+      orderBy: { id_usuario: "asc" },
+    });
+  }
+
+  async search(query: string, take = 50) {
+    return prisma.usuario.findMany({
+      where: {
+        ativo: true,
+        OR: [
+          { login: { contains: query } },
+          { funcionario: { pessoaFisica: { nome: { contains: query } } } },
+        ],
+      },
+      include: { funcionario: { include: { pessoaFisica: true } } },
+      take,
+      orderBy: { id_usuario: "asc" },
+    });
+  }
+
+  async registrarAcesso(id: number) {
+    return prisma.usuario.update({ where: { id_usuario: id }, data: { ultimo_acesso: new Date() } });
+  }
+
+  async criarSuperAdmin(data: { nome: string; login: string; senha_hash: string }) {
+    return prisma.$transaction(async (tx) => {
+      const pf = await tx.pessoaFisica.create({ data: { nome: data.nome } });
+      const func = await tx.funcionario.create({
+        data: { id_pessoa_fisica: pf.id_pessoa_fisica, cargo: "Administrador" },
+      });
+      const u = await tx.usuario.create({
+        data: {
+          id_funcionario: func.id_funcionario,
+          login: data.login,
+          senha_hash: data.senha_hash,
+          senha_alterada_em: new Date(),
+          super_admin: true,
+        },
+      });
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario: u.id_usuario,
+          acao: "CRIAR",
+          data_hora: new Date(),
+          entidade: AUDIT_ENTIDADE,
+          id_entidade_afetada: u.id_usuario,
+          dados_novos: { login: data.login, super_admin: true },
+        },
+      });
+      return u;
+    });
+  }
+
+  async definirSenha(id: number, senha_hash: string, quando: Date, id_usuario: number) {
+    return prisma.$transaction(async (tx) => {
+      const u = await tx.usuario.update({
+        where: { id_usuario: id },
+        data: { senha_hash, senha_alterada_em: quando, ultimo_acesso: quando },
+      });
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario,
+          acao: "DEFINIR_SENHA",
+          data_hora: new Date(),
+          entidade: AUDIT_ENTIDADE,
+          id_entidade_afetada: id,
+          dados_novos: { senha_definida: true },
+        },
+      });
+      return u;
+    });
+  }
+
   async create(
-    data: { id_funcionario: number; login: string; senha_hash: string; super_admin?: boolean },
+    data: { id_funcionario: number; login: string; senha_hash: string | null; super_admin?: boolean },
     id_usuario: number,
   ) {
     const created = await prisma.$transaction(async (tx) => {
@@ -66,7 +165,10 @@ export class UsuarioDAO {
 
   async updateSenha(id: number, senha_hash: string, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
-      const u = await tx.usuario.update({ where: { id_usuario: id }, data: { senha_hash } });
+      const u = await tx.usuario.update({
+        where: { id_usuario: id },
+        data: { senha_hash, senha_alterada_em: new Date() },
+      });
       await tx.registroAuditoria.create({
         data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: AUDIT_ENTIDADE, id_entidade_afetada: id, dados_novos: { senha_alterada: true } },
       });
@@ -74,14 +176,15 @@ export class UsuarioDAO {
     });
   }
 
-  async verificarRelacionamentos(id: number) {
-    const [movimentacoes, reservas, registros, mensagens, inventariosAbertos, inventariosAprovados] = await Promise.all([
-      prisma.movimentacaoEstoque.count({ where: { id_usuario: id } }),
-      prisma.reservaEstoque.count({ where: { id_usuario: id } }),
-      prisma.registroAuditoria.count({ where: { id_usuario: id } }),
-      prisma.mensagemMural.count({ where: { id_usuario: id } }),
-      prisma.inventario.count({ where: { id_usuario_abertura: id } }),
-      prisma.inventario.count({ where: { id_usuario_aprovacao: id } }),
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
+    const [movimentacoes, reservas, registros, mensagens, inventariosAbertos, inventariosAprovados, ajustesAprovados] = await Promise.all([
+      client.movimentacaoEstoque.count({ where: { id_usuario: id } }),
+      client.reservaEstoque.count({ where: { id_usuario: id } }),
+      client.registroAuditoria.count({ where: { id_usuario: id } }),
+      client.mensagemMural.count({ where: { id_usuario: id } }),
+      client.inventario.count({ where: { id_usuario_abertura: id } }),
+      client.inventario.count({ where: { id_usuario_aprovacao: id } }),
+      client.ajusteInventario.count({ where: { id_usuario_aprovacao: id } }),
     ]);
 
     const vinculos: string[] = [];
@@ -91,12 +194,16 @@ export class UsuarioDAO {
     if (mensagens > 0) vinculos.push(`${mensagens} mensagen(s) no mural`);
     if (inventariosAbertos > 0) vinculos.push(`${inventariosAbertos} inventário(s) aberto(s)`);
     if (inventariosAprovados > 0) vinculos.push(`${inventariosAprovados} inventário(s) aprovado(s)`);
+    if (ajustesAprovados > 0) vinculos.push(`${ajustesAprovados} ajuste(s) de inventário aprovado(s)`);
 
     return { podeExcluir: vinculos.length === 0, vinculos };
   }
 
   async hardDelete(id: number, id_usuario_resp: number) {
     await prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError("este usuário", vinculos);
+
       await tx.usuarioPermissao.deleteMany({ where: { id_usuario: id } });
       await tx.usuario.delete({ where: { id_usuario: id } });
       await tx.registroAuditoria.create({
