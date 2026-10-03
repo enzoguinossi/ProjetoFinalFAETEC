@@ -6,12 +6,13 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import VeiculoForm from "./novo/VeiculoForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchVeiculosList, type VeiculoListRow } from "./actions";
 import { getVeiculo, deleteVeiculo } from "./novo/actions";
 import type { VeiculoFormData } from "./novo/actions";
 
-interface Props { rows: VeiculoListRow[]; }
+interface Props { rows: VeiculoListRow[]; perms: PermissoesEntidade; }
 
 const columns: Column<VeiculoListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
@@ -22,7 +23,7 @@ const columns: Column<VeiculoListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function VeiculosClient({ rows: initialRows }: Props) {
+export default function VeiculosClient({ rows: initialRows, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<VeiculoFormData | null>(null);
@@ -56,18 +57,18 @@ export default function VeiculosClient({ rows: initialRows }: Props) {
     } catch { setDeleteError("Erro ao excluir."); } finally { setDeleting(false); }
   }
 
-  const actions = [
-    { icon: "/icons/actions/Olho.svg", label: "Visualizar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "view") },
-    { icon: "/icons/actions/Editar.svg", label: "Editar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "edit") },
-    { icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row: VeiculoListRow) => { setDeleteTarget(row); setDeleteError(""); } },
+  const actions: Action<VeiculoListRow>[] = [
+    ...(perms.canView ? [{ icon: "/icons/actions/Olho.svg", label: "Visualizar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "view") }] : []),
+    ...(perms.canEdit ? [{ icon: "/icons/actions/Editar.svg", label: "Editar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "edit") }] : []),
+    ...(perms.canDelete ? [{ icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row: VeiculoListRow) => { setDeleteTarget(row); setDeleteError(""); } }] : []),
   ];
 
   return (
     <>
-      <SearchBar placeholder="Pesquisar veículos..." onNew={() => setModalMode("create")} onSearch={handleSearch} />
+      <SearchBar placeholder="Pesquisar veículos..." onNew={() => setModalMode("create")} onSearch={handleSearch} showNew={perms.canCreate} />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px"><VeiculoForm mode="create" onSuccess={handleSuccess} onCancel={closeModal} /></Modal>
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} canDeactivate={perms.canDeactivate} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="view" initialData={formData} onCancel={closeModal} />}</Modal>
       <ConfirmDialog open={deleteTarget !== null} onClose={() => { setDeleteTarget(null); setDeleteError(""); }} onConfirm={handleDelete} title="Excluir veículo" message={deleteError || `Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`} confirmLabel={deleteError ? "OK" : "Excluir"} loading={deleting} />
     </>

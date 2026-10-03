@@ -2,6 +2,8 @@
 
 import { veiculoDAO } from "@/dao/veiculo";
 import { requireUser } from "@/lib/auth";
+import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
+import { EntidadeComVinculosError } from "@/dao/_errors";
 
 export type VeiculoFormData = {
   id_veiculo: number;
@@ -13,10 +15,12 @@ export type VeiculoFormData = {
 };
 
 export async function createVeiculo(formData: FormData) {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "veiculo.criar"))) return { error: "Sem permissão." };
+
   const placa = formData.get("placa") as string;
   if (!placa?.trim()) return { error: "Placa é obrigatória" };
 
-  const user = await requireUser();
   await veiculoDAO.create({
     placa: placa.trim().toUpperCase(),
     modelo: (formData.get("modelo") as string) || undefined,
@@ -27,6 +31,9 @@ export async function createVeiculo(formData: FormData) {
 }
 
 export async function getVeiculo(id: number): Promise<VeiculoFormData | null> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["veiculo.consultar", "veiculo.alterar"]))) return null;
+
   const v = await veiculoDAO.getById(id);
   if (!v) return null;
   return {
@@ -44,7 +51,12 @@ export async function updateVeiculo(formData: FormData) {
   if (!id) return { error: "ID inválido" };
 
   const user = await requireUser();
-  const ativo = formData.get("ativo") !== "off";
+  if (!(await usuarioPode(user, "veiculo.alterar"))) return { error: "Sem permissão." };
+
+  const ativo = formData.get("ativo") === "on";
+  if (!ativo && !(await usuarioPode(user, "veiculo.desativar"))) {
+    return { error: "Sem permissão para desativar." };
+  }
 
   await veiculoDAO.update(id, {
     placa: (formData.get("placa") as string)?.trim().toUpperCase(),
@@ -60,8 +72,16 @@ export async function updateVeiculo(formData: FormData) {
 
 export async function deleteVeiculo(id: number) {
   const user = await requireUser();
+  if (!(await usuarioPode(user, "veiculo.excluir"))) return { error: "Sem permissão." };
+
   const { podeExcluir, vinculos } = await veiculoDAO.verificarRelacionamentos(id);
   if (!podeExcluir) return { error: `Não é possível excluir pois possui ${vinculos.join(", ")}.` };
-  await veiculoDAO.hardDelete(id, user.id_usuario);
+
+  try {
+    await veiculoDAO.hardDelete(id, user.id_usuario);
+  } catch (e) {
+    if (e instanceof EntidadeComVinculosError) return { error: e.message };
+    throw e;
+  }
   return { success: true };
 }

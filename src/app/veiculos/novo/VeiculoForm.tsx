@@ -8,11 +8,12 @@ import Button from "@/components/Button";
 interface Props {
   mode?: "create" | "edit" | "view";
   initialData?: VeiculoFormData;
+  canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export default function VeiculoForm({ mode = "create", initialData, onSuccess, onCancel }: Props) {
+export default function VeiculoForm({ mode = "create", initialData, canDeactivate = true, onSuccess, onCancel }: Props) {
   const isView = mode === "view";
   const isEdit = mode === "edit";
   const [error, setError] = useState("");
@@ -38,7 +39,7 @@ export default function VeiculoForm({ mode = "create", initialData, onSuccess, o
       {error && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontSize: "0.8125rem" }}>{error}</div>}
       {isEdit && (
         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "0.875rem", cursor: "pointer" }}>
-          <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} style={{ accentColor: "#1b9956" }} /> Ativo
+          <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} disabled={!canDeactivate} style={{ accentColor: "#1b9956" }} /> Ativo
         </label>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

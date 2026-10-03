@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
+
+type Db = Prisma.TransactionClient;
 
 export class VeiculoDAO {
   async list(params: PaginationParams & { status?: string } = {}) {
@@ -17,6 +21,14 @@ export class VeiculoDAO {
     return prisma.veiculo.findUnique({
       where: { id_veiculo: id },
       include: { veiculoCodigos: { include: { tipoCodigo: true } } },
+    });
+  }
+
+  async search(query: string, take = 50) {
+    return prisma.veiculo.findMany({
+      where: { ativo: true, OR: [{ placa: { contains: query } }, { modelo: { contains: query } }] },
+      take,
+      orderBy: { placa: "asc" },
     });
   }
 
@@ -41,9 +53,9 @@ export class VeiculoDAO {
     });
   }
 
-  async verificarRelacionamentos(id: number) {
+  async verificarRelacionamentos(id: number, client: Db = prisma) {
     const [remessas] = await Promise.all([
-      prisma.remessa.count({ where: { id_veiculo: id } }),
+      client.remessa.count({ where: { id_veiculo: id } }),
     ]);
     const vinculos: string[] = [];
     if (remessas > 0) vinculos.push(`${remessas} remessa(s)`);
@@ -52,6 +64,9 @@ export class VeiculoDAO {
 
   async hardDelete(id: number, id_usuario: number) {
     await prisma.$transaction(async (tx) => {
+      const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
+      if (!podeExcluir) throw new EntidadeComVinculosError("este veículo", vinculos);
+
       await tx.veiculoCodigo.deleteMany({ where: { id_veiculo: id } });
       await tx.veiculo.delete({ where: { id_veiculo: id } });
       await tx.registroAuditoria.create({
