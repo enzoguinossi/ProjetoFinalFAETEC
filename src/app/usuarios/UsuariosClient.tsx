@@ -15,6 +15,9 @@ import type { UsuarioFormData } from "./novo/actions";
 interface Props {
   rows: UsuarioListRow[];
   funcionarios: { id_funcionario: number; pessoaFisica: { nome: string } }[];
+  grupos: { prefixo: string; permissoes: { id_permissao: number; nome: string; descricao: string | null }[] }[];
+  perfis: { id_perfil: number; nome: string; descricao: string | null }[];
+  perfilPermissoes: Record<number, string[]>;
   perms: PermissoesEntidade;
 }
 
@@ -26,7 +29,7 @@ const columns: Column<UsuarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function UsuariosClient({ rows: initialRows, funcionarios, perms }: Props) {
+export default function UsuariosClient({ rows: initialRows, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<UsuarioFormData | null>(null);
@@ -128,19 +131,25 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, perms 
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
         <UsuarioForm
           funcionarios={funcionarios}
+          grupos={grupos}
+          perfis={perfis}
+          perfilPermissoes={perfilPermissoes}
           mode="create"
           onSuccess={handleSuccess}
           onCancel={closeModal}
         />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="1000px">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
+            grupos={grupos}
+            perfis={perfis}
+            perfilPermissoes={perfilPermissoes}
             mode="edit"
             initialData={formData}
             canDeactivate={perms.canDeactivate}
@@ -150,10 +159,13 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, perms 
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="1000px">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
+            grupos={grupos}
+            perfis={perfis}
+            perfilPermissoes={perfilPermissoes}
             mode="view"
             initialData={formData}
             onCancel={closeModal}

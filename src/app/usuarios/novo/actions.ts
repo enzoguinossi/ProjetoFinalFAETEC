@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioDAO } from "@/dao/usuario";
 import { funcionarioDAO } from "@/dao/funcionario";
+import { permissaoService } from "@/services/permissao";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
 
@@ -13,7 +14,37 @@ export type UsuarioFormData = {
   super_admin: boolean;
   ativo: boolean;
   nome_funcionario: string;
+  permissoes: string[];
 };
+
+export async function listarPermissoesDisponiveis() {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["usuario.consultar", "usuario.alterar", "usuario.criar"]))) return [];
+  return permissaoService.listarTodasAgrupadas();
+}
+
+export async function listarPerfis() {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["usuario.consultar", "usuario.alterar", "usuario.criar"]))) return [];
+  return permissaoService.listarPerfis();
+}
+
+export async function permissoesDoPerfil(id_perfil: number): Promise<string[]> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["usuario.consultar", "usuario.alterar", "usuario.criar"]))) return [];
+  return permissaoService.permissoesDoPerfil(id_perfil);
+}
+
+export async function salvarPermissoesUsuario(id_usuario: number, permissoes: string[]) {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "usuario.alterar"))) return { error: "Sem permissão." };
+  try {
+    await permissaoService.salvarPermissoes(id_usuario, permissoes, user.id_usuario);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro ao salvar permissões." };
+  }
+  return { success: true };
+}
 
 export async function createUsuario(formData: FormData) {
   const user = await requireUser();
@@ -29,7 +60,9 @@ export async function createUsuario(formData: FormData) {
   const existente = await usuarioDAO.existeLogin(login);
   if (existente) return { error: "Login já existe" };
 
-  await usuarioDAO.create(
+  const permissoes = parsePermissoes(formData);
+
+  const criado = await usuarioDAO.create(
     {
       id_funcionario,
       login,
@@ -38,7 +71,22 @@ export async function createUsuario(formData: FormData) {
     user.id_usuario,
   );
 
+  if (permissoes.length > 0) {
+    await permissaoService.salvarPermissoes(criado.id_usuario, permissoes, user.id_usuario);
+  }
+
   return { success: true };
+}
+
+function parsePermissoes(formData: FormData): string[] {
+  const raw = formData.get("permissoes");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(String(raw));
+    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getUsuario(id: number): Promise<UsuarioFormData | null> {
@@ -54,6 +102,7 @@ export async function getUsuario(id: number): Promise<UsuarioFormData | null> {
     super_admin: u.super_admin,
     ativo: u.ativo,
     nome_funcionario: u.funcionario.pessoaFisica.nome,
+    permissoes: u.permissoes.map((p) => p.permissao.nome),
   };
 }
 
@@ -72,11 +121,24 @@ export async function updateUsuario(formData: FormData) {
     return { error: "Sem permissão para desativar." };
   }
 
+  const atual = await usuarioDAO.getById(id);
+  if (atual?.super_admin) {
+    return { error: "Super Admin não pode ser alterado." };
+  }
+
+  const permissoes = parsePermissoes(formData);
+
   await usuarioDAO.update(
     id,
     { login: login.trim(), ativo },
     user.id_usuario,
   );
+
+  try {
+    await permissaoService.salvarPermissoes(id, permissoes, user.id_usuario);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erro ao salvar permissões." };
+  }
 
   return { success: true };
 }

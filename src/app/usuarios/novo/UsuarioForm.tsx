@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createUsuario, updateUsuario } from "./actions";
 import type { UsuarioFormData } from "./actions";
 import Button from "@/components/Button";
+import PerfilForm from "@/components/PerfilForm";
 import styles from "./UsuarioForm.module.css";
 
 interface Funcionario {
@@ -11,8 +12,28 @@ interface Funcionario {
   pessoaFisica: { nome: string };
 }
 
+interface PermissaoOption {
+  id_permissao: number;
+  nome: string;
+  descricao: string | null;
+}
+
+interface GrupoPermissoes {
+  prefixo: string;
+  permissoes: PermissaoOption[];
+}
+
+interface PerfilOption {
+  id_perfil: number;
+  nome: string;
+  descricao: string | null;
+}
+
 interface Props {
   funcionarios: Funcionario[];
+  grupos: GrupoPermissoes[];
+  perfis: PerfilOption[];
+  perfilPermissoes: Record<number, string[]>;
   mode?: "create" | "edit" | "view";
   initialData?: UsuarioFormData;
   canDeactivate?: boolean;
@@ -20,18 +41,46 @@ interface Props {
   onCancel?: () => void;
 }
 
+function agruparPorPrefixo(nomes: string[], todas: string[]): string[] {
+  const set = new Set(todas);
+  return nomes.filter((n) => set.has(n));
+}
+
 export default function UsuarioForm({
-  funcionarios, mode = "create", initialData, canDeactivate = true,
+  funcionarios, grupos, perfis, perfilPermissoes,
+  mode = "create", initialData, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
   const isView = mode === "view";
   const isEdit = mode === "edit";
+  const isSuperAdmin = initialData?.super_admin ?? false;
+
+  const todasDisponiveis = useMemo(
+    () => grupos.flatMap((g) => g.permissoes.map((p) => p.nome)),
+    [grupos],
+  );
 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [login, setLogin] = useState(initialData?.login ?? "");
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [idFuncionario, setIdFuncionario] = useState(initialData?.id_funcionario ?? null);
+  const [selecionadas, setSelecionadas] = useState<string[]>(
+    initialData?.permissoes ? agruparPorPrefixo(initialData.permissoes, todasDisponiveis) : [],
+  );
+  const [perfilModal, setPerfilModal] = useState(false);
+
+  function alternar(nome: string) {
+    if (isSuperAdmin) return;
+    setSelecionadas((prev) =>
+      prev.includes(nome) ? prev.filter((n) => n !== nome) : [...prev, nome],
+    );
+  }
+
+  function aplicarPerfil(id_perfil: number) {
+    setSelecionadas(perfilPermissoes[id_perfil] ?? []);
+    setPerfilModal(false);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,6 +89,7 @@ export default function UsuarioForm({
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
+      form.set("permissoes", JSON.stringify(selecionadas));
       if (initialData) form.set("id_usuario", String(initialData.id_usuario));
       const result = initialData
         ? await updateUsuario(form)
@@ -53,53 +103,151 @@ export default function UsuarioForm({
     }
   }
 
+  const cardStyle = {
+    border: "1px solid #e2e2e2",
+    borderRadius: 12,
+    padding: 12,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 6,
+    maxHeight: 320,
+    overflowY: "auto" as const,
+  };
+
+  const itemStyle = (selected: boolean) => ({
+    padding: "6px 10px",
+    borderRadius: 8,
+    fontFamily: "Inter,sans-serif",
+    fontSize: "0.8125rem",
+    cursor: isSuperAdmin ? "default" : "pointer",
+    background: selected ? "#e7f6ee" : "transparent",
+    color: selected ? "#0f7a44" : "#21272a",
+    border: "1px solid transparent",
+  });
+
   return (
-    <form className={styles.form} onSubmit={handleSubmit}>
+    <form className={styles.form} style={{ maxWidth: "100%" }} onSubmit={handleSubmit}>
       {error && <div className={styles.error}>{error}</div>}
 
-      {isEdit && (
-        <label className={styles.checkboxLabel}>
-          <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} />
-          Ativo
-        </label>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
+        {/* Coluna esquerda — dados */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {isEdit && (
+            <label className={styles.checkboxLabel}>
+              <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} />
+              Ativo
+            </label>
+          )}
 
-      <div className={styles.field}>
-        <label className={styles.label}>Funcionário</label>
-        {isView ? (
-          <p className={styles.input} style={{ lineHeight: "2.5", padding: "0 0.75rem" }}>
-            {initialData?.nome_funcionario ?? "—"}
-          </p>
-        ) : (
-          <select
-            className={styles.select}
-            name="id_funcionario"
-            required={!isView}
-            value={idFuncionario ?? ""}
-            onChange={(e) => setIdFuncionario(e.target.value ? Number(e.target.value) : null)}
-            disabled={isView || isEdit}
-          >
-            <option value="">Selecione...</option>
-            {funcionarios.map((f) => (
-              <option key={f.id_funcionario} value={f.id_funcionario}>
-                {f.pessoaFisica.nome}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+          <div className={styles.field}>
+            <label className={styles.label}>Funcionário</label>
+            {isView ? (
+              <p className={styles.input} style={{ lineHeight: "2.5", padding: "0 0.75rem" }}>
+                {initialData?.nome_funcionario ?? "—"}
+              </p>
+            ) : (
+              <select
+                className={styles.select}
+                name="id_funcionario"
+                required={!isView}
+                value={idFuncionario ?? ""}
+                onChange={(e) => setIdFuncionario(e.target.value ? Number(e.target.value) : null)}
+                disabled={isView || isEdit}
+              >
+                <option value="">Selecione...</option>
+                {funcionarios.map((f) => (
+                  <option key={f.id_funcionario} value={f.id_funcionario}>
+                    {f.pessoaFisica.nome}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
-      <div className={styles.field}>
-        <label className={styles.label}>Login (e-mail)</label>
-        <input
-          className={styles.input}
-          type="email"
-          name="login"
-          required={!isView}
-          value={isView || isEdit ? login : undefined}
-          onChange={isEdit ? (e) => setLogin(e.target.value) : undefined}
-          readOnly={isView}
-        />
+          <div className={styles.field}>
+            <label className={styles.label}>Login (e-mail)</label>
+            <input
+              className={styles.input}
+              type="email"
+              name="login"
+              required={!isView}
+              value={isView || isEdit ? login : undefined}
+              onChange={isEdit ? (e) => setLogin(e.target.value) : undefined}
+              readOnly={isView}
+            />
+          </div>
+
+          {isSuperAdmin && (
+            <div style={{ padding: "0.5rem 0.75rem", background: "#fff8e1", border: "1px solid #f0c14b", borderRadius: 6, color: "#7a5a00", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>
+              Super Admin possui todas as permissões e não pode ser editado.
+            </div>
+          )}
+        </div>
+
+        {/* Coluna direita — permissões */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h3 style={{ fontFamily: '"SF Pro","Segoe UI",sans-serif', fontSize: "1.125rem", fontWeight: 590, margin: 0, color: "#1e1e1e" }}>
+              Permissões
+            </h3>
+            {!isView && !isSuperAdmin && (
+              <Button label="Aplicar perfil" onClick={() => setPerfilModal(true)} />
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            {/* Disponíveis */}
+            <div>
+              <p className={styles.label} style={{ marginBottom: 6 }}>Disponíveis</p>
+              <div style={cardStyle}>
+                {grupos.map((g) => (
+                  <div key={g.prefixo} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.6875rem", textTransform: "uppercase", letterSpacing: 0.5, color: "#9aa0a6", margin: "4px 0" }}>
+                      {g.prefixo}
+                    </span>
+                    {g.permissoes
+                      .filter((p) => !selecionadas.includes(p.nome))
+                      .map((p) => (
+                        <button
+                          key={p.nome}
+                          type="button"
+                          style={itemStyle(false)}
+                          onClick={() => alternar(p.nome)}
+                          disabled={isSuperAdmin}
+                          title={p.descricao ?? p.nome}
+                        >
+                          {p.nome}
+                        </button>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Do usuário */}
+            <div>
+              <p className={styles.label} style={{ marginBottom: 6 }}>Do usuário</p>
+              <div style={cardStyle}>
+                {selecionadas.length === 0 && (
+                  <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#9aa0a6" }}>
+                    Nenhuma permissão.
+                  </span>
+                )}
+                {[...selecionadas].sort().map((nome) => (
+                  <button
+                    key={nome}
+                    type="button"
+                    style={itemStyle(true)}
+                    onClick={() => alternar(nome)}
+                    disabled={isSuperAdmin}
+                  >
+                    {nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className={styles.actions}>
@@ -112,6 +260,13 @@ export default function UsuarioForm({
           </>
         )}
       </div>
+
+      <PerfilForm
+        open={perfilModal}
+        onClose={() => setPerfilModal(false)}
+        onConfirm={aplicarPerfil}
+        perfis={perfis}
+      />
     </form>
   );
 }
