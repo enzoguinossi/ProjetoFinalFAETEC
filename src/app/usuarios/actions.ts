@@ -1,6 +1,8 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { usuarioDAO } from "@/dao/usuario";
+import { requireUser } from "@/lib/auth";
+import { usuarioPode } from "@/lib/permissoes";
 
 export type UsuarioListRow = {
   id_usuario: number;
@@ -12,20 +14,10 @@ export type UsuarioListRow = {
 export async function searchUsuariosList(query: string): Promise<UsuarioListRow[]> {
   if (query.length < 2) return [];
 
-  const data = await prisma.usuario.findMany({
-    where: {
-      ativo: true,
-      OR: [
-        { login: { contains: query } },
-        { funcionario: { pessoaFisica: { nome: { contains: query } } } },
-      ],
-    },
-    include: {
-      funcionario: { include: { pessoaFisica: true } },
-    },
-    take: 50,
-    orderBy: { id_usuario: "asc" },
-  });
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "usuario.listar"))) return [];
+
+  const data = await usuarioDAO.search(query);
 
   return data.map((u, i) => ({
     id_usuario: u.id_usuario,

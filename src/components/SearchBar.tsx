@@ -10,6 +10,7 @@ interface SearchBarProps {
   onNew?: () => void;
   novoHref?: string;
   novoLabel?: string;
+  showNew?: boolean;
 }
 
 export default function SearchBar({
@@ -18,10 +19,11 @@ export default function SearchBar({
   onNew,
   novoHref,
   novoLabel = "Novo",
+  showNew = true,
 }: SearchBarProps) {
   return (
     <div className={styles.container}>
-      {novoHref ? (
+      {showNew && (novoHref ? (
         <Button
           label={novoLabel}
           href={novoHref}
@@ -41,7 +43,7 @@ export default function SearchBar({
             </svg>
           }
         />
-      )}
+      ))}
       <div className={styles.searchWrapper}>
         <input
           className={styles.input}

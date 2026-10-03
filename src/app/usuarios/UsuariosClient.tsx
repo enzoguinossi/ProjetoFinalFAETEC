@@ -6,7 +6,8 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import UsuarioForm from "./novo/UsuarioForm";
-import type { Column } from "@/components/DataTable";
+import type { Column, Action } from "@/components/DataTable";
+import type { PermissoesEntidade } from "@/types";
 import { searchUsuariosList, type UsuarioListRow } from "./actions";
 import { getUsuario, deleteUsuario } from "./novo/actions";
 import type { UsuarioFormData } from "./novo/actions";
@@ -14,6 +15,7 @@ import type { UsuarioFormData } from "./novo/actions";
 interface Props {
   rows: UsuarioListRow[];
   funcionarios: { id_funcionario: number; pessoaFisica: { nome: string } }[];
+  perms: PermissoesEntidade;
 }
 
 const columns: Column<UsuarioListRow>[] = [
@@ -24,7 +26,7 @@ const columns: Column<UsuarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function UsuariosClient({ rows: initialRows, funcionarios }: Props) {
+export default function UsuariosClient({ rows: initialRows, funcionarios, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -93,25 +95,31 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
     }
   }
 
-  const actions = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: (row: UsuarioListRow) => openView(row.id_usuario),
-    },
-    {
-      icon: "/icons/actions/Editar.svg",
-      label: "Editar",
-      onClick: (row: UsuarioListRow) => openEdit(row.id_usuario),
-    },
-    {
-      icon: "/icons/actions/Lixeira.svg",
-      label: "Excluir",
-      onClick: (row: UsuarioListRow) => {
-        setDeleteTarget(row);
-        setDeleteError("");
-      },
-    },
+  const actions: Action<UsuarioListRow>[] = [
+    ...(perms.canView
+      ? [{
+          icon: "/icons/actions/Olho.svg",
+          label: "Visualizar",
+          onClick: (row: UsuarioListRow) => openView(row.id_usuario),
+        }]
+      : []),
+    ...(perms.canEdit
+      ? [{
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (row: UsuarioListRow) => openEdit(row.id_usuario),
+        }]
+      : []),
+    ...(perms.canDelete
+      ? [{
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (row: UsuarioListRow) => {
+            setDeleteTarget(row);
+            setDeleteError("");
+          },
+        }]
+      : []),
   ];
 
   return (
@@ -120,6 +128,7 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
         placeholder="Pesquisar usuários..."
         onNew={() => setModalMode("create")}
         onSearch={handleSearch}
+        showNew={perms.canCreate}
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
@@ -138,6 +147,7 @@ export default function UsuariosClient({ rows: initialRows, funcionarios }: Prop
             funcionarios={funcionarios}
             mode="edit"
             initialData={formData}
+            canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
             onCancel={closeModal}
           />

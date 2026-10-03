@@ -15,12 +15,13 @@ interface Props {
   funcionarios: Funcionario[];
   mode?: "create" | "edit" | "view";
   initialData?: UsuarioFormData;
+  canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
 export default function UsuarioForm({
-  funcionarios, mode = "create", initialData,
+  funcionarios, mode = "create", initialData, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
   const isView = mode === "view";
@@ -58,7 +59,7 @@ export default function UsuarioForm({
 
       {isEdit && (
         <label className={styles.checkboxLabel}>
-          <input type="checkbox" name="ativo" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+          <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} />
           Ativo
         </label>
       )}
