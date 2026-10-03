@@ -1,8 +1,9 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { destinatarioDAO } from "@/dao/destinatario";
 import { requireUser } from "@/lib/auth";
+import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
+import { EntidadeComVinculosError } from "@/dao/_errors";
 
 export type DestinatarioFormData = {
   id_destinatario: number;
@@ -23,10 +24,12 @@ export type DestinatarioFormData = {
 };
 
 export async function createDestinatario(formData: FormData) {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "destinatario.criar"))) return { error: "Sem permissão." };
+
   const razao_social = formData.get("razao_social") as string;
   if (!razao_social?.trim()) return { error: "Razão social é obrigatória" };
 
-  const user = await requireUser();
   await destinatarioDAO.create({
     razao_social: razao_social.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
@@ -47,6 +50,9 @@ export async function createDestinatario(formData: FormData) {
 }
 
 export async function getDestinatario(id: number): Promise<DestinatarioFormData | null> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["destinatario.consultar", "destinatario.alterar"]))) return null;
+
   const d = await destinatarioDAO.getById(id);
   if (!d) return null;
   return {
@@ -72,11 +78,17 @@ export async function updateDestinatario(formData: FormData) {
   const id = Number(formData.get("id_destinatario"));
   if (!id) return { error: "ID inválido" };
   const user = await requireUser();
+  if (!(await usuarioPode(user, "destinatario.alterar"))) return { error: "Sem permissão." };
+  const ativo = formData.get("ativo") === "on";
+  if (!ativo && !(await usuarioPode(user, "destinatario.desativar"))) {
+    return { error: "Sem permissão para desativar." };
+  }
 
   await destinatarioDAO.update(id, {
     razao_social: (formData.get("razao_social") as string)?.trim(),
     cnpj: (formData.get("cnpj") as string) || undefined,
     tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+    ativo,
     endereco: {
       logradouro: (formData.get("logradouro") as string) || undefined,
       numero: (formData.get("numero") as string) || undefined,
@@ -94,8 +106,16 @@ export async function updateDestinatario(formData: FormData) {
 
 export async function deleteDestinatario(id: number) {
   const user = await requireUser();
+  if (!(await usuarioPode(user, "destinatario.excluir"))) return { error: "Sem permissão." };
+
   const { podeExcluir, vinculos } = await destinatarioDAO.verificarRelacionamentos(id);
   if (!podeExcluir) return { error: `Não é possível excluir pois possui ${vinculos.join(", ")}.` };
-  await destinatarioDAO.hardDelete(id, user.id_usuario);
+
+  try {
+    await destinatarioDAO.hardDelete(id, user.id_usuario);
+  } catch (e) {
+    if (e instanceof EntidadeComVinculosError) return { error: e.message };
+    throw e;
+  }
   return { success: true };
 }
