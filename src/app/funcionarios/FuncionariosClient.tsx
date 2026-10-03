@@ -124,11 +124,11 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
       />
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
         <FuncionarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <FuncionarioForm
             mode="edit"
@@ -141,7 +141,7 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="960px">
         {formData && (
           <FuncionarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
         )}

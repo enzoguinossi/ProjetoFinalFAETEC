@@ -3,8 +3,14 @@
 import { requireUser } from "@/lib/auth";
 import { funcionarioDAO } from "@/dao/funcionario";
 import { codigoService } from "@/services/codigo";
+import { contatoService } from "@/services/contato";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+
+export type ContatoFormData = {
+  emails: { endereco: string; principal: boolean }[];
+  telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
+};
 
 export type FuncionarioFormData = {
   id_funcionario: number;
@@ -14,6 +20,8 @@ export type FuncionarioFormData = {
   condutor: boolean;
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
+  emails: { endereco: string; principal: boolean }[];
+  telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
 };
 
 export async function createFuncionario(formData: FormData) {
@@ -26,6 +34,9 @@ export async function createFuncionario(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
+
   await funcionarioDAO.create(
     {
       nome: nome.trim(),
@@ -33,6 +44,7 @@ export async function createFuncionario(formData: FormData) {
       cargo: (formData.get("cargo") as string) || undefined,
       condutor: formData.get("condutor") === "on",
       codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
     },
     user.id_usuario,
   );
@@ -54,6 +66,8 @@ export async function getFuncionario(id: number): Promise<FuncionarioFormData | 
     condutor: f.condutor,
     ativo: f.ativo,
     codigos: f.funcionarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
+    emails: f.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
+    telefones: f.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })),
   };
 }
 
@@ -74,6 +88,9 @@ export async function updateFuncionario(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
+  const contatoResult = contatoService.resolverContatosParaSalvar(formData);
+  if ("error" in contatoResult) return { error: contatoResult.error };
+
   try {
     await funcionarioDAO.update(
       id,
@@ -83,6 +100,7 @@ export async function updateFuncionario(formData: FormData) {
         condutor: formData.get("condutor") === "on",
         ativo,
         codigos: codigoResult.codigos,
+        ...contatoResult.contatos,
       },
       user.id_usuario,
     );

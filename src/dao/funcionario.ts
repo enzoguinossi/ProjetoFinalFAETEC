@@ -4,6 +4,7 @@ import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type PaginationParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
+import type { ContatosInput } from "@/services/contato";
 
 const AUDIT_ENTIDADE = "Funcionario";
 
@@ -58,7 +59,7 @@ export class FuncionarioDAO {
   }
 
   async create(
-    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] },
+    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
   ) {
     const result = await prisma.$transaction(async (tx) => {
@@ -87,12 +88,23 @@ export class FuncionarioDAO {
         });
       }
 
+      for (const e of data.emails ?? []) {
+        await tx.funcionarioEmail.create({
+          data: { id_funcionario: func.id_funcionario, endereco: e.endereco, principal: e.principal },
+        });
+      }
+      for (const t of data.telefones ?? []) {
+        await tx.funcionarioTelefone.create({
+          data: { id_funcionario: func.id_funcionario, numero: t.numero, tipo: t.tipo, principal: t.principal },
+        });
+      }
+
       await tx.registroAuditoria.create({
         data: {
           id_usuario, acao: "CRIAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE,
           id_entidade_afetada: func.id_funcionario,
-          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [] },
+          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
         },
       });
 
@@ -106,13 +118,13 @@ export class FuncionarioDAO {
 
   async update(
     id: number,
-    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] },
+    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
-        include: { pessoaFisica: true, funcionarioCodigos: true },
+        include: { pessoaFisica: true, funcionarioCodigos: true, emails: true, telefones: true },
       });
 
       if (data.nome !== undefined) {
@@ -151,12 +163,29 @@ export class FuncionarioDAO {
         }
       }
 
+      if (data.emails !== undefined) {
+        await tx.funcionarioEmail.deleteMany({ where: { id_funcionario: id } });
+        for (const e of data.emails) {
+          await tx.funcionarioEmail.create({
+            data: { id_funcionario: id, endereco: e.endereco, principal: e.principal },
+          });
+        }
+      }
+      if (data.telefones !== undefined) {
+        await tx.funcionarioTelefone.deleteMany({ where: { id_funcionario: id } });
+        for (const t of data.telefones) {
+          await tx.funcionarioTelefone.create({
+            data: { id_funcionario: id, numero: t.numero, tipo: t.tipo, principal: t.principal },
+          });
+        }
+      }
+
       await tx.registroAuditoria.create({
         data: {
           id_usuario, acao: "ALTERAR", data_hora: new Date(),
           entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
-          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         },
       });
 
