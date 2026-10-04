@@ -5,6 +5,7 @@ import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+import { processarImagemWebp, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
 
 export type ProdutoItem = { id_produto: number; descricao: string };
 
@@ -67,7 +68,16 @@ export async function createProduto(formData: FormData) {
 
   const id_usuario = user.id_usuario;
 
-  await produtoDAO.createCompleto(
+  // Processa a imagem ANTES de persistir (garante que deu certo).
+  const arquivo = formData.get("foto_arquivo");
+  let imagemProcessada: { buffer: Buffer; hash: string } | null = null;
+  if (arquivo instanceof File && arquivo.size > 0) {
+    const res = await processarImagemWebp(arquivo);
+    if (!res.ok) return { error: res.error };
+    imagemProcessada = { buffer: res.buffer, hash: res.hash };
+  }
+
+  const criado = await produtoDAO.createCompleto(
     {
       descricao: descricao.trim(),
       foto_url,
@@ -80,6 +90,16 @@ export async function createProduto(formData: FormData) {
     },
     id_usuario,
   );
+
+  if (imagemProcessada) {
+    try {
+      const path = await salvarImagemProduto(criado.id_produto, imagemProcessada.buffer, imagemProcessada.hash);
+      await produtoDAO.setFotoUrl(criado.id_produto, path);
+    } catch {
+      await produtoDAO.rollbackCreate(criado.id_produto);
+      return { error: "Não foi possível salvar a imagem. O produto não foi criado." };
+    }
+  }
 
   return { success: true };
 }
@@ -150,11 +170,27 @@ export async function updateProduto(formData: FormData) {
     insumos.push({ id_produto_filho: id_filho, quantidade: qtd });
   }
 
+  const atual = await produtoDAO.getById(id);
+  const fotoAnterior = atual?.foto_url ?? null;
+
+  // Processa a imagem ANTES de persistir.
+  const arquivo = formData.get("foto_arquivo");
+  let novaFotoPath: string | null = null;
+  if (arquivo instanceof File && arquivo.size > 0) {
+    const res = await processarImagemWebp(arquivo);
+    if (!res.ok) return { error: res.error };
+    try {
+      novaFotoPath = await salvarImagemProduto(id, res.buffer, res.hash);
+    } catch {
+      return { error: "Não foi possível salvar a imagem. Nenhuma alteração foi feita." };
+    }
+  }
+
   await produtoDAO.updateCompleto(
     id,
     {
       descricao: descricao.trim(),
-      foto_url,
+      foto_url: novaFotoPath ?? foto_url,
       perecivel,
       composto,
       ativo,
@@ -165,6 +201,11 @@ export async function updateProduto(formData: FormData) {
     },
     user.id_usuario,
   );
+
+  // Remove a imagem antiga apenas após o sucesso, se houve substituição.
+  if (novaFotoPath && fotoAnterior && fotoAnterior !== novaFotoPath) {
+    await removerImagemProduto(fotoAnterior);
+  }
 
   return { success: true };
 }

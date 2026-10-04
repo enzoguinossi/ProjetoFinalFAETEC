@@ -21,3 +21,6 @@ dist/
 .next/
 
 tsconfig.tsbuildinfo
+
+# Uploads em runtime (imagens convertidas para WEBP)
+/public/uploads/

@@ -381,6 +381,19 @@ export class ProdutoDAO {
     });
   }
 
+  async setFotoUrl(id: number, foto_url: string | null) {
+    return prisma.produto.update({ where: { id_produto: id }, data: { foto_url } });
+  }
+
+  /** Remove o produto recém-criado em caso de falha no processamento da imagem (rollback). */
+  async rollbackCreate(id: number) {
+    await prisma.$transaction(async (tx) => {
+      await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
+      await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
+      await tx.produto.delete({ where: { id_produto: id } });
+    });
+  }
+
   async softDelete(id: number, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
