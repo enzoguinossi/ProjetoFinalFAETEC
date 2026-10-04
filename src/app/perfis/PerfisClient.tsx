@@ -7,10 +7,11 @@ import DataTable from "@/components/DataTable";
 import type { Column, Action } from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import Button from "@/components/Button";
 import PerfilForm from "./novo/PerfilForm";
 import type { PerfilListRow, PerfilFormData } from "./actions";
-import { getPerfil, desativarPerfil } from "./actions";
+import { getPerfil, excluirPerfil } from "./actions";
 import type { GrupoPermissoes } from "@/components/PermissoesPanel";
 
 interface Props {
@@ -31,12 +32,11 @@ type ModalMode = "create" | "edit" | "view" | null;
 
 export default function PerfisClient({ rows: initialRows, grupos }: Props) {
   const router = useRouter();
-  const [rows, setRows] = useState(initialRows);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [formData, setFormData] = useState<PerfilFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PerfilListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const mostrarAviso = useAviso();
 
   async function openModal(id: number, mode: "edit" | "view") {
     const data = await getPerfil(id);
@@ -45,14 +45,15 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
   }
 
   function closeModal() { setModalMode(null); setFormData(null); }
-  function handleSuccess() { closeModal(); router.refresh(); setRows(initialRows); }
+  function handleSuccess() { closeModal(); router.refresh(); }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    setDeleting(true); setDeleteError("");
+    setDeleting(true);
     try {
-      const r = await desativarPerfil(deleteTarget.id_perfil);
-      if (r.error) { setDeleteError(r.error); return; }
+      const r = await excluirPerfil(deleteTarget.id_perfil);
+      if (r.error) { mostrarAviso(r.error, "erro"); return; }
+      mostrarAviso("Perfil excluído com sucesso.", "sucesso");
       setDeleteTarget(null);
       router.refresh();
     } finally {
@@ -63,7 +64,7 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
   const actions: Action<PerfilListRow>[] = [
     { icon: "/icons/actions/Olho.svg", label: "Visualizar", onClick: (row) => openModal(row.id_perfil, "view") },
     { icon: "/icons/actions/Editar.svg", label: "Editar", onClick: (row) => openModal(row.id_perfil, "edit") },
-    { icon: "/icons/actions/Lixeira.svg", label: "Desativar", onClick: (row) => { setDeleteTarget(row); setDeleteError(""); } },
+    { icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row) => setDeleteTarget(row) },
   ];
 
   return (
@@ -75,7 +76,7 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
         <Button label="Voltar" variant="cancel" onClick={() => router.push("/usuarios")} />
       </div>
 
-      <DataTable columns={columns} data={rows} idField="id_perfil" actions={actions} />
+      <DataTable columns={columns} data={initialRows} idField="id_perfil" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
         <PerfilForm grupos={grupos} mode="create" onSuccess={handleSuccess} onCancel={closeModal} />
@@ -95,11 +96,11 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Desativar perfil"
-        message={deleteError || `Tem certeza que deseja desativar "${deleteTarget?.nome}"?`}
-        confirmLabel={deleteError ? "OK" : "Desativar"}
+        title="Excluir perfil"
+        message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"? As permissões já aplicadas aos usuários não serão removidas.`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

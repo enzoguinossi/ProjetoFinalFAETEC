@@ -720,7 +720,6 @@ model Perfil {
   id_perfil  Int               @id @default(autoincrement()) @map("ID_perfil")
   nome       String            @unique @map("nome")
   descricao  String?           @map("descricao") @db.Text
-  ativo      Boolean           @default(true) @map("ativo")
   permissoes PerfilPermissao[]
 
   @@map("perfil")

@@ -4,6 +4,7 @@ import { permissaoService } from "@/services/permissao";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { parsePermissoes } from "@/lib/form-data";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export type PerfilListRow = {
   id_perfil: number;
@@ -64,11 +65,15 @@ export async function createPerfil(formData: FormData) {
   const nome = (formData.get("nome") as string)?.trim();
   if (!nome) return { error: "Nome é obrigatório." };
 
-  await permissaoService.criarPerfil({
-    nome,
-    descricao: (formData.get("descricao") as string) || undefined,
-    permissoes: parsePermissoes(formData),
-  });
+  try {
+    await permissaoService.criarPerfil({
+      nome,
+      descricao: (formData.get("descricao") as string) || undefined,
+      permissoes: parsePermissoes(formData),
+    });
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -83,19 +88,27 @@ export async function updatePerfil(formData: FormData) {
   const nome = (formData.get("nome") as string)?.trim();
   if (!nome) return { error: "Nome é obrigatório." };
 
-  await permissaoService.alterarPerfil(id, {
-    nome,
-    descricao: (formData.get("descricao") as string) || undefined,
-    permissoes: parsePermissoes(formData),
-  });
+  try {
+    await permissaoService.alterarPerfil(id, {
+      nome,
+      descricao: (formData.get("descricao") as string) || undefined,
+      permissoes: parsePermissoes(formData),
+    });
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
 
-export async function desativarPerfil(id: number) {
+export async function excluirPerfil(id: number) {
   const user = await requireUser();
-  if (!(await usuarioPode(user, "perfil.desativar"))) return { error: "Sem permissão." };
+  if (!(await usuarioPode(user, "perfil.excluir"))) return { error: "Sem permissão." };
 
-  await permissaoService.desativarPerfil(id);
+  try {
+    await permissaoService.excluirPerfil(id, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
   return { success: true };
 }

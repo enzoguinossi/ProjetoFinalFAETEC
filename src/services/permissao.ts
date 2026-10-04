@@ -35,7 +35,6 @@ export class PermissaoService {
 
   async listarPerfis(): Promise<PerfilItem[]> {
     const perfis = await prisma.perfil.findMany({
-      where: { ativo: true },
       orderBy: { nome: "asc" },
     });
     return perfis.map((p) => ({ id_perfil: p.id_perfil, nome: p.nome, descricao: p.descricao }));
@@ -96,8 +95,34 @@ export class PermissaoService {
     });
   }
 
-  async desativarPerfil(id_perfil: number) {
-    return prisma.perfil.update({ where: { id_perfil }, data: { ativo: false } });
+  /**
+   * Exclui fisicamente um perfil-template. Perfis não possuem vínculo com
+   * nenhuma entidade: as permissões já aplicadas aos usuários permanecem.
+   */
+  async excluirPerfil(id_perfil: number, id_usuario_resp: number) {
+    const antes = await prisma.perfil.findUniqueOrThrow({
+      where: { id_perfil },
+      include: { permissoes: { include: { permissao: true } } },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.perfilPermissao.deleteMany({ where: { id_perfil } });
+      await tx.perfil.delete({ where: { id_perfil } });
+      await tx.registroAuditoria.create({
+        data: {
+          id_usuario: id_usuario_resp,
+          acao: "EXCLUIR",
+          data_hora: new Date(),
+          entidade: "Perfil",
+          id_entidade_afetada: id_perfil,
+          dados_anteriores: {
+            nome: antes.nome,
+            descricao: antes.descricao,
+            permissoes: antes.permissoes.map((p) => p.permissao.nome).sort(),
+          },
+        },
+      });
+    });
   }
 
   async verificar(id_usuario: number, permissao: string) {
