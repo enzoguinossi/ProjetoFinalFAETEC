@@ -1,3 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+
+  --color-brand: #1b9956;
+  --color-brand-hover: #15844a;
+  --color-ink: #21272a;
+  --color-ink-strong: #1e1e1e;
+  --color-border: #dde1e6;
+  --color-border-input: #d9d9d9;
+  --color-hover: #f2f4f8;
+  --color-table-alt: #e2e2e2;
+  --color-danger: #da1e28;
+  --color-danger-bg: #fff1f0;
+  --color-cancel: #ff383c;
+  --color-cancel-hover: #ff0000;
+}
+
 * {
   margin: 0;
   padding: 0;
