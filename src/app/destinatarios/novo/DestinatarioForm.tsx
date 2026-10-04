@@ -8,6 +8,7 @@ import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/componen
 import EnderecoFields from "@/components/EnderecoFields";
 import { normalizaTelefones } from "@/lib/contatos";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -53,45 +54,43 @@ export default function DestinatarioForm({
     }
   }
 
-  const inputStyle = { height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none", width: "100%", boxSizing: "border-box" as const };
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {error && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>{error}</div>}
+    <form onSubmit={handleSubmit} className={ui.form}>
+      {error && <div className={ui.errorBox}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "stretch" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div className="grid grid-cols-[1fr_1fr] gap-6 items-stretch">
+        <div className="flex flex-col gap-4">
           {isEdit && (
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#21272a", cursor: "pointer" }}>
-              <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} style={{ accentColor: "#1b9956" }} />
+            <label className="flex items-center gap-2 font-sans text-sm text-ink cursor-pointer">
+              <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} className="accent-brand" />
               Ativo
             </label>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Razão Social</label>
+          <div className={ui.field}>
+            <label className={ui.label}>Razão Social</label>
             <input
               name="razao_social"
               required={!isView}
               value={isView || isEdit ? razaoSocial : undefined}
               onChange={isEdit ? (e) => setRazaoSocial(e.target.value) : undefined}
               readOnly={isView}
-              style={inputStyle}
+              className={ui.input}
             />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>CNPJ</label>
+          <div className={ui.field}>
+            <label className={ui.label}>CNPJ</label>
             {isView ? (
-              <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.cnpj ?? "—"}</p>
+              <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.cnpj ?? "—"}</p>
             ) : (
-              <input name="cnpj" defaultValue={initialData?.cnpj ?? undefined} style={inputStyle} />
+              <input name="cnpj" defaultValue={initialData?.cnpj ?? undefined} className={ui.input} />
             )}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Tipo</label>
-            <select name="tipo_destinatario" defaultValue={initialData?.tipo_destinatario ?? "ESCOLA"} disabled={isView} style={{ ...inputStyle, background: "#fff" }}>
+          <div className={ui.field}>
+            <label className={ui.label}>Tipo</label>
+            <select name="tipo_destinatario" defaultValue={initialData?.tipo_destinatario ?? "ESCOLA"} disabled={isView} className={ui.select}>
               <option value="ESCOLA">Escola</option>
               <option value="CRECHE">Creche</option>
             </select>
@@ -132,7 +131,7 @@ export default function DestinatarioForm({
         />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
+      <div className={ui.rowActions}>
         {isView ? (
           <Button label="Fechar" variant="cancel" onClick={onCancel} />
         ) : (
