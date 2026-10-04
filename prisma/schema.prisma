@@ -273,13 +273,11 @@ model FornecedorEmail {
 }
 
 model ConversaoUnidade {
-  id_conversao     Int               @id @default(autoincrement()) @map("ID_conversao")
-  nome             String            @unique @map("nome")
-  fator            Float             @map("fator")
-  descricao        String?           @map("descricao")
-  ativo            Boolean           @default(true) @map("ativo")
-  itensNotaEntrada ItemNotaEntrada[]
-  produtos         Produto[]
+  id_conversao Int      @id @default(autoincrement()) @map("ID_conversao")
+  nome         String   @unique @map("nome")
+  fator        Float    @map("fator")
+  descricao    String?  @map("descricao")
+  produtos     Produto[]
 
   @@map("conversao_unidade")
 }
@@ -677,18 +675,16 @@ model NotaEntradaChaveAcesso {
 }
 
 model ItemNotaEntrada {
-  id_item_nota_entrada  Int               @id @default(autoincrement()) @map("ID_item_nota_entrada")
-  id_nota_entrada       Int               @map("ID_nota_entrada")
-  id_produto            Int               @map("ID_produto")
-  id_conversao          Int?              @map("ID_conversao")
-  quantidade            Float             @map("quantidade")
-  quantidade_convertida Float             @map("quantidade_convertida")
-  observacao            String?           @map("observacao") @db.Text
-  conversao             ConversaoUnidade? @relation(fields: [id_conversao], references: [id_conversao])
-  notaEntrada           NotaEntrada       @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
-  produto               Produto           @relation(fields: [id_produto], references: [id_produto])
+  id_item_nota_entrada  Int         @id @default(autoincrement()) @map("ID_item_nota_entrada")
+  id_nota_entrada       Int         @map("ID_nota_entrada")
+  id_produto            Int         @map("ID_produto")
+  fator_conversao       Float       @default(1) @map("fator_conversao")
+  quantidade            Float       @map("quantidade")
+  quantidade_convertida Float       @map("quantidade_convertida")
+  observacao            String?     @map("observacao") @db.Text
+  notaEntrada           NotaEntrada @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
+  produto               Produto     @relation(fields: [id_produto], references: [id_produto])
 
-  @@index([id_conversao], map: "item_nota_entrada_ID_conversao_fkey")
   @@index([id_nota_entrada], map: "item_nota_entrada_ID_nota_entrada_fkey")
   @@index([id_produto], map: "item_nota_entrada_ID_produto_fkey")
   @@map("item_nota_entrada")

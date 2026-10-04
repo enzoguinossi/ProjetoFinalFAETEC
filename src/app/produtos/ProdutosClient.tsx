@@ -14,7 +14,7 @@ import type { ProdutoFormData } from "./novo/actions";
 
 interface Props {
   rows: ProdutoListRow[];
-  conversoes: { id_conversao: number; nome: string }[];
+  conversoes: { id_conversao: number; nome: string; fator: number; descricao: string | null }[];
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }

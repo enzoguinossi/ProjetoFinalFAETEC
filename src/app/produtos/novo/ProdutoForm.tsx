@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createProduto, updateProduto, getProduto, searchProdutos } from "./actions";
 import type { ProdutoFormData } from "./actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
+import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import styles from "./ProdutoForm.module.css";
@@ -13,6 +14,8 @@ import styles from "./ProdutoForm.module.css";
 interface Conversao {
   id_conversao: number;
   nome: string;
+  fator: number;
+  descricao: string | null;
 }
 
 interface TipoCodigo {
@@ -51,6 +54,8 @@ export default function ProdutoForm({
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [descricao, setDescricao] = useState(initialData?.descricao ?? "");
   const [idConversao, setIdConversao] = useState(initialData?.id_conversao_padrao ?? null);
+  const [conversoesAtuais, setConversoesAtuais] = useState<Conversao[]>(conversoes);
+  const [unidadesModalOpen, setUnidadesModalOpen] = useState(false);
 
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
 
@@ -62,6 +67,17 @@ export default function ProdutoForm({
 
   const [insumoViewOpen, setInsumoViewOpen] = useState(false);
   const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
+
+  const fotoInputRef = useRef<HTMLInputElement>(null);
+  const [previewFoto, setPreviewFoto] = useState<string | null>(null);
+  const [fotoNome, setFotoNome] = useState("");
+
+  function onSelecionarFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) { setPreviewFoto(null); setFotoNome(""); return; }
+    setFotoNome(file.name);
+    setPreviewFoto(URL.createObjectURL(file));
+  }
 
   const editable = !isView;
 
@@ -190,18 +206,37 @@ export default function ProdutoForm({
         {/* Unidade + Checkboxes */}
         <div className={styles.field}>
           <label className={styles.label}>Unidade Padrão de Entrada</label>
-          <select
-            className={styles.select}
-            name="id_conversao"
-            value={idConversao ?? ""}
-            onChange={isEdit ? (e) => setIdConversao(e.target.value ? Number(e.target.value) : null) : undefined}
-            disabled={isView}
-          >
-            <option value="">Selecione...</option>
-            {conversoes.map((c) => (
-              <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
-            ))}
-          </select>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <select
+              className={styles.select}
+              name="id_conversao"
+              value={idConversao ?? ""}
+              onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
+              disabled={isView}
+              style={{ flex: 1 }}
+            >
+              <option value="">Selecione...</option>
+              {conversoesAtuais.map((c) => (
+                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
+              ))}
+            </select>
+            {!isView && (
+              <button
+                type="button"
+                onClick={() => setUnidadesModalOpen(true)}
+                title="Gerenciar unidades de conversão"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 40, height: 40, border: "1px solid #d9d9d9", borderRadius: 8,
+                  background: "#fff", cursor: "pointer", color: "#1b9956", flexShrink: 0,
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         {isEdit && (
@@ -292,15 +327,37 @@ export default function ProdutoForm({
               readOnly={isView}
             />
             {!isView && (
-              <button type="button" className={styles.fotoBtn} title="Upload">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </button>
+              <>
+                <input
+                  ref={fotoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  name="foto_arquivo"
+                  style={{ display: "none" }}
+                  onChange={onSelecionarFoto}
+                />
+                <button type="button" className={styles.fotoBtn} title="Upload" onClick={() => fotoInputRef.current?.click()}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2 2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </button>
+              </>
             )}
           </div>
+          {fotoNome && (
+            <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#616161" }}>
+              {fotoNome} — será convertida para WEBP ao salvar
+            </span>
+          )}
+          {(previewFoto || initialData?.foto_url) && (
+            <img
+              src={previewFoto ?? initialData?.foto_url ?? ""}
+              alt="Pré-visualização"
+              style={{ marginTop: 8, maxWidth: 160, maxHeight: 160, borderRadius: 8, objectFit: "cover" }}
+            />
+          )}
         </div>
 
         {/* Actions */}
@@ -325,6 +382,13 @@ export default function ProdutoForm({
         getItemId={(item) => item.id_produto}
         getItemLabel={(item) => item.descricao}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
+      />
+
+      <UnidadesModal
+        open={unidadesModalOpen}
+        onClose={() => setUnidadesModalOpen(false)}
+        initial={conversoesAtuais}
+        onChanged={(lista) => setConversoesAtuais(lista.map((u) => ({ id_conversao: u.id_conversao, nome: u.nome, fator: u.fator, descricao: u.descricao })))}
       />
 
       <Modal
