@@ -269,9 +269,9 @@ async function main() {
 
   // ── Veículos ──
   const veiculos = [
-    { descricao: "Fiorino Branco", placa: "ABC-1234", status: StatusVeiculo.DISPONIVEL, capacidade: 800 },
-    { descricao: "Kombi Azul", placa: "DEF-5678", status: StatusVeiculo.INDISPONIVEL, capacidade: 1200 },
-    { descricao: "SUV Preto", placa: "GHI-9012", status: StatusVeiculo.DISPONIVEL, capacidade: 500 },
+    { descricao: "Fiorino Branco", placa: "ABC-1234", status: StatusVeiculo.DISPONIVEL },
+    { descricao: "Kombi Azul", placa: "DEF-5678", status: StatusVeiculo.INDISPONIVEL },
+    { descricao: "SUV Preto", placa: "GHI-9012", status: StatusVeiculo.DISPONIVEL },
   ];
 
   for (const v of veiculos) {
@@ -281,7 +281,6 @@ async function main() {
       create: {
         placa: v.placa,
         modelo: v.descricao,
-        capacidade: v.capacidade,
         status: v.status,
       },
     });

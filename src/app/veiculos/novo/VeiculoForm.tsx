@@ -54,10 +54,6 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
         {isView ? <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.modelo ?? "—"}</p> : <input name="modelo" defaultValue={initialData?.modelo ?? undefined} readOnly={isView} style={inputStyle} />}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Capacidade</label>
-        {isView ? <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.capacidade ?? "—"}</p> : <input name="capacidade" type="number" defaultValue={initialData?.capacidade ?? undefined} style={inputStyle} />}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Status</label>
         <select name="status" defaultValue={initialData?.status ?? "DISPONIVEL"} disabled={isView} style={{ ...inputStyle, background: "#fff" }}>
           <option value="DISPONIVEL">Disponível</option>

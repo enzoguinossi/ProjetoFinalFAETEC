@@ -352,7 +352,6 @@ package "Logística" as Logistica {
     + ID_veiculo: Integer
     + placa: String
     + modelo: String
-    + capacidade: Decimal
     + status: Enum
     + ativo: Boolean
   }

@@ -785,7 +785,6 @@ veiculo
 ├── ID_veiculo             INT PK auto_increment
 ├── placa                  VARCHAR NOT NULL UNIQUE
 ├── modelo                 VARCHAR
-├── capacidade             DECIMAL
 ├── status                 ENUM('DISPONIVEL','INDISPONIVEL','EM_ROTA')
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```

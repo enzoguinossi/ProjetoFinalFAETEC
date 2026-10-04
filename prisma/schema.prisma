@@ -642,7 +642,6 @@ model Veiculo {
   id_veiculo     Int             @id @default(autoincrement()) @map("ID_veiculo")
   placa          String          @unique @map("placa")
   modelo         String?         @map("modelo")
-  capacidade     Float?          @map("capacidade")
   status         StatusVeiculo   @map("status")
   ativo          Boolean         @default(true) @map("ativo")
   remessas       Remessa[]

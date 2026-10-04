@@ -522,7 +522,6 @@ entity "veiculo" as veiculo {
   --
   * placa : VARCHAR <<UK>>
   modelo : VARCHAR
-  capacidade : DECIMAL
   * status : StatusVeiculo
   * ativo : BOOLEAN
 }

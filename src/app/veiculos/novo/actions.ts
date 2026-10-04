@@ -10,7 +10,6 @@ export type VeiculoFormData = {
   id_veiculo: number;
   placa: string;
   modelo: string | null;
-  capacidade: number | null;
   status: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA";
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
@@ -29,7 +28,6 @@ export async function createVeiculo(formData: FormData) {
   await veiculoDAO.create({
     placa: placa.trim().toUpperCase(),
     modelo: (formData.get("modelo") as string) || undefined,
-    capacidade: formData.get("capacidade") ? Number(formData.get("capacidade")) : undefined,
     codigos: codigoResult.codigos,
   }, user.id_usuario);
 
@@ -46,7 +44,6 @@ export async function getVeiculo(id: number): Promise<VeiculoFormData | null> {
     id_veiculo: v.id_veiculo,
     placa: v.placa,
     modelo: v.modelo,
-    capacidade: v.capacidade,
     status: v.status,
     ativo: v.ativo,
     codigos: v.veiculoCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
@@ -71,7 +68,6 @@ export async function updateVeiculo(formData: FormData) {
   await veiculoDAO.update(id, {
     placa: (formData.get("placa") as string)?.trim().toUpperCase(),
     modelo: (formData.get("modelo") as string) || undefined,
-    capacidade: formData.get("capacidade") ? Number(formData.get("capacidade")) : undefined,
     status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA",
     codigos: codigoResult.codigos,
   }, user.id_usuario);
