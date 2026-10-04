@@ -18,11 +18,6 @@
   --color-cancel-hover: #ff0000;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-}
-
 :root {
   --green: #1b9956;
   --green-hover: #15844a;
