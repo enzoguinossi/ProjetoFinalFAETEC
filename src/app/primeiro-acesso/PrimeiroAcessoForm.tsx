@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { primeiroAcessoAction } from "./actions";
+import { ui } from "@/lib/ui";
 
 export default function PrimeiroAcessoForm() {
   const router = useRouter();
@@ -26,72 +27,46 @@ export default function PrimeiroAcessoForm() {
   }
 
   return (
-    <div style={{
-      background: "#fff",
-      borderRadius: "1.25rem",
-      padding: "2rem",
-      maxWidth: 420,
-      display: "flex",
-      flexDirection: "column",
-      gap: "1rem",
-    }}>
-      <h2 style={{ margin: 0, fontFamily: "'SF Pro','Segoe UI',sans-serif", fontWeight: 590 }}>
+    <div className="bg-white rounded-[1.25rem] p-8 max-w-[420px] flex flex-col gap-4">
+      <h2 className="m-0 font-display font-[590]">
         Criar Administrador
       </h2>
-      <p style={{ margin: 0, fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#697077" }}>
+      <p className="m-0 font-sans text-sm text-[#697077]">
         Nenhum administrador encontrado. Crie o primeiro para começar.
       </p>
 
       {error && (
-        <div style={{
-          padding: "0.5rem 0.75rem",
-          background: "#fff1f0",
-          border: "1px solid #da1e28",
-          borderRadius: 6,
-          color: "#da1e28",
-          fontFamily: "Inter,sans-serif",
-          fontSize: "0.8125rem",
-        }}>
+        <div className={ui.errorBox}>
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", fontWeight: 500 }}>
+      <form onSubmit={handleSubmit} className={ui.form}>
+        <div className="flex flex-col gap-1.5">
+          <label className="font-sans text-sm font-medium">
             Nome completo
           </label>
           <input
             name="nome"
             required
-            style={{
-              height: "2.5rem", padding: "0 0.75rem",
-              border: "1px solid #c1c7cd", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "0.875rem",
-              outline: "none",
-            }}
+            className="h-10 rounded-lg border border-[#c1c7cd] px-3 font-sans text-sm outline-none"
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", fontWeight: 500 }}>
+        <div className="flex flex-col gap-1.5">
+          <label className="font-sans text-sm font-medium">
             Login (e-mail)
           </label>
           <input
             name="login"
             type="email"
             required
-            style={{
-              height: "2.5rem", padding: "0 0.75rem",
-              border: "1px solid #c1c7cd", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "0.875rem",
-              outline: "none",
-            }}
+            className="h-10 rounded-lg border border-[#c1c7cd] px-3 font-sans text-sm outline-none"
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "0.875rem", fontWeight: 500 }}>
+        <div className="flex flex-col gap-1.5">
+          <label className="font-sans text-sm font-medium">
             Senha
           </label>
           <input
@@ -99,25 +74,15 @@ export default function PrimeiroAcessoForm() {
             type="password"
             required
             minLength={4}
-            style={{
-              height: "2.5rem", padding: "0 0.75rem",
-              border: "1px solid #c1c7cd", borderRadius: 8,
-              fontFamily: "Inter,sans-serif", fontSize: "0.875rem",
-              outline: "none",
-            }}
+            className="h-10 rounded-lg border border-[#c1c7cd] px-3 font-sans text-sm outline-none"
           />
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={saving}
-            style={{
-              padding: "0.5rem 1.5rem", border: "none", borderRadius: 8,
-              background: "#1b9956", color: "#fff",
-              fontFamily: "Inter,sans-serif", fontSize: "0.875rem", fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className="px-6 py-2 border-0 rounded-lg bg-brand text-white font-sans text-sm font-semibold cursor-pointer"
           >
             {saving ? "Criando..." : "Criar e acessar"}
           </button>

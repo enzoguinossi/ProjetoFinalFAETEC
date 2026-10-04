@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface PerfilOption {
   id_perfil: number;
@@ -16,12 +17,6 @@ interface PerfilFormProps {
   onConfirm: (id_perfil: number) => void;
   perfis: PerfilOption[];
 }
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-  borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-  outline: "none", background: "#fff", width: "100%", boxSizing: "border-box" as const,
-};
 
 export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilFormProps) {
   const [idPerfil, setIdPerfil] = useState<number | "">("");
@@ -47,13 +42,13 @@ export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilF
 
   return (
     <Modal open={open} onClose={handleClose} width="440px">
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Perfil</label>
+      <div className="flex flex-col gap-4">
+        <div className={ui.field}>
+          <label className={ui.label}>Perfil</label>
           <select
             value={idPerfil}
             onChange={(e) => { setIdPerfil(e.target.value ? Number(e.target.value) : ""); setErro(""); }}
-            style={inputStyle}
+            className={ui.select}
           >
             <option value="">Selecione...</option>
             {perfis.map((p) => (
@@ -61,14 +56,14 @@ export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilF
             ))}
           </select>
           {selecionado?.descricao && (
-            <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#616161" }}>
+            <span className="font-sans text-[0.8125rem] text-[#616161]">
               {selecionado.descricao}
             </span>
           )}
-          {erro && <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>{erro}</span>}
+          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: "4px" }}>
+        <div className={ui.rowActions}>
           <Button label="Cancelar" variant="cancel" onClick={handleClose} />
           <Button label="Aplicar" variant="primary" onClick={handleConfirm} disabled={idPerfil === ""} />
         </div>

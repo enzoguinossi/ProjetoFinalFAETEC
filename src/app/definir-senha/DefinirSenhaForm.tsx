@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { definirSenhaAction } from "./actions";
-import styles from "./DefinirSenha.module.css";
+import { ui } from "@/lib/ui";
 
 export default function DefinirSenhaForm() {
   const router = useRouter();
@@ -27,24 +27,24 @@ export default function DefinirSenhaForm() {
   }
 
   return (
-    <div className={styles.wrapper}>
-      <form className={styles.card} onSubmit={handleSubmit}>
-        <div className={styles.logoArea}>
-          <img src="/logo.svg" alt="Nexus" className={styles.logo} />
+    <div className="flex justify-center items-center min-h-screen bg-brand">
+      <form className="w-[clamp(300px,30vw,421px)] min-h-[25rem] bg-white rounded-[30px] border border-brand px-[0.6875rem] py-[0.75rem] flex flex-col gap-[2.125rem] box-border" onSubmit={handleSubmit}>
+        <div className="flex justify-center items-center h-[7.5625rem]">
+          <img src="/logo.svg" alt="Nexus" className="w-[6.875rem] h-auto" />
         </div>
-        <div className={styles.formArea}>
-          <h2 className={styles.title}>Definir Senha</h2>
-          <p className={styles.subtitle}>Primeiro acesso. Escolha sua senha.</p>
-          {error && <div className={styles.error}>{error}</div>}
-          <div className={styles.field}>
-            <label className={styles.label}>Nova senha</label>
-            <input className={styles.input} type="password" name="senha" required minLength={4} />
+        <div className="flex-1 flex flex-col gap-4 px-[0.625rem]">
+          <h2 className="font-display text-xl font-semibold text-ink m-0 text-center">Definir Senha</h2>
+          <p className="font-sans text-[0.8125rem] text-[#697077] m-0 text-center">Primeiro acesso. Escolha sua senha.</p>
+          {error && <div className={ui.errorBox}>{error}</div>}
+          <div className="flex flex-col gap-[0.375rem]">
+            <label className="font-sans text-sm font-medium text-ink">Nova senha</label>
+            <input className="w-full h-11 px-[0.875rem] rounded-lg border border-[#c1c7cd] bg-white text-ink text-sm outline-none transition-[border-color,box-shadow] duration-150 box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.15)]" type="password" name="senha" required minLength={4} />
           </div>
-          <div className={styles.field}>
-            <label className={styles.label}>Confirmar senha</label>
-            <input className={styles.input} type="password" name="confirmacao" required />
+          <div className="flex flex-col gap-[0.375rem]">
+            <label className="font-sans text-sm font-medium text-ink">Confirmar senha</label>
+            <input className="w-full h-11 px-[0.875rem] rounded-lg border border-[#c1c7cd] bg-white text-ink text-sm outline-none transition-[border-color,box-shadow] duration-150 box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.15)]" type="password" name="confirmacao" required />
           </div>
-          <button className={styles.button} type="submit" disabled={saving}>
+          <button className="w-full h-12 border-none rounded-lg bg-brand text-white text-base font-semibold cursor-pointer transition-[background] duration-150 hover:bg-brand-hover disabled:opacity-60 disabled:cursor-default" type="submit" disabled={saving}>
             {saving ? "Salvando..." : "Definir senha e acessar"}
           </button>
         </div>

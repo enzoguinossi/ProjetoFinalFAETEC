@@ -5,6 +5,7 @@ import { createPerfil, updatePerfil } from "../actions";
 import type { PerfilFormData } from "../actions";
 import Button from "@/components/Button";
 import PermissoesPanel, { type GrupoPermissoes } from "@/components/PermissoesPanel";
+import { ui } from "@/lib/ui";
 
 interface Props {
   grupos: GrupoPermissoes[];
@@ -13,12 +14,6 @@ interface Props {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-  borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-  outline: "none", width: "100%", boxSizing: "border-box" as const,
-};
 
 export default function PerfilForm({
   grupos, mode = "create", initialData, onSuccess, onCancel,
@@ -52,27 +47,27 @@ export default function PerfilForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {error && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>{error}</div>}
+    <form onSubmit={handleSubmit} className={ui.form}>
+      {error && <div className={ui.errorBox}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: "1.5rem", alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Nome</label>
+      <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
+        <div className="flex flex-col gap-4">
+          <div className={ui.field}>
+            <label className={ui.label}>Nome</label>
             <input name="nome" required={!isView} value={isView || isEdit ? nome : undefined}
-              onChange={isEdit ? (e) => setNome(e.target.value) : undefined} readOnly={isView} style={inputStyle} />
+              onChange={isEdit ? (e) => setNome(e.target.value) : undefined} readOnly={isView} className={ui.input} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Descrição</label>
+          <div className={ui.field}>
+            <label className={ui.label}>Descrição</label>
             {isView ? (
-              <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.descricao ?? "—"}</p>
+              <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.descricao ?? "—"}</p>
             ) : (
               <input
                 name="descricao"
                 value={isEdit ? descricao : undefined}
                 defaultValue={isEdit ? undefined : (initialData?.descricao ?? undefined)}
                 onChange={isEdit ? (e) => setDescricao(e.target.value) : undefined}
-                style={inputStyle}
+                className={ui.input}
               />
             )}
           </div>
@@ -87,7 +82,7 @@ export default function PerfilForm({
         />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
+      <div className={ui.rowActions}>
         {isView ? (
           <Button label="Fechar" variant="cancel" onClick={onCancel} />
         ) : (

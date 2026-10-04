@@ -6,7 +6,7 @@ import type { UsuarioFormData } from "./actions";
 import Button from "@/components/Button";
 import PerfilForm from "@/components/PerfilForm";
 import PermissoesPanel, { type GrupoPermissoes } from "@/components/PermissoesPanel";
-import styles from "./UsuarioForm.module.css";
+import { ui } from "@/lib/ui";
 
 interface Funcionario {
   id_funcionario: number;
@@ -102,28 +102,28 @@ export default function UsuarioForm({
   }
 
   return (
-    <form className={styles.form} style={{ maxWidth: "100%" }} onSubmit={handleSubmit}>
-      {error && <div className={styles.error}>{error}</div>}
+    <form className="flex flex-col gap-4 bg-white rounded-[1.25rem] p-6 w-full box-border max-w-full" onSubmit={handleSubmit}>
+      {error && <div className={ui.errorBox}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: "1.5rem", alignItems: "start" }}>
+      <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
         {/* Coluna esquerda — dados */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div className="flex flex-col gap-4">
           {isEdit && (
-            <label className={styles.checkboxLabel}>
+            <label className="flex items-center gap-2 font-sans text-sm text-ink cursor-pointer [&_input[type=checkbox]]:size-[1.125rem] [&_input[type=checkbox]]:accent-brand [&_input[type=checkbox]]:cursor-pointer">
               <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} />
               Ativo
             </label>
           )}
 
-          <div className={styles.field}>
-            <label className={styles.label}>Funcionário</label>
+          <div className="flex flex-col gap-[0.375rem]">
+            <label className="font-display text-[0.9375rem] font-medium text-ink">Funcionário</label>
             {isView ? (
-              <p className={styles.input} style={{ lineHeight: "2.5", padding: "0 0.75rem" }}>
+              <p className="h-10 px-3 border border-[#c1c7cd] rounded-lg font-sans text-sm outline-none transition-[border-color] duration-[120ms] w-full box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)] leading-[2.5]">
                 {initialData?.nome_funcionario ?? "—"}
               </p>
             ) : (
               <select
-                className={styles.select}
+                className="h-10 px-3 border border-[#c1c7cd] rounded-lg font-sans text-sm outline-none transition-[border-color] duration-[120ms] w-full box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]"
                 name="id_funcionario"
                 required={!isView}
                 value={idFuncionario ?? ""}
@@ -140,10 +140,10 @@ export default function UsuarioForm({
             )}
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Login (e-mail)</label>
+          <div className="flex flex-col gap-[0.375rem]">
+            <label className="font-display text-[0.9375rem] font-medium text-ink">Login (e-mail)</label>
             <input
-              className={styles.input}
+              className="h-10 px-3 border border-[#c1c7cd] rounded-lg font-sans text-sm outline-none transition-[border-color] duration-[120ms] w-full box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]"
               type="email"
               name="login"
               required={!isView}
@@ -154,7 +154,7 @@ export default function UsuarioForm({
           </div>
 
           {isSuperAdmin && (
-            <div style={{ padding: "0.5rem 0.75rem", background: "#fff8e1", border: "1px solid #f0c14b", borderRadius: 6, color: "#7a5a00", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>
+            <div className="px-3 py-2 bg-[#fff8e1] border border-[#f0c14b] rounded-md text-[#7a5a00] font-sans text-[0.8125rem]">
               Super Admin possui todas as permissões e não pode ser editado.
             </div>
           )}
@@ -175,7 +175,7 @@ export default function UsuarioForm({
         />
       </div>
 
-      <div className={styles.actions}>
+      <div className="flex justify-end gap-3 pt-2 border-t border-table-alt">
         {isView ? (
           <Button label="Fechar" variant="cancel" onClick={onCancel} />
         ) : (

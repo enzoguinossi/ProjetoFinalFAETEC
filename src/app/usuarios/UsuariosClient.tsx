@@ -126,8 +126,8 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, grupos
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <div style={{ flex: 1 }}>
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
           <SearchBar
             placeholder="Pesquisar usuários..."
             onNew={() => setModalMode("create")}
