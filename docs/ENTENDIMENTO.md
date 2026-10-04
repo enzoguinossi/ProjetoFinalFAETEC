@@ -287,7 +287,7 @@ produto
 
 **Flags removidas:** fracionado, porGrade, localizacao_fisica, gtin (gtin agora é código personalizado)
 
-**Foto:** O usuário faz upload para o servidor da aplicação → salva no file system local → guarda URL no DB.
+**Foto:** O usuário faz upload para o servidor da aplicação. A imagem é validada (JPG/PNG/WEBP, ≤ 5 MB), redimensionada (máx. 1024px) e convertida para **WEBP** (qualidade 80) via `sharp`, gravada no file system em `public/uploads/produtos/{ID_produto}/{timestamp}-{hash}.webp` e o caminho relativo é salvo em `foto_url`. A gravação é atômica em relação ao cadastro: se o processamento falhar, o produto não é persistido (rollback).
 
 #### 3.6.1 Conversão de Unidades
 
@@ -298,8 +298,7 @@ conversao_unidade
 ├── ID_conversao       INT PK auto_increment
 ├── nome               VARCHAR NOT NULL UNIQUE  ← 'CX20', 'PCT10', 'UN', 'RESMA'
 ├── fator              DECIMAL NOT NULL          ← 20, 10, 1
-├── descricao          VARCHAR
-└── ativo              BOOLEAN DEFAULT TRUE
+└── descricao          VARCHAR
 ```
 
 Regras:
@@ -308,6 +307,9 @@ Regras:
 - Ao criar um documento de entrada, o usuário pode selecionar qualquer conversão
 - Se o produto tiver `ID_conversao_padrao`, esse valor é pré-selecionado (economiza cliques)
 - O fator pode ser editado manualmente no momento da entrada **sem alterar o template**
+- Unidades **não são desativadas**: podem ser criadas, editadas e excluídas fisicamente
+- Ao excluir uma unidade, os produtos que a usavam como `ID_conversao_padrao` são **desvinculados** (`NULL`)
+- Na **nota de entrada** não se guarda a unidade, apenas o **fator de conversão** aplicado (`fator_conversao`)
 
 #### 3.6.2 Produto Composto (BOM — Bill of Materials)
 
@@ -760,7 +762,7 @@ item_nota_entrada
 ├── ID_item_nota_entrada  INT PK auto_increment
 ├── ID_nota_entrada       INT FK NOT NULL
 ├── ID_produto            INT FK NOT NULL
-├── ID_conversao          INT FK → conversao_unidade NULL
+├── fator_conversao       DECIMAL NOT NULL DEFAULT 1  ← fator aplicado (a unidade não é guardada)
 ├── quantidade            DECIMAL NOT NULL         ← qtd recebida (ex: 10 caixas)
 ├── quantidade_convertida DECIMAL NOT NULL         ← qtd * fator (ex: 10 * 20 = 200)
 └── observacao            TEXT
@@ -839,6 +841,7 @@ Permissões do MVP:
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
 | `perfil` | criar, alterar, consultar, desativar |
+| `unidade_conversao` | criar, alterar, consultar, excluir (sem desativar) |
 | `mural` | criar, alterar, excluir |
 
 #### 3.15.2 Perfil (Template)
@@ -862,6 +865,7 @@ Regras:
 - Perfis podem ser **criados, alterados e excluídos** livremente pelo admin
 - Alterar um perfil **não afeta** usuários que já tiveram o perfil aplicado anteriormente
 - **Não há auditoria** de alterações em perfis
+- A gestão de perfis tem tela própria (`/perfis`), acessível pelo botão **"Gerenciar perfis"** na tela de Usuários
 
 #### 3.15.3 Super Admin
 

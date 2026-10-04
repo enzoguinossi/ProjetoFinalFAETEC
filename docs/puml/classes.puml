@@ -194,7 +194,6 @@ package "Produtos e Estoque" as Produtos {
     + ID_conversao: Integer
     + nome: String
     + fator: Decimal
-    + ativo: Boolean
   }
 
   class Produto {
@@ -404,6 +403,7 @@ package "Nota de Entrada" as NotaEntrada {
 
   class ItemNotaEntrada {
     + ID_item_nota_entrada: Integer
+    + fator_conversao: Decimal
     + quantidade: Decimal
     + quantidade_convertida: Decimal
   }
@@ -413,7 +413,6 @@ Fornecedor "1" --> "*" NotaEntrada : emite >
 NotaEntrada "1" --> "*" ItemNotaEntrada : contém >
 NotaEntrada "1" --> "*" NotaEntradaChaveAcesso : referência >
 Produto "1" --> "*" ItemNotaEntrada : listado em >
-ConversaoUnidade "1" --> "*" ItemNotaEntrada : conversão usada >
 
 ' =========================================================
 ' ACESSOS E SEGURANÇA

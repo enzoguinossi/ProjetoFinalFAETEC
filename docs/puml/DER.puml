@@ -257,7 +257,6 @@ entity "conversao_unidade" as conv {
   * nome : VARCHAR <<UK>>
   * fator : DECIMAL
   descricao : VARCHAR
-  * ativo : BOOLEAN
 }
 
 entity "produto" as produto {
@@ -551,7 +550,7 @@ entity "item_nota_entrada" as item_nota_entrada {
   --
   * ID_nota_entrada : INT <<FK>>
   * ID_produto : INT <<FK>>
-  ID_conversao : INT <<FK>>
+  * fator_conversao : DECIMAL
   * quantidade : DECIMAL
   * quantidade_convertida : DECIMAL
   observacao : TEXT
@@ -722,7 +721,6 @@ remessa ||--o{ rota_rem
 ' Nota de Entrada
 fornecedor ||--o{ nota_entrada
 nota_entrada ||--|{ item_nota_entrada
-conv ||--o{ item_nota_entrada
 
 ' Anexos
 remessa ||--o{ anexo

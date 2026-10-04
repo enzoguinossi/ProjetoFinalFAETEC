@@ -10,7 +10,23 @@ Sistema de Controle de Estoque e Logística de Remessas para galpão logístico 
 | **ORM** | Prisma 7 |
 | **Banco** | MySQL |
 | **Autenticação** | Feita na mão (bcrypt + JWT via `jose`, HS256) |
+| **Imagens** | `sharp` — conversão para WEBP no upload |
+| **CEP** | `cep-promise` — busca de endereço |
 | **Versionamento** | GitHub |
+
+## Dependências e utilitários relevantes
+
+| Recurso | Onde | Descrição |
+|---------|------|-----------|
+| `sharp` | `src/lib/imagem.ts` | Valida (JPG/PNG/WEBP, ≤ 5 MB), redimensiona (máx. 1024px) e converte para WEBP (qualidade 80). Grava em `public/uploads/produtos/{id}/{timestamp}-{hash}.webp`. |
+| `cep-promise` | `src/services/cep.ts` | Preenche logradouro/bairro/cidade/UF a partir do CEP (providers brasilapi/viacep/widenet). |
+| Códigos personalizados | `src/lib/codigo.ts` + `CodigosSection` | Tipos por entidade (EAN12/13, COD_FORNECEDOR, COD_ESCOLA, MATRICULA, DIGITACAO). |
+| Permissões | `src/services/permissao.ts` + `PermissoesPanel` | Perfis-template, aplicar perfil e edição individual de permissões. |
+| Unidades de conversão | `src/components/UnidadesModal.tsx` | CRUD no modal do cadastro de produto (sem desativação). |
+
+## Uploads
+
+As imagens enviadas são convertidas para **WEBP** e salvas em `public/uploads/` (fora do versionamento — ver `.gitignore`). O processamento ocorre durante o salvamento do cadastro: se a imagem falhar, o registro não é persistido.
 
 ## Estrutura
 
