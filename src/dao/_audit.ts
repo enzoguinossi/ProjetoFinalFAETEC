@@ -31,9 +31,3 @@ export async function registrarAuditoria(
     },
   });
 }
-
-export type AuditavelParams = {
-  id_usuario: number;
-  entidade: string;
-  id_entidade_afetada: number;
-};

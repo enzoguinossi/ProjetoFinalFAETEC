@@ -3,6 +3,7 @@
 import { funcionarioDAO } from "@/dao/funcionario";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export type FuncionarioListRow = {
   id_funcionario: number;
@@ -20,9 +21,9 @@ export async function searchFuncionariosList(query: string): Promise<Funcionario
 
   const data = await funcionarioDAO.search(query);
 
-  return data.map((f, i) => ({
+  return data.map((f) => ({
     id_funcionario: f.id_funcionario,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(f.id_funcionario),
     nome: f.pessoaFisica.nome,
     cargo: f.cargo ?? "",
     condutor: f.condutor ? "Sim" : "Não",

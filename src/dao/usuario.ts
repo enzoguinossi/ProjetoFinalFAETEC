@@ -17,16 +17,6 @@ export class UsuarioDAO {
     });
   }
 
-  async getByLogin(login: string) {
-    return prisma.usuario.findUnique({
-      where: { login },
-      include: {
-        funcionario: { include: { pessoaFisica: true } },
-        permissoes: { include: { permissao: true } },
-      },
-    });
-  }
-
   async getByLoginComFuncionario(login: string) {
     return prisma.usuario.findUnique({
       where: { login },
@@ -39,10 +29,6 @@ export class UsuarioDAO {
   }
 
   async getAdmin() {
-    return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
-  }
-
-  async existeSuperAdmin() {
     return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
   }
 
@@ -159,19 +145,6 @@ export class UsuarioDAO {
         },
       });
       return depois;
-    });
-  }
-
-  async updateSenha(id: number, senha_hash: string, id_usuario: number) {
-    return prisma.$transaction(async (tx) => {
-      const u = await tx.usuario.update({
-        where: { id_usuario: id },
-        data: { senha_hash, senha_alterada_em: new Date() },
-      });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: AUDIT_ENTIDADE, id_entidade_afetada: id, dados_novos: { senha_alterada: true } },
-      });
-      return u;
     });
   }
 

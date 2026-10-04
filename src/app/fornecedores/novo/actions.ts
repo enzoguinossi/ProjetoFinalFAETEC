@@ -148,9 +148,6 @@ export async function deleteFornecedor(id: number) {
   const user = await requireUser();
   if (!(await usuarioPode(user, "fornecedor.excluir"))) return { error: "Sem permissão." };
 
-  const { podeExcluir, vinculos } = await fornecedorDAO.verificarRelacionamentos(id);
-  if (!podeExcluir) return { error: `Não é possível excluir pois possui ${vinculos.join(", ")}.` };
-
   try {
     await fornecedorDAO.hardDelete(id, user.id_usuario);
   } catch (e) {

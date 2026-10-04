@@ -37,8 +37,8 @@ async function verifyToken(token: string): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow public routes and API routes
-  if (isPublic(pathname) || pathname.startsWith("/api/")) {
+  // Always allow public routes
+  if (isPublic(pathname)) {
     return NextResponse.next();
   }
 

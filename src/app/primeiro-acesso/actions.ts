@@ -14,8 +14,8 @@ export async function primeiroAcessoAction(formData: FormData) {
   if (senha.length < 4) return { error: "Senha deve ter no mínimo 4 caracteres" };
 
   // Verifica se já existe admin (race condition improvável)
-  const existente = await usuarioDAO.existeSuperAdmin();
-  if (existente) return { error: "Já existe um administrador" };
+  const admin = await usuarioDAO.getAdmin();
+  if (admin) return { error: "Já existe um administrador" };
 
   const senha_hash = await bcrypt.hash(senha, 10);
 

@@ -235,13 +235,6 @@ export async function deleteProduto(id: number) {
   const user = await requireUser();
   if (!(await usuarioPode(user, "produto.excluir"))) return { error: "Sem permissão." };
 
-  const { podeExcluir, vinculos } = await produtoDAO.verificarRelacionamentos(id);
-  if (!podeExcluir) {
-    return {
-      error: `Não é possível excluir este produto pois ele possui vínculos com: ${vinculos.join(", ")}.`,
-    };
-  }
-
   try {
     await produtoDAO.hardDelete(id, user.id_usuario);
   } catch (e) {

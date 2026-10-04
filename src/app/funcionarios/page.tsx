@@ -4,6 +4,7 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,9 @@ export default async function FuncionariosPage() {
     tipoCodigoDAO.listParaEntidade("FUNCIONARIO"),
   ]);
 
-  const rows = data.map((f, i) => ({
+  const rows = data.map((f) => ({
     id_funcionario: f.id_funcionario,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(f.id_funcionario),
     nome: f.pessoaFisica.nome,
     cargo: f.cargo ?? "",
     condutor: f.condutor ? "Sim" : "Não",

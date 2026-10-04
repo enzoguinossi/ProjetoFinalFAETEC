@@ -1,5 +1,3 @@
-import type { Prisma } from "@prisma/client";
-
 // ── Constantes ──────────────────────────────────────────────────────
 
 export const STATUS_NOTA_SAIDA = [
@@ -75,32 +73,3 @@ export function buildPagination(params: PaginationParams): {
   const skip = (page - 1) * take;
   return { skip, take };
 }
-
-// ── Selects reutilizáveis ──────────────────────────────────────────
-
-export const pessoaFisicaSelect = {
-  id_pessoa_fisica: true,
-  nome: true,
-  cpf: true,
-  ativo: true,
-} satisfies Prisma.PessoaFisicaSelect;
-
-export const pessoaJuridicaSelect = {
-  id_pessoa_juridica: true,
-  razao_social: true,
-  cnpj: true,
-  ativo: true,
-} satisfies Prisma.PessoaJuridicaSelect;
-
-export const enderecoSelect = {
-  id_endereco: true,
-  logradouro: true,
-  numero: true,
-  complemento: true,
-  bairro: true,
-  cidade: true,
-  uf: true,
-  cep: true,
-  latitude: true,
-  longitude: true,
-} satisfies Prisma.EnderecoSelect;

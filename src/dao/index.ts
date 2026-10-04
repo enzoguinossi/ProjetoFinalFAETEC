@@ -1,4 +1,3 @@
-export { pessoaFisicaDAO } from "./pessoa-fisica";
 export { funcionarioDAO } from "./funcionario";
 export { usuarioDAO } from "./usuario";
 export { destinatarioDAO } from "./destinatario";

@@ -5,6 +5,7 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { permissaoService } from "@/services/permissao";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,9 @@ export default async function UsuariosPage() {
     }),
   );
 
-  const rows = data.map((u, i) => ({
+  const rows = data.map((u) => ({
     id_usuario: u.id_usuario,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(u.id_usuario),
     login: u.login,
     nome: u.funcionario.pessoaFisica.nome,
   }));

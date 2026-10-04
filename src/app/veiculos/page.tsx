@@ -4,6 +4,7 @@ import { veiculoDAO } from "@/dao/veiculo";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,9 @@ export default async function VeiculosPage() {
     tipoCodigoDAO.listParaEntidade("VEICULO"),
   ]);
 
-  const rows = data.map((v, i) => ({
+  const rows = data.map((v) => ({
     id_veiculo: v.id_veiculo,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(v.id_veiculo),
     descricao: v.modelo ?? v.placa,
     placa: v.placa,
     status: v.status === "DISPONIVEL" ? "Ativo" : v.status === "EM_ROTA" ? "Em rota" : "Indisponível",

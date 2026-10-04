@@ -81,9 +81,6 @@ export async function deleteVeiculo(id: number) {
   const user = await requireUser();
   if (!(await usuarioPode(user, "veiculo.excluir"))) return { error: "Sem permissão." };
 
-  const { podeExcluir, vinculos } = await veiculoDAO.verificarRelacionamentos(id);
-  if (!podeExcluir) return { error: `Não é possível excluir pois possui ${vinculos.join(", ")}.` };
-
   try {
     await veiculoDAO.hardDelete(id, user.id_usuario);
   } catch (e) {

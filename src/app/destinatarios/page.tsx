@@ -4,6 +4,7 @@ import { destinatarioDAO } from "@/dao/destinatario";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,9 @@ export default async function DestinatariosPage() {
     destinatarioDAO.list(),
     tipoCodigoDAO.listParaEntidade("DESTINATARIO"),
   ]);
-  const rows = data.map((d, i) => ({
+  const rows = data.map((d) => ({
     id_destinatario: d.id_destinatario,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(d.id_destinatario),
     razao: d.pessoaJuridica.razao_social,
   }));
   return (

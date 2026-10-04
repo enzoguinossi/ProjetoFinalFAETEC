@@ -3,6 +3,7 @@
 import { produtoDAO } from "@/dao/produto";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export type ProdutoListRow = {
   id_produto: number;
@@ -25,7 +26,7 @@ export async function searchProdutosList(query: string): Promise<ProdutoListRow[
     const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
     return {
       id_produto: p.id_produto,
-      codigo: String(p.id_produto).padStart(6, "0"),
+      codigo: formatarCodigo(p.id_produto),
       descricao: p.descricao,
       qtd: String(qtd),
       livre: String(qtd - reservado),

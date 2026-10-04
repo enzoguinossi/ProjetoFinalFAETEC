@@ -12,8 +12,8 @@ export default async function PrimeiroAcessoPage() {
   if (sessao) redirect("/dashboard");
 
   // Já existe administrador → fluxo de primeiro acesso não se aplica.
-  const existente = await usuarioDAO.existeSuperAdmin();
-  if (existente) redirect("/login");
+  const admin = await usuarioDAO.getAdmin();
+  if (admin) redirect("/login");
 
   return (
     <DashboardLayout title="Bem-vindo ao Nexus">

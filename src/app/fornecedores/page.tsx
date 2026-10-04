@@ -4,6 +4,7 @@ import { fornecedorDAO } from "@/dao/fornecedor";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,9 @@ export default async function FornecedoresPage() {
     fornecedorDAO.list(),
     tipoCodigoDAO.listParaEntidade("FORNECEDOR"),
   ]);
-  const rows = data.map((f, i) => ({
+  const rows = data.map((f) => ({
     id_fornecedor: f.id_fornecedor,
-    codigo: String(i + 1).padStart(3, "0"),
+    codigo: formatarCodigo(f.id_fornecedor),
     razao: f.pessoaJuridica.razao_social,
   }));
   return (

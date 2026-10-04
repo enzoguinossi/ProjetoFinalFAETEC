@@ -18,7 +18,7 @@ export class CodigoService {
     const nomesTipos = formData.getAll("codigo_tipo") as string[];
     const valores = formData.getAll("codigo_valor") as string[];
 
-    const codigos: CodigoInput[] = [];
+    const entradas: { nome: string; valor: string }[] = [];
     for (let i = 0; i < nomesTipos.length; i++) {
       const nome = nomesTipos[i];
       const bruto = valores[i] ?? "";
@@ -33,15 +33,21 @@ export class CodigoService {
       const validacao = validarCodigo(nome, bruto);
       if (!validacao.ok) return { error: validacao.erro };
 
-      const tipo = await tipoCodigoDAO.getByNome(nome);
-      if (!tipo) {
+      entradas.push({ nome, valor: validacao.valor });
+    }
+
+    if (entradas.length === 0) return { codigos: [] };
+
+    const tipos = await tipoCodigoDAO.getByNomes([...new Set(entradas.map((e) => e.nome))]);
+    const idPorNome = new Map(tipos.map((t) => [t.nome, t.id_tipo_codigo]));
+
+    const codigos: CodigoInput[] = [];
+    for (const { nome, valor } of entradas) {
+      const id_tipo_codigo = idPorNome.get(nome);
+      if (!id_tipo_codigo) {
         return { error: `Tipo de código ${nome} não encontrado.` };
       }
-
-      codigos.push({
-        id_tipo_codigo: tipo.id_tipo_codigo,
-        codigo: validacao.valor,
-      });
+      codigos.push({ id_tipo_codigo, codigo: valor });
     }
 
     return { codigos };

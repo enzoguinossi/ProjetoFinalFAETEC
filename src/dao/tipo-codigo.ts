@@ -13,8 +13,9 @@ export class TipoCodigoDAO {
     });
   }
 
-  async getByNome(nome: string) {
-    return prisma.tipoCodigo.findUnique({ where: { nome } });
+  async getByNomes(nomes: string[]) {
+    if (nomes.length === 0) return [];
+    return prisma.tipoCodigo.findMany({ where: { nome: { in: nomes } } });
   }
 }
 

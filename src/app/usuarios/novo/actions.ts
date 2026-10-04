@@ -6,6 +6,7 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { permissaoService } from "@/services/permissao";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+import { parsePermissoes } from "@/lib/form-data";
 
 export type UsuarioFormData = {
   id_usuario: number;
@@ -78,17 +79,6 @@ export async function createUsuario(formData: FormData) {
   return { success: true };
 }
 
-function parsePermissoes(formData: FormData): string[] {
-  const raw = formData.get("permissoes");
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(String(raw));
-    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 export async function getUsuario(id: number): Promise<UsuarioFormData | null> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, ["usuario.consultar", "usuario.alterar"]))) return null;
@@ -146,13 +136,6 @@ export async function updateUsuario(formData: FormData) {
 export async function deleteUsuario(id: number) {
   const user = await requireUser();
   if (!(await usuarioPode(user, "usuario.excluir"))) return { error: "Sem permissão." };
-
-  const { podeExcluir, vinculos } = await usuarioDAO.verificarRelacionamentos(id);
-  if (!podeExcluir) {
-    return {
-      error: `Não é possível excluir este usuário pois ele possui ${vinculos.join(", ")}.`,
-    };
-  }
 
   try {
     await usuarioDAO.hardDelete(id, user.id_usuario);

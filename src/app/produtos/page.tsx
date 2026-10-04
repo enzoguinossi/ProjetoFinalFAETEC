@@ -5,6 +5,7 @@ import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function ProdutosPage() {
     const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
     return {
       id_produto: p.id_produto,
-      codigo: String(p.id_produto).padStart(6, "0"),
+      codigo: formatarCodigo(p.id_produto),
       descricao: p.descricao,
       qtd: String(qtd),
       livre: String(qtd - reservado),

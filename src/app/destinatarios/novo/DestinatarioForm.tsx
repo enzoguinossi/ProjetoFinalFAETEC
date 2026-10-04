@@ -6,7 +6,7 @@ import type { DestinatarioFormData } from "./actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import EnderecoFields from "@/components/EnderecoFields";
-import { TIPO_TELEFONE } from "@/types";
+import { normalizaTelefones } from "@/lib/contatos";
 import Button from "@/components/Button";
 
 interface Props {
@@ -16,16 +16,6 @@ interface Props {
   canDeactivate?: boolean;
   onSuccess?: () => void;
   onCancel?: () => void;
-}
-
-function normalizaTelefones(
-  t: { numero: string; tipo: string; principal: boolean }[] | undefined,
-): TelefoneEntry[] {
-  return (t ?? []).map((x) => ({
-    numero: x.numero,
-    tipo: (TIPO_TELEFONE.includes(x.tipo as never) ? x.tipo : "CELULAR") as TelefoneEntry["tipo"],
-    principal: x.principal,
-  }));
 }
 
 export default function DestinatarioForm({

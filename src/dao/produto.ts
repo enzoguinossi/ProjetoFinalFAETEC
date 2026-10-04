@@ -192,24 +192,6 @@ export class ProdutoDAO {
     });
   }
 
-  async create(
-    data: {
-      descricao: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
-      data_validade?: string; id_conversao_padrao?: number;
-    },
-    id_usuario: number,
-  ) {
-    return prisma.$transaction(async (tx) => {
-      const p = await tx.produto.create({
-        data: { ...data, data_validade: data.data_validade ? new Date(data.data_validade) : undefined },
-      });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao } },
-      });
-      return p;
-    });
-  }
-
   async createCompleto(
     data: {
       descricao: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
@@ -253,24 +235,6 @@ export class ProdutoDAO {
         where: { id_produto: p.id_produto },
         include: { conversaoPadrao: true, produtoCodigos: { include: { tipoCodigo: true } }, insumosPai: { include: { produtoFilho: true } } },
       });
-    });
-  }
-
-  async update(
-    id: number,
-    data: { descricao?: string; foto_url?: string; perecivel?: boolean; data_validade?: string },
-    id_usuario: number,
-  ) {
-    return prisma.$transaction(async (tx) => {
-      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
-      const depois = await tx.produto.update({
-        where: { id_produto: id },
-        data: { ...data, data_validade: data.data_validade ? new Date(data.data_validade) : undefined },
-      });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel }, dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel } },
-      });
-      return depois;
     });
   }
 
