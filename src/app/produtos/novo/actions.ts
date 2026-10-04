@@ -4,7 +4,7 @@ import { produtoDAO } from "@/dao/produto";
 import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
 
 export type ProdutoItem = { id_produto: number; descricao: string };
@@ -98,19 +98,24 @@ export async function createProduto(formData: FormData) {
   const imagem = await resolverImagem(formData, foto_url);
   if (imagem && "error" in imagem) return { error: imagem.error };
 
-  const criado = await produtoDAO.createCompleto(
-    {
-      descricao: descricao.trim(),
-      foto_url: imagem ? undefined : foto_url,
-      perecivel,
-      composto,
-      data_validade,
-      id_conversao_padrao: id_conversao,
-      codigos,
-      insumos,
-    },
-    id_usuario,
-  );
+  let criado: { id_produto: number };
+  try {
+    criado = await produtoDAO.createCompleto(
+      {
+        descricao: descricao.trim(),
+        foto_url: imagem ? undefined : foto_url,
+        perecivel,
+        composto,
+        data_validade,
+        id_conversao_padrao: id_conversao,
+        codigos,
+        insumos,
+      },
+      id_usuario,
+    );
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   if (imagem) {
     try {
@@ -207,21 +212,25 @@ export async function updateProduto(formData: FormData) {
     }
   }
 
-  await produtoDAO.updateCompleto(
-    id,
-    {
-      descricao: descricao.trim(),
-      foto_url: novaFotoPath ?? foto_url,
-      perecivel,
-      composto,
-      ativo,
-      data_validade,
-      id_conversao_padrao: id_conversao,
-      codigos,
-      insumos,
-    },
-    user.id_usuario,
-  );
+  try {
+    await produtoDAO.updateCompleto(
+      id,
+      {
+        descricao: descricao.trim(),
+        foto_url: novaFotoPath ?? foto_url,
+        perecivel,
+        composto,
+        ativo,
+        data_validade,
+        id_conversao_padrao: id_conversao,
+        codigos,
+        insumos,
+      },
+      user.id_usuario,
+    );
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   // Remove a imagem antiga apenas após o sucesso, se houve substituição.
   if (novaFotoPath && fotoAnterior && fotoAnterior !== novaFotoPath) {
@@ -238,8 +247,7 @@ export async function deleteProduto(id: number) {
   try {
     await produtoDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

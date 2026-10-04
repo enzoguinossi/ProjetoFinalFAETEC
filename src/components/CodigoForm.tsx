@@ -5,6 +5,7 @@ import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { validarCodigo } from "@/lib/codigo";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface TipoCodigo {
   id_tipo_codigo: number;
@@ -36,7 +37,7 @@ export default function CodigoForm({
 
   const [tipo, setTipo] = useState(initialTipo ?? padrao);
   const [valor, setValor] = useState(initialValor);
-  const [erro, setErro] = useState("");
+  const mostrarAviso = useAviso();
 
   const ehEan = tipo === "EAN12" || tipo === "EAN13";
   const maxLength = tipo === "EAN12" ? 12 : tipo === "EAN13" ? 13 : undefined;
@@ -44,19 +45,17 @@ export default function CodigoForm({
   function handleConfirm() {
     const res = validarCodigo(tipo, valor);
     if (!res.ok) {
-      setErro(res.erro);
+      mostrarAviso(res.erro, "erro");
       return;
     }
     onConfirm(tipo, res.valor);
     setValor("");
     setTipo(padrao);
-    setErro("");
   }
 
   function handleClose() {
     setValor("");
     setTipo(padrao);
-    setErro("");
     onClose();
   }
 
@@ -69,7 +68,7 @@ export default function CodigoForm({
           </label>
           <select
             value={tipo}
-            onChange={(e) => { setTipo(e.target.value); setErro(""); }}
+            onChange={(e) => setTipo(e.target.value)}
             className={ui.select}
           >
             {tiposCodigo.map((t) => (
@@ -90,17 +89,11 @@ export default function CodigoForm({
             onChange={(e) => {
               const v = ehEan ? e.target.value.replace(/\D/g, "") : e.target.value;
               setValor(v);
-              setErro("");
             }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder={ehEan ? `${maxLength} dígitos` : "Valor do código"}
-            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
+            className={ui.input}
           />
-          {erro && (
-            <span className="font-sans text-[0.8125rem] text-cancel">
-              {erro}
-            </span>
-          )}
         </div>
 
         <div className={ui.rowActions}>

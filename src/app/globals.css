@@ -14,6 +14,7 @@
   --color-table-alt: #e2e2e2;
   --color-danger: #da1e28;
   --color-danger-bg: #fff1f0;
+  --color-warning: #d97706;
   --color-cancel: #ff383c;
   --color-cancel-hover: #ff0000;
 }
@@ -28,4 +29,15 @@
   --hover-bg: #f2f4f8;
   --table-alt: #e2e2e2;
   --alert: #da1e28;
+}
+
+@keyframes aviso-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

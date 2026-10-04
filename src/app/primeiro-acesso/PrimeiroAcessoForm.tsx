@@ -4,23 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { primeiroAcessoAction } from "./actions";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 export default function PrimeiroAcessoForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
       const result = await primeiroAcessoAction(form);
-      if (result.error) setError(result.error);
-      else router.push("/dashboard");
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Administrador criado com sucesso.", "sucesso");
+      router.push("/dashboard");
     } catch {
-      setError("Erro ao criar administrador.");
+      mostrarAviso("Erro ao criar administrador.", "erro");
     } finally {
       setSaving(false);
     }
@@ -34,12 +35,6 @@ export default function PrimeiroAcessoForm() {
       <p className="m-0 font-sans text-sm text-[#697077]">
         Nenhum administrador encontrado. Crie o primeiro para começar.
       </p>
-
-      {error && (
-        <div className={ui.errorBox}>
-          {error}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className={ui.form}>
         <div className="flex flex-col gap-1.5">

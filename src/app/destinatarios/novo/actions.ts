@@ -6,7 +6,7 @@ import { cepService } from "@/services/cep";
 import { contatoService } from "@/services/contato";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export async function buscarCep(cep: string) {
   const user = await requireUser();
@@ -51,24 +51,28 @@ export async function createDestinatario(formData: FormData) {
   const contatoResult = contatoService.resolverContatosParaSalvar(formData);
   if ("error" in contatoResult) return { error: contatoResult.error };
 
-  await destinatarioDAO.create({
-    razao_social: razao_social.trim(),
-    cnpj: (formData.get("cnpj") as string) || undefined,
-    tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
-    codigos: codigoResult.codigos,
-    ...contatoResult.contatos,
-    endereco: {
-      logradouro: formData.get("logradouro") as string,
-      numero: (formData.get("numero") as string) || undefined,
-      complemento: (formData.get("complemento") as string) || undefined,
-      bairro: (formData.get("bairro") as string) || undefined,
-      cidade: formData.get("cidade") as string,
-      uf: (formData.get("uf") as string) || undefined,
-      cep: (formData.get("cep") as string) || undefined,
-      latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
-      longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
-    },
-  }, user.id_usuario);
+  try {
+    await destinatarioDAO.create({
+      razao_social: razao_social.trim(),
+      cnpj: (formData.get("cnpj") as string) || undefined,
+      tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+      codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
+      endereco: {
+        logradouro: formData.get("logradouro") as string,
+        numero: (formData.get("numero") as string) || undefined,
+        complemento: (formData.get("complemento") as string) || undefined,
+        bairro: (formData.get("bairro") as string) || undefined,
+        cidade: formData.get("cidade") as string,
+        uf: (formData.get("uf") as string) || undefined,
+        cep: (formData.get("cep") as string) || undefined,
+        latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
+        longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
+      },
+    }, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -118,25 +122,29 @@ export async function updateDestinatario(formData: FormData) {
   const contatoResult = contatoService.resolverContatosParaSalvar(formData);
   if ("error" in contatoResult) return { error: contatoResult.error };
 
-  await destinatarioDAO.update(id, {
-    razao_social: (formData.get("razao_social") as string)?.trim(),
-    cnpj: (formData.get("cnpj") as string) || undefined,
-    tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
-    ativo,
-    codigos: codigoResult.codigos,
-    ...contatoResult.contatos,
-    endereco: {
-      logradouro: (formData.get("logradouro") as string) || undefined,
-      numero: (formData.get("numero") as string) || undefined,
-      complemento: (formData.get("complemento") as string) || undefined,
-      bairro: (formData.get("bairro") as string) || undefined,
-      cidade: (formData.get("cidade") as string) || undefined,
-      uf: (formData.get("uf") as string) || undefined,
-      cep: (formData.get("cep") as string) || undefined,
-      latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
-      longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
-    },
-  }, user.id_usuario);
+  try {
+    await destinatarioDAO.update(id, {
+      razao_social: (formData.get("razao_social") as string)?.trim(),
+      cnpj: (formData.get("cnpj") as string) || undefined,
+      tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+      ativo,
+      codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
+      endereco: {
+        logradouro: (formData.get("logradouro") as string) || undefined,
+        numero: (formData.get("numero") as string) || undefined,
+        complemento: (formData.get("complemento") as string) || undefined,
+        bairro: (formData.get("bairro") as string) || undefined,
+        cidade: (formData.get("cidade") as string) || undefined,
+        uf: (formData.get("uf") as string) || undefined,
+        cep: (formData.get("cep") as string) || undefined,
+        latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
+        longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
+      },
+    }, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -148,8 +156,7 @@ export async function deleteDestinatario(id: number) {
   try {
     await destinatarioDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

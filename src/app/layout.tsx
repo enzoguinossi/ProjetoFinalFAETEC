@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AvisoProvider from "@/components/AvisoProvider";
 
 export const metadata: Metadata = {
   title: "Nexus — Sistema Logístico",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <AvisoProvider>{children}</AvisoProvider>
+      </body>
     </html>
   );
 }

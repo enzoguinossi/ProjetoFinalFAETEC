@@ -58,6 +58,8 @@ interface DataTableProps<T> {
   actions?: Action<T>[];
   /** Campo usado como React key (ex: "codigo", "placa"). Padrão: índice da linha. */
   idField?: keyof T & string;
+  /** Chave estável customizada (tem prioridade sobre idField). */
+  getRowKey?: (row: T, index: number) => string | number;
   pageSize?: number;
 }
 
@@ -94,6 +96,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   data,
   actions,
   idField,
+  getRowKey,
   pageSize = 10,
 }: DataTableProps<T>) {
   const resolvedActions = actions ?? (defaultActions as Action<T>[]);
@@ -142,6 +145,21 @@ export default function DataTable<T extends Record<string, unknown>>({
     .concat(actions !== undefined ? "178px" : "")
     .join(" ");
 
+  // Garante keys únicas mesmo quando idField se repete (ex.: contatos duplicados).
+  const rowKeys = useMemo(() => {
+    const seen = new Map<string | number, number>();
+    return data.map((row, i) => {
+      const base = getRowKey
+        ? getRowKey(row, i)
+        : idField
+          ? (row[idField] as string | number)
+          : i;
+      const count = (seen.get(base) ?? 0) + 1;
+      seen.set(base, count);
+      return count > 1 ? `${String(base)}-${i}` : base;
+    });
+  }, [data, idField, getRowKey]);
+
   return (
     <div className={wrapperCls}>
       <div className={scrollWrapperCls}>
@@ -163,9 +181,7 @@ export default function DataTable<T extends Record<string, unknown>>({
           {table.getRowModel().rows.length > 0 ? (
             table.getRowModel().rows.map((row) => {
               const original = row.original as T;
-              const key = idField
-                ? (original[idField] as string | number)
-                : row.index;
+              const key = rowKeys[row.index] ?? row.index;
               return (
                 <div
                   key={key}

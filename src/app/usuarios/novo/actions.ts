@@ -5,7 +5,7 @@ import { usuarioDAO } from "@/dao/usuario";
 import { funcionarioDAO } from "@/dao/funcionario";
 import { permissaoService } from "@/services/permissao";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 import { parsePermissoes } from "@/lib/form-data";
 
 export type UsuarioFormData = {
@@ -42,7 +42,7 @@ export async function salvarPermissoesUsuario(id_usuario: number, permissoes: st
   try {
     await permissaoService.salvarPermissoes(id_usuario, permissoes, user.id_usuario);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erro ao salvar permissões." };
+    return { error: mensagemDeErro(e, "Erro ao salvar permissões.") };
   }
   return { success: true };
 }
@@ -63,17 +63,21 @@ export async function createUsuario(formData: FormData) {
 
   const permissoes = parsePermissoes(formData);
 
-  const criado = await usuarioDAO.create(
-    {
-      id_funcionario,
-      login,
-      senha_hash: null,
-    },
-    user.id_usuario,
-  );
+  try {
+    const criado = await usuarioDAO.create(
+      {
+        id_funcionario,
+        login,
+        senha_hash: null,
+      },
+      user.id_usuario,
+    );
 
-  if (permissoes.length > 0) {
-    await permissaoService.salvarPermissoes(criado.id_usuario, permissoes, user.id_usuario);
+    if (permissoes.length > 0) {
+      await permissaoService.salvarPermissoes(criado.id_usuario, permissoes, user.id_usuario);
+    }
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
   }
 
   return { success: true };
@@ -118,16 +122,16 @@ export async function updateUsuario(formData: FormData) {
 
   const permissoes = parsePermissoes(formData);
 
-  await usuarioDAO.update(
-    id,
-    { login: login.trim(), ativo },
-    user.id_usuario,
-  );
-
   try {
+    await usuarioDAO.update(
+      id,
+      { login: login.trim(), ativo },
+      user.id_usuario,
+    );
+
     await permissaoService.salvarPermissoes(id, permissoes, user.id_usuario);
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Erro ao salvar permissões." };
+    return { error: mensagemDeErro(e, "Erro ao salvar permissões.") };
   }
 
   return { success: true };
@@ -140,8 +144,7 @@ export async function deleteUsuario(id: number) {
   try {
     await usuarioDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

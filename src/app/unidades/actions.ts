@@ -3,6 +3,7 @@
 import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export type UnidadeFormData = {
   id_conversao: number;
@@ -42,10 +43,14 @@ export async function createUnidade(formData: FormData) {
   );
   if (existente) return { error: "Já existe uma unidade com esse nome." };
 
-  await conversaoUnidadeDAO.create(
-    { nome, fator, descricao: (formData.get("descricao") as string) || undefined },
-    user.id_usuario,
-  );
+  try {
+    await conversaoUnidadeDAO.create(
+      { nome, fator, descricao: (formData.get("descricao") as string) || undefined },
+      user.id_usuario,
+    );
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -67,11 +72,15 @@ export async function updateUnidade(formData: FormData) {
   );
   if (existente) return { error: "Já existe uma unidade com esse nome." };
 
-  await conversaoUnidadeDAO.update(
-    id,
-    { nome, fator, descricao: (formData.get("descricao") as string) || undefined },
-    user.id_usuario,
-  );
+  try {
+    await conversaoUnidadeDAO.update(
+      id,
+      { nome, fator, descricao: (formData.get("descricao") as string) || undefined },
+      user.id_usuario,
+    );
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -80,6 +89,10 @@ export async function deleteUnidade(id: number) {
   const user = await requireUser();
   if (!(await usuarioPode(user, "unidade_conversao.excluir"))) return { error: "Sem permissão." };
 
-  await conversaoUnidadeDAO.hardDelete(id, user.id_usuario);
+  try {
+    await conversaoUnidadeDAO.hardDelete(id, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
   return { success: true };
 }

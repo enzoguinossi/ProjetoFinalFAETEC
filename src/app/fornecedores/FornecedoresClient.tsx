@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import FornecedorForm from "./novo/FornecedorForm";
 import type { Column, Action } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
@@ -31,8 +33,9 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
   const [formData, setFormData] = useState<FornecedorFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FornecedorListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
+  const router = useRouter();
+  const mostrarAviso = useAviso();
 
   useEffect(() => {
     if (searchRef.current.length < 2) {
@@ -63,23 +66,20 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
 
   function handleSuccess() {
     closeModal();
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    setDeleteError("");
     try {
       const result = await deleteFornecedor(deleteTarget.id_fornecedor);
-      if (result.error) {
-        setDeleteError(result.error);
-      } else {
-        setDeleteTarget(null);
-        window.location.reload();
-      }
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Fornecedor excluído com sucesso.", "sucesso");
+      setDeleteTarget(null);
+      router.refresh();
     } catch {
-      setDeleteError("Erro ao excluir. Tente novamente.");
+      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
     } finally {
       setDeleting(false);
     }
@@ -104,10 +104,7 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
       ? [{
           icon: "/icons/actions/Lixeira.svg",
           label: "Excluir",
-          onClick: (row: FornecedorListRow) => {
-            setDeleteTarget(row);
-            setDeleteError("");
-          },
+          onClick: (row: FornecedorListRow) => setDeleteTarget(row),
         }]
       : []),
   ];
@@ -147,15 +144,11 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir fornecedor"
-        message={
-          deleteError
-            ? deleteError
-            : `Tem certeza que deseja excluir "${deleteTarget?.razao}"?`
-        }
-        confirmLabel={deleteError ? "OK" : "Excluir"}
+        message={`Tem certeza que deseja excluir "${deleteTarget?.razao}"?`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

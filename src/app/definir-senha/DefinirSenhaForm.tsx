@@ -3,24 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { definirSenhaAction } from "./actions";
-import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 export default function DefinirSenhaForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
       const result = await definirSenhaAction(form);
-      if (result.error) setError(result.error);
-      else router.push("/dashboard");
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Senha definida com sucesso.", "sucesso");
+      router.push("/dashboard");
     } catch {
-      setError("Erro ao definir senha.");
+      mostrarAviso("Erro ao definir senha.", "erro");
     } finally {
       setSaving(false);
     }
@@ -35,7 +35,6 @@ export default function DefinirSenhaForm() {
         <div className="flex-1 flex flex-col gap-4 px-[0.625rem]">
           <h2 className="font-display text-xl font-semibold text-ink m-0 text-center">Definir Senha</h2>
           <p className="font-sans text-[0.8125rem] text-[#697077] m-0 text-center">Primeiro acesso. Escolha sua senha.</p>
-          {error && <div className={ui.errorBox}>{error}</div>}
           <div className="flex flex-col gap-[0.375rem]">
             <label className="font-sans text-sm font-medium text-ink">Nova senha</label>
             <input className="w-full h-11 px-[0.875rem] rounded-lg border border-[#c1c7cd] bg-white text-ink text-sm outline-none transition-[border-color,box-shadow] duration-150 box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.15)]" type="password" name="senha" required minLength={4} />

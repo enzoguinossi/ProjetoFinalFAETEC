@@ -6,7 +6,7 @@ import type { UsuarioFormData } from "./actions";
 import Button from "@/components/Button";
 import PerfilForm from "@/components/PerfilForm";
 import PermissoesPanel, { type GrupoPermissoes } from "@/components/PermissoesPanel";
-import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Funcionario {
   id_funcionario: number;
@@ -65,8 +65,8 @@ export default function UsuarioForm({
     return lista;
   }, [funcionarios, initialData]);
 
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [login, setLogin] = useState(initialData?.login ?? "");
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [idFuncionario, setIdFuncionario] = useState(initialData?.id_funcionario ?? null);
@@ -83,7 +83,6 @@ export default function UsuarioForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
@@ -92,10 +91,11 @@ export default function UsuarioForm({
       const result = initialData
         ? await updateUsuario(form)
         : await createUsuario(form);
-      if (result.error) setError(result.error);
-      else onSuccess?.();
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
     } catch {
-      setError("Erro ao salvar.");
+      mostrarAviso("Erro ao salvar.", "erro");
     } finally {
       setSaving(false);
     }
@@ -103,8 +103,6 @@ export default function UsuarioForm({
 
   return (
     <form className="flex flex-col gap-4 bg-white rounded-[1.25rem] p-6 w-full box-border max-w-full" onSubmit={handleSubmit}>
-      {error && <div className={ui.errorBox}>{error}</div>}
-
       <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
         {/* Coluna esquerda — dados */}
         <div className="flex flex-col gap-4">

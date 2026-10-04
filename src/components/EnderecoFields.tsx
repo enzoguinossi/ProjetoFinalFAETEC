@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UFS } from "@/lib/uf";
 import type { EnderecoCep, ResultadoCep } from "@/services/cep";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 export type EnderecoValue = {
   logradouro: string;
@@ -55,7 +56,7 @@ export default function EnderecoFields({
 }: Props) {
   const [value, setValue] = useState<EnderecoValue>(toValue(initial));
   const [buscando, setBuscando] = useState(false);
-  const [erro, setErro] = useState("");
+  const mostrarAviso = useAviso();
 
   function set<K extends keyof EnderecoValue>(key: K, v: EnderecoValue[K]) {
     setValue((prev) => ({ ...prev, [key]: v }));
@@ -64,15 +65,14 @@ export default function EnderecoFields({
   async function buscarCep() {
     const digitos = value.cep.replace(/\D/g, "");
     if (digitos.length !== 8) {
-      setErro("CEP deve conter 8 dígitos.");
+      mostrarAviso("CEP deve conter 8 dígitos.", "erro");
       return;
     }
     setBuscando(true);
-    setErro("");
     try {
       const result = await onLookup(digitos);
       if ("error" in result) {
-        setErro(result.error);
+        mostrarAviso(result.error, "erro");
         return;
       }
       const e: EnderecoCep = result.endereco;
@@ -85,7 +85,7 @@ export default function EnderecoFields({
         uf: e.uf || prev.uf,
       }));
     } catch {
-      setErro("Não foi possível consultar o CEP.");
+      mostrarAviso("Não foi possível consultar o CEP.", "erro");
     } finally {
       setBuscando(false);
     }
@@ -159,12 +159,6 @@ export default function EnderecoFields({
           )}
         </div>
       </div>
-      {erro && (
-        <span className="font-sans text-[0.8125rem] text-cancel">
-          {erro}
-        </span>
-      )}
-
       {/* Logradouro */}
       <div className="flex flex-col gap-2">
         <label className={ui.label}>Logradouro</label>

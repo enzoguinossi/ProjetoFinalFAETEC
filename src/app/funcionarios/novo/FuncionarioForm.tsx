@@ -8,6 +8,7 @@ import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/componen
 import { normalizaTelefones } from "@/lib/contatos";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -25,8 +26,8 @@ export default function FuncionarioForm({
   const isView = mode === "view";
   const isEdit = mode === "edit";
 
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [nome, setNome] = useState(initialData?.nome ?? "");
   const [condutor, setCondutor] = useState(initialData?.condutor ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
@@ -37,7 +38,6 @@ export default function FuncionarioForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
@@ -45,10 +45,11 @@ export default function FuncionarioForm({
       const result = initialData
         ? await updateFuncionario(form)
         : await createFuncionario(form);
-      if (result.error) setError(result.error);
-      else onSuccess?.();
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
     } catch {
-      setError("Erro ao salvar.");
+      mostrarAviso("Erro ao salvar.", "erro");
     } finally {
       setSaving(false);
     }
@@ -74,8 +75,6 @@ export default function FuncionarioForm({
 
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
-      {error && <div className={ui.errorBox}>{error}</div>}
-
       <div className="grid grid-cols-[1fr_1fr] gap-6 items-stretch">
         {/* Coluna esquerda — dados */}
         <div className="flex flex-col gap-4">

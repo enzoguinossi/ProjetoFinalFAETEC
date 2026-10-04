@@ -5,7 +5,7 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { codigoService } from "@/services/codigo";
 import { contatoService } from "@/services/contato";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export type ContatoFormData = {
   emails: { endereco: string; principal: boolean }[];
@@ -37,17 +37,21 @@ export async function createFuncionario(formData: FormData) {
   const contatoResult = contatoService.resolverContatosParaSalvar(formData);
   if ("error" in contatoResult) return { error: contatoResult.error };
 
-  await funcionarioDAO.create(
-    {
-      nome: nome.trim(),
-      cpf: (formData.get("cpf") as string) || undefined,
-      cargo: (formData.get("cargo") as string) || undefined,
-      condutor: formData.get("condutor") === "on",
-      codigos: codigoResult.codigos,
-      ...contatoResult.contatos,
-    },
-    user.id_usuario,
-  );
+  try {
+    await funcionarioDAO.create(
+      {
+        nome: nome.trim(),
+        cpf: (formData.get("cpf") as string) || undefined,
+        cargo: (formData.get("cargo") as string) || undefined,
+        condutor: formData.get("condutor") === "on",
+        codigos: codigoResult.codigos,
+        ...contatoResult.contatos,
+      },
+      user.id_usuario,
+    );
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -105,8 +109,7 @@ export async function updateFuncionario(formData: FormData) {
       user.id_usuario,
     );
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
 
   return { success: true };
@@ -119,8 +122,7 @@ export async function deleteFuncionario(id: number) {
   try {
     await funcionarioDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

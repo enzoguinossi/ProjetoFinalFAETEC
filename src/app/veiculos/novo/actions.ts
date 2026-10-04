@@ -4,7 +4,7 @@ import { veiculoDAO } from "@/dao/veiculo";
 import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export type VeiculoFormData = {
   id_veiculo: number;
@@ -25,11 +25,15 @@ export async function createVeiculo(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("VEICULO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
-  await veiculoDAO.create({
-    placa: placa.trim().toUpperCase(),
-    modelo: (formData.get("modelo") as string) || undefined,
-    codigos: codigoResult.codigos,
-  }, user.id_usuario);
+  try {
+    await veiculoDAO.create({
+      placa: placa.trim().toUpperCase(),
+      modelo: (formData.get("modelo") as string) || undefined,
+      codigos: codigoResult.codigos,
+    }, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -65,14 +69,18 @@ export async function updateVeiculo(formData: FormData) {
   const codigoResult = await codigoService.resolverCodigosParaSalvar("VEICULO", formData);
   if ("error" in codigoResult) return { error: codigoResult.error };
 
-  await veiculoDAO.update(id, {
-    placa: (formData.get("placa") as string)?.trim().toUpperCase(),
-    modelo: (formData.get("modelo") as string) || undefined,
-    status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA",
-    codigos: codigoResult.codigos,
-  }, user.id_usuario);
+  try {
+    await veiculoDAO.update(id, {
+      placa: (formData.get("placa") as string)?.trim().toUpperCase(),
+      modelo: (formData.get("modelo") as string) || undefined,
+      status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA",
+      codigos: codigoResult.codigos,
+    }, user.id_usuario);
 
-  if (!ativo) await veiculoDAO.softDelete(id, user.id_usuario);
+    if (!ativo) await veiculoDAO.softDelete(id, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -84,8 +92,7 @@ export async function deleteVeiculo(id: number) {
   try {
     await veiculoDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

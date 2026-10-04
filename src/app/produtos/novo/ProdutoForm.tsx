@@ -9,6 +9,7 @@ import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Conversao {
   id_conversao: number;
@@ -51,8 +52,8 @@ export default function ProdutoForm({
   const isView = mode === "view";
   const isEdit = mode === "edit";
 
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [perecivel, setPerecivel] = useState(initialData?.perecivel ?? false);
   const [composto, setComposto] = useState(initialData?.composto ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
@@ -163,7 +164,6 @@ export default function ProdutoForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
@@ -171,10 +171,11 @@ export default function ProdutoForm({
       const result = initialData
         ? await updateProduto(form)
         : await createProduto(form);
-      if (result.error) setError(result.error);
-      else onSuccess?.();
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
     } catch {
-      setError("Erro ao salvar. Tente novamente.");
+      mostrarAviso("Erro ao salvar. Tente novamente.", "erro");
     } finally {
       setSaving(false);
     }
@@ -185,10 +186,6 @@ export default function ProdutoForm({
   return (
     <>
       <form className="flex flex-col gap-[11px] p-0 w-full box-border" onSubmit={handleSubmit}>
-        {error && <div className="px-3 py-2 bg-danger-bg border border-cancel rounded-md text-cancel font-sans text-[0.8125rem]">{error}</div>}
-
-
-
         {/* Descrição */}
         <div className="flex flex-col gap-2">
           <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Descrição do produto</label>

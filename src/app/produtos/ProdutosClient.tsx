@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import ProdutoForm from "./novo/ProdutoForm";
 import type { Column, Action } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
@@ -34,8 +36,9 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
   const [formData, setFormData] = useState<ProdutoFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProdutoListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
+  const router = useRouter();
+  const mostrarAviso = useAviso();
 
   useEffect(() => {
     if (searchRef.current.length < 2) {
@@ -71,23 +74,20 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
 
   function handleSuccess() {
     closeModal();
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    setDeleteError("");
     try {
       const result = await deleteProduto(deleteTarget.id_produto);
-      if (result.error) {
-        setDeleteError(result.error);
-      } else {
-        setDeleteTarget(null);
-        window.location.reload();
-      }
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Produto excluído com sucesso.", "sucesso");
+      setDeleteTarget(null);
+      router.refresh();
     } catch {
-      setDeleteError("Erro ao excluir. Tente novamente.");
+      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
     } finally {
       setDeleting(false);
     }
@@ -112,10 +112,7 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
       ? [{
           icon: "/icons/actions/Lixeira.svg",
           label: "Excluir",
-          onClick: (row: ProdutoListRow) => {
-            setDeleteTarget(row);
-            setDeleteError("");
-          },
+          onClick: (row: ProdutoListRow) => setDeleteTarget(row),
         }]
       : []),
   ];
@@ -180,15 +177,11 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir produto"
-        message={
-          deleteError
-            ? deleteError
-            : `Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`
-        }
-        confirmLabel={deleteError ? "OK" : "Excluir"}
+        message={`Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

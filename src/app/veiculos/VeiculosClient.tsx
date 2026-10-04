@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import VeiculoForm from "./novo/VeiculoForm";
 import type { Column, Action } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
@@ -29,8 +31,9 @@ export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }
   const [formData, setFormData] = useState<VeiculoFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VeiculoListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
+  const router = useRouter();
+  const mostrarAviso = useAviso();
 
   useEffect(() => { if (searchRef.current.length < 2) setRows(initialRows); }, [initialRows]);
 
@@ -46,21 +49,23 @@ export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }
   }
 
   function closeModal() { setModalMode(null); setFormData(null); }
-  function handleSuccess() { closeModal(); window.location.reload(); }
+  function handleSuccess() { closeModal(); router.refresh(); }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    setDeleting(true); setDeleteError("");
+    setDeleting(true);
     try {
       const result = await deleteVeiculo(deleteTarget.id_veiculo);
-      if (result.error) setDeleteError(result.error); else { setDeleteTarget(null); window.location.reload(); }
-    } catch { setDeleteError("Erro ao excluir."); } finally { setDeleting(false); }
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Veículo excluído com sucesso.", "sucesso");
+      setDeleteTarget(null); router.refresh();
+    } catch { mostrarAviso("Erro ao excluir.", "erro"); } finally { setDeleting(false); }
   }
 
   const actions: Action<VeiculoListRow>[] = [
     ...(perms.canView ? [{ icon: "/icons/actions/Olho.svg", label: "Visualizar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "view") }] : []),
     ...(perms.canEdit ? [{ icon: "/icons/actions/Editar.svg", label: "Editar", onClick: (row: VeiculoListRow) => openModal(row.id_veiculo, "edit") }] : []),
-    ...(perms.canDelete ? [{ icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row: VeiculoListRow) => { setDeleteTarget(row); setDeleteError(""); } }] : []),
+    ...(perms.canDelete ? [{ icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row: VeiculoListRow) => setDeleteTarget(row) }] : []),
   ];
 
   return (
@@ -70,7 +75,7 @@ export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px"><VeiculoForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} /></Modal>
       <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} tiposCodigo={tiposCodigo} canDeactivate={perms.canDeactivate} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />}</Modal>
-      <ConfirmDialog open={deleteTarget !== null} onClose={() => { setDeleteTarget(null); setDeleteError(""); }} onConfirm={handleDelete} title="Excluir veículo" message={deleteError || `Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`} confirmLabel={deleteError ? "OK" : "Excluir"} loading={deleting} />
+      <ConfirmDialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Excluir veículo" message={`Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`} confirmLabel="Excluir" loading={deleting} />
     </>
   );
 }

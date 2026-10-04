@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import DestinatarioForm from "./novo/DestinatarioForm";
 import type { Column, Action } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
@@ -31,8 +33,9 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
   const [formData, setFormData] = useState<DestinatarioFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DestinatarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
+  const router = useRouter();
+  const mostrarAviso = useAviso();
 
   useEffect(() => {
     if (searchRef.current.length < 2) {
@@ -63,23 +66,20 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
 
   function handleSuccess() {
     closeModal();
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    setDeleteError("");
     try {
       const result = await deleteDestinatario(deleteTarget.id_destinatario);
-      if (result.error) {
-        setDeleteError(result.error);
-      } else {
-        setDeleteTarget(null);
-        window.location.reload();
-      }
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Destinatário excluído com sucesso.", "sucesso");
+      setDeleteTarget(null);
+      router.refresh();
     } catch {
-      setDeleteError("Erro ao excluir. Tente novamente.");
+      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
     } finally {
       setDeleting(false);
     }
@@ -104,10 +104,7 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
       ? [{
           icon: "/icons/actions/Lixeira.svg",
           label: "Excluir",
-          onClick: (row: DestinatarioListRow) => {
-            setDeleteTarget(row);
-            setDeleteError("");
-          },
+          onClick: (row: DestinatarioListRow) => setDeleteTarget(row),
         }]
       : []),
   ];
@@ -147,15 +144,11 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir destinatário"
-        message={
-          deleteError
-            ? deleteError
-            : `Tem certeza que deseja excluir "${deleteTarget?.razao}"?`
-        }
-        confirmLabel={deleteError ? "OK" : "Excluir"}
+        message={`Tem certeza que deseja excluir "${deleteTarget?.razao}"?`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

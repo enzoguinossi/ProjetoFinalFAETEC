@@ -6,6 +6,7 @@ import type { VeiculoFormData } from "./actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -19,26 +20,27 @@ interface Props {
 export default function VeiculoForm({ mode = "create", initialData, tiposCodigo, canDeactivate = true, onSuccess, onCancel }: Props) {
   const isView = mode === "view";
   const isEdit = mode === "edit";
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [placa, setPlaca] = useState(initialData?.placa ?? "");
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError(""); setSaving(true);
+    setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
       if (initialData) form.set("id_veiculo", String(initialData.id_veiculo));
       const r = initialData ? await updateVeiculo(form) : await createVeiculo(form);
-      if (r.error) setError(r.error); else onSuccess?.();
-    } catch { setError("Erro ao salvar."); } finally { setSaving(false); }
+      if (r.error) { mostrarAviso(r.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
+    } catch { mostrarAviso("Erro ao salvar.", "erro"); } finally { setSaving(false); }
   }
 
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
-      {error && <div className={ui.errorBox}>{error}</div>}
       {isEdit && (
         <label className="flex items-center gap-2 font-sans text-sm cursor-pointer">
           <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} disabled={!canDeactivate} className="accent-brand" /> Ativo

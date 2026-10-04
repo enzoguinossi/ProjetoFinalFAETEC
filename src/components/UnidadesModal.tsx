@@ -13,6 +13,7 @@ import {
   deleteUnidade,
 } from "@/app/unidades/actions";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 export type UnidadeItem = {
   id_conversao: number;
@@ -42,12 +43,11 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
   const [nome, setNome] = useState("");
   const [fator, setFator] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [erro, setErro] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
 
   const [deleteTarget, setDeleteTarget] = useState<UnidadeItem | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
 
   async function carregar() {
     const lista = await listarUnidades();
@@ -56,17 +56,16 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
   }
 
   function iniciarNovo() {
-    setEditando(null); setNome(""); setFator(""); setDescricao(""); setErro("");
+    setEditando(null); setNome(""); setFator(""); setDescricao("");
     setFormOpen(true);
   }
 
   function iniciarEdicao(u: UnidadeItem) {
-    setEditando(u); setNome(u.nome); setFator(String(u.fator)); setDescricao(u.descricao ?? ""); setErro("");
+    setEditando(u); setNome(u.nome); setFator(String(u.fator)); setDescricao(u.descricao ?? "");
     setFormOpen(true);
   }
 
   async function salvar() {
-    setErro("");
     setSaving(true);
     try {
       const fd = new FormData();
@@ -75,7 +74,8 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
       fd.set("descricao", descricao);
       if (editando) fd.set("id_conversao", String(editando.id_conversao));
       const r = editando ? await updateUnidade(fd) : await createUnidade(fd);
-      if (r.error) { setErro(r.error); return; }
+      if (r.error) { mostrarAviso(r.error, "erro"); return; }
+      mostrarAviso(editando ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
       setFormOpen(false);
       await carregar();
     } finally {
@@ -85,10 +85,11 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
   async function confirmarExclusao() {
     if (!deleteTarget) return;
-    setDeleting(true); setDeleteError("");
+    setDeleting(true);
     try {
       const r = await deleteUnidade(deleteTarget.id_conversao);
-      if (r.error) { setDeleteError(r.error); return; }
+      if (r.error) { mostrarAviso(r.error, "erro"); return; }
+      mostrarAviso("Unidade excluída com sucesso.", "sucesso");
       setDeleteTarget(null);
       await carregar();
     } finally {
@@ -98,7 +99,7 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
   const actions: Action<UnidadeItem>[] = [
     { icon: "/icons/actions/Editar.svg", label: "Editar", onClick: iniciarEdicao },
-    { icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row) => { setDeleteTarget(row); setDeleteError(""); } },
+    { icon: "/icons/actions/Lixeira.svg", label: "Excluir", onClick: (row) => { setDeleteTarget(row); } },
   ];
 
   return (
@@ -126,8 +127,6 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} width="440px">
         <div className={ui.form}>
-          {erro && <div className={ui.errorBox}>{erro}</div>}
-
           <div className={ui.field}>
             <label className={ui.label}>Nome</label>
             <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="CX20, PCT10, UN..." className={ui.input} />
@@ -152,11 +151,11 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={confirmarExclusao}
         title="Excluir unidade"
-        message={deleteError || `Tem certeza que deseja excluir "${deleteTarget?.nome}"? Produtos que a usam como padrão serão desvinculados.`}
-        confirmLabel={deleteError ? "OK" : "Excluir"}
+        message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"? Produtos que a usam como padrão serão desvinculados.`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

@@ -6,7 +6,7 @@ import { cepService } from "@/services/cep";
 import { contatoService } from "@/services/contato";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
-import { EntidadeComVinculosError } from "@/dao/_errors";
+import { mensagemDeErro } from "@/dao/_errors";
 
 export async function buscarCep(cep: string) {
   const user = await requireUser();
@@ -64,14 +64,18 @@ export async function createFornecedor(formData: FormData) {
     longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
   } : undefined;
 
-  await fornecedorDAO.create({
-    razao_social: razao_social.trim(),
-    cnpj: (formData.get("cnpj") as string) || undefined,
-    contato: (formData.get("contato") as string) || undefined,
-    codigos: codigoResult.codigos,
-    ...contatoResult.contatos,
-    endereco,
-  }, user.id_usuario);
+  try {
+    await fornecedorDAO.create({
+      razao_social: razao_social.trim(),
+      cnpj: (formData.get("cnpj") as string) || undefined,
+      contato: (formData.get("contato") as string) || undefined,
+      codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
+      endereco,
+    }, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -121,25 +125,29 @@ export async function updateFornecedor(formData: FormData) {
   const contatoResult = contatoService.resolverContatosParaSalvar(formData);
   if ("error" in contatoResult) return { error: contatoResult.error };
 
-  await fornecedorDAO.update(id, {
-    razao_social: (formData.get("razao_social") as string)?.trim(),
-    cnpj: (formData.get("cnpj") as string) || undefined,
-    contato: (formData.get("contato") as string) || undefined,
-    ativo,
-    codigos: codigoResult.codigos,
-    ...contatoResult.contatos,
-    endereco: {
-      logradouro: (formData.get("logradouro") as string) || undefined,
-      numero: (formData.get("numero") as string) || undefined,
-      complemento: (formData.get("complemento") as string) || undefined,
-      bairro: (formData.get("bairro") as string) || undefined,
-      cidade: (formData.get("cidade") as string) || undefined,
-      uf: (formData.get("uf") as string) || undefined,
-      cep: (formData.get("cep") as string) || undefined,
-      latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
-      longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
-    },
-  }, user.id_usuario);
+  try {
+    await fornecedorDAO.update(id, {
+      razao_social: (formData.get("razao_social") as string)?.trim(),
+      cnpj: (formData.get("cnpj") as string) || undefined,
+      contato: (formData.get("contato") as string) || undefined,
+      ativo,
+      codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
+      endereco: {
+        logradouro: (formData.get("logradouro") as string) || undefined,
+        numero: (formData.get("numero") as string) || undefined,
+        complemento: (formData.get("complemento") as string) || undefined,
+        bairro: (formData.get("bairro") as string) || undefined,
+        cidade: (formData.get("cidade") as string) || undefined,
+        uf: (formData.get("uf") as string) || undefined,
+        cep: (formData.get("cep") as string) || undefined,
+        latitude: formData.get("latitude") ? Number(formData.get("latitude")) : undefined,
+        longitude: formData.get("longitude") ? Number(formData.get("longitude")) : undefined,
+      },
+    }, user.id_usuario);
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
 
   return { success: true };
 }
@@ -151,8 +159,7 @@ export async function deleteFornecedor(id: number) {
   try {
     await fornecedorDAO.hardDelete(id, user.id_usuario);
   } catch (e) {
-    if (e instanceof EntidadeComVinculosError) return { error: e.message };
-    throw e;
+    return { error: mensagemDeErro(e) };
   }
   return { success: true };
 }

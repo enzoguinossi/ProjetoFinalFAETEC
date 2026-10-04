@@ -9,6 +9,7 @@ import EnderecoFields from "@/components/EnderecoFields";
 import { normalizaTelefones } from "@/lib/contatos";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -26,8 +27,8 @@ export default function FornecedorForm({
   const isView = mode === "view";
   const isEdit = mode === "edit";
 
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
   const [emails, setEmails] = useState<EmailEntry[]>(initialData?.emails ?? []);
@@ -36,7 +37,6 @@ export default function FornecedorForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
@@ -44,10 +44,11 @@ export default function FornecedorForm({
       const result = initialData
         ? await updateFornecedor(form)
         : await createFornecedor(form);
-      if (result.error) setError(result.error);
-      else onSuccess?.();
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
     } catch {
-      setError("Erro ao salvar.");
+      mostrarAviso("Erro ao salvar.", "erro");
     } finally {
       setSaving(false);
     }
@@ -66,8 +67,6 @@ export default function FornecedorForm({
 
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
-      {error && <div className={ui.errorBox}>{error}</div>}
-
       <div className="grid grid-cols-[1fr_1fr] gap-6 items-stretch">
         {/* Coluna esquerda — dados, endereço e códigos */}
         <div className="flex flex-col gap-4">

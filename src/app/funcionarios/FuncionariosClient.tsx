@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAviso } from "@/components/AvisoProvider";
 import FuncionarioForm from "./novo/FuncionarioForm";
 import type { Column, Action } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
@@ -33,8 +35,9 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
   const [formData, setFormData] = useState<FuncionarioFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FuncionarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
   const searchRef = useRef("");
+  const router = useRouter();
+  const mostrarAviso = useAviso();
 
   useEffect(() => {
     if (searchRef.current.length < 2) {
@@ -65,23 +68,20 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
 
   function handleSuccess() {
     closeModal();
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
-    setDeleteError("");
     try {
       const result = await deleteFuncionario(deleteTarget.id_funcionario);
-      if (result.error) {
-        setDeleteError(result.error);
-      } else {
-        setDeleteTarget(null);
-        window.location.reload();
-      }
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso("Funcionário excluído com sucesso.", "sucesso");
+      setDeleteTarget(null);
+      router.refresh();
     } catch {
-      setDeleteError("Erro ao excluir. Tente novamente.");
+      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
     } finally {
       setDeleting(false);
     }
@@ -106,10 +106,7 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
       ? [{
           icon: "/icons/actions/Lixeira.svg",
           label: "Excluir",
-          onClick: (row: FuncionarioListRow) => {
-            setDeleteTarget(row);
-            setDeleteError("");
-          },
+          onClick: (row: FuncionarioListRow) => setDeleteTarget(row),
         }]
       : []),
   ];
@@ -149,15 +146,11 @@ export default function FuncionariosClient({ rows: initialRows, tiposCodigo, per
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        onClose={() => { setDeleteTarget(null); setDeleteError(""); }}
+        onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Excluir funcionário"
-        message={
-          deleteError
-            ? deleteError
-            : `Tem certeza que deseja excluir "${deleteTarget?.nome}"?`
-        }
-        confirmLabel={deleteError ? "OK" : "Excluir"}
+        message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"?`}
+        confirmLabel="Excluir"
         loading={deleting}
       />
     </>

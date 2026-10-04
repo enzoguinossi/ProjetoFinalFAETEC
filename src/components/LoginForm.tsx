@@ -3,16 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginAction } from "@/app/login/actions";
-import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 export default function LoginForm() {
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const mostrarAviso = useAviso();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
 
     const form = new FormData(e.currentTarget);
@@ -20,7 +19,7 @@ export default function LoginForm() {
     setLoading(false);
 
     if (result.error) {
-      setError(result.error);
+      mostrarAviso(result.error, "erro");
     } else if ("redirect" in result && result.redirect) {
       router.push(result.redirect);
     } else {
@@ -38,7 +37,6 @@ export default function LoginForm() {
 
         {/* Form */}
         <div className="flex-1 flex flex-col gap-[2.125rem] px-[0.625rem]">
-          {error && <div className={ui.errorBox}>{error}</div>}
           <div className="flex flex-col gap-[0.375rem]">
             <label className="font-sans text-sm font-medium text-ink">Login</label>
             <input

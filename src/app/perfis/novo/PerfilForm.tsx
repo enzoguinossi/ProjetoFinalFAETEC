@@ -6,6 +6,7 @@ import type { PerfilFormData } from "../actions";
 import Button from "@/components/Button";
 import PermissoesPanel, { type GrupoPermissoes } from "@/components/PermissoesPanel";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface Props {
   grupos: GrupoPermissoes[];
@@ -21,8 +22,8 @@ export default function PerfilForm({
   const isView = mode === "view";
   const isEdit = mode === "edit";
 
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
   const [nome, setNome] = useState(initialData?.nome ?? "");
   const [descricao, setDescricao] = useState(initialData?.descricao ?? "");
   const [selecionadas, setSelecionadas] = useState<string[]>(initialData?.permissoes ?? []);
@@ -30,17 +31,17 @@ export default function PerfilForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (isView) return;
-    setError("");
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
       form.set("permissoes", JSON.stringify(selecionadas));
       if (initialData) form.set("id_perfil", String(initialData.id_perfil));
       const result = initialData ? await updatePerfil(form) : await createPerfil(form);
-      if (result.error) setError(result.error);
-      else onSuccess?.();
+      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onSuccess?.();
     } catch {
-      setError("Erro ao salvar.");
+      mostrarAviso("Erro ao salvar.", "erro");
     } finally {
       setSaving(false);
     }
@@ -48,8 +49,6 @@ export default function PerfilForm({
 
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
-      {error && <div className={ui.errorBox}>{error}</div>}
-
       <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
         <div className="flex flex-col gap-4">
           <div className={ui.field}>

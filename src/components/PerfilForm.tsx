@@ -4,6 +4,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
 
 interface PerfilOption {
   id_perfil: number;
@@ -20,21 +21,19 @@ interface PerfilFormProps {
 
 export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilFormProps) {
   const [idPerfil, setIdPerfil] = useState<number | "">("");
-  const [erro, setErro] = useState("");
+  const mostrarAviso = useAviso();
 
   function handleConfirm() {
     if (idPerfil === "") {
-      setErro("Selecione um perfil.");
+      mostrarAviso("Selecione um perfil.", "erro");
       return;
     }
     onConfirm(Number(idPerfil));
     setIdPerfil("");
-    setErro("");
   }
 
   function handleClose() {
     setIdPerfil("");
-    setErro("");
     onClose();
   }
 
@@ -47,7 +46,7 @@ export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilF
           <label className={ui.label}>Perfil</label>
           <select
             value={idPerfil}
-            onChange={(e) => { setIdPerfil(e.target.value ? Number(e.target.value) : ""); setErro(""); }}
+            onChange={(e) => setIdPerfil(e.target.value ? Number(e.target.value) : "")}
             className={ui.select}
           >
             <option value="">Selecione...</option>
@@ -60,7 +59,6 @@ export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilF
               {selecionado.descricao}
             </span>
           )}
-          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
         <div className={ui.rowActions}>
