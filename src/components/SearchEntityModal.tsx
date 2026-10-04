@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Modal from "@/components/Modal";
-import styles from "./SearchEntityModal.module.css";
 
 interface SearchEntityModalProps<T> {
   open: boolean;
@@ -73,11 +72,15 @@ export default function SearchEntityModal<T>({
 
   return (
     <Modal open={open} onClose={handleClose} width="480px">
-      <div className={styles.searchWrapper}>
-        <img src="/icons/actions/Lupa.svg" alt="" className={styles.searchIcon} />
+      <div className="flex items-center gap-2 h-10 px-3 mx-5 border border-[#c1c7cd] rounded-lg bg-white transition-[border-color] duration-150 focus-within:border-brand focus-within:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]">
+        <img
+          src="/icons/actions/Lupa.svg"
+          alt=""
+          className="w-[1.125rem] h-[1.125rem] shrink-0 opacity-50"
+        />
         <input
           ref={inputRef}
-          className={styles.searchInput}
+          className="flex-1 border-none outline-none bg-transparent font-sans text-sm text-ink h-full min-w-0 placeholder:text-[#8a8f9a]"
           type="text"
           placeholder={placeholder}
           value={query}
@@ -85,15 +88,15 @@ export default function SearchEntityModal<T>({
         />
       </div>
 
-      <div className={styles.list}>
-        {loading && <p className={styles.status}>Buscando...</p>}
+      <div className="overflow-y-auto px-2 py-3 max-h-[40vh]">
+        {loading && <p className="p-6 text-center text-[#697077] font-sans text-sm">Buscando...</p>}
         {!loading && query.length >= 2 && results.length === 0 && (
-          <p className={styles.status}>Nenhum resultado encontrado.</p>
+          <p className="p-6 text-center text-[#697077] font-sans text-sm">Nenhum resultado encontrado.</p>
         )}
         {results.map((item) => (
           <button
             key={getItemId(item)}
-            className={styles.item}
+            className="block w-full px-3 py-[0.625rem] border-none rounded-md bg-transparent text-left font-sans text-sm text-ink cursor-pointer transition-[background-color] duration-100 hover:bg-[#f2f4f8] [&+&]:mt-[2px]"
             onClick={() => handleSelect(item)}
           >
             {getItemLabel(item)}

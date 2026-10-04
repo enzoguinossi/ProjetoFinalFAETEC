@@ -1,7 +1,6 @@
 "use client";
 
 import Button from "@/components/Button";
-import styles from "./SearchBar.module.css";
 
 interface SearchBarProps {
   placeholder?: string;
@@ -21,7 +20,7 @@ export default function SearchBar({
   showNew = true,
 }: SearchBarProps) {
   return (
-    <div className={styles.container}>
+    <div className="flex items-center gap-[0.625rem] w-full h-[2.875rem] px-[0.6875rem] box-border">
       {showNew && (novoHref ? (
         <Button
           label={novoLabel}
@@ -43,14 +42,18 @@ export default function SearchBar({
           }
         />
       ))}
-      <div className={styles.searchWrapper}>
+      <div className="flex-1 flex items-center gap-2 h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white transition-[border-color] duration-150 focus-within:border-brand focus-within:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]">
         <input
-          className={styles.input}
+          className="flex-1 border-none outline-none bg-transparent font-sans text-sm text-ink h-full min-w-0 placeholder:text-[#8a8f9a]"
           type="text"
           placeholder={placeholder}
           onChange={(e) => onSearch?.(e.target.value)}
         />
-        <img src="/icons/actions/Lupa.svg" alt="" className={styles.searchIcon} />
+        <img
+          src="/icons/actions/Lupa.svg"
+          alt=""
+          className="w-[1.125rem] h-[1.125rem] shrink-0 opacity-50"
+        />
       </div>
     </div>
   );
