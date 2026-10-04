@@ -51,7 +51,7 @@ const iconBtnCls =
   "w-12 h-12 flex items-center justify-center border-none rounded-lg bg-transparent cursor-pointer transition-[background-color] duration-[120ms] hover:bg-[#f2f4f8] [&_img]:w-6 [&_img]:h-6";
 const navCls = "flex-1 flex flex-col min-h-0 w-full";
 const navItemCls =
-  "flex items-center gap-2 w-full py-3 px-2 border-b border-[#f2f4f8] bg-transparent cursor-pointer font-[Roboto,sans-serif] text-base font-medium text-ink text-left transition-[background-color] duration-[120ms] box-border hover:bg-[#f2f4f8]";
+  "flex items-center gap-2 w-full h-12 py-3 px-2 border-b border-[#f2f4f8] bg-transparent cursor-pointer font-[Roboto,sans-serif] text-base leading-none font-medium text-ink text-left transition-[background-color] duration-[120ms] box-border hover:bg-[#f2f4f8]";
 const navItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]! border-b-transparent";
 const subItemsCls = "flex flex-col pl-2";
 const subItemCls =
@@ -106,7 +106,7 @@ export default function Sidebar() {
     <aside className={sidebarCls}>
       {/* Logo */}
       <div className={logoAreaCls}>
-        <img src="/logo.svg" alt="Nexus" className="w-[4.375rem] h-auto" />
+        <img src="/logo.svg" alt="Nexus" className="w-[70.69px] h-auto" />
       </div>
 
       {/* Botões de ação */}
