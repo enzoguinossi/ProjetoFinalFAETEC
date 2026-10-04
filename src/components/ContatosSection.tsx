@@ -7,6 +7,8 @@ import EmailForm from "@/components/EmailForm";
 import TelefoneForm from "@/components/TelefoneForm";
 import Button from "@/components/Button";
 import type { TipoTelefone } from "@/types";
+import { useAviso } from "@/components/AvisoProvider";
+import { formatarTelefone } from "@/lib/telefone";
 
 export type EmailEntry = { endereco: string; principal: boolean };
 export type TelefoneEntry = { numero: string; tipo: TipoTelefone; principal: boolean };
@@ -29,13 +31,11 @@ const tituloSecao = "m-0 font-display text-lg font-[590] tracking-[-0.028125rem]
 
 const emailColumns: Column<EmailEntry>[] = [
   { key: "endereco", label: "E-mail", width: "3fr" },
-  { key: "principal", label: "Principal", width: "1fr", render: (v) => (v ? "Sim" : "—") },
 ];
 
 const telefoneColumns: Column<TelefoneEntry>[] = [
-  { key: "numero", label: "Número", width: "2fr" },
+  { key: "numero", label: "Número", width: "2fr", render: (v) => formatarTelefone(String(v)) },
   { key: "tipo", label: "Tipo", width: "1.5fr", render: (v) => TIPO_LABEL[v as TipoTelefone] ?? String(v) },
-  { key: "principal", label: "Principal", width: "1fr", render: (v) => (v ? "Sim" : "—") },
 ];
 
 function ordenar<T extends { principal: boolean }>(list: T[]): T[] {
@@ -61,8 +61,11 @@ export default function ContatosSection({
   const [telModal, setTelModal] = useState(false);
   const [telIdx, setTelIdx] = useState<number | null>(null);
 
+  const mostrarAviso = useAviso();
+
   // ── Emails ──
   function confirmarEmail(endereco: string, principal: boolean) {
+    const conflito = principal && emails.some((e, i) => e.principal && i !== emailIdx);
     let next = [...emails];
     const idx = emailIdx;
     if (idx !== null) {
@@ -74,6 +77,9 @@ export default function ContatosSection({
     }
     onEmailsChange(ordenar(next));
     setEmailModal(false);
+    if (conflito) {
+      mostrarAviso("Já existe um e-mail principal. O anterior foi desmarcado e este passou a ser o principal.", "cautela");
+    }
   }
 
   function removerEmail(i: number) {
@@ -82,6 +88,7 @@ export default function ContatosSection({
 
   // ── Telefones ──
   function confirmarTelefone(numero: string, tipo: TipoTelefone, principal: boolean) {
+    const conflito = principal && telefones.some((t, i) => t.principal && i !== telIdx);
     let next = [...telefones];
     const idx = telIdx;
     if (idx !== null) {
@@ -93,6 +100,9 @@ export default function ContatosSection({
     }
     onTelefonesChange(ordenar(next));
     setTelModal(false);
+    if (conflito) {
+      mostrarAviso("Já existe um telefone principal. O anterior foi desmarcado e este passou a ser o principal.", "cautela");
+    }
   }
 
   function removerTelefone(i: number) {

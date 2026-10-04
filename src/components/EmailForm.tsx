@@ -4,6 +4,8 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
+import { validarEmail } from "@/lib/email";
 
 interface EmailFormProps {
   open: boolean;
@@ -13,8 +15,6 @@ interface EmailFormProps {
   initialPrincipal?: boolean;
   editing?: boolean;
 }
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function EmailForm({
   open,
@@ -26,24 +26,22 @@ export default function EmailForm({
 }: EmailFormProps) {
   const [endereco, setEndereco] = useState(initialEndereco);
   const [principal, setPrincipal] = useState(initialPrincipal);
-  const [erro, setErro] = useState("");
+  const mostrarAviso = useAviso();
 
   function handleConfirm() {
-    const v = endereco.trim();
-    if (!EMAIL_RE.test(v)) {
-      setErro("Informe um e-mail válido.");
+    const res = validarEmail(endereco);
+    if (!res.ok) {
+      mostrarAviso(res.erro, "erro");
       return;
     }
-    onConfirm(v, principal);
+    onConfirm(res.endereco, principal);
     setEndereco("");
     setPrincipal(false);
-    setErro("");
   }
 
   function handleClose() {
     setEndereco("");
     setPrincipal(false);
-    setErro("");
     onClose();
   }
 
@@ -55,12 +53,11 @@ export default function EmailForm({
           <input
             autoFocus
             value={endereco}
-            onChange={(e) => { setEndereco(e.target.value); setErro(""); }}
+            onChange={(e) => setEndereco(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder="nome@dominio.com"
-            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
+            className={ui.input}
           />
-          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
         <label className="flex cursor-pointer items-center gap-2 font-sans text-base text-ink-strong">

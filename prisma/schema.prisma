@@ -203,7 +203,7 @@ model Endereco {
 model FuncionarioTelefone {
   id_funcionario_telefone Int          @id @default(autoincrement()) @map("ID_funcionario_telefone")
   id_funcionario          Int          @map("ID_funcionario")
-  numero                  String       @unique @map("numero")
+  numero                  String       @unique @db.VarChar(11) @map("numero")
   tipo                    TipoTelefone @map("tipo")
   principal               Boolean      @default(false) @map("principal")
   ativo                   Boolean      @default(true) @map("ativo")
@@ -216,7 +216,7 @@ model FuncionarioTelefone {
 model DestinatarioTelefone {
   id_destinatario_telefone Int          @id @default(autoincrement()) @map("ID_destinatario_telefone")
   id_destinatario          Int          @map("ID_destinatario")
-  numero                   String       @unique @map("numero")
+  numero                   String       @unique @db.VarChar(11) @map("numero")
   tipo                     TipoTelefone @map("tipo")
   principal                Boolean      @default(false) @map("principal")
   ativo                    Boolean      @default(true) @map("ativo")
@@ -229,7 +229,7 @@ model DestinatarioTelefone {
 model FornecedorTelefone {
   id_fornecedor_telefone Int          @id @default(autoincrement()) @map("ID_fornecedor_telefone")
   id_fornecedor          Int          @map("ID_fornecedor")
-  numero                 String       @unique @map("numero")
+  numero                 String       @unique @db.VarChar(11) @map("numero")
   tipo                   TipoTelefone @map("tipo")
   principal              Boolean      @default(false) @map("principal")
   ativo                  Boolean      @default(true) @map("ativo")

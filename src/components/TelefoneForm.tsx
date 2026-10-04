@@ -5,6 +5,8 @@ import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { TIPO_TELEFONE, type TipoTelefone } from "@/types";
 import { ui } from "@/lib/ui";
+import { useAviso } from "@/components/AvisoProvider";
+import { formatarTelefone, validarTelefone, TELEFONE_MAX_CARACTERES } from "@/lib/telefone";
 
 interface TelefoneFormProps {
   open: boolean;
@@ -31,29 +33,27 @@ export default function TelefoneForm({
   initialPrincipal = false,
   editing,
 }: TelefoneFormProps) {
-  const [numero, setNumero] = useState(initialNumero);
+  const [numero, setNumero] = useState(formatarTelefone(initialNumero));
   const [tipo, setTipo] = useState<TipoTelefone>(initialTipo);
   const [principal, setPrincipal] = useState(initialPrincipal);
-  const [erro, setErro] = useState("");
+  const mostrarAviso = useAviso();
 
   function handleConfirm() {
-    const v = numero.trim();
-    if (!v) {
-      setErro("Informe o número.");
+    const res = validarTelefone(numero);
+    if (!res.ok) {
+      mostrarAviso(res.erro, "erro");
       return;
     }
-    onConfirm(v, tipo, principal);
+    onConfirm(res.numero, tipo, principal);
     setNumero("");
     setTipo("CELULAR");
     setPrincipal(false);
-    setErro("");
   }
 
   function handleClose() {
     setNumero("");
     setTipo("CELULAR");
     setPrincipal(false);
-    setErro("");
     onClose();
   }
 
@@ -65,12 +65,13 @@ export default function TelefoneForm({
           <input
             autoFocus
             value={numero}
-            onChange={(e) => { setNumero(e.target.value); setErro(""); }}
+            inputMode="tel"
+            maxLength={TELEFONE_MAX_CARACTERES}
+            onChange={(e) => setNumero(formatarTelefone(e.target.value))}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
-            placeholder="(21) 99999-9999"
-            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
+            placeholder="(00) 00000-0000"
+            className={ui.input}
           />
-          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
         <div className={ui.field}>
