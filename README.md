@@ -71,12 +71,31 @@ npm install
 
 # Configurar banco
 cp .env.example .env   # editar credenciais MySQL
-npx prisma db push     # criar tabelas
-npx prisma generate    # gerar client
+
+# Preparar o ambiente (generate + push + seed de referência)
+npm run setup          # ou: npm run db:setup
 
 # Iniciar dev
 npm run dev
 ```
+
+## Comandos
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Inicia o servidor de desenvolvimento |
+| `npm run build` | Build de produção |
+| `npm run lint` | Lint do projeto |
+| `npm run setup` | `npm install` + preparação do banco |
+| `npm run db:setup` | `prisma generate` + `prisma db push` + seed |
+| `npm run db:reset` | **Apaga todos os dados** (`--force-reset`) e re-seeda |
+| `npm run db:push` | Aplica o schema no banco |
+| `npm run db:seed` | Executa o seed de referência |
+| `npm run db:studio` | Abre o Prisma Studio |
+
+### Seed
+
+O seed popula apenas os dados fixos de referência: **tipos de código, permissões, perfis-template (Operador/Auxiliar) e unidades de conversão**. Nenhum cadastro (usuários, funcionários, produtos, destinatários, fornecedores, veículos) é criado — o Super Admin é criado pelo fluxo de primeiro acesso do próprio sistema.
 
 ## Equipe
 
