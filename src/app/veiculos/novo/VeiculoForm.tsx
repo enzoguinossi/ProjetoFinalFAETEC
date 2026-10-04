@@ -5,6 +5,7 @@ import { createVeiculo, updateVeiculo } from "./actions";
 import type { VeiculoFormData } from "./actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -35,27 +36,25 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
     } catch { setError("Erro ao salvar."); } finally { setSaving(false); }
   }
 
-  const inputStyle = { height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none", width: "100%", boxSizing: "border-box" as const };
-
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {error && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontSize: "0.8125rem" }}>{error}</div>}
+    <form onSubmit={handleSubmit} className={ui.form}>
+      {error && <div className={ui.errorBox}>{error}</div>}
       {isEdit && (
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "0.875rem", cursor: "pointer" }}>
-          <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} disabled={!canDeactivate} style={{ accentColor: "#1b9956" }} /> Ativo
+        <label className="flex items-center gap-2 font-sans text-sm cursor-pointer">
+          <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} disabled={!canDeactivate} className="accent-brand" /> Ativo
         </label>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Placa</label>
-        <input name="placa" required={!isView} value={isView || isEdit ? placa : undefined} onChange={isEdit ? e => setPlaca(e.target.value.toUpperCase()) : undefined} readOnly={isView} style={inputStyle} />
+      <div className={ui.field}>
+        <label className={ui.label}>Placa</label>
+        <input name="placa" required={!isView} value={isView || isEdit ? placa : undefined} onChange={isEdit ? e => setPlaca(e.target.value.toUpperCase()) : undefined} readOnly={isView} className={ui.input} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Modelo</label>
-        {isView ? <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.modelo ?? "—"}</p> : <input name="modelo" defaultValue={initialData?.modelo ?? undefined} readOnly={isView} style={inputStyle} />}
+      <div className={ui.field}>
+        <label className={ui.label}>Modelo</label>
+        {isView ? <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.modelo ?? "—"}</p> : <input name="modelo" defaultValue={initialData?.modelo ?? undefined} readOnly={isView} className={ui.input} />}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Status</label>
-        <select name="status" defaultValue={initialData?.status ?? "DISPONIVEL"} disabled={isView} style={{ ...inputStyle, background: "#fff" }}>
+      <div className={ui.field}>
+        <label className={ui.label}>Status</label>
+        <select name="status" defaultValue={initialData?.status ?? "DISPONIVEL"} disabled={isView} className={ui.select}>
           <option value="DISPONIVEL">Disponível</option>
           <option value="INDISPONIVEL">Indisponível</option>
           <option value="EM_ROTA">Em rota</option>
@@ -67,7 +66,7 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
         onChange={setCodigos}
         disabled={isView}
       />
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4 }}>
+      <div className={ui.rowActions}>
         {isView ? <Button label="Fechar" variant="cancel" onClick={onCancel} /> : <><Button label="Cancelar" variant="cancel" onClick={onCancel} /><Button label={isEdit ? "Salvar" : "Gravar"} variant="primary" type="submit" disabled={saving} /></>}
       </div>
     </form>
