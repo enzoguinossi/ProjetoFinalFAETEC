@@ -9,7 +9,6 @@ import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
-import styles from "./ProdutoForm.module.css";
 
 interface Conversao {
   id_conversao: number;
@@ -39,6 +38,11 @@ interface Props {
 }
 
 type InsumoEntry = { id: number; descricao: string; qtd: string };
+
+const INPUT_CLASS =
+  "h-10 px-4 border border-border-input rounded-lg font-sans text-base outline-none transition-[border-color] duration-[120ms] w-full box-border bg-white focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]";
+const CHECKBOX_LABEL_CLASS =
+  "flex items-center gap-2 font-sans text-base font-normal text-ink-strong leading-[1.4] cursor-pointer [&_input[type=checkbox]]:size-[1.125rem] [&_input[type=checkbox]]:accent-brand [&_input[type=checkbox]]:cursor-pointer";
 
 export default function ProdutoForm({
   conversoes, tiposCodigo, mode = "create", initialData, canDeactivate = true,
@@ -98,11 +102,7 @@ export default function ProdutoForm({
             next[i] = { ...next[i], qtd: e.target.value };
             setInsumos(next);
           }}
-          style={{
-            width: "100%", height: 28, border: "1px solid #d9d9d9", borderRadius: 6,
-            padding: "0 8px", fontFamily: "Inter,sans-serif", fontSize: "0.875rem",
-            outline: "none", boxSizing: "border-box",
-          }}
+          className="w-full h-7 border border-border-input rounded-md px-2 font-sans text-sm outline-none box-border"
         />
       ) : undefined,
     },
@@ -184,16 +184,16 @@ export default function ProdutoForm({
 
   return (
     <>
-      <form className={styles.form} onSubmit={handleSubmit}>
-        {error && <div className={styles.error}>{error}</div>}
+      <form className="flex flex-col gap-[11px] p-0 w-full box-border" onSubmit={handleSubmit}>
+        {error && <div className="px-3 py-2 bg-danger-bg border border-cancel rounded-md text-cancel font-sans text-[0.8125rem]">{error}</div>}
 
 
 
         {/* Descrição */}
-        <div className={styles.field}>
-          <label className={styles.label}>Descrição do produto</label>
+        <div className="flex flex-col gap-2">
+          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Descrição do produto</label>
           <input
-            className={styles.input}
+            className={INPUT_CLASS}
             name="descricao"
             required={!isView}
             value={isView || isEdit ? descricao : undefined}
@@ -204,16 +204,15 @@ export default function ProdutoForm({
         </div>
 
         {/* Unidade + Checkboxes */}
-        <div className={styles.field}>
-          <label className={styles.label}>Unidade Padrão de Entrada</label>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div className="flex flex-col gap-2">
+          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Entrada</label>
+          <div className="flex gap-2 items-center">
             <select
-              className={styles.select}
+              className={`${INPUT_CLASS} flex-1`}
               name="id_conversao"
               value={idConversao ?? ""}
               onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
               disabled={isView}
-              style={{ flex: 1 }}
             >
               <option value="">Selecione...</option>
               {conversoesAtuais.map((c) => (
@@ -225,11 +224,7 @@ export default function ProdutoForm({
                 type="button"
                 onClick={() => setUnidadesModalOpen(true)}
                 title="Gerenciar unidades de conversão"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 40, height: 40, border: "1px solid #d9d9d9", borderRadius: 8,
-                  background: "#fff", cursor: "pointer", color: "#1b9956", flexShrink: 0,
-                }}
+                className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -240,8 +235,8 @@ export default function ProdutoForm({
         </div>
 
         {isEdit && (
-            <div className={styles.flagsRow}>
-              <label className={styles.checkboxLabel}>
+            <div className="flex items-start justify-between gap-4">
+              <label className={CHECKBOX_LABEL_CLASS}>
                 <input
                     type="checkbox"
                     name="ativo"
@@ -255,22 +250,22 @@ export default function ProdutoForm({
         )}
 
         {/* Flags + Data lado a lado */}
-        <div className={styles.flagsRow}>
-          <div className={styles.checkboxCol}>
-            <label className={styles.checkboxLabel}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-[5px]">
+            <label className={CHECKBOX_LABEL_CLASS}>
               <input type="checkbox" name="perecivel" checked={perecivel} onChange={(e) => setPerecivel(e.target.checked)} disabled={isView} />
               Perecível
             </label>
-            <label className={styles.checkboxLabel}>
+            <label className={CHECKBOX_LABEL_CLASS}>
               <input type="checkbox" name="composto" checked={composto} onChange={(e) => setComposto(e.target.checked)} disabled={isView} />
               Composto
             </label>
           </div>
           {perecivel && (
-            <div className={styles.dateCol}>
-              <label className={styles.label}>Validade</label>
+            <div className="flex flex-col gap-2 min-w-[200px]">
+              <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Validade</label>
               <input
-                className={styles.input}
+                className={INPUT_CLASS}
                 type="date"
                 name="data_validade"
                 defaultValue={initialData?.data_validade ?? undefined}
@@ -290,9 +285,9 @@ export default function ProdutoForm({
 
         {/* ── Insumos ── */}
         {composto && (
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>Insumos</h3>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-xl font-[590] tracking-[-0.028125rem] leading-[1.5625rem] text-ink-strong m-0">Insumos</h3>
               {!isView && (
                 <Button
                   label="Novo"
@@ -307,7 +302,7 @@ export default function ProdutoForm({
             </div>
             <DataTable columns={insumoColumns} data={insumos} actions={insumoActions} idField="descricao" pageSize={5} />
             {insumos.map((ins, i) => (
-              <div key={`hi-${i}`} style={{ display: "none" }}>
+              <div key={`hi-${i}`} className="hidden">
                 <input name="insumo_produto" value={ins.id} readOnly />
                 <input name="insumo_qtd" value={ins.qtd} readOnly />
               </div>
@@ -316,11 +311,11 @@ export default function ProdutoForm({
         )}
 
         {/* Foto */}
-        <div className={styles.field}>
-          <label className={styles.label}>Foto</label>
-          <div className={styles.fotoRow}>
+        <div className="flex flex-col gap-2">
+          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Foto</label>
+          <div className="flex gap-2 items-center [&_input]:flex-1">
             <input
-              className={styles.input}
+              className={INPUT_CLASS}
               name="foto_url"
               placeholder="URL da imagem..."
               defaultValue={initialData?.foto_url ?? undefined}
@@ -333,10 +328,10 @@ export default function ProdutoForm({
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   name="foto_arquivo"
-                  style={{ display: "none" }}
+                  className="hidden"
                   onChange={onSelecionarFoto}
                 />
-                <button type="button" className={styles.fotoBtn} title="Upload" onClick={() => fotoInputRef.current?.click()}>
+                <button type="button" className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-[#697077] shrink-0 transition-[background] duration-[120ms] hover:bg-hover" title="Upload" onClick={() => fotoInputRef.current?.click()}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2 2v-4" />
                     <polyline points="17 8 12 3 7 8" />
@@ -347,7 +342,7 @@ export default function ProdutoForm({
             )}
           </div>
           {fotoNome && (
-            <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#616161" }}>
+            <span className="font-sans text-[0.8125rem] text-[#616161]">
               {fotoNome} — será convertida para WEBP ao salvar
             </span>
           )}
@@ -355,20 +350,20 @@ export default function ProdutoForm({
             <img
               src={previewFoto ?? initialData?.foto_url ?? ""}
               alt="Pré-visualização"
-              style={{ marginTop: 8, maxWidth: 160, maxHeight: 160, borderRadius: 8, objectFit: "cover" }}
+              className="mt-2 max-w-40 max-h-40 rounded-lg object-cover"
             />
           )}
         </div>
 
         {/* Actions */}
         {!isView && (
-          <div className={styles.actions}>
+          <div className="flex justify-end gap-[10px] pt-1">
             <Button label="Cancelar" variant="cancel" onClick={onCancel} />
             <Button label={isEdit ? "Salvar" : "Gravar"} variant="primary" type="submit" disabled={saving} />
           </div>
         )}
         {isView && (
-          <div className={styles.actions}>
+          <div className="flex justify-end gap-[10px] pt-1">
             <Button label="Fechar" variant="cancel" onClick={onCancel} />
           </div>
         )}

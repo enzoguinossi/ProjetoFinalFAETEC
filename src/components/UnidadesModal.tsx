@@ -12,6 +12,7 @@ import {
   updateUnidade,
   deleteUnidade,
 } from "@/app/unidades/actions";
+import { ui } from "@/lib/ui";
 
 export type UnidadeItem = {
   id_conversao: number;
@@ -27,12 +28,6 @@ interface Props {
   /** Lista inicial de unidades (vinda da página). */
   initial?: UnidadeItem[];
 }
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-  borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-  outline: "none", width: "100%", boxSizing: "border-box" as const,
-};
 
 const columns: Column<UnidadeItem>[] = [
   { key: "nome", label: "Nome", width: "1.5fr" },
@@ -109,9 +104,9 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
   return (
     <>
       <Modal open={open} onClose={onClose} width="640px">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <h3 style={{ fontFamily: '"SF Pro","Segoe UI",sans-serif', fontSize: "1.25rem", fontWeight: 590, margin: 0, color: "#1e1e1e" }}>
+        <div className={ui.form}>
+          <div className="flex items-center justify-between">
+            <h3 className="m-0 font-display text-xl font-[590] text-ink-strong">
               Unidades de Conversão
             </h3>
             <Button
@@ -123,32 +118,32 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
           <DataTable columns={columns} data={unidades} actions={actions} idField="id_conversao" pageSize={5} />
 
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div className="flex justify-end">
             <Button label="Fechar" variant="cancel" onClick={onClose} />
           </div>
         </div>
       </Modal>
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} width="440px">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {erro && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>{erro}</div>}
+        <div className={ui.form}>
+          {erro && <div className={ui.errorBox}>{erro}</div>}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Nome</label>
-            <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="CX20, PCT10, UN..." style={inputStyle} />
+          <div className={ui.field}>
+            <label className={ui.label}>Nome</label>
+            <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="CX20, PCT10, UN..." className={ui.input} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Fator</label>
-            <input type="number" min="0" step="any" value={fator} onChange={(e) => setFator(e.target.value)} placeholder="20" style={inputStyle} />
+          <div className={ui.field}>
+            <label className={ui.label}>Fator</label>
+            <input type="number" min="0" step="any" value={fator} onChange={(e) => setFator(e.target.value)} placeholder="20" className={ui.input} />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Descrição</label>
-            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" style={inputStyle} />
+          <div className={ui.field}>
+            <label className={ui.label}>Descrição</label>
+            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className={ui.input} />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4 }}>
+          <div className={ui.rowActions}>
             <Button label="Cancelar" variant="cancel" onClick={() => setFormOpen(false)} />
             <Button label={editando ? "Salvar" : "Gravar"} variant="primary" onClick={salvar} disabled={saving || !nome.trim() || !fator} />
           </div>
