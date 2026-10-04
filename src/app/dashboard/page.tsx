@@ -1,9 +1,12 @@
-"use client";
-
 import DashboardLayout from "@/components/DashboardLayout";
 import "@/app/home.css";
+import { requireUser } from "@/lib/auth";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  await requireUser();
+
   return (
     <DashboardLayout title="Dashboard">
       <div className="stats-grid">
