@@ -7,6 +7,7 @@ import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import { normalizaTelefones } from "@/lib/contatos";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -16,14 +17,6 @@ interface Props {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9", borderRadius: 8,
-  fontFamily: "Inter,sans-serif", fontSize: "1rem", outline: "none", width: "100%",
-  boxSizing: "border-box" as const,
-};
-
-const labelStyle = { fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" };
 
 export default function FuncionarioForm({
   mode = "create", initialData, tiposCodigo, canDeactivate = true,
@@ -62,10 +55,10 @@ export default function FuncionarioForm({
   }
 
   const textField = (label: string, name: string, value?: string | null, stateValue?: string, setState?: (v: string) => void, required = false) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <label style={labelStyle}>{label}</label>
+    <div className={ui.field}>
+      <label className={ui.label}>{label}</label>
       {isView ? (
-        <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value ?? "—"}</p>
+        <p className={`${ui.input} leading-[2.5] m-0`}>{value ?? "—"}</p>
       ) : (
         <input
           name={name}
@@ -73,22 +66,22 @@ export default function FuncionarioForm({
           value={isEdit ? stateValue : undefined}
           onChange={isEdit && setState ? (e) => setState(e.target.value) : undefined}
           readOnly={isView}
-          style={inputStyle}
+          className={ui.input}
         />
       )}
     </div>
   );
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {error && <div style={{ padding: "0.5rem 0.75rem", background: "#fff1f0", border: "1px solid #da1e28", borderRadius: 6, color: "#da1e28", fontFamily: "Inter,sans-serif", fontSize: "0.8125rem" }}>{error}</div>}
+    <form onSubmit={handleSubmit} className={ui.form}>
+      {error && <div className={ui.errorBox}>{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "stretch" }}>
+      <div className="grid grid-cols-[1fr_1fr] gap-6 items-stretch">
         {/* Coluna esquerda — dados */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div className="flex flex-col gap-4">
           {isEdit && (
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "0.875rem", color: "#21272a", cursor: "pointer" }}>
-              <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} style={{ accentColor: "#1b9956" }} />
+            <label className="flex items-center gap-2 font-sans text-sm text-ink cursor-pointer">
+              <input type="checkbox" name="ativo" checked={ativo} disabled={!canDeactivate} onChange={(e) => setAtivo(e.target.checked)} className="accent-brand" />
               Ativo
             </label>
           )}
@@ -98,14 +91,14 @@ export default function FuncionarioForm({
           {textField("Cargo", "cargo", initialData?.cargo)}
 
           {!isView ? (
-            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e", cursor: "pointer" }}>
-              <input type="checkbox" name="condutor" checked={condutor} onChange={(e) => setCondutor(e.target.checked)} style={{ accentColor: "#1b9956", width: "1.125rem", height: "1.125rem" }} />
+            <label className="flex items-center gap-2 font-sans text-base text-ink-strong cursor-pointer">
+              <input type="checkbox" name="condutor" checked={condutor} onChange={(e) => setCondutor(e.target.checked)} className="accent-brand w-[1.125rem] h-[1.125rem]" />
               É condutor
             </label>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={labelStyle}>Condutor</label>
-              <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{initialData?.condutor ? "Sim" : "Não"}</p>
+            <div className={ui.field}>
+              <label className={ui.label}>Condutor</label>
+              <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.condutor ? "Sim" : "Não"}</p>
             </div>
           )}
 
@@ -127,7 +120,7 @@ export default function FuncionarioForm({
         />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
+      <div className={ui.rowActions}>
         {isView ? (
           <Button label="Fechar" variant="cancel" onClick={onCancel} />
         ) : (
