@@ -14,14 +14,10 @@ export type ResultadoImagem =
   | { ok: false; error: string };
 
 /**
- * Valida e converte uma imagem enviada para WEBP (redimensionada).
+ * Converte um buffer de imagem (já validado) para WEBP redimensionado.
  * Não grava em disco — apenas retorna o buffer processado.
  */
-export async function processarImagemWebp(file: File): Promise<ResultadoImagem> {
-  if (!MIMES.includes(file.type)) {
-    return { ok: false, error: "Formato inválido. Use JPG, PNG ou WEBP." };
-  }
-  const original = Buffer.from(await file.arrayBuffer());
+export async function processarBufferWebp(original: Buffer): Promise<ResultadoImagem> {
   if (original.byteLength > MAX_BYTES) {
     return { ok: false, error: "Imagem maior que 5 MB." };
   }
@@ -37,6 +33,43 @@ export async function processarImagemWebp(file: File): Promise<ResultadoImagem> 
   } catch {
     return { ok: false, error: "Não foi possível processar a imagem." };
   }
+}
+
+/**
+ * Valida e converte uma imagem enviada (upload) para WEBP (redimensionada).
+ * Não grava em disco — apenas retorna o buffer processado.
+ */
+export async function processarImagemWebp(file: File): Promise<ResultadoImagem> {
+  if (!MIMES.includes(file.type)) {
+    return { ok: false, error: "Formato inválido. Use JPG, PNG ou WEBP." };
+  }
+  const original = Buffer.from(await file.arrayBuffer());
+  return processarBufferWebp(original);
+}
+
+/**
+ * Baixa uma imagem de uma URL externa, valida o tipo e converte para WEBP.
+ * Usado quando o usuário informa uma URL em vez de fazer upload.
+ */
+export async function processarImagemDeUrl(url: string): Promise<ResultadoImagem> {
+  let resposta: Response;
+  try {
+    resposta = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  } catch {
+    return { ok: false, error: "Não foi possível baixar a imagem da URL informada." };
+  }
+
+  if (!resposta.ok) {
+    return { ok: false, error: "Não foi possível baixar a imagem da URL informada." };
+  }
+
+  const tipo = resposta.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
+  if (!MIMES.includes(tipo)) {
+    return { ok: false, error: "A URL não aponta para uma imagem JPG, PNG ou WEBP." };
+  }
+
+  const original = Buffer.from(await resposta.arrayBuffer());
+  return processarBufferWebp(original);
 }
 
 /**

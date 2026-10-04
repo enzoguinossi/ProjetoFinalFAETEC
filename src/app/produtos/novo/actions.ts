@@ -5,7 +5,7 @@ import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { EntidadeComVinculosError } from "@/dao/_errors";
-import { processarImagemWebp, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
+import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
 
 export type ProdutoItem = { id_produto: number; descricao: string };
 
@@ -31,6 +31,32 @@ export async function searchProdutos(query: string) {
   }
 
   return produtoDAO.searchPriorizado(query);
+}
+
+/**
+ * Resolve a imagem do produto a partir do upload (foto_arquivo) ou de uma URL
+ * externa (foto_url). Em ambos os casos converte para WEBP. Retorna o buffer
+ * processado, `null` se não houver imagem, ou `{ error }` em falha.
+ */
+async function resolverImagem(
+  formData: FormData,
+  fotoUrl: string | undefined,
+): Promise<{ buffer: Buffer; hash: string } | null | { error: string }> {
+  const arquivo = formData.get("foto_arquivo");
+  if (arquivo instanceof File && arquivo.size > 0) {
+    const res = await processarImagemWebp(arquivo);
+    if (!res.ok) return { error: res.error };
+    return { buffer: res.buffer, hash: res.hash };
+  }
+
+  const url = fotoUrl?.trim();
+  if (url && /^https?:\/\//i.test(url)) {
+    const res = await processarImagemDeUrl(url);
+    if (!res.ok) return { error: res.error };
+    return { buffer: res.buffer, hash: res.hash };
+  }
+
+  return null;
 }
 
 export async function createProduto(formData: FormData) {
@@ -68,19 +94,14 @@ export async function createProduto(formData: FormData) {
 
   const id_usuario = user.id_usuario;
 
-  // Processa a imagem ANTES de persistir (garante que deu certo).
-  const arquivo = formData.get("foto_arquivo");
-  let imagemProcessada: { buffer: Buffer; hash: string } | null = null;
-  if (arquivo instanceof File && arquivo.size > 0) {
-    const res = await processarImagemWebp(arquivo);
-    if (!res.ok) return { error: res.error };
-    imagemProcessada = { buffer: res.buffer, hash: res.hash };
-  }
+  // Processa a imagem (upload ou URL externa) ANTES de persistir.
+  const imagem = await resolverImagem(formData, foto_url);
+  if (imagem && "error" in imagem) return { error: imagem.error };
 
   const criado = await produtoDAO.createCompleto(
     {
       descricao: descricao.trim(),
-      foto_url,
+      foto_url: imagem ? undefined : foto_url,
       perecivel,
       composto,
       data_validade,
@@ -91,9 +112,9 @@ export async function createProduto(formData: FormData) {
     id_usuario,
   );
 
-  if (imagemProcessada) {
+  if (imagem) {
     try {
-      const path = await salvarImagemProduto(criado.id_produto, imagemProcessada.buffer, imagemProcessada.hash);
+      const path = await salvarImagemProduto(criado.id_produto, imagem.buffer, imagem.hash);
       await produtoDAO.setFotoUrl(criado.id_produto, path);
     } catch {
       await produtoDAO.rollbackCreate(criado.id_produto);
@@ -173,14 +194,14 @@ export async function updateProduto(formData: FormData) {
   const atual = await produtoDAO.getById(id);
   const fotoAnterior = atual?.foto_url ?? null;
 
-  // Processa a imagem ANTES de persistir.
-  const arquivo = formData.get("foto_arquivo");
+  // Processa a imagem (upload ou URL externa) ANTES de persistir.
+  const imagem = await resolverImagem(formData, foto_url);
+  if (imagem && "error" in imagem) return { error: imagem.error };
+
   let novaFotoPath: string | null = null;
-  if (arquivo instanceof File && arquivo.size > 0) {
-    const res = await processarImagemWebp(arquivo);
-    if (!res.ok) return { error: res.error };
+  if (imagem) {
     try {
-      novaFotoPath = await salvarImagemProduto(id, res.buffer, res.hash);
+      novaFotoPath = await salvarImagemProduto(id, imagem.buffer, imagem.hash);
     } catch {
       return { error: "Não foi possível salvar a imagem. Nenhuma alteração foi feita." };
     }
