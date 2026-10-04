@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface EmailFormProps {
   open: boolean;
@@ -12,12 +13,6 @@ interface EmailFormProps {
   initialPrincipal?: boolean;
   editing?: boolean;
 }
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-  borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-  outline: "none", background: "#fff", width: "100%", boxSizing: "border-box" as const,
-};
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -54,26 +49,26 @@ export default function EmailForm({
 
   return (
     <Modal open={open} onClose={handleClose} width="440px">
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>E-mail</label>
+      <div className={ui.form}>
+        <div className={ui.field}>
+          <label className={ui.label}>E-mail</label>
           <input
             autoFocus
             value={endereco}
             onChange={(e) => { setEndereco(e.target.value); setErro(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder="nome@dominio.com"
-            style={{ ...inputStyle, borderColor: erro ? "#ff383c" : "#d9d9d9" }}
+            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
           />
-          {erro && <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>{erro}</span>}
+          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e", cursor: "pointer" }}>
-          <input type="checkbox" checked={principal} onChange={(e) => setPrincipal(e.target.checked)} style={{ accentColor: "#1b9956", width: 18, height: 18 }} />
+        <label className="flex cursor-pointer items-center gap-2 font-sans text-base text-ink-strong">
+          <input type="checkbox" checked={principal} onChange={(e) => setPrincipal(e.target.checked)} className="h-[18px] w-[18px] accent-brand" />
           E-mail principal
         </label>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: "4px" }}>
+        <div className={ui.rowActions}>
           <Button label="Cancelar" variant="cancel" onClick={handleClose} />
           <Button label={editing ? "Atualizar" : "Adicionar"} variant="primary" onClick={handleConfirm} disabled={!endereco.trim()} />
         </div>

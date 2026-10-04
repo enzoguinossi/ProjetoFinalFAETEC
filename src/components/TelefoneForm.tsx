@@ -4,6 +4,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { TIPO_TELEFONE, type TipoTelefone } from "@/types";
+import { ui } from "@/lib/ui";
 
 interface TelefoneFormProps {
   open: boolean;
@@ -19,12 +20,6 @@ const TIPO_LABEL: Record<TipoTelefone, string> = {
   CELULAR: "Celular",
   FIXO: "Fixo",
   COMERCIAL: "Comercial",
-};
-
-const inputStyle = {
-  height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-  borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-  outline: "none", background: "#fff", width: "100%", boxSizing: "border-box" as const,
 };
 
 export default function TelefoneForm({
@@ -64,33 +59,33 @@ export default function TelefoneForm({
 
   return (
     <Modal open={open} onClose={handleClose} width="440px">
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Número</label>
+      <div className={ui.form}>
+        <div className={ui.field}>
+          <label className={ui.label}>Número</label>
           <input
             autoFocus
             value={numero}
             onChange={(e) => { setNumero(e.target.value); setErro(""); }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder="(21) 99999-9999"
-            style={{ ...inputStyle, borderColor: erro ? "#ff383c" : "#d9d9d9" }}
+            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
           />
-          {erro && <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>{erro}</span>}
+          {erro && <span className="font-sans text-[0.8125rem] text-cancel">{erro}</span>}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>Tipo</label>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoTelefone)} style={inputStyle}>
+        <div className={ui.field}>
+          <label className={ui.label}>Tipo</label>
+          <select value={tipo} onChange={(e) => setTipo(e.target.value as TipoTelefone)} className={ui.select}>
             {TIPO_TELEFONE.map((t) => <option key={t} value={t}>{TIPO_LABEL[t]}</option>)}
           </select>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e", cursor: "pointer" }}>
-          <input type="checkbox" checked={principal} onChange={(e) => setPrincipal(e.target.checked)} style={{ accentColor: "#1b9956", width: 18, height: 18 }} />
+        <label className="flex cursor-pointer items-center gap-2 font-sans text-base text-ink-strong">
+          <input type="checkbox" checked={principal} onChange={(e) => setPrincipal(e.target.checked)} className="h-[18px] w-[18px] accent-brand" />
           Telefone principal
         </label>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: "4px" }}>
+        <div className={ui.rowActions}>
           <Button label="Cancelar" variant="cancel" onClick={handleClose} />
           <Button label={editing ? "Atualizar" : "Adicionar"} variant="primary" onClick={handleConfirm} disabled={!numero.trim()} />
         </div>

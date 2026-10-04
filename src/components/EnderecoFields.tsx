@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UFS } from "@/lib/uf";
 import type { EnderecoCep, ResultadoCep } from "@/services/cep";
+import { ui } from "@/lib/ui";
 
 export type EnderecoValue = {
   logradouro: string;
@@ -28,30 +29,8 @@ interface Props {
   onLookup: (cep: string) => Promise<ResultadoCep>;
 }
 
-const inputStyle = {
-  height: 40,
-  padding: "0 16px",
-  border: "1px solid #d9d9d9",
-  borderRadius: 8,
-  fontFamily: "Inter,sans-serif",
-  fontSize: "1rem",
-  outline: "none",
-  width: "100%",
-  boxSizing: "border-box" as const,
-};
-
-const labelStyle = {
-  fontFamily: "Inter,sans-serif",
-  fontSize: "1rem",
-  color: "#1e1e1e",
-};
-
-const colStyle = {
-  display: "flex",
-  flexDirection: "column" as const,
-  gap: "8px",
-  flex: 1,
-};
+const roClass = "flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base";
+const colClass = "flex flex-1 flex-col gap-2";
 
 function toValue(initial?: EnderecoInitial | null): EnderecoValue {
   return {
@@ -114,27 +93,27 @@ export default function EnderecoFields({
 
   const text = (key: keyof EnderecoValue, requiredField = false) =>
     disabled ? (
-      <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value[key] || "—"}</p>
+      <p className={roClass}>{value[key] || "—"}</p>
     ) : (
       <input
         name={key}
         required={requiredField}
         value={value[key]}
         onChange={(e) => set(key, e.target.value)}
-        style={inputStyle}
+        className={ui.input}
       />
     );
 
   return (
     <>
       {/* CEP + UF */}
-      <div style={{ display: "flex", gap: "1rem" }}>
-        <div style={{ ...colStyle, flex: 2 }}>
-          <label style={labelStyle}>CEP</label>
+      <div className="flex gap-4">
+        <div className={`${colClass} flex-[2]`}>
+          <label className={ui.label}>CEP</label>
           {disabled ? (
-            <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value.cep || "—"}</p>
+            <p className={roClass}>{value.cep || "—"}</p>
           ) : (
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="flex gap-2">
               <input
                 name="cep"
                 value={value.cep}
@@ -142,19 +121,14 @@ export default function EnderecoFields({
                 placeholder="00000-000"
                 inputMode="numeric"
                 maxLength={9}
-                style={inputStyle}
+                className={ui.input}
               />
               <button
                 type="button"
                 onClick={buscarCep}
                 disabled={buscando}
                 title="Buscar endereço pelo CEP"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  minWidth: 40, height: 40, border: "1px solid #d9d9d9", borderRadius: 8,
-                  background: "#fff", cursor: buscando ? "wait" : "pointer", color: "#1b9956",
-                  flexShrink: 0, opacity: buscando ? 0.6 : 1,
-                }}
+                className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
               >
                 {buscando ? "…" : (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -166,16 +140,16 @@ export default function EnderecoFields({
             </div>
           )}
         </div>
-        <div style={{ ...colStyle, flex: 1 }}>
-          <label style={labelStyle}>UF</label>
+        <div className={`${colClass} flex-1`}>
+          <label className={ui.label}>UF</label>
           {disabled ? (
-            <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value.uf || "—"}</p>
+            <p className={roClass}>{value.uf || "—"}</p>
           ) : (
             <select
               name="uf"
               value={value.uf}
               onChange={(e) => set("uf", e.target.value)}
-              style={{ ...inputStyle, background: "#fff" }}
+              className={ui.select}
             >
               <option value="">Selecione...</option>
               {UFS.map((u) => (
@@ -186,60 +160,60 @@ export default function EnderecoFields({
         </div>
       </div>
       {erro && (
-        <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>
+        <span className="font-sans text-[0.8125rem] text-cancel">
           {erro}
         </span>
       )}
 
       {/* Logradouro */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <label style={labelStyle}>Logradouro</label>
+      <div className="flex flex-col gap-2">
+        <label className={ui.label}>Logradouro</label>
         {text("logradouro", required)}
       </div>
 
       {/* Número + Complemento */}
-      <div style={{ display: "flex", gap: "1rem" }}>
-        <div style={colStyle}>
-          <label style={labelStyle}>Número</label>
+      <div className="flex gap-4">
+        <div className={colClass}>
+          <label className={ui.label}>Número</label>
           {text("numero")}
         </div>
-        <div style={colStyle}>
-          <label style={labelStyle}>Complemento</label>
+        <div className={colClass}>
+          <label className={ui.label}>Complemento</label>
           {text("complemento")}
         </div>
       </div>
 
       {/* Bairro + Cidade */}
-      <div style={{ display: "flex", gap: "1rem" }}>
-        <div style={colStyle}>
-          <label style={labelStyle}>Bairro</label>
+      <div className="flex gap-4">
+        <div className={colClass}>
+          <label className={ui.label}>Bairro</label>
           {text("bairro")}
         </div>
-        <div style={colStyle}>
-          <label style={labelStyle}>Cidade</label>
+        <div className={colClass}>
+          <label className={ui.label}>Cidade</label>
           {text("cidade", required)}
         </div>
       </div>
 
       {/* Coordenadas */}
       {showCoords && (
-        <div style={{ display: "flex", gap: "1rem" }}>
-          <div style={colStyle}>
-            <label style={labelStyle}>Latitude</label>
+        <div className="flex gap-4">
+          <div className={colClass}>
+            <label className={ui.label}>Latitude</label>
             {disabled ? (
-              <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value.latitude || "—"}</p>
+              <p className={roClass}>{value.latitude || "—"}</p>
             ) : (
               <input name="latitude" type="number" step="any" value={value.latitude}
-                onChange={(e) => set("latitude", e.target.value)} style={inputStyle} />
+                onChange={(e) => set("latitude", e.target.value)} className={ui.input} />
             )}
           </div>
-          <div style={colStyle}>
-            <label style={labelStyle}>Longitude</label>
+          <div className={colClass}>
+            <label className={ui.label}>Longitude</label>
             {disabled ? (
-              <p style={{ ...inputStyle, lineHeight: "2.5", margin: 0 }}>{value.longitude || "—"}</p>
+              <p className={roClass}>{value.longitude || "—"}</p>
             ) : (
               <input name="longitude" type="number" step="any" value={value.longitude}
-                onChange={(e) => set("longitude", e.target.value)} style={inputStyle} />
+                onChange={(e) => set("longitude", e.target.value)} className={ui.input} />
             )}
           </div>
         </div>

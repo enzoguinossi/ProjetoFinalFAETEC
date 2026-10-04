@@ -2,6 +2,7 @@
 
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import { ui } from "@/lib/ui";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -24,11 +25,11 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal open={open} onClose={onClose} width="420px" title={title}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <p style={{ fontFamily: "Inter,sans-serif", fontSize: "0.9375rem", color: "#21272a", lineHeight: "1.5", margin: 0 }}>
+      <div className={ui.form}>
+        <p className="m-0 font-sans text-[0.9375rem] leading-normal text-ink">
           {message}
         </p>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
+        <div className={ui.rowActions}>
           <Button label="Cancelar" variant="ghost" onClick={onClose} />
           <Button label={confirmLabel} variant="cancel" onClick={onConfirm} disabled={loading} />
         </div>

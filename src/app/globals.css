@@ -2,6 +2,7 @@
 
 @theme {
   --font-sans: "Inter", sans-serif;
+  --font-display: "SF Pro", "Segoe UI", sans-serif;
 
   --color-brand: #1b9956;
   --color-brand-hover: #15844a;

@@ -78,18 +78,10 @@ export default function CodigosSection({
       ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <h3
-          style={{
-            fontFamily: '"SF Pro", "Segoe UI", sans-serif',
-            fontSize: "1.25rem",
-            fontWeight: 590,
-            letterSpacing: "-0.028125rem",
-            lineHeight: "1.5625rem",
-            color: "#1e1e1e",
-            margin: 0,
-          }}
+          className="m-0 font-display text-xl font-[590] leading-[1.5625rem] tracking-[-0.028125rem] text-ink-strong"
         >
           Códigos Personalizados
         </h3>
@@ -115,7 +107,7 @@ export default function CodigosSection({
       />
 
       {value.map((c, i) => (
-        <div key={`hc-${i}`} style={{ display: "none" }}>
+        <div key={`hc-${i}`} className="hidden">
           <input name="codigo_tipo" value={c.tipo} readOnly />
           <input name="codigo_valor" value={c.valor} readOnly />
         </div>

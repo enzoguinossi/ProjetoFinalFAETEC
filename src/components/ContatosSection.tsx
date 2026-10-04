@@ -25,14 +25,7 @@ const TIPO_LABEL: Record<TipoTelefone, string> = {
   COMERCIAL: "Comercial",
 };
 
-const sectionTitle = {
-  fontFamily: '"SF Pro", "Segoe UI", sans-serif',
-  fontSize: "1.125rem",
-  fontWeight: 590,
-  letterSpacing: "-0.028125rem",
-  color: "#1e1e1e",
-  margin: 0,
-} as const;
+const tituloSecao = "m-0 font-display text-lg font-[590] tracking-[-0.028125rem] text-ink-strong";
 
 const emailColumns: Column<EmailEntry>[] = [
   { key: "endereco", label: "E-mail", width: "3fr" },
@@ -133,21 +126,21 @@ export default function ContatosSection({
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 20, height: "100%", minHeight: 0 }}>
+    <div className="grid h-full min-h-0 grid-rows-2 gap-5">
       {/* Emails */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 style={sectionTitle}>E-mails</h3>
+      <div className="flex min-h-0 flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h3 className={tituloSecao}>E-mails</h3>
           {!disabled && (
             <Button label="Novo" iconLeft={novoIcon}
               onClick={() => { setEmailIdx(null); setEmailModal(true); }} />
           )}
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <DataTable columns={emailColumns} data={emails} actions={emailActions} idField="endereco" pageSize={5} />
         </div>
         {emails.map((e, i) => (
-          <div key={`he-${i}`} style={{ display: "none" }}>
+          <div key={`he-${i}`} className="hidden">
             <input name="email_endereco" value={e.endereco} readOnly />
             <input name="email_principal" value={String(e.principal)} readOnly />
           </div>
@@ -155,19 +148,19 @@ export default function ContatosSection({
       </div>
 
       {/* Telefones */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 style={sectionTitle}>Telefones</h3>
+      <div className="flex min-h-0 flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h3 className={tituloSecao}>Telefones</h3>
           {!disabled && (
             <Button label="Novo" iconLeft={novoIcon}
               onClick={() => { setTelIdx(null); setTelModal(true); }} />
           )}
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <DataTable columns={telefoneColumns} data={telefones} actions={telActions} idField="numero" pageSize={5} />
         </div>
         {telefones.map((t, i) => (
-          <div key={`ht-${i}`} style={{ display: "none" }}>
+          <div key={`ht-${i}`} className="hidden">
             <input name="telefone_numero" value={t.numero} readOnly />
             <input name="telefone_tipo" value={t.tipo} readOnly />
             <input name="telefone_principal" value={String(t.principal)} readOnly />

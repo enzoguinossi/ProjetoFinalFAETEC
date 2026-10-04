@@ -4,6 +4,7 @@ import { useState } from "react";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import { validarCodigo } from "@/lib/codigo";
+import { ui } from "@/lib/ui";
 
 interface TipoCodigo {
   id_tipo_codigo: number;
@@ -61,19 +62,15 @@ export default function CodigoForm({
 
   return (
     <Modal open={open} onClose={handleClose} width="480px">
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>
+      <div className={ui.form}>
+        <div className={ui.field}>
+          <label className={ui.label}>
             Tipo de código
           </label>
           <select
             value={tipo}
             onChange={(e) => { setTipo(e.target.value); setErro(""); }}
-            style={{
-              height: 40, padding: "0 16px", border: "1px solid #d9d9d9",
-              borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-              outline: "none", background: "#fff",
-            }}
+            className={ui.select}
           >
             {tiposCodigo.map((t) => (
               <option key={t.id_tipo_codigo} value={t.nome}>{t.nome}</option>
@@ -81,8 +78,8 @@ export default function CodigoForm({
           </select>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <label style={{ fontFamily: "Inter,sans-serif", fontSize: "1rem", color: "#1e1e1e" }}>
+        <div className={ui.field}>
+          <label className={ui.label}>
             Código
           </label>
           <input
@@ -97,20 +94,16 @@ export default function CodigoForm({
             }}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleConfirm(); } }}
             placeholder={ehEan ? `${maxLength} dígitos` : "Valor do código"}
-            style={{
-              height: 40, padding: "0 16px", border: `1px solid ${erro ? "#ff383c" : "#d9d9d9"}`,
-              borderRadius: 8, fontFamily: "Inter,sans-serif", fontSize: "1rem",
-              outline: "none",
-            }}
+            className={`${ui.input} ${erro ? "border-cancel" : ""}`}
           />
           {erro && (
-            <span style={{ fontFamily: "Inter,sans-serif", fontSize: "0.8125rem", color: "#ff383c" }}>
+            <span className="font-sans text-[0.8125rem] text-cancel">
               {erro}
             </span>
           )}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", paddingTop: "4px" }}>
+        <div className={ui.rowActions}>
           <Button label="Cancelar" variant="cancel" onClick={handleClose} />
           <Button label={editing ? "Atualizar" : "Adicionar"} variant="primary" onClick={handleConfirm} disabled={!valor.trim()} />
         </div>
