@@ -41,6 +41,65 @@ export class PermissaoService {
     return perfis.map((p) => ({ id_perfil: p.id_perfil, nome: p.nome, descricao: p.descricao }));
   }
 
+  async getPerfil(id_perfil: number) {
+    return prisma.perfil.findUnique({ where: { id_perfil } });
+  }
+
+  /** Cria um perfil-template com as permissões informadas. */
+  async criarPerfil(
+    data: { nome: string; descricao?: string; permissoes: string[] },
+  ) {
+    const permissoes = await prisma.permissao.findMany({
+      where: { nome: { in: data.permissoes }, ativo: true },
+      select: { id_permissao: true },
+    });
+
+    return prisma.$transaction(async (tx) => {
+      const perfil = await tx.perfil.create({
+        data: { nome: data.nome, descricao: data.descricao },
+      });
+      if (permissoes.length > 0) {
+        await tx.perfilPermissao.createMany({
+          data: permissoes.map((p) => ({ id_perfil: perfil.id_perfil, id_permissao: p.id_permissao })),
+        });
+      }
+      return perfil;
+    });
+  }
+
+  /** Atualiza um perfil-template; não afeta usuários já vinculados (não há vínculo). */
+  async alterarPerfil(
+    id_perfil: number,
+    data: { nome?: string; descricao?: string; permissoes?: string[] },
+  ) {
+    const permissoes = data.permissoes
+      ? await prisma.permissao.findMany({
+          where: { nome: { in: data.permissoes }, ativo: true },
+          select: { id_permissao: true },
+        })
+      : null;
+
+    return prisma.$transaction(async (tx) => {
+      const perfil = await tx.perfil.update({
+        where: { id_perfil },
+        data: { nome: data.nome, descricao: data.descricao },
+      });
+      if (permissoes) {
+        await tx.perfilPermissao.deleteMany({ where: { id_perfil } });
+        if (permissoes.length > 0) {
+          await tx.perfilPermissao.createMany({
+            data: permissoes.map((p) => ({ id_perfil, id_permissao: p.id_permissao })),
+          });
+        }
+      }
+      return perfil;
+    });
+  }
+
+  async desativarPerfil(id_perfil: number) {
+    return prisma.perfil.update({ where: { id_perfil }, data: { ativo: false } });
+  }
+
   async verificar(id_usuario: number, permissao: string) {
     const usuario = await prisma.usuario.findUnique({
       where: { id_usuario },

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
+import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -30,6 +32,7 @@ const columns: Column<UsuarioListRow>[] = [
 type ModalMode = "create" | "edit" | "view" | null;
 
 export default function UsuariosClient({ rows: initialRows, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
+  const router = useRouter();
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<UsuarioFormData | null>(null);
@@ -123,12 +126,17 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, grupos
 
   return (
     <>
-      <SearchBar
-        placeholder="Pesquisar usuários..."
-        onNew={() => setModalMode("create")}
-        onSearch={handleSearch}
-        showNew={perms.canCreate}
-      />
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <div style={{ flex: 1 }}>
+          <SearchBar
+            placeholder="Pesquisar usuários..."
+            onNew={() => setModalMode("create")}
+            onSearch={handleSearch}
+            showNew={perms.canCreate}
+          />
+        </div>
+        <Button label="Gerenciar perfis" onClick={() => router.push("/perfis")} />
+      </div>
       <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
