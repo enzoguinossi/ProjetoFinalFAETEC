@@ -41,6 +41,8 @@ export default function FornecedorForm({
     try {
       const form = new FormData(e.currentTarget);
       if (initialData) form.set("id_fornecedor", String(initialData.id_fornecedor));
+      form.set("codigos", JSON.stringify(codigos));
+      form.set("contatos", JSON.stringify({ emails, telefones }));
       const result = initialData
         ? await updateFornecedor(form)
         : await createFornecedor(form);

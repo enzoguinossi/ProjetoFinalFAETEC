@@ -1,17 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { useAviso } from "@/components/AvisoProvider";
 import ProdutoForm from "./novo/ProdutoForm";
 import ProdutoView from "./novo/ProdutoView";
-import type { Column, Action } from "@/components/DataTable";
+import type { Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
-import { useListaPaginada } from "@/lib/use-lista-paginada";
+import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarProdutos,
   getProduto,
@@ -34,85 +31,37 @@ const columns: Column<ProdutoListRow>[] = [
   { key: "livre", label: "Qtd. Livre", width: "1fr" },
 ];
 
-type ModalMode = "create" | "edit" | "view" | null;
-
 export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms }: Props) {
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [formData, setFormData] = useState<ProdutoFormData | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ProdutoListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const router = useRouter();
-  const mostrarAviso = useAviso();
-  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
-    useListaPaginada(listarProdutos, inicial);
-
-  async function openEdit(id: number) {
-    const data = await getProduto(id);
-    setFormData(data);
-    setModalMode("edit");
-  }
-
-  async function openView(id: number) {
-    const data = await getProduto(id);
-    setFormData(data);
-    setModalMode("view");
-  }
-
-  function closeModal() {
-    setModalMode(null);
-    setFormData(null);
-  }
-
-  function handleSuccess() {
-    closeModal();
-    router.refresh();
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const result = await deleteProduto(deleteTarget.id_produto);
-      if (result.error) { mostrarAviso(result.error, "erro"); return; }
-      mostrarAviso("Produto excluído com sucesso.", "sucesso");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch {
-      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  const actions: Action<ProdutoListRow>[] = [
-    ...(perms.canView
-      ? [{
-          icon: "/icons/actions/Olho.svg",
-          label: "Visualizar",
-          onClick: (row: ProdutoListRow) => openView(row.id_produto),
-        }]
-      : []),
-    ...(perms.canEdit
-      ? [{
-          icon: "/icons/actions/Editar.svg",
-          label: "Editar",
-          onClick: (row: ProdutoListRow) => openEdit(row.id_produto),
-        }]
-      : []),
-    ...(perms.canDelete
-      ? [{
-          icon: "/icons/actions/Lixeira.svg",
-          label: "Excluir",
-          onClick: (row: ProdutoListRow) => setDeleteTarget(row),
-        }]
-      : []),
-  ];
+  const {
+    resultado,
+    carregando,
+    buscarPorTermo,
+    paginacaoServidor,
+    actions,
+    modalMode,
+    formData,
+    abrirNovo,
+    fecharModal,
+    aoSalvar,
+    deleteTarget,
+    setDeleteTarget,
+    confirmarExclusao,
+    excluindo,
+  } = useCrudLista<ProdutoListRow, ProdutoFormData>({
+    buscar: listarProdutos,
+    inicial,
+    carregar: getProduto,
+    excluir: deleteProduto,
+    idDe: (row) => row.id_produto,
+    perms,
+    mensagemExcluido: "Produto excluído com sucesso.",
+  });
 
   return (
     <>
       <SearchBar
         placeholder="Pesquisar produtos..."
-        onNew={() => setModalMode("create")}
+        onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
@@ -121,57 +70,39 @@ export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms
         data={resultado.data}
         idField="codigo"
         actions={actions}
-        paginacaoServidor={{
-          total: resultado.total,
-          page: resultado.page,
-          pageSize: resultado.limit,
-          onPageChange: irParaPagina,
-          onPageSizeChange: mudarTamanho,
-        }}
+        paginacaoServidor={paginacaoServidor}
         carregando={carregando}
       />
 
-      <Modal
-        open={modalMode === "create"}
-        onClose={closeModal}
-        width="728px"
-      >
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="728px">
         <ProdutoForm
           conversoes={conversoes}
           tiposCodigo={tiposCodigo}
-          onSuccess={handleSuccess}
-          onCancel={closeModal}
+          onSuccess={aoSalvar}
+          onCancel={fecharModal}
         />
       </Modal>
 
-      <Modal
-        open={modalMode === "edit" && formData !== null}
-        onClose={closeModal}
-        width="728px"
-      >
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="728px">
         {formData && (
           <ProdutoForm
             conversoes={conversoes}
             tiposCodigo={tiposCodigo}
             initialData={formData}
             canDeactivate={perms.canDeactivate}
-            onSuccess={handleSuccess}
-            onCancel={closeModal}
+            onSuccess={aoSalvar}
+            onCancel={fecharModal}
           />
         )}
       </Modal>
 
-      <Modal
-        open={modalMode === "view" && formData !== null}
-        onClose={closeModal}
-        width="728px"
-      >
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="728px">
         {formData && (
           <ProdutoView
             conversoes={conversoes}
             tiposCodigo={tiposCodigo}
             data={formData}
-            onClose={closeModal}
+            onClose={fecharModal}
           />
         )}
       </Modal>
@@ -179,11 +110,11 @@ export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmarExclusao}
         title="Excluir produto"
         message={`Tem certeza que deseja excluir "${deleteTarget?.descricao}"?`}
         confirmLabel="Excluir"
-        loading={deleting}
+        loading={excluindo}
       />
     </>
   );

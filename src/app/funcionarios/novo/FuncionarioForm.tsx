@@ -42,6 +42,8 @@ export default function FuncionarioForm({
     try {
       const form = new FormData(e.currentTarget);
       if (initialData) form.set("id_funcionario", String(initialData.id_funcionario));
+      form.set("codigos", JSON.stringify(codigos));
+      form.set("contatos", JSON.stringify({ emails, telefones }));
       const result = initialData
         ? await updateFuncionario(form)
         : await createFuncionario(form);

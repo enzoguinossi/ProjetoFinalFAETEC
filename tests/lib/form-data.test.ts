@@ -2,8 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   lerEnderecoDoFormData,
   lerEnderecoParcialDoFormData,
+  lerJson,
   parsePermissoes,
 } from "@/lib/form-data";
+
+describe("lerJson", () => {
+  it("retorna null para campo ausente ou JSON inválido", () => {
+    expect(lerJson(new FormData(), "campo")).toBeNull();
+    const invalido = new FormData();
+    invalido.set("campo", "{nao é json");
+    expect(lerJson(invalido, "campo")).toBeNull();
+  });
+
+  it("retorna o valor decodificado", () => {
+    const fd = new FormData();
+    fd.set("campo", JSON.stringify({ a: [1, 2] }));
+    expect(lerJson(fd, "campo")).toEqual({ a: [1, 2] });
+  });
+});
 
 describe("parsePermissoes", () => {
   it("lê um array JSON de strings", () => {

@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { useAviso } from "@/components/AvisoProvider";
 import FornecedorForm from "./novo/FornecedorForm";
-import type { Column, Action } from "@/components/DataTable";
+import type { Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
-import { useListaPaginada } from "@/lib/use-lista-paginada";
+import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarFornecedores,
   getFornecedor,
@@ -30,80 +27,37 @@ const columns: Column<FornecedorListRow>[] = [
   { key: "razao", label: "Razão Social", width: "5fr" },
 ];
 
-type ModalMode = "create" | "edit" | "view" | null;
-
 export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Props) {
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [formData, setFormData] = useState<FornecedorFormData | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<FornecedorListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const router = useRouter();
-  const mostrarAviso = useAviso();
-  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
-    useListaPaginada(listarFornecedores, inicial);
-
-  async function openModal(id: number | null, mode: "edit" | "view") {
-    if (id === null) { setModalMode("create"); return; }
-    const data = await getFornecedor(id);
-    setFormData(data);
-    setModalMode(mode);
-  }
-
-  function closeModal() {
-    setModalMode(null);
-    setFormData(null);
-  }
-
-  function handleSuccess() {
-    closeModal();
-    router.refresh();
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const result = await deleteFornecedor(deleteTarget.id_fornecedor);
-      if (result.error) { mostrarAviso(result.error, "erro"); return; }
-      mostrarAviso("Fornecedor excluído com sucesso.", "sucesso");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch {
-      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  const actions: Action<FornecedorListRow>[] = [
-    ...(perms.canView
-      ? [{
-          icon: "/icons/actions/Olho.svg",
-          label: "Visualizar",
-          onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "view"),
-        }]
-      : []),
-    ...(perms.canEdit
-      ? [{
-          icon: "/icons/actions/Editar.svg",
-          label: "Editar",
-          onClick: (row: FornecedorListRow) => openModal(row.id_fornecedor, "edit"),
-        }]
-      : []),
-    ...(perms.canDelete
-      ? [{
-          icon: "/icons/actions/Lixeira.svg",
-          label: "Excluir",
-          onClick: (row: FornecedorListRow) => setDeleteTarget(row),
-        }]
-      : []),
-  ];
+  const {
+    resultado,
+    carregando,
+    buscarPorTermo,
+    paginacaoServidor,
+    actions,
+    modalMode,
+    formData,
+    abrirNovo,
+    fecharModal,
+    aoSalvar,
+    deleteTarget,
+    setDeleteTarget,
+    confirmarExclusao,
+    excluindo,
+  } = useCrudLista<FornecedorListRow, FornecedorFormData>({
+    buscar: listarFornecedores,
+    inicial,
+    carregar: getFornecedor,
+    excluir: deleteFornecedor,
+    idDe: (row) => row.id_fornecedor,
+    perms,
+    mensagemExcluido: "Fornecedor excluído com sucesso.",
+  });
 
   return (
     <>
       <SearchBar
         placeholder="Pesquisar fornecedores..."
-        onNew={() => setModalMode("create")}
+        onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
@@ -112,47 +66,41 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
         data={resultado.data}
         idField="codigo"
         actions={actions}
-        paginacaoServidor={{
-          total: resultado.total,
-          page: resultado.page,
-          pageSize: resultado.limit,
-          onPageChange: irParaPagina,
-          onPageSizeChange: mudarTamanho,
-        }}
+        paginacaoServidor={paginacaoServidor}
         carregando={carregando}
       />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
-        <FornecedorForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">
+        <FornecedorForm mode="create" tiposCodigo={tiposCodigo} onSuccess={aoSalvar} onCancel={fecharModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="960px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
           <FornecedorForm
             mode="edit"
             initialData={formData}
             tiposCodigo={tiposCodigo}
             canDeactivate={perms.canDeactivate}
-            onSuccess={handleSuccess}
-            onCancel={closeModal}
+            onSuccess={aoSalvar}
+            onCancel={fecharModal}
           />
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="960px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
-          <FornecedorForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
+          <FornecedorForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={fecharModal} />
         )}
       </Modal>
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmarExclusao}
         title="Excluir fornecedor"
         message={`Tem certeza que deseja excluir "${deleteTarget?.razao}"?`}
         confirmLabel="Excluir"
-        loading={deleting}
+        loading={excluindo}
       />
     </>
   );

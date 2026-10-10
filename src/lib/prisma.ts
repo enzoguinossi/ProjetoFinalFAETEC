@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function parseMysqlUrl(url: string) {
   // mysql://user:pass@host:port/database?params
-  const pattern = /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/;
+  const pattern = /^(?:mysql|mariadb):\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/;
   const match = url.match(pattern);
   if (!match) throw new Error("DATABASE_URL inválida");
   return {
@@ -19,31 +19,47 @@ function parseMysqlUrl(url: string) {
   };
 }
 
+/**
+ * Registro de driver adapters por scheme de URL (o Prisma 7 exige um adapter por
+ * provider). Para trocar de SGBD: instale o adapter oficial e registre-o aqui.
+ */
+function criarAdapter(url: string) {
+  const scheme = new URL(url).protocol;
+  switch (scheme) {
+    case "mysql:":
+    case "mariadb:": {
+      const parsed = parseMysqlUrl(url);
+      // idleTimeout recicla conexões ociosas após 3 min (evita pool leak em hot-reload)
+      // acquireTimeout reduzido para falhar rápido em vez de travar 30s
+      return new PrismaMariaDb(
+        {
+          host: parsed.host,
+          port: parsed.port,
+          user: parsed.user,
+          password: parsed.password,
+          database: parsed.database,
+          connectTimeout: 10000,
+          acquireTimeout: 5000,
+          connectionLimit: 10,
+          idleTimeout: 180,
+          minDelayValidation: 1500,
+          allowPublicKeyRetrieval: true,
+        },
+        { useTextProtocol: true },
+      );
+    }
+    default:
+      throw new Error(
+        `Nenhum driver adapter registrado para "${scheme}". ` +
+          "Instale o adapter oficial (ex.: @prisma/adapter-pg) e registre-o em src/lib/prisma.ts.",
+      );
+  }
+}
+
 function createPrisma() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL não definida");
-
-  const parsed = parseMysqlUrl(url);
-
-  // idleTimeout recicla conexões ociosas após 3 min (evita pool leak em hot-reload)
-  // acquireTimeout reduzido para falhar rápido em vez de travar 30s
-  const adapter = new PrismaMariaDb(
-    {
-      host: parsed.host,
-      port: parsed.port,
-      user: parsed.user,
-      password: parsed.password,
-      database: parsed.database,
-      connectTimeout: 10000,
-      acquireTimeout: 5000,
-      connectionLimit: 10,
-      idleTimeout: 180,
-      minDelayValidation: 1500,
-      allowPublicKeyRetrieval: true,
-    },
-    { useTextProtocol: true },
-  );
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter: criarAdapter(url) });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrisma();
