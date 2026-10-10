@@ -5,6 +5,7 @@ import { codigoService } from "@/services/codigo";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
+import { lerJson } from "@/lib/form-data";
 import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
 import { formatarCodigo } from "@/lib/formatar";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
@@ -108,6 +109,22 @@ async function resolverImagem(
   return null;
 }
 
+/** Lê o campo `insumos` (JSON: [{ id, qtd }]) do FormData. */
+function lerInsumos(formData: FormData): { id_produto_filho: number; quantidade: number }[] {
+  const raw = lerJson(formData, "insumos");
+  if (!Array.isArray(raw)) return [];
+
+  const insumos: { id_produto_filho: number; quantidade: number }[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const id = Number((item as { id?: unknown }).id);
+    const qtd = Number((item as { qtd?: unknown }).qtd);
+    if (!id || !qtd) continue;
+    insumos.push({ id_produto_filho: id, quantidade: qtd });
+  }
+  return insumos;
+}
+
 export async function getProduto(id: number): Promise<ProdutoFormData | null> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, ["produto.consultar", "produto.alterar"]))) return null;
@@ -155,15 +172,7 @@ export async function createProduto(formData: FormData) {
     if ("error" in codigoResult) return { error: codigoResult.error };
     const codigos = codigoResult.codigos;
 
-    const insumos: { id_produto_filho: number; quantidade: number }[] = [];
-    const idsFilho = formData.getAll("insumo_produto") as string[];
-    const quantidades = formData.getAll("insumo_qtd") as string[];
-    for (let i = 0; i < idsFilho.length; i++) {
-      const id = Number(idsFilho[i]);
-      const qtd = Number(quantidades[i]);
-      if (!id || !qtd) continue;
-      insumos.push({ id_produto_filho: id, quantidade: qtd });
-    }
+    const insumos = lerInsumos(formData);
 
     const id_usuario = user.id_usuario;
 
@@ -229,15 +238,7 @@ export async function updateProduto(formData: FormData) {
     if ("error" in codigoResult) return { error: codigoResult.error };
     const codigos = codigoResult.codigos;
 
-    const insumos: { id_produto_filho: number; quantidade: number }[] = [];
-    const idsFilho = formData.getAll("insumo_produto") as string[];
-    const quantidades = formData.getAll("insumo_qtd") as string[];
-    for (let i = 0; i < idsFilho.length; i++) {
-      const id_filho = Number(idsFilho[i]);
-      const qtd = Number(quantidades[i]);
-      if (!id_filho || !qtd) continue;
-      insumos.push({ id_produto_filho: id_filho, quantidade: qtd });
-    }
+    const insumos = lerInsumos(formData);
 
     const atual = await produtoDAO.getById(id);
     const fotoAnterior = atual?.foto_url ?? null;

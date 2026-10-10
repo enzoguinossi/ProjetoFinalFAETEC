@@ -1,12 +1,17 @@
-export function parsePermissoes(formData: FormData): string[] {
-  const raw = formData.get("permissoes");
-  if (!raw) return [];
+/** Lê um campo JSON do FormData. Retorna null quando ausente ou inválido. */
+export function lerJson(formData: FormData, campo: string): unknown {
+  const raw = formData.get(campo);
+  if (!raw) return null;
   try {
-    const parsed = JSON.parse(String(raw));
-    return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
+    return JSON.parse(String(raw));
   } catch {
-    return [];
+    return null;
   }
+}
+
+export function parsePermissoes(formData: FormData): string[] {
+  const parsed = lerJson(formData, "permissoes");
+  return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string") : [];
 }
 
 export type EnderecoFormData = {

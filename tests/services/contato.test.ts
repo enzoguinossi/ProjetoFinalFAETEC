@@ -6,15 +6,20 @@ function formCom(entradas: {
   telefones?: { numero: string; tipo?: string; principal?: boolean }[];
 }) {
   const fd = new FormData();
-  for (const e of entradas.emails ?? []) {
-    fd.append("email_endereco", e.endereco);
-    fd.append("email_principal", String(e.principal ?? false));
-  }
-  for (const t of entradas.telefones ?? []) {
-    fd.append("telefone_numero", t.numero);
-    fd.append("telefone_tipo", t.tipo ?? "CELULAR");
-    fd.append("telefone_principal", String(t.principal ?? false));
-  }
+  fd.set(
+    "contatos",
+    JSON.stringify({
+      emails: (entradas.emails ?? []).map((e) => ({
+        endereco: e.endereco,
+        principal: e.principal ?? false,
+      })),
+      telefones: (entradas.telefones ?? []).map((t) => ({
+        numero: t.numero,
+        tipo: t.tipo ?? "CELULAR",
+        principal: t.principal ?? false,
+      })),
+    }),
+  );
   return fd;
 }
 
@@ -103,5 +108,36 @@ describe("contatoService.resolverContatosParaSalvar", () => {
     );
 
     expect(resultado).toMatchObject({ error: "Apenas um telefone pode ser o principal." });
+  });
+
+  it("trata JSON inválido ou ausente como listas vazias", () => {
+    const invalido = new FormData();
+    invalido.set("contatos", "{quebrado");
+    expect(contatoService.resolverContatosParaSalvar(invalido)).toEqual({
+      contatos: { emails: [], telefones: [] },
+    });
+    expect(contatoService.resolverContatosParaSalvar(new FormData())).toEqual({
+      contatos: { emails: [], telefones: [] },
+    });
+  });
+
+  it("rejeita payload com formato inesperado", () => {
+    const naoObjeto = new FormData();
+    naoObjeto.set("contatos", JSON.stringify("texto"));
+    expect(contatoService.resolverContatosParaSalvar(naoObjeto)).toEqual({
+      error: "Dados de contatos inválidos.",
+    });
+
+    const emailInvalido = new FormData();
+    emailInvalido.set("contatos", JSON.stringify({ emails: [{ principal: true }] }));
+    expect(contatoService.resolverContatosParaSalvar(emailInvalido)).toEqual({
+      error: "Dados de contatos inválidos.",
+    });
+
+    const telefoneInvalido = new FormData();
+    telefoneInvalido.set("contatos", JSON.stringify({ telefones: [{ numero: 123 }] }));
+    expect(contatoService.resolverContatosParaSalvar(telefoneInvalido)).toEqual({
+      error: "Dados de contatos inválidos.",
+    });
   });
 });

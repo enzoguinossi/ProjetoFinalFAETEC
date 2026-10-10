@@ -136,12 +136,6 @@ export default function ContatosSection({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataTable columns={emailColumns} data={emails} actions={emailActions} idField="endereco" pageSize={5} />
         </div>
-        {emails.map((e, i) => (
-          <div key={`he-${i}`} className="hidden">
-            <input name="email_endereco" value={e.endereco} readOnly />
-            <input name="email_principal" value={String(e.principal)} readOnly />
-          </div>
-        ))}
       </div>
 
       {/* Telefones */}
@@ -156,13 +150,6 @@ export default function ContatosSection({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <DataTable columns={telefoneColumns} data={telefones} actions={telActions} idField="numero" pageSize={5} />
         </div>
-        {telefones.map((t, i) => (
-          <div key={`ht-${i}`} className="hidden">
-            <input name="telefone_numero" value={t.numero} readOnly />
-            <input name="telefone_tipo" value={t.tipo} readOnly />
-            <input name="telefone_principal" value={String(t.principal)} readOnly />
-          </div>
-        ))}
       </div>
 
       {emailModal && (

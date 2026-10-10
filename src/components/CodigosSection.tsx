@@ -106,13 +106,6 @@ export default function CodigosSection({
         pageSize={5}
       />
 
-      {value.map((c, i) => (
-        <div key={`hc-${i}`} className="hidden">
-          <input name="codigo_tipo" value={c.tipo} readOnly />
-          <input name="codigo_valor" value={c.valor} readOnly />
-        </div>
-      ))}
-
       <CodigoForm
         key={editandoIdx ?? "novo"}
         open={modalOpen}

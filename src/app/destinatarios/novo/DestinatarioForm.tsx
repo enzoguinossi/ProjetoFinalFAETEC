@@ -42,6 +42,8 @@ export default function DestinatarioForm({
     try {
       const form = new FormData(e.currentTarget);
       if (initialData) form.set("id_destinatario", String(initialData.id_destinatario));
+      form.set("codigos", JSON.stringify(codigos));
+      form.set("contatos", JSON.stringify({ emails, telefones }));
       const result = initialData
         ? await updateDestinatario(form)
         : await createDestinatario(form);

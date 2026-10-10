@@ -1,17 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { useAviso } from "@/components/AvisoProvider";
 import UsuarioForm from "./novo/UsuarioForm";
-import type { Column, Action } from "@/components/DataTable";
+import type { Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
-import { useListaPaginada } from "@/lib/use-lista-paginada";
+import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarUsuarios,
   getUsuario,
@@ -35,79 +33,32 @@ const columns: Column<UsuarioListRow>[] = [
   { key: "login", label: "Login", width: "2fr" },
 ];
 
-type ModalMode = "create" | "edit" | "view" | null;
-
 export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
   const router = useRouter();
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [formData, setFormData] = useState<UsuarioFormData | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UsuarioListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const mostrarAviso = useAviso();
-  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
-    useListaPaginada(listarUsuarios, inicial);
-
-  async function openEdit(id: number) {
-    const data = await getUsuario(id);
-    setFormData(data);
-    setModalMode("edit");
-  }
-
-  async function openView(id: number) {
-    const data = await getUsuario(id);
-    setFormData(data);
-    setModalMode("view");
-  }
-
-  function closeModal() {
-    setModalMode(null);
-    setFormData(null);
-  }
-
-  function handleSuccess() {
-    closeModal();
-    router.refresh();
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const result = await deleteUsuario(deleteTarget.id_usuario);
-      if (result.error) { mostrarAviso(result.error, "erro"); return; }
-      mostrarAviso("Usuário excluído com sucesso.", "sucesso");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch {
-      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  const actions: Action<UsuarioListRow>[] = [
-    ...(perms.canView
-      ? [{
-          icon: "/icons/actions/Olho.svg",
-          label: "Visualizar",
-          onClick: (row: UsuarioListRow) => openView(row.id_usuario),
-        }]
-      : []),
-    ...(perms.canEdit
-      ? [{
-          icon: "/icons/actions/Editar.svg",
-          label: "Editar",
-          onClick: (row: UsuarioListRow) => openEdit(row.id_usuario),
-        }]
-      : []),
-    ...(perms.canDelete
-      ? [{
-          icon: "/icons/actions/Lixeira.svg",
-          label: "Excluir",
-          onClick: (row: UsuarioListRow) => setDeleteTarget(row),
-        }]
-      : []),
-  ];
+  const {
+    resultado,
+    carregando,
+    buscarPorTermo,
+    paginacaoServidor,
+    actions,
+    modalMode,
+    formData,
+    abrirNovo,
+    fecharModal,
+    aoSalvar,
+    deleteTarget,
+    setDeleteTarget,
+    confirmarExclusao,
+    excluindo,
+  } = useCrudLista<UsuarioListRow, UsuarioFormData>({
+    buscar: listarUsuarios,
+    inicial,
+    carregar: getUsuario,
+    excluir: deleteUsuario,
+    idDe: (row) => row.id_usuario,
+    perms,
+    mensagemExcluido: "Usuário excluído com sucesso.",
+  });
 
   return (
     <>
@@ -115,7 +66,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         <div className="flex-1">
           <SearchBar
             placeholder="Pesquisar usuários..."
-            onNew={() => setModalMode("create")}
+            onNew={abrirNovo}
             onSearch={buscarPorTermo}
             showNew={perms.canCreate}
           />
@@ -127,29 +78,23 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         data={resultado.data}
         idField="codigo"
         actions={actions}
-        paginacaoServidor={{
-          total: resultado.total,
-          page: resultado.page,
-          pageSize: resultado.limit,
-          onPageChange: irParaPagina,
-          onPageSizeChange: mudarTamanho,
-        }}
+        paginacaoServidor={paginacaoServidor}
         carregando={carregando}
       />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="1000px">
         <UsuarioForm
           funcionarios={funcionarios}
           grupos={grupos}
           perfis={perfis}
           perfilPermissoes={perfilPermissoes}
           mode="create"
-          onSuccess={handleSuccess}
-          onCancel={closeModal}
+          onSuccess={aoSalvar}
+          onCancel={fecharModal}
         />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="1000px">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
@@ -159,13 +104,13 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
             mode="edit"
             initialData={formData}
             canDeactivate={perms.canDeactivate}
-            onSuccess={handleSuccess}
-            onCancel={closeModal}
+            onSuccess={aoSalvar}
+            onCancel={fecharModal}
           />
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="1000px">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
@@ -174,7 +119,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
             perfilPermissoes={perfilPermissoes}
             mode="view"
             initialData={formData}
-            onCancel={closeModal}
+            onCancel={fecharModal}
           />
         )}
       </Modal>
@@ -182,11 +127,11 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmarExclusao}
         title="Excluir usuário"
         message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"?`}
         confirmLabel="Excluir"
-        loading={deleting}
+        loading={excluindo}
       />
     </>
   );

@@ -4,10 +4,7 @@ import { criarTipoCodigo } from "../helpers/factories";
 
 function formComCodigos(entradas: { tipo: string; valor: string }[]) {
   const fd = new FormData();
-  for (const e of entradas) {
-    fd.append("codigo_tipo", e.tipo);
-    fd.append("codigo_valor", e.valor);
-  }
+  fd.set("codigos", JSON.stringify(entradas));
   return fd;
 }
 
@@ -61,5 +58,26 @@ describe("codigoService.resolverCodigosParaSalvar", () => {
     );
 
     expect(resultado).toMatchObject({ error: expect.stringContaining("não encontrado") });
+  });
+
+  it("trata JSON inválido ou ausente como lista vazia", async () => {
+    const invalido = new FormData();
+    invalido.set("codigos", "{quebrado");
+    expect(await codigoService.resolverCodigosParaSalvar("PRODUTO", invalido)).toEqual({ codigos: [] });
+    expect(await codigoService.resolverCodigosParaSalvar("PRODUTO", new FormData())).toEqual({ codigos: [] });
+  });
+
+  it("rejeita payload com formato inesperado", async () => {
+    const naoArray = new FormData();
+    naoArray.set("codigos", JSON.stringify({ tipo: "DIGITACAO", valor: "X" }));
+    expect(await codigoService.resolverCodigosParaSalvar("PRODUTO", naoArray)).toEqual({
+      error: "Dados de códigos inválidos.",
+    });
+
+    const itemInvalido = new FormData();
+    itemInvalido.set("codigos", JSON.stringify([{ tipo: "DIGITACAO" }]));
+    expect(await codigoService.resolverCodigosParaSalvar("PRODUTO", itemInvalido)).toEqual({
+      error: "Dados de códigos inválidos.",
+    });
   });
 });

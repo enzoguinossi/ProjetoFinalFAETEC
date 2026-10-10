@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { useAviso } from "@/components/AvisoProvider";
 import DestinatarioForm from "./novo/DestinatarioForm";
-import type { Column, Action } from "@/components/DataTable";
+import type { Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
-import { useListaPaginada } from "@/lib/use-lista-paginada";
+import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarDestinatarios,
   getDestinatario,
@@ -30,80 +27,37 @@ const columns: Column<DestinatarioListRow>[] = [
   { key: "razao", label: "Razão Social", width: "5fr" },
 ];
 
-type ModalMode = "create" | "edit" | "view" | null;
-
 export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Props) {
-  const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [formData, setFormData] = useState<DestinatarioFormData | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DestinatarioListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const router = useRouter();
-  const mostrarAviso = useAviso();
-  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
-    useListaPaginada(listarDestinatarios, inicial);
-
-  async function openModal(id: number | null, mode: "edit" | "view") {
-    if (id === null) { setModalMode("create"); return; }
-    const data = await getDestinatario(id);
-    setFormData(data);
-    setModalMode(mode);
-  }
-
-  function closeModal() {
-    setModalMode(null);
-    setFormData(null);
-  }
-
-  function handleSuccess() {
-    closeModal();
-    router.refresh();
-  }
-
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const result = await deleteDestinatario(deleteTarget.id_destinatario);
-      if (result.error) { mostrarAviso(result.error, "erro"); return; }
-      mostrarAviso("Destinatário excluído com sucesso.", "sucesso");
-      setDeleteTarget(null);
-      router.refresh();
-    } catch {
-      mostrarAviso("Erro ao excluir. Tente novamente.", "erro");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  const actions: Action<DestinatarioListRow>[] = [
-    ...(perms.canView
-      ? [{
-          icon: "/icons/actions/Olho.svg",
-          label: "Visualizar",
-          onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "view"),
-        }]
-      : []),
-    ...(perms.canEdit
-      ? [{
-          icon: "/icons/actions/Editar.svg",
-          label: "Editar",
-          onClick: (row: DestinatarioListRow) => openModal(row.id_destinatario, "edit"),
-        }]
-      : []),
-    ...(perms.canDelete
-      ? [{
-          icon: "/icons/actions/Lixeira.svg",
-          label: "Excluir",
-          onClick: (row: DestinatarioListRow) => setDeleteTarget(row),
-        }]
-      : []),
-  ];
+  const {
+    resultado,
+    carregando,
+    buscarPorTermo,
+    paginacaoServidor,
+    actions,
+    modalMode,
+    formData,
+    abrirNovo,
+    fecharModal,
+    aoSalvar,
+    deleteTarget,
+    setDeleteTarget,
+    confirmarExclusao,
+    excluindo,
+  } = useCrudLista<DestinatarioListRow, DestinatarioFormData>({
+    buscar: listarDestinatarios,
+    inicial,
+    carregar: getDestinatario,
+    excluir: deleteDestinatario,
+    idDe: (row) => row.id_destinatario,
+    perms,
+    mensagemExcluido: "Destinatário excluído com sucesso.",
+  });
 
   return (
     <>
       <SearchBar
         placeholder="Pesquisar destinatários..."
-        onNew={() => setModalMode("create")}
+        onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
@@ -112,47 +66,41 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
         data={resultado.data}
         idField="codigo"
         actions={actions}
-        paginacaoServidor={{
-          total: resultado.total,
-          page: resultado.page,
-          pageSize: resultado.limit,
-          onPageChange: irParaPagina,
-          onPageSizeChange: mudarTamanho,
-        }}
+        paginacaoServidor={paginacaoServidor}
         carregando={carregando}
       />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
-        <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">
+        <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={aoSalvar} onCancel={fecharModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="960px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
           <DestinatarioForm
             mode="edit"
             initialData={formData}
             tiposCodigo={tiposCodigo}
             canDeactivate={perms.canDeactivate}
-            onSuccess={handleSuccess}
-            onCancel={closeModal}
+            onSuccess={aoSalvar}
+            onCancel={fecharModal}
           />
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="960px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
-          <DestinatarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />
+          <DestinatarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={fecharModal} />
         )}
       </Modal>
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={confirmarExclusao}
         title="Excluir destinatário"
         message={`Tem certeza que deseja excluir "${deleteTarget?.razao}"?`}
         confirmLabel="Excluir"
-        loading={deleting}
+        loading={excluindo}
       />
     </>
   );
