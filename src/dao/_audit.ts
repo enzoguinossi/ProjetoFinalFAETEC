@@ -11,6 +11,8 @@ type AcaoAuditoria =
   | "LOGOUT"
   | "DEFINIR_SENHA";
 
+type Db = Prisma.TransactionClient;
+
 export async function registrarAuditoria(
   id_usuario: number,
   acao: AcaoAuditoria,
@@ -18,8 +20,9 @@ export async function registrarAuditoria(
   id_entidade_afetada: number,
   dados_anteriores?: Record<string, unknown> | null,
   dados_novos?: Record<string, unknown> | null,
+  client: Db = prisma,
 ) {
-  await prisma.registroAuditoria.create({
+  await client.registroAuditoria.create({
     data: {
       id_usuario,
       acao,

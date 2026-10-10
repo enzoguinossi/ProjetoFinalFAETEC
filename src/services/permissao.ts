@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { registrarAuditoria } from "@/dao/_audit";
 
 export type PermissaoItem = { id_permissao: number; nome: string; descricao: string | null };
 export type PerfilItem = { id_perfil: number; nome: string; descricao: string | null };
@@ -33,11 +34,18 @@ export class PermissaoService {
     return [...mapa.entries()].map(([prefixo, permissoes]) => ({ prefixo, permissoes }));
   }
 
-  async listarPerfis(): Promise<PerfilItem[]> {
+  /** Lista os perfis com suas permissões em uma única consulta. */
+  async listarPerfisComPermissoes(): Promise<(PerfilItem & { permissoes: string[] })[]> {
     const perfis = await prisma.perfil.findMany({
       orderBy: { nome: "asc" },
+      include: { permissoes: { include: { permissao: true } } },
     });
-    return perfis.map((p) => ({ id_perfil: p.id_perfil, nome: p.nome, descricao: p.descricao }));
+    return perfis.map((p) => ({
+      id_perfil: p.id_perfil,
+      nome: p.nome,
+      descricao: p.descricao,
+      permissoes: p.permissoes.map((pp) => pp.permissao.nome),
+    }));
   }
 
   async getPerfil(id_perfil: number) {
@@ -108,33 +116,20 @@ export class PermissaoService {
     await prisma.$transaction(async (tx) => {
       await tx.perfilPermissao.deleteMany({ where: { id_perfil } });
       await tx.perfil.delete({ where: { id_perfil } });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario: id_usuario_resp,
-          acao: "EXCLUIR",
-          data_hora: new Date(),
-          entidade: "Perfil",
-          id_entidade_afetada: id_perfil,
-          dados_anteriores: {
-            nome: antes.nome,
-            descricao: antes.descricao,
-            permissoes: antes.permissoes.map((p) => p.permissao.nome).sort(),
-          },
+      await registrarAuditoria(
+        id_usuario_resp,
+        "EXCLUIR",
+        "Perfil",
+        id_perfil,
+        {
+          nome: antes.nome,
+          descricao: antes.descricao,
+          permissoes: antes.permissoes.map((p) => p.permissao.nome).sort(),
         },
-      });
+        null,
+        tx,
+      );
     });
-  }
-
-  async verificar(id_usuario: number, permissao: string) {
-    const usuario = await prisma.usuario.findUnique({
-      where: { id_usuario },
-    });
-    if (usuario?.super_admin) return true;
-
-    const count = await prisma.usuarioPermissao.count({
-      where: { id_usuario, permissao: { nome: permissao } },
-    });
-    return count > 0;
   }
 
   /** Permissões (nomes) de um perfil. */
@@ -170,28 +165,21 @@ export class PermissaoService {
     const ids = permissoes.map((p) => p.id_permissao);
     const anteriores = alvo.permissoes.map((p) => p.permissao.nome).sort();
 
-    await prisma.$transaction([
-      prisma.usuarioPermissao.deleteMany({ where: { id_usuario } }),
-      prisma.usuarioPermissao.createMany({
+    await prisma.$transaction(async (tx) => {
+      await tx.usuarioPermissao.deleteMany({ where: { id_usuario } });
+      await tx.usuarioPermissao.createMany({
         data: ids.map((id_permissao) => ({ id_usuario, id_permissao })),
-      }),
-      prisma.registroAuditoria.create({
-        data: {
-          id_usuario: id_usuario_resp,
-          acao: "ALTERAR",
-          data_hora: new Date(),
-          entidade: "UsuarioPermissao",
-          id_entidade_afetada: id_usuario,
-          dados_anteriores: { permissoes: anteriores },
-          dados_novos: { permissoes: [...nomes].sort() },
-        },
-      }),
-    ]);
-  }
-
-  async aplicarPerfil(id_usuario: number, id_perfil: number, id_usuario_resp: number) {
-    const nomes = await this.permissoesDoPerfil(id_perfil);
-    await this.salvarPermissoes(id_usuario, nomes, id_usuario_resp);
+      });
+      await registrarAuditoria(
+        id_usuario_resp,
+        "ALTERAR",
+        "UsuarioPermissao",
+        id_usuario,
+        { permissoes: anteriores },
+        { permissoes: [...nomes].sort() },
+        tx,
+      );
+    });
   }
 }
 

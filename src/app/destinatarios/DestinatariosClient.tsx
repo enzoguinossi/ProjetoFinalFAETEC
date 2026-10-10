@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
@@ -9,13 +9,18 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAviso } from "@/components/AvisoProvider";
 import DestinatarioForm from "./novo/DestinatarioForm";
 import type { Column, Action } from "@/components/DataTable";
-import type { PermissoesEntidade } from "@/types";
-import { searchDestinatariosList, type DestinatarioListRow } from "./actions";
-import { getDestinatario, deleteDestinatario } from "./novo/actions";
-import type { DestinatarioFormData } from "./novo/actions";
+import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useListaPaginada } from "@/lib/use-lista-paginada";
+import {
+  listarDestinatarios,
+  getDestinatario,
+  deleteDestinatario,
+  type DestinatarioListRow,
+  type DestinatarioFormData,
+} from "./actions";
 
 interface Props {
-  rows: DestinatarioListRow[];
+  inicial: PaginatedResult<DestinatarioListRow>;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }
@@ -27,30 +32,15 @@ const columns: Column<DestinatarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function DestinatariosClient({ rows: initialRows, tiposCodigo, perms }: Props) {
+export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<DestinatarioFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DestinatarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const searchRef = useRef("");
   const router = useRouter();
   const mostrarAviso = useAviso();
-
-  useEffect(() => {
-    if (searchRef.current.length < 2) {
-      setRows(initialRows);
-    }
-  }, [initialRows]);
-
-  function handleSearch(value: string) {
-    searchRef.current = value;
-    if (value.length < 2) {
-      setRows(initialRows);
-      return;
-    }
-    searchDestinatariosList(value).then(setRows).catch(() => setRows(initialRows));
-  }
+  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
+    useListaPaginada(listarDestinatarios, inicial);
 
   async function openModal(id: number | null, mode: "edit" | "view") {
     if (id === null) { setModalMode("create"); return; }
@@ -114,10 +104,23 @@ export default function DestinatariosClient({ rows: initialRows, tiposCodigo, pe
       <SearchBar
         placeholder="Pesquisar destinatários..."
         onNew={() => setModalMode("create")}
-        onSearch={handleSearch}
+        onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
-      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
+      <DataTable
+        columns={columns}
+        data={resultado.data}
+        idField="codigo"
+        actions={actions}
+        paginacaoServidor={{
+          total: resultado.total,
+          page: resultado.page,
+          pageSize: resultado.limit,
+          onPageChange: irParaPagina,
+          onPageSizeChange: mudarTamanho,
+        }}
+        carregando={carregando}
+      />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
         <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />

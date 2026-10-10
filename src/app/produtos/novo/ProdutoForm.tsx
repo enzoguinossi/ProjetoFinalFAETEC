@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { createProduto, updateProduto, getProduto, searchProdutos } from "./actions";
-import type { ProdutoFormData } from "./actions";
+import { useEffect, useRef, useState } from "react";
+import { createProduto, updateProduto, getProduto, searchProdutos } from "../actions";
+import type { ProdutoFormData } from "../actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
+import ProdutoView from "./ProdutoView";
 import Button from "@/components/Button";
 import { useAviso } from "@/components/AvisoProvider";
 
@@ -31,7 +32,6 @@ export interface ProdutoItem {
 interface Props {
   conversoes: Conversao[];
   tiposCodigo: TipoCodigo[];
-  mode?: "create" | "edit" | "view";
   initialData?: ProdutoFormData;
   canDeactivate?: boolean;
   onSuccess?: () => void;
@@ -46,11 +46,10 @@ const CHECKBOX_LABEL_CLASS =
   "flex items-center gap-2 font-sans text-base font-normal text-ink-strong leading-[1.4] cursor-pointer [&_input[type=checkbox]]:size-[1.125rem] [&_input[type=checkbox]]:accent-brand [&_input[type=checkbox]]:cursor-pointer";
 
 export default function ProdutoForm({
-  conversoes, tiposCodigo, mode = "create", initialData, canDeactivate = true,
+  conversoes, tiposCodigo, initialData, canDeactivate = true,
   onSuccess, onCancel,
 }: Props) {
-  const isView = mode === "view";
-  const isEdit = mode === "edit";
+  const isEdit = initialData !== undefined;
 
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
@@ -69,13 +68,18 @@ export default function ProdutoForm({
   );
   const [editandoIns, setEditandoIns] = useState<number | null>(null);
   const [buscandoIdx, setBuscandoIdx] = useState<number | null>(null);
-
-  const [insumoViewOpen, setInsumoViewOpen] = useState(false);
   const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
 
   const fotoInputRef = useRef<HTMLInputElement>(null);
   const [previewFoto, setPreviewFoto] = useState<string | null>(null);
   const [fotoNome, setFotoNome] = useState("");
+
+  useEffect(
+    () => () => {
+      if (previewFoto) URL.revokeObjectURL(previewFoto);
+    },
+    [previewFoto],
+  );
 
   function onSelecionarFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -84,13 +88,11 @@ export default function ProdutoForm({
     setPreviewFoto(URL.createObjectURL(file));
   }
 
-  const editable = !isView;
-
   const insumoColumns: import("@/components/DataTable").Column<InsumoEntry>[] = [
     { key: "descricao", label: "Produto", width: "3fr" },
     {
       key: "qtd", label: "Quantidade", width: "1fr",
-      render: editable ? (value: string | number, row: InsumoEntry) => (
+      render: (value: string | number, row: InsumoEntry) => (
         <input
           type="number"
           min="0"
@@ -105,7 +107,7 @@ export default function ProdutoForm({
           }}
           className="w-full h-7 border border-border-input rounded-md px-2 font-sans text-sm outline-none box-border"
         />
-      ) : undefined,
+      ),
     },
   ];
 
@@ -132,38 +134,31 @@ export default function ProdutoForm({
     setBuscandoIdx(null);
   }
 
-  async function visualizarInsumo(id_produto: number) {
-    const data = await getProduto(id_produto);
-    if (data) {
-      setInsumoViewData(data);
-      setInsumoViewOpen(true);
-    }
-  }
-
   const insumoActions = [
     {
       icon: "/icons/actions/Olho.svg",
       label: "Visualizar",
-      onClick: (row: Record<string, unknown>) => {
+      onClick: async (row: Record<string, unknown>) => {
         const i = insumos.findIndex((ins) => ins.descricao === row.descricao);
-        if (i >= 0 && insumos[i].id > 0) visualizarInsumo(insumos[i].id);
+        if (i < 0 || insumos[i].id <= 0) return;
+        const produto = await getProduto(insumos[i].id);
+        if (produto) setInsumoViewData(produto);
       },
     },
-    ...(editable ? [{
+    {
       icon: "/icons/actions/Lixeira.svg",
       label: "Excluir",
       onClick: (row: Record<string, unknown>) => {
         const i = insumos.findIndex((ins) => ins.descricao === row.descricao);
         if (i >= 0) removerInsumo(i);
       },
-    }] : []),
+    },
   ];
 
   // ── Submit ──
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (isView) return;
     setSaving(true);
     try {
       const form = new FormData(e.currentTarget);
@@ -192,11 +187,9 @@ export default function ProdutoForm({
           <input
             className={INPUT_CLASS}
             name="descricao"
-            required={!isView}
-            value={isView || isEdit ? descricao : undefined}
-            onChange={isEdit ? (e) => setDescricao(e.target.value) : undefined}
-            readOnly={isView}
-            tabIndex={isView ? -1 : 0}
+            required
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
           />
         </div>
 
@@ -209,25 +202,22 @@ export default function ProdutoForm({
               name="id_conversao"
               value={idConversao ?? ""}
               onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
-              disabled={isView}
             >
               <option value="">Selecione...</option>
               {conversoesAtuais.map((c) => (
                 <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
               ))}
             </select>
-            {!isView && (
-              <button
-                type="button"
-                onClick={() => setUnidadesModalOpen(true)}
-                title="Gerenciar unidades de conversão"
-                className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
-              >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setUnidadesModalOpen(true)}
+              title="Gerenciar unidades de conversão"
+              className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -250,11 +240,11 @@ export default function ProdutoForm({
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-[5px]">
             <label className={CHECKBOX_LABEL_CLASS}>
-              <input type="checkbox" name="perecivel" checked={perecivel} onChange={(e) => setPerecivel(e.target.checked)} disabled={isView} />
+              <input type="checkbox" name="perecivel" checked={perecivel} onChange={(e) => setPerecivel(e.target.checked)} />
               Perecível
             </label>
             <label className={CHECKBOX_LABEL_CLASS}>
-              <input type="checkbox" name="composto" checked={composto} onChange={(e) => setComposto(e.target.checked)} disabled={isView} />
+              <input type="checkbox" name="composto" checked={composto} onChange={(e) => setComposto(e.target.checked)} />
               Composto
             </label>
           </div>
@@ -266,7 +256,6 @@ export default function ProdutoForm({
                 type="date"
                 name="data_validade"
                 defaultValue={initialData?.data_validade ?? undefined}
-                readOnly={isView}
               />
             </div>
           )}
@@ -277,7 +266,6 @@ export default function ProdutoForm({
           tiposCodigo={tiposCodigo}
           value={codigos}
           onChange={setCodigos}
-          disabled={isView}
         />
 
         {/* ── Insumos ── */}
@@ -285,17 +273,15 @@ export default function ProdutoForm({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-xl font-[590] tracking-[-0.028125rem] leading-[1.5625rem] text-ink-strong m-0">Insumos</h3>
-              {!isView && (
-                <Button
-                  label="Novo"
-                  iconLeft={
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  }
-                  onClick={iniciarNovoInsumo}
-                />
-              )}
+              <Button
+                label="Novo"
+                iconLeft={
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                }
+                onClick={iniciarNovoInsumo}
+              />
             </div>
             <DataTable columns={insumoColumns} data={insumos} actions={insumoActions} idField="descricao" pageSize={5} />
             {insumos.map((ins, i) => (
@@ -316,27 +302,22 @@ export default function ProdutoForm({
               name="foto_url"
               placeholder="URL da imagem..."
               defaultValue={initialData?.foto_url ?? undefined}
-              readOnly={isView}
             />
-            {!isView && (
-              <>
-                <input
-                  ref={fotoInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  name="foto_arquivo"
-                  className="hidden"
-                  onChange={onSelecionarFoto}
-                />
-                <button type="button" className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-[#697077] shrink-0 transition-[background] duration-[120ms] hover:bg-hover" title="Upload" onClick={() => fotoInputRef.current?.click()}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2 2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                </button>
-              </>
-            )}
+            <input
+              ref={fotoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              name="foto_arquivo"
+              className="hidden"
+              onChange={onSelecionarFoto}
+            />
+            <button type="button" className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-[#697077] shrink-0 transition-[background] duration-[120ms] hover:bg-hover" title="Upload" onClick={() => fotoInputRef.current?.click()}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2 2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
           </div>
           {fotoNome && (
             <span className="font-sans text-[0.8125rem] text-[#616161]">
@@ -353,17 +334,10 @@ export default function ProdutoForm({
         </div>
 
         {/* Actions */}
-        {!isView && (
-          <div className="flex justify-end gap-[10px] pt-1">
-            <Button label="Cancelar" variant="cancel" onClick={onCancel} />
-            <Button label={isEdit ? "Salvar" : "Gravar"} variant="primary" type="submit" disabled={saving} />
-          </div>
-        )}
-        {isView && (
-          <div className="flex justify-end gap-[10px] pt-1">
-            <Button label="Fechar" variant="cancel" onClick={onCancel} />
-          </div>
-        )}
+        <div className="flex justify-end gap-[10px] pt-1">
+          <Button label="Cancelar" variant="cancel" onClick={onCancel} />
+          <Button label={isEdit ? "Salvar" : "Gravar"} variant="primary" type="submit" disabled={saving} />
+        </div>
       </form>
 
       <SearchEntityModal
@@ -384,17 +358,16 @@ export default function ProdutoForm({
       />
 
       <Modal
-        open={insumoViewOpen && insumoViewData !== null}
-        onClose={() => { setInsumoViewOpen(false); setInsumoViewData(null); }}
+        open={insumoViewData !== null}
+        onClose={() => setInsumoViewData(null)}
         width="728px"
       >
         {insumoViewData && (
-          <ProdutoForm
-            conversoes={conversoes}
+          <ProdutoView
+            conversoes={conversoesAtuais}
             tiposCodigo={tiposCodigo}
-            mode="view"
-            initialData={insumoViewData}
-            onCancel={() => { setInsumoViewOpen(false); setInsumoViewData(null); }}
+            data={insumoViewData}
+            onClose={() => setInsumoViewData(null)}
           />
         )}
       </Modal>

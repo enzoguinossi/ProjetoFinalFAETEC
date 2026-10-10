@@ -1,34 +1,28 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
 
 export class FornecedorDAO {
-  async list(params: PaginationParams = {}) {
+  async list(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
+    const where: Prisma.FornecedorWhereInput = { ativo: true };
+    if (params.search) where.pessoaJuridica = { razao_social: { contains: params.search } };
     const [data, total] = await Promise.all([
       prisma.fornecedor.findMany({
         skip, take,
-        where: { ativo: true },
+        where,
         include: { pessoaJuridica: true, endereco: true },
         orderBy: { id_fornecedor: "desc" },
       }),
-      prisma.fornecedor.count({ where: { ativo: true } }),
+      prisma.fornecedor.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
-  }
-
-  async search(query: string, take = 50) {
-    return prisma.fornecedor.findMany({
-      where: { ativo: true, pessoaJuridica: { razao_social: { contains: query } } },
-      include: { pessoaJuridica: true },
-      take,
-      orderBy: { id_fornecedor: "desc" },
-    });
   }
 
   async getById(id: number) {
@@ -54,9 +48,12 @@ export class FornecedorDAO {
   ) {
     return prisma.$transaction(async (tx) => {
       const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "PessoaJuridica", id_entidade_afetada: pj.id_pessoa_juridica, dados_novos: { razao_social: data.razao_social } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "PessoaJuridica", pj.id_pessoa_juridica,
+        null,
+        { razao_social: data.razao_social },
+        tx,
+      );
 
       let id_endereco: number | undefined;
       if (data.endereco) {
@@ -67,9 +64,12 @@ export class FornecedorDAO {
       const forn = await tx.fornecedor.create({
         data: { id_pessoa_juridica: pj.id_pessoa_juridica, contato: data.contato, id_endereco },
       });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: forn.id_fornecedor, dados_novos: { contato: data.contato ?? null, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "Fornecedor", forn.id_fornecedor,
+        null,
+        { contato: data.contato ?? null, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       for (const c of data.codigos ?? []) {
         await tx.fornecedorCodigo.create({
@@ -161,9 +161,15 @@ export class FornecedorDAO {
         }
       }
 
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] } },
-      });
+      await registrarAuditoria(
+        id_usuario,
+        data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
+        "Fornecedor",
+        id,
+        { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       return depois;
     });
@@ -191,20 +197,12 @@ export class FornecedorDAO {
       await tx.fornecedor.delete({ where: { id_fornecedor: id } });
       if (f.id_endereco) await tx.endereco.delete({ where: { id_endereco: f.id_endereco } });
       await tx.pessoaJuridica.delete({ where: { id_pessoa_juridica: f.id_pessoa_juridica } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { id_fornecedor: id } },
-      });
-    });
-  }
-
-  async softDelete(id: number, id_usuario: number) {
-    return prisma.$transaction(async (tx) => {
-      const antes = await tx.fornecedor.findUniqueOrThrow({ where: { id_fornecedor: id } });
-      const depois = await tx.fornecedor.update({ where: { id_fornecedor: id }, data: { ativo: false } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Fornecedor", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
-      });
-      return depois;
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", "Fornecedor", id,
+        { id_fornecedor: id },
+        null,
+        tx,
+      );
     });
   }
 }

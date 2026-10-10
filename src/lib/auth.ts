@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getAuthToken, clearAuthCookie } from "./cookies";
 import { verifyToken } from "./jwt";
@@ -20,8 +21,9 @@ async function limparSessaoInvalida() {
  * - rejeita se o usuário não existir mais ou estiver inativo;
  * - rejeita se a senha foi alterada depois da emissão do token (sv).
  * Se o token existir mas o usuário não, limpa o cookie inválido.
+ * Memoizado por request para evitar consultas repetidas na mesma renderização.
  */
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   const token = await getAuthToken();
   if (!token) return null;
 
@@ -52,7 +54,7 @@ export async function getSession(): Promise<Session | null> {
     ...payload,
     super_admin: usuario.super_admin,
   };
-}
+});
 
 export async function getCurrentUser(): Promise<Session | null> {
   return getSession();

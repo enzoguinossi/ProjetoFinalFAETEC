@@ -1,10 +1,9 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import DestinatariosClient from "./DestinatariosClient";
-import { destinatarioDAO } from "@/dao/destinatario";
+import { listarDestinatarios } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
-import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -12,18 +11,14 @@ export default async function DestinatariosPage() {
   const perms = await resolverPermissoes("destinatario");
   if (!perms.canList) redirect("/dashboard");
 
-  const [{ data }, tiposCodigo] = await Promise.all([
-    destinatarioDAO.list(),
+  const [inicial, tiposCodigo] = await Promise.all([
+    listarDestinatarios({ page: 1, limit: 20 }),
     tipoCodigoDAO.listParaEntidade("DESTINATARIO"),
   ]);
-  const rows = data.map((d) => ({
-    id_destinatario: d.id_destinatario,
-    codigo: formatarCodigo(d.id_destinatario),
-    razao: d.pessoaJuridica.razao_social,
-  }));
+
   return (
     <DashboardLayout title="Destinatários">
-      <DestinatariosClient rows={rows} tiposCodigo={tiposCodigo} perms={perms} />
+      <DestinatariosClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
     </DashboardLayout>
   );
 }

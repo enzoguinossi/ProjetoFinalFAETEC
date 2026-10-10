@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import TablePagination from "@/components/TablePagination";
 import {
   useTable,
   tableFeatures,
@@ -8,27 +9,8 @@ import {
   createPaginatedRowModel,
   type ColumnDef,
   type PaginationState,
+  type Updater,
 } from "@tanstack/react-table";
-
-/* ── Ações padrão (placeholder) ── */
-
-const defaultActions: Action<Record<string, unknown>>[] = [
-  {
-    icon: "/icons/actions/Editar.svg",
-    label: "Editar",
-    onClick: (row) => console.log("Edit", row),
-  },
-  {
-    icon: "/icons/actions/Olho.svg",
-    label: "Visualizar",
-    onClick: (row) => console.log("View", row),
-  },
-  {
-    icon: "/icons/actions/Lixeira.svg",
-    label: "Excluir",
-    onClick: (row) => console.log("Delete", row),
-  },
-];
 
 /* ── Features (fora do componente = referência estável) ── */
 
@@ -52,15 +34,24 @@ export interface Action<T> {
   onClick: (row: T) => void;
 }
 
+export interface PaginacaoServidor {
+  total: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}
+
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
   actions?: Action<T>[];
   /** Campo usado como React key (ex: "codigo", "placa"). Padrão: índice da linha. */
   idField?: keyof T & string;
-  /** Chave estável customizada (tem prioridade sobre idField). */
-  getRowKey?: (row: T, index: number) => string | number;
   pageSize?: number;
+  /** Quando informado, a paginação passa a ser server-side (manual). */
+  paginacaoServidor?: PaginacaoServidor;
+  carregando?: boolean;
 }
 
 /* ── Classes ── */
@@ -79,13 +70,6 @@ const cellCls =
 const actionsCls = "flex items-center justify-center gap-[0.625rem] py-1";
 const actionBtnCls =
   "flex items-center justify-center w-7 h-7 border-none rounded-md bg-transparent cursor-pointer transition-[background-color] duration-[120ms] text-ink hover:bg-[rgba(0,0,0,0.06)] [&_svg]:w-5 [&_svg]:h-5";
-const paginationCls =
-  "flex items-center justify-center gap-1.5 font-sans text-[0.8125rem] text-ink";
-const pageBtnCls =
-  "flex items-center justify-center w-8 h-8 border border-border rounded-md bg-white cursor-pointer text-ink transition-[background-color,border-color] duration-[120ms] hover:enabled:bg-[#f2f4f8] hover:enabled:border-[#c1c7cd] disabled:opacity-35 disabled:cursor-default";
-const pageInfoCls = "mx-2 whitespace-nowrap";
-const pageSizeSelectCls =
-  "ml-3 px-2 py-1 border border-border rounded-md bg-white font-sans text-[0.8125rem] text-ink cursor-pointer";
 const emptyCls =
   "flex items-center justify-center py-8 px-4 font-sans text-sm text-[#697077] bg-white rounded-b-[1.25rem]";
 
@@ -96,15 +80,21 @@ export default function DataTable<T extends Record<string, unknown>>({
   data,
   actions,
   idField,
-  getRowKey,
   pageSize = 10,
+  paginacaoServidor,
+  carregando = false,
 }: DataTableProps<T>) {
-  const resolvedActions = actions ?? (defaultActions as Action<T>[]);
-
-  const [pagination, setPagination] = useState<PaginationState>({
+  const [paginationInterna, setPaginationInterna] = useState<PaginationState>({
     pageIndex: 0,
     pageSize,
   });
+
+  const pagination: PaginationState = paginacaoServidor
+    ? {
+        pageIndex: Math.max(0, paginacaoServidor.page - 1),
+        pageSize: paginacaoServidor.pageSize,
+      }
+    : paginationInterna;
 
   const tanstackColumns = useMemo(
     () =>
@@ -133,8 +123,22 @@ export default function DataTable<T extends Record<string, unknown>>({
       features,
       columns: tanstackColumns,
       data,
+      manualPagination: paginacaoServidor !== undefined,
+      rowCount: paginacaoServidor?.total,
       state: { pagination },
-      onPaginationChange: setPagination,
+      onPaginationChange: (updater: Updater<PaginationState>) => {
+        const proxima =
+          typeof updater === "function" ? updater(pagination) : updater;
+        if (!paginacaoServidor) {
+          setPaginationInterna(proxima);
+          return;
+        }
+        if (proxima.pageSize !== pagination.pageSize) {
+          paginacaoServidor.onPageSizeChange(proxima.pageSize);
+        } else if (proxima.pageIndex !== pagination.pageIndex) {
+          paginacaoServidor.onPageChange(proxima.pageIndex + 1);
+        }
+      },
       autoResetPageIndex: false,
     },
     (state) => ({ pagination: state.pagination }),
@@ -149,19 +153,17 @@ export default function DataTable<T extends Record<string, unknown>>({
   const rowKeys = useMemo(() => {
     const seen = new Map<string | number, number>();
     return data.map((row, i) => {
-      const base = getRowKey
-        ? getRowKey(row, i)
-        : idField
-          ? (row[idField] as string | number)
-          : i;
+      const base = idField ? (row[idField] as string | number) : i;
       const count = (seen.get(base) ?? 0) + 1;
       seen.set(base, count);
       return count > 1 ? `${String(base)}-${i}` : base;
     });
-  }, [data, idField, getRowKey]);
+  }, [data, idField]);
 
   return (
-    <div className={wrapperCls}>
+    <div
+      className={`${wrapperCls} transition-opacity ${carregando ? "opacity-60" : ""}`}
+    >
       <div className={scrollWrapperCls}>
         <div className={tableCls}>
           {/* Header */}
@@ -195,7 +197,7 @@ export default function DataTable<T extends Record<string, unknown>>({
                   ))}
                   {actions !== undefined && (
                     <div className={actionsCls}>
-                      {resolvedActions.map((action, i) => (
+                      {actions.map((action, i) => (
                         <button
                           key={i}
                           className={actionBtnCls}
@@ -218,131 +220,18 @@ export default function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {/* Pagination */}
-      <div className={paginationCls}>
-        <button
-          className={pageBtnCls}
-          onClick={() => table.firstPage()}
-          disabled={!table.getCanPreviousPage()}
-          title="Primeira página"
-          type="button"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M12 4L8 8L12 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M8 4L4 8L8 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <button
-          className={pageBtnCls}
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-          title="Página anterior"
-          type="button"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M10 4L6 8L10 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-
-        <span className={pageInfoCls}>
-          Página{" "}
-          <strong>
-            {table.state.pagination.pageIndex + 1} de{" "}
-            {table.getPageCount()}
-          </strong>
-        </span>
-
-        <button
-          className={pageBtnCls}
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-          title="Próxima página"
-          type="button"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M6 4L10 8L6 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <button
-          className={pageBtnCls}
-          onClick={() => table.lastPage()}
-          disabled={!table.getCanNextPage()}
-          title="Última página"
-          type="button"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path
-              d="M4 4L8 8L4 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M8 4L12 8L8 12"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-
-        <select
-          className={pageSizeSelectCls}
-          value={table.state.pagination.pageSize}
-          onChange={(e) => table.setPageSize(Number(e.target.value))}
-        >
-          {[5, 10, 20, 50].map((size) => (
-            <option key={size} value={size}>
-              {size} por página
-            </option>
-          ))}
-        </select>
-      </div>
+      <TablePagination
+        pageIndex={table.state.pagination.pageIndex}
+        pageCount={table.getPageCount()}
+        pageSize={table.state.pagination.pageSize}
+        canPrevious={table.getCanPreviousPage()}
+        canNext={table.getCanNextPage()}
+        onFirst={() => table.firstPage()}
+        onPrevious={() => table.previousPage()}
+        onNext={() => table.nextPage()}
+        onLast={() => table.lastPage()}
+        onPageSizeChange={(size) => table.setPageSize(size)}
+      />
     </div>
   );
 }

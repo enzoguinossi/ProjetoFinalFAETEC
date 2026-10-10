@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createFuncionario, updateFuncionario } from "./actions";
-import type { FuncionarioFormData } from "./actions";
+import { createFuncionario, updateFuncionario } from "../actions";
+import type { FuncionarioFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import { normalizaTelefones } from "@/lib/contatos";

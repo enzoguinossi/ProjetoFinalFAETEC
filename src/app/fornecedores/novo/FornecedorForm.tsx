@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createFornecedor, updateFornecedor, buscarCep } from "./actions";
-import type { FornecedorFormData } from "./actions";
+import { createFornecedor, updateFornecedor, buscarCep } from "../actions";
+import type { FornecedorFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import EnderecoFields from "@/components/EnderecoFields";
@@ -85,6 +85,7 @@ export default function FornecedorForm({
           <p className="font-sans text-sm text-[#616161] m-0">Endereço (opcional)</p>
 
           <EnderecoFields
+            key={initialData?.id_fornecedor ?? "novo"}
             disabled={isView}
             showCoords
             onLookup={buscarCep}

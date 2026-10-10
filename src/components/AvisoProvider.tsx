@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import Aviso, { type AvisoTipo } from "@/components/Aviso";
 
 type MostrarAviso = (mensagem: string, tipo?: AvisoTipo) => void;
@@ -14,13 +14,23 @@ export function useAviso(): MostrarAviso {
 export default function AvisoProvider({ children }: { children: ReactNode }) {
   const [avisos, setAvisos] = useState<{ id: number; mensagem: string; tipo: AvisoTipo }[]>([]);
   const idRef = useRef(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(
+    () => () => {
+      for (const timer of timers.current) clearTimeout(timer);
+    },
+    [],
+  );
 
   const mostrarAviso = useCallback<MostrarAviso>((mensagem, tipo = "sucesso") => {
     const id = idRef.current++;
     setAvisos((atual) => [...atual, { id, mensagem, tipo }]);
-    setTimeout(() => {
-      setAvisos((atual) => atual.filter((a) => a.id !== id));
-    }, 5000);
+    timers.current.push(
+      setTimeout(() => {
+        setAvisos((atual) => atual.filter((a) => a.id !== id));
+      }, 5000),
+    );
   }, []);
 
   return (

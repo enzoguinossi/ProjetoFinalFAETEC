@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
@@ -9,13 +9,18 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAviso } from "@/components/AvisoProvider";
 import FornecedorForm from "./novo/FornecedorForm";
 import type { Column, Action } from "@/components/DataTable";
-import type { PermissoesEntidade } from "@/types";
-import { searchFornecedoresList, type FornecedorListRow } from "./actions";
-import { getFornecedor, deleteFornecedor } from "./novo/actions";
-import type { FornecedorFormData } from "./novo/actions";
+import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useListaPaginada } from "@/lib/use-lista-paginada";
+import {
+  listarFornecedores,
+  getFornecedor,
+  deleteFornecedor,
+  type FornecedorListRow,
+  type FornecedorFormData,
+} from "./actions";
 
 interface Props {
-  rows: FornecedorListRow[];
+  inicial: PaginatedResult<FornecedorListRow>;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }
@@ -27,30 +32,15 @@ const columns: Column<FornecedorListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function FornecedoresClient({ rows: initialRows, tiposCodigo, perms }: Props) {
+export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<FornecedorFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FornecedorListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const searchRef = useRef("");
   const router = useRouter();
   const mostrarAviso = useAviso();
-
-  useEffect(() => {
-    if (searchRef.current.length < 2) {
-      setRows(initialRows);
-    }
-  }, [initialRows]);
-
-  function handleSearch(value: string) {
-    searchRef.current = value;
-    if (value.length < 2) {
-      setRows(initialRows);
-      return;
-    }
-    searchFornecedoresList(value).then(setRows).catch(() => setRows(initialRows));
-  }
+  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
+    useListaPaginada(listarFornecedores, inicial);
 
   async function openModal(id: number | null, mode: "edit" | "view") {
     if (id === null) { setModalMode("create"); return; }
@@ -114,10 +104,23 @@ export default function FornecedoresClient({ rows: initialRows, tiposCodigo, per
       <SearchBar
         placeholder="Pesquisar fornecedores..."
         onNew={() => setModalMode("create")}
-        onSearch={handleSearch}
+        onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
-      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
+      <DataTable
+        columns={columns}
+        data={resultado.data}
+        idField="codigo"
+        actions={actions}
+        paginacaoServidor={{
+          total: resultado.total,
+          page: resultado.page,
+          pageSize: resultado.limit,
+          onPageChange: irParaPagina,
+          onPageSizeChange: mudarTamanho,
+        }}
+        carregando={carregando}
+      />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="960px">
         <FornecedorForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} />

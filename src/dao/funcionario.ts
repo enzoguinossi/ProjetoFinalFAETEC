@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
@@ -11,19 +11,21 @@ const AUDIT_ENTIDADE = "Funcionario";
 type Db = Prisma.TransactionClient;
 
 export class FuncionarioDAO {
-  async list(params: PaginationParams = {}) {
+  async list(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
+    const where: Prisma.FuncionarioWhereInput = { ativo: true };
+    if (params.search) where.pessoaFisica = { nome: { contains: params.search } };
     const [data, total] = await Promise.all([
       prisma.funcionario.findMany({
         skip, take,
-        where: { ativo: true },
+        where,
         include: {
           pessoaFisica: { select: { id_pessoa_fisica: true, nome: true, cpf: true } },
           usuario: { select: { id_usuario: true, login: true, ativo: true } },
         },
         orderBy: { id_funcionario: "desc" },
       }),
-      prisma.funcionario.count({ where: { ativo: true } }),
+      prisma.funcionario.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
   }
@@ -49,15 +51,6 @@ export class FuncionarioDAO {
     });
   }
 
-  async search(query: string, take = 50) {
-    return prisma.funcionario.findMany({
-      where: { ativo: true, pessoaFisica: { nome: { contains: query } } },
-      include: { pessoaFisica: { select: { nome: true } } },
-      take,
-      orderBy: { id_funcionario: "desc" },
-    });
-  }
-
   async create(
     data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
@@ -66,14 +59,12 @@ export class FuncionarioDAO {
       const pf = await tx.pessoaFisica.create({
         data: { nome: data.nome, cpf: data.cpf },
       });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "CRIAR", data_hora: new Date(),
-          entidade: "PessoaFisica",
-          id_entidade_afetada: pf.id_pessoa_fisica,
-          dados_novos: { nome: data.nome, cpf: data.cpf ?? null },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "PessoaFisica", pf.id_pessoa_fisica,
+        null,
+        { nome: data.nome, cpf: data.cpf ?? null },
+        tx,
+      );
 
       const func = await tx.funcionario.create({
         data: {
@@ -99,14 +90,12 @@ export class FuncionarioDAO {
         });
       }
 
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "CRIAR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE,
-          id_entidade_afetada: func.id_funcionario,
-          dados_novos: { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", AUDIT_ENTIDADE, func.id_funcionario,
+        null,
+        { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: func.id_funcionario },
@@ -180,14 +169,15 @@ export class FuncionarioDAO {
         }
       }
 
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "ALTERAR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-          dados_novos: { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario,
+        data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
+        AUDIT_ENTIDADE,
+        id,
+        { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
@@ -224,24 +214,13 @@ export class FuncionarioDAO {
       await tx.funcionario.delete({ where: { id_funcionario: id } });
       await tx.pessoaFisica.delete({ where: { id_pessoa_fisica: func.id_pessoa_fisica } });
 
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "EXCLUIR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { id_funcionario: id, id_pessoa_fisica: func.id_pessoa_fisica },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", AUDIT_ENTIDADE, id,
+        { id_funcionario: id, id_pessoa_fisica: func.id_pessoa_fisica },
+        null,
+        tx,
+      );
     });
-  }
-
-  async softDelete(id: number, id_usuario: number) {
-    const antes = await prisma.funcionario.findUniqueOrThrow({ where: { id_funcionario: id } });
-    const depois = await prisma.funcionario.update({ where: { id_funcionario: id }, data: { ativo: false } });
-    await registrarAuditoria(id_usuario, "DESATIVAR", AUDIT_ENTIDADE, id,
-      { ativo: antes.ativo },
-      { ativo: depois.ativo },
-    );
-    return depois;
   }
 }
 

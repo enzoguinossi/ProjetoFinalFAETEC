@@ -33,6 +33,23 @@ interface Props {
 const roClass = "flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base";
 const colClass = "flex flex-1 flex-col gap-2";
 
+function Campo({
+  label,
+  className = colClass,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={className}>
+      <label className={ui.label}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function toValue(initial?: EnderecoInitial | null): EnderecoValue {
   return {
     logradouro: initial?.logradouro ?? "",
@@ -108,8 +125,7 @@ export default function EnderecoFields({
     <>
       {/* CEP + UF */}
       <div className="flex gap-4">
-        <div className={`${colClass} flex-[2]`}>
-          <label className={ui.label}>CEP</label>
+        <Campo label="CEP" className={`${colClass} flex-[2]`}>
           {disabled ? (
             <p className={roClass}>{value.cep || "—"}</p>
           ) : (
@@ -139,9 +155,8 @@ export default function EnderecoFields({
               </button>
             </div>
           )}
-        </div>
-        <div className={`${colClass} flex-1`}>
-          <label className={ui.label}>UF</label>
+        </Campo>
+        <Campo label="UF" className={`${colClass} flex-1`}>
           {disabled ? (
             <p className={roClass}>{value.uf || "—"}</p>
           ) : (
@@ -157,59 +172,42 @@ export default function EnderecoFields({
               ))}
             </select>
           )}
-        </div>
+        </Campo>
       </div>
-      {/* Logradouro */}
-      <div className="flex flex-col gap-2">
-        <label className={ui.label}>Logradouro</label>
-        {text("logradouro", required)}
-      </div>
+
+      <Campo label="Logradouro">{text("logradouro", required)}</Campo>
 
       {/* Número + Complemento */}
       <div className="flex gap-4">
-        <div className={colClass}>
-          <label className={ui.label}>Número</label>
-          {text("numero")}
-        </div>
-        <div className={colClass}>
-          <label className={ui.label}>Complemento</label>
-          {text("complemento")}
-        </div>
+        <Campo label="Número">{text("numero")}</Campo>
+        <Campo label="Complemento">{text("complemento")}</Campo>
       </div>
 
       {/* Bairro + Cidade */}
       <div className="flex gap-4">
-        <div className={colClass}>
-          <label className={ui.label}>Bairro</label>
-          {text("bairro")}
-        </div>
-        <div className={colClass}>
-          <label className={ui.label}>Cidade</label>
-          {text("cidade", required)}
-        </div>
+        <Campo label="Bairro">{text("bairro")}</Campo>
+        <Campo label="Cidade">{text("cidade", required)}</Campo>
       </div>
 
       {/* Coordenadas */}
       {showCoords && (
         <div className="flex gap-4">
-          <div className={colClass}>
-            <label className={ui.label}>Latitude</label>
+          <Campo label="Latitude">
             {disabled ? (
               <p className={roClass}>{value.latitude || "—"}</p>
             ) : (
               <input name="latitude" type="number" step="any" value={value.latitude}
                 onChange={(e) => set("latitude", e.target.value)} className={ui.input} />
             )}
-          </div>
-          <div className={colClass}>
-            <label className={ui.label}>Longitude</label>
+          </Campo>
+          <Campo label="Longitude">
             {disabled ? (
               <p className={roClass}>{value.longitude || "—"}</p>
             ) : (
               <input name="longitude" type="number" step="any" value={value.longitude}
                 onChange={(e) => set("longitude", e.target.value)} className={ui.input} />
             )}
-          </div>
+          </Campo>
         </div>
       )}
     </>

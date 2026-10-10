@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createDestinatario, updateDestinatario, buscarCep } from "./actions";
-import type { DestinatarioFormData } from "./actions";
+import { createDestinatario, updateDestinatario, buscarCep } from "../actions";
+import type { DestinatarioFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import EnderecoFields from "@/components/EnderecoFields";
@@ -96,6 +96,7 @@ export default function DestinatarioForm({
           </div>
 
           <EnderecoFields
+            key={initialData?.id_destinatario ?? "novo"}
             disabled={isView}
             required
             showCoords

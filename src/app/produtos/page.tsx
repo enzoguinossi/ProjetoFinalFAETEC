@@ -1,11 +1,10 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import ProdutosClient from "./ProdutosClient";
-import { produtoDAO } from "@/dao/produto";
+import { listarProdutos } from "./actions";
 import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
-import { formatarCodigo } from "@/lib/formatar";
 
 export const dynamic = "force-dynamic";
 
@@ -13,27 +12,15 @@ export default async function ProdutosPage() {
   const perms = await resolverPermissoes("produto");
   if (!perms.canList) redirect("/dashboard");
 
-  const [listResult, conversoes, tiposCodigo] = await Promise.all([
-    produtoDAO.list(),
+  const [inicial, conversoes, tiposCodigo] = await Promise.all([
+    listarProdutos({ page: 1, limit: 20 }),
     conversaoUnidadeDAO.list(),
     tipoCodigoDAO.listParaEntidade("PRODUTO"),
   ]);
 
-  const rows = listResult.data.map((p) => {
-    const qtd = p.estoques.reduce((s, e) => s + Number(e.quantidade_atual), 0);
-    const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
-    return {
-      id_produto: p.id_produto,
-      codigo: formatarCodigo(p.id_produto),
-      descricao: p.descricao,
-      qtd: String(qtd),
-      livre: String(qtd - reservado),
-    };
-  });
-
   return (
     <DashboardLayout title="Produtos">
-      <ProdutosClient rows={rows} conversoes={conversoes} tiposCodigo={tiposCodigo} perms={perms} />
+      <ProdutosClient inicial={inicial} conversoes={conversoes} tiposCodigo={tiposCodigo} perms={perms} />
     </DashboardLayout>
   );
 }

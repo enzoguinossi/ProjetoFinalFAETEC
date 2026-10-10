@@ -1,14 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
 
 export class DestinatarioDAO {
-  async list(params: PaginationParams & { search?: string } = {}) {
+  async list(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.DestinatarioWhereInput = { ativo: true };
     if (params.search) {
@@ -24,15 +25,6 @@ export class DestinatarioDAO {
       prisma.destinatario.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
-  }
-
-  async search(query: string, take = 50) {
-    return prisma.destinatario.findMany({
-      where: { ativo: true, pessoaJuridica: { razao_social: { contains: query } } },
-      include: { pessoaJuridica: true },
-      take,
-      orderBy: { id_destinatario: "desc" },
-    });
   }
 
   async getById(id: number) {
@@ -59,17 +51,23 @@ export class DestinatarioDAO {
   ) {
     return prisma.$transaction(async (tx) => {
       const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "PessoaJuridica", id_entidade_afetada: pj.id_pessoa_juridica, dados_novos: { razao_social: data.razao_social } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "PessoaJuridica", pj.id_pessoa_juridica,
+        null,
+        { razao_social: data.razao_social },
+        tx,
+      );
 
       const end = await tx.endereco.create({ data: data.endereco });
       const dest = await tx.destinatario.create({
         data: { id_pessoa_juridica: pj.id_pessoa_juridica, tipo_destinatario: data.tipo_destinatario, id_endereco: end.id_endereco },
       });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: dest.id_destinatario, dados_novos: { tipo: data.tipo_destinatario, id_endereco: end.id_endereco, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "Destinatario", dest.id_destinatario,
+        null,
+        { tipo: data.tipo_destinatario, id_endereco: end.id_endereco, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       for (const c of data.codigos ?? []) {
         await tx.destinatarioCodigo.create({
@@ -161,9 +159,15 @@ export class DestinatarioDAO {
         }
       }
 
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) }, dados_novos: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] } },
-      });
+      await registrarAuditoria(
+        id_usuario,
+        data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
+        "Destinatario",
+        id,
+        { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        tx,
+      );
 
       return depois;
     });
@@ -201,20 +205,12 @@ export class DestinatarioDAO {
       await tx.destinatario.delete({ where: { id_destinatario: id } });
       await tx.endereco.delete({ where: { id_endereco: d.id_endereco } });
       await tx.pessoaJuridica.delete({ where: { id_pessoa_juridica: d.id_pessoa_juridica } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { id_destinatario: id } },
-      });
-    });
-  }
-
-  async softDelete(id: number, id_usuario: number) {
-    return prisma.$transaction(async (tx) => {
-      const antes = await tx.destinatario.findUniqueOrThrow({ where: { id_destinatario: id } });
-      const depois = await tx.destinatario.update({ where: { id_destinatario: id }, data: { ativo: false } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Destinatario", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
-      });
-      return depois;
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", "Destinatario", id,
+        { id_destinatario: id },
+        null,
+        tx,
+      );
     });
   }
 }

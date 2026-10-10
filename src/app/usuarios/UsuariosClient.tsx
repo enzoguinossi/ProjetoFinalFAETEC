@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import Button from "@/components/Button";
@@ -10,13 +10,18 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAviso } from "@/components/AvisoProvider";
 import UsuarioForm from "./novo/UsuarioForm";
 import type { Column, Action } from "@/components/DataTable";
-import type { PermissoesEntidade } from "@/types";
-import { searchUsuariosList, type UsuarioListRow } from "./actions";
-import { getUsuario, deleteUsuario } from "./novo/actions";
-import type { UsuarioFormData } from "./novo/actions";
+import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useListaPaginada } from "@/lib/use-lista-paginada";
+import {
+  listarUsuarios,
+  getUsuario,
+  deleteUsuario,
+  type UsuarioListRow,
+  type UsuarioFormData,
+} from "./actions";
 
 interface Props {
-  rows: UsuarioListRow[];
+  inicial: PaginatedResult<UsuarioListRow>;
   funcionarios: { id_funcionario: number; pessoaFisica: { nome: string } }[];
   grupos: { prefixo: string; permissoes: { id_permissao: number; nome: string; descricao: string | null }[] }[];
   perfis: { id_perfil: number; nome: string; descricao: string | null }[];
@@ -32,30 +37,15 @@ const columns: Column<UsuarioListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function UsuariosClient({ rows: initialRows, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
+export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
   const router = useRouter();
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<UsuarioFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UsuarioListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const searchRef = useRef("");
   const mostrarAviso = useAviso();
-
-  useEffect(() => {
-    if (searchRef.current.length < 2) {
-      setRows(initialRows);
-    }
-  }, [initialRows]);
-
-  function handleSearch(value: string) {
-    searchRef.current = value;
-    if (value.length < 2) {
-      setRows(initialRows);
-      return;
-    }
-    searchUsuariosList(value).then(setRows).catch(() => setRows(initialRows));
-  }
+  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
+    useListaPaginada(listarUsuarios, inicial);
 
   async function openEdit(id: number) {
     const data = await getUsuario(id);
@@ -126,13 +116,26 @@ export default function UsuariosClient({ rows: initialRows, funcionarios, grupos
           <SearchBar
             placeholder="Pesquisar usuários..."
             onNew={() => setModalMode("create")}
-            onSearch={handleSearch}
+            onSearch={buscarPorTermo}
             showNew={perms.canCreate}
           />
         </div>
         <Button label="Gerenciar perfis" onClick={() => router.push("/perfis")} />
       </div>
-      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
+      <DataTable
+        columns={columns}
+        data={resultado.data}
+        idField="codigo"
+        actions={actions}
+        paginacaoServidor={{
+          total: resultado.total,
+          page: resultado.page,
+          pageSize: resultado.limit,
+          onPageChange: irParaPagina,
+          onPageSizeChange: mudarTamanho,
+        }}
+        carregando={carregando}
+      />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
         <UsuarioForm

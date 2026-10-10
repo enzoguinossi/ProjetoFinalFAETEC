@@ -56,6 +56,8 @@ export type PaginationParams = {
   limit?: number;
 };
 
+export type ListParams = PaginationParams & { search?: string };
+
 export type PaginatedResult<T> = {
   data: T[];
   total: number;
@@ -72,4 +74,9 @@ export function buildPagination(params: PaginationParams): {
   const take = Math.min(100, Math.max(1, params.limit ?? 20));
   const skip = (page - 1) * take;
   return { skip, take };
+}
+
+export function resultadoVazio<T>(params: PaginationParams = {}): PaginatedResult<T> {
+  const { take } = buildPagination(params);
+  return { data: [], total: 0, page: Math.max(1, params.page ?? 1), limit: take, totalPages: 0 };
 }

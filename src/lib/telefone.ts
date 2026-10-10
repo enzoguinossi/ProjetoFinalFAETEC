@@ -1,7 +1,15 @@
+import type { TipoTelefone } from "@/types";
+
 export const TELEFONE_MIN_DIGITOS = 10;
 export const TELEFONE_MAX_DIGITOS = 11;
 /** Comprimento máximo do valor formatado: "(00) 00000-0000". */
 export const TELEFONE_MAX_CARACTERES = 15;
+
+export const TIPO_TELEFONE_LABEL: Record<TipoTelefone, string> = {
+  CELULAR: "Celular",
+  FIXO: "Fixo",
+  COMERCIAL: "Comercial",
+};
 
 export function apenasDigitosTelefone(valor: string): string {
   return (valor ?? "").replace(/\D/g, "");

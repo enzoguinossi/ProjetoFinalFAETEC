@@ -4,15 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getUserInfo } from "@/app/actions/user";
 import { logoutAction } from "@/app/login/actions";
+import {
+  cadastroItems,
+  navItems,
+  sidebarCls,
+  logoAreaCls,
+  buttonGroupCls,
+  iconBtnCls,
+  navCls,
+  navItemCls,
+  navItemActiveCls,
+  subItemsCls,
+  subItemCls,
+  subItemActiveCls,
+  userInfoCls,
+  type SidebarUser,
+} from "@/components/sidebar-config";
 
 // Cache o módulo para evitar recarregar a cada navegação
-type SidebarUser = {
-  id_usuario: number;
-  nome: string;
-  login: string;
-  super_admin: boolean;
-  permissoes: string[];
-};
 let cachedUser: SidebarUser | null = null;
 let cachePromise: Promise<typeof cachedUser> | null = null;
 
@@ -26,39 +35,6 @@ function loadUser() {
   });
   return cachePromise;
 }
-
-const cadastroItems = [
-  { label: "Usuários", path: "/usuarios", icon: "/icons/cadastros/usuario.svg", permissao: "usuario.listar" },
-  { label: "Funcionários", path: "/funcionarios", icon: "/icons/cadastros/funcionarios.svg", permissao: "funcionario.listar" },
-  { label: "Destinatários", path: "/destinatarios", icon: "/icons/cadastros/escola.svg", permissao: "destinatario.listar" },
-  { label: "Produtos", path: "/produtos", icon: "/icons/cadastros/produto.svg", permissao: "produto.listar" },
-  { label: "Fornecedores", path: "/fornecedores", icon: "/icons/nav/dados.svg", permissao: "fornecedor.listar" },
-  { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg", permissao: "veiculo.listar" },
-];
-
-const navItems = [
-  { label: "Dashboard", path: "/dashboard", icon: "/icons/nav/dashboard.svg" },
-  { label: "Mov. Estoque", path: "/mov-estoque", icon: "/icons/nav/estoque.svg" },
-  { label: "Pedidos", path: "/pedidos", icon: "/icons/nav/dados.svg" },
-  { label: "Relatórios", path: "/relatorios", icon: "/icons/nav/estoque.svg" },
-];
-
-const sidebarCls =
-  "w-[var(--sidebar-width)] h-screen bg-white flex flex-col shrink-0 sticky top-0 border-r border-border gap-4 py-6 px-4 box-border";
-const logoAreaCls = "flex justify-center items-center w-full";
-const buttonGroupCls = "flex justify-center gap-4 w-full";
-const iconBtnCls =
-  "w-12 h-12 flex items-center justify-center border-none rounded-lg bg-transparent cursor-pointer transition-[background-color] duration-[120ms] hover:bg-[#f2f4f8] [&_img]:w-6 [&_img]:h-6";
-const navCls = "flex-1 flex flex-col min-h-0 w-full";
-const navItemCls =
-  "flex items-center gap-2 w-full h-12 py-3 px-2 border-b border-[#f2f4f8] bg-transparent cursor-pointer font-[Roboto,sans-serif] text-base leading-none font-medium text-ink text-left transition-[background-color] duration-[120ms] box-border hover:bg-[#f2f4f8]";
-const navItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]! border-b-transparent";
-const subItemsCls = "flex flex-col pl-2";
-const subItemCls =
-  "flex items-center gap-2 w-full py-2 px-3 border-none bg-transparent cursor-pointer font-[Roboto,sans-serif] text-sm font-normal text-ink text-left transition-[background-color] duration-[120ms] rounded-md box-border hover:bg-[#f2f4f8]";
-const subItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]!";
-const userInfoCls =
-  "flex items-center gap-[0.625rem] w-full pt-2 border-t border-border bg-transparent border-l-0 border-r-0 border-b-0 cursor-pointer font-[inherit] text-left";
 
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);

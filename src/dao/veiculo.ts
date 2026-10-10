@@ -1,16 +1,23 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
 
 export class VeiculoDAO {
-  async list(params: PaginationParams & { status?: string } = {}) {
+  async list(params: ListParams & { status?: string } = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.VeiculoWhereInput = { ativo: true };
     if (params.status) where.status = params.status as Prisma.VeiculoWhereInput["status"];
+    if (params.search) {
+      where.OR = [
+        { placa: { contains: params.search } },
+        { modelo: { contains: params.search } },
+      ];
+    }
     const [data, total] = await Promise.all([
       prisma.veiculo.findMany({ skip, take, where, orderBy: { placa: "asc" } }),
       prisma.veiculo.count({ where }),
@@ -25,14 +32,6 @@ export class VeiculoDAO {
     });
   }
 
-  async search(query: string, take = 50) {
-    return prisma.veiculo.findMany({
-      where: { ativo: true, OR: [{ placa: { contains: query } }, { modelo: { contains: query } }] },
-      take,
-      orderBy: { placa: "asc" },
-    });
-  }
-
   async create(data: { placa: string; modelo?: string; codigos?: CodigoInput[] }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const v = await tx.veiculo.create({ data: { placa: data.placa, modelo: data.modelo, status: "DISPONIVEL" } });
@@ -41,9 +40,12 @@ export class VeiculoDAO {
           data: { id_veiculo: v.id_veiculo, id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo },
         });
       }
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: v.id_veiculo, dados_novos: { placa: data.placa, modelo: data.modelo, codigos: data.codigos ?? [] } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "Veiculo", v.id_veiculo,
+        null,
+        { placa: data.placa, modelo: data.modelo, codigos: data.codigos ?? [] },
+        tx,
+      );
       return v;
     });
   }
@@ -62,9 +64,12 @@ export class VeiculoDAO {
         }
       }
 
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { placa: antes.placa, modelo: antes.modelo, status: antes.status, codigos: antes.veiculoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) }, dados_novos: { placa: depois.placa, modelo: depois.modelo, status: depois.status, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
-      });
+      await registrarAuditoria(
+        id_usuario, "ALTERAR", "Veiculo", id,
+        { placa: antes.placa, modelo: antes.modelo, status: antes.status, codigos: antes.veiculoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        { placa: depois.placa, modelo: depois.modelo, status: depois.status, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        tx,
+      );
       return depois;
     });
   }
@@ -85,9 +90,12 @@ export class VeiculoDAO {
 
       await tx.veiculoCodigo.deleteMany({ where: { id_veiculo: id } });
       await tx.veiculo.delete({ where: { id_veiculo: id } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { id_veiculo: id } },
-      });
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", "Veiculo", id,
+        { id_veiculo: id },
+        null,
+        tx,
+      );
     });
   }
 
@@ -95,9 +103,12 @@ export class VeiculoDAO {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id } });
       const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { ativo: false } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Veiculo", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
-      });
+      await registrarAuditoria(
+        id_usuario, "DESATIVAR", "Veiculo", id,
+        { ativo: antes.ativo },
+        { ativo: depois.ativo },
+        tx,
+      );
       return depois;
     });
   }
