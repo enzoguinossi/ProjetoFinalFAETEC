@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 interface ModalProps {
   open: boolean;
@@ -11,8 +11,6 @@ interface ModalProps {
 }
 
 export default function Modal({ open, onClose, title, children, width }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -30,7 +28,6 @@ export default function Modal({ open, onClose, title, children, width }: ModalPr
       onClick={onClose}
     >
       <div
-        ref={dialogRef}
         className="bg-white border-t-[13px] border-[#1b9956] rounded-[26px] w-[728px] max-h-[90vh] flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.15)] overflow-hidden"
         style={width ? { width } : undefined}
         onClick={(e) => e.stopPropagation()}

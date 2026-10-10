@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { createUsuario, updateUsuario } from "./actions";
-import type { UsuarioFormData } from "./actions";
+import { createUsuario, updateUsuario } from "../actions";
+import type { UsuarioFormData } from "../actions";
 import Button from "@/components/Button";
 import PerfilForm from "@/components/PerfilForm";
 import PermissoesPanel, { type GrupoPermissoes } from "@/components/PermissoesPanel";

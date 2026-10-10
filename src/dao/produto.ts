@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
 
 export class ProdutoDAO {
-  async list(params: PaginationParams & { search?: string } = {}) {
+  async list(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.ProdutoWhereInput = { ativo: true };
     if (params.search) where.descricao = { contains: params.search };
@@ -27,157 +28,89 @@ export class ProdutoDAO {
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
   }
 
-  async searchPriorizado(
+  /**
+   * Busca priorizada: código exato → prefixo → contém código → descrição.
+   * Mantém a ordem de prioridade e remove duplicados entre os lotes.
+   */
+  private async buscarPriorizado<T extends { id_produto: number }>(
     query: string,
-    take = 20,
-  ): Promise<{ id_produto: number; descricao: string }[]> {
-    const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
-      prisma.produto.findMany({
-        where: { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
-        select: { id_produto: true, descricao: true },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          produtoCodigos: { some: { codigo: { startsWith: query } } },
-          NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+    take: number,
+    find: (where: Prisma.ProdutoWhereInput) => Promise<T[]>,
+  ): Promise<T[]> {
+    const condicoes: Prisma.ProdutoWhereInput[] = [
+      { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
+      {
+        ativo: true,
+        produtoCodigos: { some: { codigo: { startsWith: query } } },
+        NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+      },
+      {
+        ativo: true,
+        produtoCodigos: { some: { codigo: { contains: query } } },
+        NOT: {
+          OR: [
+            { produtoCodigos: { some: { codigo: { equals: query } } } },
+            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+          ],
         },
-        select: { id_produto: true, descricao: true },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          produtoCodigos: { some: { codigo: { contains: query } } },
-          NOT: {
-            OR: [
-              { produtoCodigos: { some: { codigo: { equals: query } } } },
-              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-            ],
-          },
+      },
+      {
+        ativo: true,
+        descricao: { contains: query },
+        NOT: {
+          OR: [
+            { produtoCodigos: { some: { codigo: { equals: query } } } },
+            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+            { produtoCodigos: { some: { codigo: { contains: query } } } },
+          ],
         },
-        select: { id_produto: true, descricao: true },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          descricao: { contains: query },
-          NOT: {
-            OR: [
-              { produtoCodigos: { some: { codigo: { equals: query } } } },
-              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-              { produtoCodigos: { some: { codigo: { contains: query } } } },
-            ],
-          },
-        },
-        select: { id_produto: true, descricao: true },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-    ]);
+      },
+    ];
 
-    const seen = new Set<number>();
-    const results: { id_produto: number; descricao: string }[] = [];
-    for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
-      for (const p of batch) {
-        if (!seen.has(p.id_produto)) {
-          seen.add(p.id_produto);
-          results.push(p);
-          if (results.length >= take) break;
+    const lotes = await Promise.all(condicoes.map((where) => find(where)));
+
+    const vistos = new Set<number>();
+    const resultados: T[] = [];
+    for (const lote of lotes) {
+      for (const p of lote) {
+        if (!vistos.has(p.id_produto)) {
+          vistos.add(p.id_produto);
+          resultados.push(p);
+          if (resultados.length >= take) break;
         }
       }
-      if (results.length >= take) break;
+      if (resultados.length >= take) break;
     }
-    return results.slice(0, take);
+    return resultados.slice(0, take);
   }
 
-  async searchPriorizadoComEstoque(
-    query: string,
-    take = 50,
-  ): Promise<
-    {
-      id_produto: number;
-      descricao: string;
-      estoques: { quantidade_atual: number; saldo_reservado: number }[];
-    }[]
-  > {
-    const select = {
-      id_produto: true,
-      descricao: true,
-      estoques: {
-        where: { ativo: true },
-        select: { quantidade_atual: true, saldo_reservado: true },
-      },
-    } as const;
+  async searchPriorizado(query: string, take = 20) {
+    return this.buscarPriorizado(query, take, (where) =>
+      prisma.produto.findMany({
+        where,
+        select: { id_produto: true, descricao: true },
+        take,
+        orderBy: { descricao: "asc" },
+      }),
+    );
+  }
 
-    const [exactCode, prefixCode, containCode, containDesc] = await Promise.all([
+  async searchPriorizadoComEstoque(query: string, take = 50) {
+    return this.buscarPriorizado(query, take, (where) =>
       prisma.produto.findMany({
-        where: { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
-        select,
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          produtoCodigos: { some: { codigo: { startsWith: query } } },
-          NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
-        },
-        select,
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          produtoCodigos: { some: { codigo: { contains: query } } },
-          NOT: {
-            OR: [
-              { produtoCodigos: { some: { codigo: { equals: query } } } },
-              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-            ],
+        where,
+        select: {
+          id_produto: true,
+          descricao: true,
+          estoques: {
+            where: { ativo: true },
+            select: { quantidade_atual: true, saldo_reservado: true },
           },
         },
-        select,
         take,
         orderBy: { descricao: "asc" },
       }),
-      prisma.produto.findMany({
-        where: {
-          ativo: true,
-          descricao: { contains: query },
-          NOT: {
-            OR: [
-              { produtoCodigos: { some: { codigo: { equals: query } } } },
-              { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-              { produtoCodigos: { some: { codigo: { contains: query } } } },
-            ],
-          },
-        },
-        select,
-        take,
-        orderBy: { descricao: "asc" },
-      }),
-    ]);
-
-    const seen = new Set<number>();
-    const results: (typeof exactCode)[number][] = [];
-    for (const batch of [exactCode, prefixCode, containCode, containDesc]) {
-      for (const p of batch) {
-        if (!seen.has(p.id_produto)) {
-          seen.add(p.id_produto);
-          results.push(p);
-          if (results.length >= take) break;
-        }
-      }
-      if (results.length >= take) break;
-    }
-    return results.slice(0, take);
+    );
   }
 
   async getById(id: number) {
@@ -213,9 +146,12 @@ export class ProdutoDAO {
         },
       });
 
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "CRIAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: p.id_produto, dados_novos: { descricao: data.descricao, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) } },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", "Produto", p.id_produto,
+        null,
+        { descricao: data.descricao, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        tx,
+      );
 
       // Códigos personalizados
       for (const c of data.codigos ?? []) {
@@ -267,14 +203,14 @@ export class ProdutoDAO {
         },
       });
 
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "ALTERAR", data_hora: new Date(), entidade: "Produto",
-          id_entidade_afetada: id,
-          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo, codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
-          dados_novos: { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario,
+        data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
+        "Produto", id,
+        { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo, codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        tx,
+      );
 
       // Substitui códigos personalizados
       await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
@@ -335,37 +271,42 @@ export class ProdutoDAO {
       await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
       await tx.produto.delete({ where: { id_produto: id } });
 
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "EXCLUIR", data_hora: new Date(), entidade: "Produto",
-          id_entidade_afetada: id,
-          dados_anteriores: { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", "Produto", id,
+        { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto },
+        null,
+        tx,
+      );
     });
   }
 
-  async setFotoUrl(id: number, foto_url: string | null) {
-    return prisma.produto.update({ where: { id_produto: id }, data: { foto_url } });
+  async setFotoUrl(id: number, foto_url: string | null, id_usuario: number) {
+    return prisma.$transaction(async (tx) => {
+      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
+      const depois = await tx.produto.update({ where: { id_produto: id }, data: { foto_url } });
+      await registrarAuditoria(
+        id_usuario, "ALTERAR", "Produto", id,
+        { foto_url: antes.foto_url },
+        { foto_url: depois.foto_url },
+        tx,
+      );
+      return depois;
+    });
   }
 
   /** Remove o produto recém-criado em caso de falha no processamento da imagem (rollback). */
-  async rollbackCreate(id: number) {
+  async rollbackCreate(id: number, id_usuario: number) {
     await prisma.$transaction(async (tx) => {
+      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
       await tx.produtoCodigo.deleteMany({ where: { id_produto: id } });
       await tx.produtoInsumo.deleteMany({ where: { id_produto_pai: id } });
       await tx.produto.delete({ where: { id_produto: id } });
-    });
-  }
-
-  async softDelete(id: number, id_usuario: number) {
-    return prisma.$transaction(async (tx) => {
-      const antes = await tx.produto.findUniqueOrThrow({ where: { id_produto: id } });
-      const depois = await tx.produto.update({ where: { id_produto: id }, data: { ativo: false } });
-      await tx.registroAuditoria.create({
-        data: { id_usuario, acao: "DESATIVAR", data_hora: new Date(), entidade: "Produto", id_entidade_afetada: id, dados_anteriores: { ativo: antes.ativo }, dados_novos: { ativo: depois.ativo } },
-      });
-      return depois;
+      await registrarAuditoria(
+        id_usuario, "EXCLUIR", "Produto", id,
+        { descricao: antes.descricao, foto_url: antes.foto_url, perecivel: antes.perecivel, composto: antes.composto },
+        null,
+        tx,
+      );
     });
   }
 }

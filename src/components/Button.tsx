@@ -3,7 +3,6 @@ import Link from "next/link";
 interface ButtonProps {
   label: string;
   iconLeft?: React.ReactNode;
-  iconRight?: React.ReactNode;
   variant?: "primary" | "cancel" | "ghost";
   disabled?: boolean;
   onClick?: () => void;
@@ -27,7 +26,6 @@ const iconCls = "flex items-center [&_svg]:w-5 [&_svg]:h-5";
 export default function Button({
   label,
   iconLeft,
-  iconRight,
   variant = "primary",
   disabled,
   onClick,
@@ -41,7 +39,6 @@ export default function Button({
       <Link href={href} className={cls}>
         {iconLeft && <span className={iconCls}>{iconLeft}</span>}
         {label}
-        {iconRight && <span className={iconCls}>{iconRight}</span>}
       </Link>
     );
   }
@@ -50,7 +47,6 @@ export default function Button({
     <button type={type} className={cls} onClick={onClick} disabled={disabled}>
       {iconLeft && <span className={iconCls}>{iconLeft}</span>}
       {label}
-      {iconRight && <span className={iconCls}>{iconRight}</span>}
     </button>
   );
 }

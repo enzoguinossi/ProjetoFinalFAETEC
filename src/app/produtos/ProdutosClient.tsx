@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
@@ -8,14 +8,20 @@ import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAviso } from "@/components/AvisoProvider";
 import ProdutoForm from "./novo/ProdutoForm";
+import ProdutoView from "./novo/ProdutoView";
 import type { Column, Action } from "@/components/DataTable";
-import type { PermissoesEntidade } from "@/types";
-import { searchProdutosList, type ProdutoListRow } from "./actions";
-import { getProduto, deleteProduto } from "./novo/actions";
-import type { ProdutoFormData } from "./novo/actions";
+import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useListaPaginada } from "@/lib/use-lista-paginada";
+import {
+  listarProdutos,
+  getProduto,
+  deleteProduto,
+  type ProdutoListRow,
+  type ProdutoFormData,
+} from "./actions";
 
 interface Props {
-  rows: ProdutoListRow[];
+  inicial: PaginatedResult<ProdutoListRow>;
   conversoes: { id_conversao: number; nome: string; fator: number; descricao: string | null }[];
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
@@ -30,30 +36,15 @@ const columns: Column<ProdutoListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function ProdutosClient({ rows: initialRows, conversoes, tiposCodigo, perms }: Props) {
+export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<ProdutoFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProdutoListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const searchRef = useRef("");
   const router = useRouter();
   const mostrarAviso = useAviso();
-
-  useEffect(() => {
-    if (searchRef.current.length < 2) {
-      setRows(initialRows);
-    }
-  }, [initialRows]);
-
-  function handleSearch(value: string) {
-    searchRef.current = value;
-    if (value.length < 2) {
-      setRows(initialRows);
-      return;
-    }
-    searchProdutosList(value).then(setRows).catch(() => setRows(initialRows));
-  }
+  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
+    useListaPaginada(listarProdutos, inicial);
 
   async function openEdit(id: number) {
     const data = await getProduto(id);
@@ -122,10 +113,23 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
       <SearchBar
         placeholder="Pesquisar produtos..."
         onNew={() => setModalMode("create")}
-        onSearch={handleSearch}
+        onSearch={buscarPorTermo}
         showNew={perms.canCreate}
       />
-      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
+      <DataTable
+        columns={columns}
+        data={resultado.data}
+        idField="codigo"
+        actions={actions}
+        paginacaoServidor={{
+          total: resultado.total,
+          page: resultado.page,
+          pageSize: resultado.limit,
+          onPageChange: irParaPagina,
+          onPageSizeChange: mudarTamanho,
+        }}
+        carregando={carregando}
+      />
 
       <Modal
         open={modalMode === "create"}
@@ -135,7 +139,6 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
         <ProdutoForm
           conversoes={conversoes}
           tiposCodigo={tiposCodigo}
-          mode="create"
           onSuccess={handleSuccess}
           onCancel={closeModal}
         />
@@ -150,7 +153,6 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
           <ProdutoForm
             conversoes={conversoes}
             tiposCodigo={tiposCodigo}
-            mode="edit"
             initialData={formData}
             canDeactivate={perms.canDeactivate}
             onSuccess={handleSuccess}
@@ -165,12 +167,11 @@ export default function ProdutosClient({ rows: initialRows, conversoes, tiposCod
         width="728px"
       >
         {formData && (
-          <ProdutoForm
+          <ProdutoView
             conversoes={conversoes}
             tiposCodigo={tiposCodigo}
-            mode="view"
-            initialData={formData}
-            onCancel={closeModal}
+            data={formData}
+            onClose={closeModal}
           />
         )}
       </Modal>

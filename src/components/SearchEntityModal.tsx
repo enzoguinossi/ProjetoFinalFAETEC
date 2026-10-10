@@ -7,7 +7,6 @@ interface SearchEntityModalProps<T> {
   open: boolean;
   onClose: () => void;
   onSelect: (item: T) => void;
-  title?: string;
   placeholder?: string;
   searchAction: (query: string) => Promise<T[]>;
   excludeIds?: number[];
@@ -19,7 +18,6 @@ export default function SearchEntityModal<T>({
   open,
   onClose,
   onSelect,
-  title: _title = "Buscar",
   placeholder = "Pesquisar...",
   searchAction,
   excludeIds,
@@ -30,6 +28,16 @@ export default function SearchEntityModal<T>({
   const [results, setResults] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const requisicao = useRef(0);
+  const searchActionRef = useRef(searchAction);
+  const getItemIdRef = useRef(getItemId);
+  const excludeIdsRef = useRef(excludeIds);
+
+  useEffect(() => {
+    searchActionRef.current = searchAction;
+    getItemIdRef.current = getItemId;
+    excludeIdsRef.current = excludeIds;
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -40,22 +48,24 @@ export default function SearchEntityModal<T>({
         setResults([]);
         return;
       }
+      const id = ++requisicao.current;
       setLoading(true);
       try {
-        let data = await searchAction(query);
-        if (excludeIds) {
-          data = data.filter((item) => !excludeIds.includes(getItemId(item)));
+        let data = await searchActionRef.current(query);
+        const excluidos = excludeIdsRef.current;
+        if (excluidos) {
+          data = data.filter((item) => !excluidos.includes(getItemIdRef.current(item)));
         }
-        setResults(data);
+        if (id === requisicao.current) setResults(data);
       } catch {
-        setResults([]);
+        if (id === requisicao.current) setResults([]);
       } finally {
-        setLoading(false);
+        if (id === requisicao.current) setLoading(false);
       }
     }, 250);
 
     return () => clearTimeout(timeout);
-  }, [query, open, excludeIds, searchAction, getItemId]);
+  }, [query, open]);
 
   function handleSelect(item: T) {
     onSelect(item);

@@ -25,15 +25,13 @@ export async function listarPerfisComPermissoes(): Promise<PerfilListRow[]> {
   if (!(await usuarioPodeAlguma(user, ["perfil.listar", "perfil.consultar", "perfil.criar", "perfil.alterar"]))) {
     return [];
   }
-  const perfis = await permissaoService.listarPerfis();
-  return Promise.all(
-    perfis.map(async (p) => ({
-      id_perfil: p.id_perfil,
-      nome: p.nome,
-      descricao: p.descricao,
-      permissoes: await permissaoService.permissoesDoPerfil(p.id_perfil),
-    })),
-  );
+  const perfis = await permissaoService.listarPerfisComPermissoes();
+  return perfis.map((p) => ({
+    id_perfil: p.id_perfil,
+    nome: p.nome,
+    descricao: p.descricao,
+    permissoes: p.permissoes,
+  }));
 }
 
 export async function listarPermissoesAgrupadas() {

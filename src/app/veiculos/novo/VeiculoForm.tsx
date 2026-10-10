@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createVeiculo, updateVeiculo } from "./actions";
-import type { VeiculoFormData } from "./actions";
+import { createVeiculo, updateVeiculo } from "../actions";
+import type { VeiculoFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";

@@ -36,14 +36,70 @@ const columns: Column<UnidadeItem>[] = [
   { key: "descricao", label: "Descrição", width: "3fr" },
 ];
 
+function UnidadeFormModal({
+  unidade,
+  onClose,
+  onSaved,
+}: {
+  unidade: UnidadeItem | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [nome, setNome] = useState(unidade?.nome ?? "");
+  const [fator, setFator] = useState(unidade ? String(unidade.fator) : "");
+  const [descricao, setDescricao] = useState(unidade?.descricao ?? "");
+  const [saving, setSaving] = useState(false);
+  const mostrarAviso = useAviso();
+
+  async function salvar() {
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.set("nome", nome);
+      fd.set("fator", fator);
+      fd.set("descricao", descricao);
+      if (unidade) fd.set("id_conversao", String(unidade.id_conversao));
+      const r = unidade ? await updateUnidade(fd) : await createUnidade(fd);
+      if (r.error) { mostrarAviso(r.error, "erro"); return; }
+      mostrarAviso(unidade ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
+      onClose();
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} width="440px">
+      <div className={ui.form}>
+        <div className={ui.field}>
+          <label className={ui.label}>Nome</label>
+          <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="CX20, PCT10, UN..." className={ui.input} />
+        </div>
+
+        <div className={ui.field}>
+          <label className={ui.label}>Fator</label>
+          <input type="number" min="0" step="any" value={fator} onChange={(e) => setFator(e.target.value)} placeholder="20" className={ui.input} />
+        </div>
+
+        <div className={ui.field}>
+          <label className={ui.label}>Descrição</label>
+          <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className={ui.input} />
+        </div>
+
+        <div className={ui.rowActions}>
+          <Button label="Cancelar" variant="cancel" onClick={onClose} />
+          <Button label={unidade ? "Salvar" : "Gravar"} variant="primary" onClick={salvar} disabled={saving || !nome.trim() || !fator} />
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function UnidadesModal({ open, onClose, onChanged, initial = [] }: Props) {
   const [unidades, setUnidades] = useState<UnidadeItem[]>(initial);
   const [formOpen, setFormOpen] = useState(false);
   const [editando, setEditando] = useState<UnidadeItem | null>(null);
-  const [nome, setNome] = useState("");
-  const [fator, setFator] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
 
   const [deleteTarget, setDeleteTarget] = useState<UnidadeItem | null>(null);
@@ -56,31 +112,13 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
   }
 
   function iniciarNovo() {
-    setEditando(null); setNome(""); setFator(""); setDescricao("");
+    setEditando(null);
     setFormOpen(true);
   }
 
   function iniciarEdicao(u: UnidadeItem) {
-    setEditando(u); setNome(u.nome); setFator(String(u.fator)); setDescricao(u.descricao ?? "");
+    setEditando(u);
     setFormOpen(true);
-  }
-
-  async function salvar() {
-    setSaving(true);
-    try {
-      const fd = new FormData();
-      fd.set("nome", nome);
-      fd.set("fator", fator);
-      fd.set("descricao", descricao);
-      if (editando) fd.set("id_conversao", String(editando.id_conversao));
-      const r = editando ? await updateUnidade(fd) : await createUnidade(fd);
-      if (r.error) { mostrarAviso(r.error, "erro"); return; }
-      mostrarAviso(editando ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
-      setFormOpen(false);
-      await carregar();
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function confirmarExclusao() {
@@ -125,29 +163,13 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
         </div>
       </Modal>
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} width="440px">
-        <div className={ui.form}>
-          <div className={ui.field}>
-            <label className={ui.label}>Nome</label>
-            <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="CX20, PCT10, UN..." className={ui.input} />
-          </div>
-
-          <div className={ui.field}>
-            <label className={ui.label}>Fator</label>
-            <input type="number" min="0" step="any" value={fator} onChange={(e) => setFator(e.target.value)} placeholder="20" className={ui.input} />
-          </div>
-
-          <div className={ui.field}>
-            <label className={ui.label}>Descrição</label>
-            <input value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Opcional" className={ui.input} />
-          </div>
-
-          <div className={ui.rowActions}>
-            <Button label="Cancelar" variant="cancel" onClick={() => setFormOpen(false)} />
-            <Button label={editando ? "Salvar" : "Gravar"} variant="primary" onClick={salvar} disabled={saving || !nome.trim() || !fator} />
-          </div>
-        </div>
-      </Modal>
+      {formOpen && (
+        <UnidadeFormModal
+          unidade={editando}
+          onClose={() => setFormOpen(false)}
+          onSaved={carregar}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

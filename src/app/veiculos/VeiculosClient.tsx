@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
@@ -9,12 +9,17 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useAviso } from "@/components/AvisoProvider";
 import VeiculoForm from "./novo/VeiculoForm";
 import type { Column, Action } from "@/components/DataTable";
-import type { PermissoesEntidade } from "@/types";
-import { searchVeiculosList, type VeiculoListRow } from "./actions";
-import { getVeiculo, deleteVeiculo } from "./novo/actions";
-import type { VeiculoFormData } from "./novo/actions";
+import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useListaPaginada } from "@/lib/use-lista-paginada";
+import {
+  listarVeiculos,
+  getVeiculo,
+  deleteVeiculo,
+  type VeiculoListRow,
+  type VeiculoFormData,
+} from "./actions";
 
-interface Props { rows: VeiculoListRow[]; tiposCodigo: { id_tipo_codigo: number; nome: string }[]; perms: PermissoesEntidade; }
+interface Props { inicial: PaginatedResult<VeiculoListRow>; tiposCodigo: { id_tipo_codigo: number; nome: string }[]; perms: PermissoesEntidade; }
 
 const columns: Column<VeiculoListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
@@ -25,23 +30,15 @@ const columns: Column<VeiculoListRow>[] = [
 
 type ModalMode = "create" | "edit" | "view" | null;
 
-export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }: Props) {
+export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
-  const [rows, setRows] = useState(initialRows);
   const [formData, setFormData] = useState<VeiculoFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VeiculoListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const searchRef = useRef("");
   const router = useRouter();
   const mostrarAviso = useAviso();
-
-  useEffect(() => { if (searchRef.current.length < 2) setRows(initialRows); }, [initialRows]);
-
-  function handleSearch(value: string) {
-    searchRef.current = value;
-    if (value.length < 2) { setRows(initialRows); return; }
-    searchVeiculosList(value).then(setRows).catch(() => setRows(initialRows));
-  }
+  const { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho } =
+    useListaPaginada(listarVeiculos, inicial);
 
   async function openModal(id: number | null, mode: "edit" | "view") {
     if (id === null) { setModalMode("create"); return; }
@@ -70,8 +67,21 @@ export default function VeiculosClient({ rows: initialRows, tiposCodigo, perms }
 
   return (
     <>
-      <SearchBar placeholder="Pesquisar veículos..." onNew={() => setModalMode("create")} onSearch={handleSearch} showNew={perms.canCreate} />
-      <DataTable columns={columns} data={rows} idField="codigo" actions={actions} />
+      <SearchBar placeholder="Pesquisar veículos..." onNew={() => setModalMode("create")} onSearch={buscarPorTermo} showNew={perms.canCreate} />
+      <DataTable
+        columns={columns}
+        data={resultado.data}
+        idField="codigo"
+        actions={actions}
+        paginacaoServidor={{
+          total: resultado.total,
+          page: resultado.page,
+          pageSize: resultado.limit,
+          onPageChange: irParaPagina,
+          onPageSizeChange: mudarTamanho,
+        }}
+        carregando={carregando}
+      />
       <Modal open={modalMode === "create"} onClose={closeModal} width="520px"><VeiculoForm mode="create" tiposCodigo={tiposCodigo} onSuccess={handleSuccess} onCancel={closeModal} /></Modal>
       <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="edit" initialData={formData} tiposCodigo={tiposCodigo} canDeactivate={perms.canDeactivate} onSuccess={handleSuccess} onCancel={closeModal} />}</Modal>
       <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="520px">{formData && <VeiculoForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={closeModal} />}</Modal>

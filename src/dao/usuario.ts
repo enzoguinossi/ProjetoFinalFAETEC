@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
+import { buildPagination, type ListParams } from "@/types";
 
 const AUDIT_ENTIDADE = "Usuario";
 
@@ -32,27 +34,25 @@ export class UsuarioDAO {
     return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
   }
 
-  async list() {
-    return prisma.usuario.findMany({
-      where: { ativo: true },
-      include: { funcionario: { include: { pessoaFisica: true } } },
-      orderBy: { id_usuario: "asc" },
-    });
-  }
-
-  async search(query: string, take = 50) {
-    return prisma.usuario.findMany({
-      where: {
-        ativo: true,
-        OR: [
-          { login: { contains: query } },
-          { funcionario: { pessoaFisica: { nome: { contains: query } } } },
-        ],
-      },
-      include: { funcionario: { include: { pessoaFisica: true } } },
-      take,
-      orderBy: { id_usuario: "asc" },
-    });
+  async list(params: ListParams = {}) {
+    const { skip, take } = buildPagination(params);
+    const where: Prisma.UsuarioWhereInput = { ativo: true };
+    if (params.search) {
+      where.OR = [
+        { login: { contains: params.search } },
+        { funcionario: { pessoaFisica: { nome: { contains: params.search } } } },
+      ];
+    }
+    const [data, total] = await Promise.all([
+      prisma.usuario.findMany({
+        skip, take,
+        where,
+        include: { funcionario: { include: { pessoaFisica: true } } },
+        orderBy: { id_usuario: "asc" },
+      }),
+      prisma.usuario.count({ where }),
+    ]);
+    return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
   }
 
   async registrarAcesso(id: number) {
@@ -74,16 +74,12 @@ export class UsuarioDAO {
           super_admin: true,
         },
       });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario: u.id_usuario,
-          acao: "CRIAR",
-          data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE,
-          id_entidade_afetada: u.id_usuario,
-          dados_novos: { login: data.login, super_admin: true },
-        },
-      });
+      await registrarAuditoria(
+        u.id_usuario, "CRIAR", AUDIT_ENTIDADE, u.id_usuario,
+        null,
+        { login: data.login, super_admin: true },
+        tx,
+      );
       return u;
     });
   }
@@ -94,16 +90,12 @@ export class UsuarioDAO {
         where: { id_usuario: id },
         data: { senha_hash, senha_alterada_em: quando, ultimo_acesso: quando },
       });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario,
-          acao: "DEFINIR_SENHA",
-          data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE,
-          id_entidade_afetada: id,
-          dados_novos: { senha_definida: true },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "DEFINIR_SENHA", AUDIT_ENTIDADE, id,
+        null,
+        { senha_definida: true },
+        tx,
+      );
       return u;
     });
   }
@@ -114,15 +106,12 @@ export class UsuarioDAO {
   ) {
     const created = await prisma.$transaction(async (tx) => {
       const u = await tx.usuario.create({ data });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario,
-          acao: "CRIAR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE,
-          id_entidade_afetada: u.id_usuario,
-          dados_novos: { login: data.login, super_admin: data.super_admin ?? false },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario, "CRIAR", AUDIT_ENTIDADE, u.id_usuario,
+        null,
+        { login: data.login, super_admin: data.super_admin ?? false },
+        tx,
+      );
       return u;
     });
     return created;
@@ -136,14 +125,15 @@ export class UsuarioDAO {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.usuario.findUniqueOrThrow({ where: { id_usuario: id } });
       const depois = await tx.usuario.update({ where: { id_usuario: id }, data });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario: id_usuario_resp, acao: "ALTERAR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { login: antes.login, super_admin: antes.super_admin, ativo: antes.ativo },
-          dados_novos: { login: depois.login, super_admin: depois.super_admin, ativo: depois.ativo },
-        },
-      });
+      await registrarAuditoria(
+        id_usuario_resp,
+        data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
+        AUDIT_ENTIDADE,
+        id,
+        { login: antes.login, super_admin: antes.super_admin, ativo: antes.ativo },
+        { login: depois.login, super_admin: depois.super_admin, ativo: depois.ativo },
+        tx,
+      );
       return depois;
     });
   }
@@ -178,29 +168,12 @@ export class UsuarioDAO {
 
       await tx.usuarioPermissao.deleteMany({ where: { id_usuario: id } });
       await tx.usuario.delete({ where: { id_usuario: id } });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario: id_usuario_resp, acao: "EXCLUIR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { id_usuario: id },
-        },
-      });
-    });
-  }
-
-  async softDelete(id: number, id_usuario: number) {
-    return prisma.$transaction(async (tx) => {
-      const antes = await tx.usuario.findUniqueOrThrow({ where: { id_usuario: id } });
-      const depois = await tx.usuario.update({ where: { id_usuario: id }, data: { ativo: false } });
-      await tx.registroAuditoria.create({
-        data: {
-          id_usuario, acao: "DESATIVAR", data_hora: new Date(),
-          entidade: AUDIT_ENTIDADE, id_entidade_afetada: id,
-          dados_anteriores: { ativo: antes.ativo },
-          dados_novos: { ativo: depois.ativo },
-        },
-      });
-      return depois;
+      await registrarAuditoria(
+        id_usuario_resp, "EXCLUIR", AUDIT_ENTIDADE, id,
+        { id_usuario: id },
+        null,
+        tx,
+      );
     });
   }
 }
