@@ -194,6 +194,8 @@ export class FornecedorDAO {
         include: { endereco: true },
       });
       await tx.fornecedorCodigo.deleteMany({ where: { id_fornecedor: id } });
+      await tx.fornecedorEmail.deleteMany({ where: { id_fornecedor: id } });
+      await tx.fornecedorTelefone.deleteMany({ where: { id_fornecedor: id } });
       await tx.fornecedor.delete({ where: { id_fornecedor: id } });
       if (f.id_endereco) await tx.endereco.delete({ where: { id_endereco: f.id_endereco } });
       await tx.pessoaJuridica.delete({ where: { id_pessoa_juridica: f.id_pessoa_juridica } });

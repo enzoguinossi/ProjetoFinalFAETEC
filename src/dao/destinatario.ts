@@ -202,6 +202,8 @@ export class DestinatarioDAO {
         include: { endereco: true },
       });
       await tx.destinatarioCodigo.deleteMany({ where: { id_destinatario: id } });
+      await tx.destinatarioEmail.deleteMany({ where: { id_destinatario: id } });
+      await tx.destinatarioTelefone.deleteMany({ where: { id_destinatario: id } });
       await tx.destinatario.delete({ where: { id_destinatario: id } });
       await tx.endereco.delete({ where: { id_endereco: d.id_endereco } });
       await tx.pessoaJuridica.delete({ where: { id_pessoa_juridica: d.id_pessoa_juridica } });
