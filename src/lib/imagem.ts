@@ -97,3 +97,13 @@ export async function removerImagemProduto(fotoUrl: string | null | undefined): 
   const absoluto = path.join(process.cwd(), "public", fotoUrl.replace(/^\//, ""));
   await fs.rm(absoluto, { force: true });
 }
+
+/**
+ * Remove a pasta de uploads de um produto (`public/uploads/produtos/{id}`).
+ * Usado quando o produto é excluído: a pasta é exclusiva daquele produto e
+ * deixa de ter razão de existir. Ignora ausência.
+ */
+export async function removerPastaProduto(idProduto: number): Promise<void> {
+  const absoluto = path.join(process.cwd(), "public", "uploads", "produtos", String(idProduto));
+  await fs.rm(absoluto, { recursive: true, force: true });
+}

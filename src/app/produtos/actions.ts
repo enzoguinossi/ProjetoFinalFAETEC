@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
-import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
+import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto, removerPastaProduto } from "@/lib/imagem";
 import { formatarCodigo } from "@/lib/formatar";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
@@ -290,6 +290,11 @@ export async function deleteProduto(id: number) {
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }
+
+    // Exclusão concluída: remove também as imagens enviadas para este produto
+    // (a pasta é exclusiva dele). Ignora ausência.
+    await removerPastaProduto(id);
+
     return { success: true };
   });
 }
