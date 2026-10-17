@@ -74,5 +74,5 @@ estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 2. **Sessão nova:** revisar documentação e fluxos; iniciar a **movimentação de estoque**
    (KAN-140), com a task criada pelo formato novo do `docs/agents/JIRA.MD` (texto exato
    mostrado ao usuário antes de criar).
-3. Registrar o **worklog** de KAN-165 e KAN-166 (horas efetivamente trabalhadas — pendente
-   de confirmação do usuário).
+3. **Worklog registrado** em 2026-10-17 (via MCP): KAN-165 = `1h 30m` (início 13:30) ·
+   KAN-166 = `4h` (início 14:20), no fuso `America/Sao_Paulo`.
