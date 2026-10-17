@@ -80,31 +80,13 @@ function ehSomenteBiblioteca(componente) {
   return SOMENTE_BIBLIOTECA.indexOf(componente) >= 0;
 }
 
-/** Tokens de `src/app/globals.css` (`@theme` + `:root`). */
-const TOKENS_COR = {
-  brand: "#1b9956",
-  "brand-hover": "#15844a",
-  ink: "#21272a",
-  "ink-strong": "#1e1e1e",
-  border: "#dde1e6",
-  "border-input": "#d9d9d9",
-  hover: "#f2f4f8",
-  "table-alt": "#e2e2e2",
-  danger: "#da1e28",
-  "danger-bg": "#fff1f0",
-  warning: "#d97706",
-  cancel: "#ff383c",
-  "cancel-hover": "#ff0000",
-  branco: "#ffffff",
-};
-
-const TOKENS_METRICA = {
-  "sidebar-width": 256,
-  "header-height": 54,
-  "raio-lg": 8,
-  "raio-xl": 20,
-  "raio-pill": 26,
-};
+/*
+ * Tokens de design: NÃO existe tabela aqui.
+ *
+ * Eles vêm do `src/app/globals.css` (fonte única) → colheita → manifesto
+ * (`scenes.json` → `estado.tokens`). Copiá-los aqui já custou uma divergência:
+ * o `globals.css` mudou e as variáveis do Figma continuaram antigas.
+ */
 
 const ALINHAMENTO = {
   left: "LEFT",
@@ -163,6 +145,8 @@ const estado = {
   variaveisCor: null,
   variaveisMetrica: null,
   variaveisProntas: false,
+  /** Tokens do `globals.css` vindos do manifesto (`cores`/`metricas`). */
+  tokens: null,
   paginaBiblioteca: null,
   secoes: new Map(),
   ordemSecoes: [],
@@ -256,30 +240,119 @@ function hexParaRgba(hex) {
   };
 }
 
-function criarColecao(nome, tokens, tipo) {
-  const colecao = figma.variables.createVariableCollection(nome);
-  const modoId = colecao.modes[0].modeId;
-  const mapa = {};
-  for (const chave of Object.keys(tokens)) {
-    const variavel = figma.variables.createVariable(chave, colecao, tipo);
-    const bruto = tokens[chave];
-    variavel.setValueForMode(modoId, tipo === "COLOR" ? hexParaRgba(bruto) : bruto);
-    // Escopos específicos: evita poluir todos os seletores de propriedade.
-    try {
-      variavel.scopes =
-        tipo === "COLOR"
-          ? ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR", "TEXT_FILL"]
-          : ["WIDTH_HEIGHT", "GAP", "CORNER_RADIUS"];
-    } catch {
-      /* escopos são opcionais */
-    }
-    mapa[chave] = variavel;
+/** `true` se a chave está na tabela (evita `in`, que acha o protótipo). */
+function temChave(tabela, chave) {
+  return Object.prototype.hasOwnProperty.call(tabela, chave);
+}
+
+/** Escopos específicos: evita poluir todos os seletores de propriedade. */
+function aplicarEscopos(variavel, tipo) {
+  try {
+    variavel.scopes =
+      tipo === "COLOR"
+        ? ["FRAME_FILL", "SHAPE_FILL", "STROKE_COLOR", "TEXT_FILL"]
+        : ["WIDTH_HEIGHT", "GAP", "CORNER_RADIUS"];
+  } catch {
+    /* escopos são opcionais */
   }
+}
+
+/**
+ * Coleção de variáveis por **upsert**, a partir dos tokens do manifesto:
+ * a variável que já existe tem o valor do modo padrão **atualizado**; a que
+ * não existe é **criada**. Nada é removido — um token que saiu da lista só é
+ * registrado, porque pode estar em uso no design.
+ *
+ * Falha em uma variável não derruba a importação: vai para `registrarFalha`.
+ */
+async function garantirColecao(nome, colecaoExistente, tokens, tipo) {
+  const colecao = colecaoExistente || figma.variables.createVariableCollection(nome);
+  const modos = colecao.modes || [];
+  const modoId = colecao.defaultModeId || (modos[0] ? modos[0].modeId : null);
+  const mapa = {};
+
+  if (colecaoExistente) {
+    let locais = [];
+    try {
+      locais = await figma.variables.getLocalVariablesAsync(tipo);
+    } catch (erro) {
+      registrarFalha({ componente: nome }, "listar as variáveis existentes", erro);
+    }
+    for (let i = 0; i < locais.length; i++) {
+      const variavel = locais[i];
+      if (variavel.variableCollectionId !== colecao.id) continue;
+      mapa[variavel.name] = variavel;
+    }
+  }
+
+  if (!modoId) {
+    registrarFalha({ componente: nome }, "descobrir o modo padrão da coleção", null);
+    return mapa;
+  }
+
+  const chaves = Object.keys(tokens);
+  let atualizadas = 0;
+  let criadas = 0;
+  for (let i = 0; i < chaves.length; i++) {
+    const chave = chaves[i];
+    const valor = tipo === "COLOR" ? hexParaRgba(tokens[chave]) : tokens[chave];
+    try {
+      if (mapa[chave]) {
+        mapa[chave].setValueForMode(modoId, valor);
+        atualizadas++;
+      } else {
+        const variavel = figma.variables.createVariable(chave, colecao, tipo);
+        aplicarEscopos(variavel, tipo);
+        variavel.setValueForMode(modoId, valor);
+        mapa[chave] = variavel;
+        criadas++;
+      }
+    } catch (erro) {
+      registrarFalha({ componente: nome }, "gravar o token " + chave, erro);
+    }
+  }
+  enviar("log", {
+    texto: "  ✓ " + nome + ": " + criadas + " criada(s), " + atualizadas + " atualizada(s)",
+  });
+
+  const foraDosTokens = [];
+  for (const chave in mapa) {
+    if (!temChave(tokens, chave)) foraDosTokens.push(chave);
+  }
+  if (foraDosTokens.length) {
+    enviar("log", {
+      texto:
+        "  ⚠ " +
+        nome +
+        ": " +
+        foraDosTokens.length +
+        " variável(is) fora dos tokens do globals.css (mantidas): " +
+        foraDosTokens.join(", "),
+      aviso: true,
+    });
+  }
+
   return mapa;
 }
 
 async function garantirVariaveis(pagina) {
   if (estado.variaveisProntas) return;
+
+  const tokens = estado.tokens;
+  if (!tokens || !tokens.cores || !tokens.metricas) {
+    // Manifesto antigo (de antes dos tokens no `scenes.json`): as telas ainda
+    // importam, mas sem variáveis — a falha fica visível em vez de silenciosa.
+    registrarFalha(
+      { componente: "Nexus / Variáveis" },
+      "ler os tokens do manifesto",
+      "o manifesto não traz `tokens` — rode `npm run figma:harvest`",
+    );
+    estado.variaveisCor = {};
+    estado.variaveisMetrica = {};
+    estado.variaveisProntas = true;
+    void pagina;
+    return;
+  }
 
   let existentes = [];
   try {
@@ -290,27 +363,31 @@ async function garantirVariaveis(pagina) {
   const nomes = {};
   for (const colecao of existentes) nomes[colecao.name] = colecao;
 
-  if (nomes["Nexus / Cor"] && nomes["Nexus / Métrica"]) {
-    // Reaproveita as coleções já criadas numa execução anterior.
-    const cor = await figma.variables.getLocalVariablesAsync("COLOR");
-    const metrica = await figma.variables.getLocalVariablesAsync("FLOAT");
-    estado.variaveisCor = {};
-    estado.variaveisMetrica = {};
-    for (const v of cor) if (v.variableCollectionId === nomes["Nexus / Cor"].id) estado.variaveisCor[v.name] = v;
-    for (const v of metrica) if (v.variableCollectionId === nomes["Nexus / Métrica"].id) estado.variaveisMetrica[v.name] = v;
-  } else {
-    estado.variaveisCor = criarColecao("Nexus / Cor", TOKENS_COR, "COLOR");
-    estado.variaveisMetrica = criarColecao("Nexus / Métrica", TOKENS_METRICA, "FLOAT");
-  }
+  // Reaproveita as coleções de uma execução anterior e converge cada variável
+  // para o valor atual do `globals.css`.
+  estado.variaveisCor = await garantirColecao(
+    "Nexus / Cor",
+    nomes["Nexus / Cor"],
+    tokens.cores,
+    "COLOR",
+  );
+  estado.variaveisMetrica = await garantirColecao(
+    "Nexus / Métrica",
+    nomes["Nexus / Métrica"],
+    tokens.metricas,
+    "FLOAT",
+  );
   estado.variaveisProntas = true;
   void pagina;
 }
 
 /** Encontra a variável de cor cujo valor bate exatamente com o do preenchimento. */
 function variavelDeCor(cor) {
-  if (!estado.variaveisCor) return null;
-  for (const chave of Object.keys(estado.variaveisCor)) {
-    const alvo = hexParaRgba(TOKENS_COR[chave]);
+  if (!estado.variaveisCor || !estado.tokens || !estado.tokens.cores) return null;
+  const cores = estado.tokens.cores;
+  for (const chave in estado.variaveisCor) {
+    if (!temChave(cores, chave)) continue;
+    const alvo = hexParaRgba(cores[chave]);
     if (
       Math.abs(alvo.r - cor.r) < 0.004 &&
       Math.abs(alvo.g - cor.g) < 0.004 &&
@@ -323,10 +400,11 @@ function variavelDeCor(cor) {
 }
 
 function variavelDeRaio(valor) {
-  if (!estado.variaveisMetrica) return null;
-  for (const chave of Object.keys(estado.variaveisMetrica)) {
-    if (chave.indexOf("raio-") !== 0) continue;
-    if (Math.abs(TOKENS_METRICA[chave] - valor) < 0.01) return estado.variaveisMetrica[chave];
+  if (!estado.variaveisMetrica || !estado.tokens || !estado.tokens.metricas) return null;
+  const metricas = estado.tokens.metricas;
+  for (const chave in estado.variaveisMetrica) {
+    if (chave.indexOf("raio-") !== 0 || !temChave(metricas, chave)) continue;
+    if (Math.abs(metricas[chave] - valor) < 0.01) return estado.variaveisMetrica[chave];
   }
   return null;
 }
@@ -1760,8 +1838,10 @@ async function buscarBytes(url) {
 
 async function carregarManifesto(base) {
   const manifesto = await buscarJson(String(base).replace(/\/+$/, "") + "/scenes.json");
-  // tabela de origens vem do manifesto: o plugin não guarda uma cópia própria
+  // Duas tabelas vêm do manifesto, não do plugin: a de origens (o `figma:diff`
+  // usa a mesma para dizer onde mexer) e a de tokens do `globals.css`.
   estado.origem = (manifesto && manifesto.origem) || {};
+  estado.tokens = (manifesto && manifesto.tokens) || null;
   enviar("manifesto", { ok: true, manifesto: manifesto });
 }
 

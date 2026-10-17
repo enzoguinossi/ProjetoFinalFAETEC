@@ -486,7 +486,12 @@ function criarFigmaMock() {
 
   const variaveisPorColecao = new Map<string, Record<string, unknown>>();
   /** Coleções e variáveis criadas — a leitura de volta as enumera. */
-  const colecoesMock: Array<{ id: string; name: string; modes: { modeId: string; name: string }[] }> = [];
+  const colecoesMock: Array<{
+    id: string;
+    name: string;
+    defaultModeId: string;
+    modes: { modeId: string; name: string }[];
+  }> = [];
   interface VariavelMock {
     id: string;
     name: string;
@@ -607,6 +612,8 @@ function criarFigmaMock() {
         const colecao = {
           id: proximoId(),
           name: nome,
+          // Como no Figma: a coleção tem um modo padrão identificado.
+          defaultModeId: `${nome}-default`,
           modes: [{ modeId: `${nome}-default`, name: "Mode 1" }],
           renameMode() {},
         };
@@ -792,13 +799,43 @@ async function main() {
   }
   const dados = JSON.parse(readFileSync(manifesto, "utf8")) as {
     scenes: { id: string; title: string; group: string; file: string; refImage: string }[];
+    tokens?: { cores: Record<string, string>; metricas: Record<string, number> };
   };
   const cenas = dados.scenes;
   console.log(`🧪 Verificando o plugin com ${cenas.length} cenário(s)\n`);
 
+  // Os tokens de design vêm do `globals.css` (fonte única) pelo manifesto: sem
+  // eles o plugin não tem como acertar as variáveis do Figma — colheita antiga
+  // aqui é falha clara, não aviso.
+  if (!dados.tokens?.cores || !dados.tokens?.metricas) {
+    problema(
+      "o manifesto não traz `tokens` (colheita anterior à fonte única) — rode `npm run figma:harvest`",
+    );
+  }
+
   const { figma } = criarFigmaMock();
   const registros = { verificacoes: [] as string[], snapshots: new Map<string, unknown>() };
   const codigo = readFileSync(path.join(TOOL_DIR, "plugin", "code.js"), "utf8");
+
+  // ── estado de uma execução ANTERIOR do plugin ──
+  // O upsert só prova alguma coisa se a variável já existir com outro valor: era
+  // exatamente esse o defeito (as variáveis ficavam com os tokens antigos
+  // copiados no plugin quando o `globals.css` mudava). Por isso as coleções são
+  // semeadas com valores desatualizados ANTES da importação.
+  const COR_ANTIGA = { r: 1, g: 0, b: 0, a: 1 }; // #ff0000, o brand "de antes"
+  const RAIO_ANTIGO = 4;
+  const colecaoCorAntiga = figma.variables.createVariableCollection("Nexus / Cor");
+  figma.variables
+    .createVariable("brand", colecaoCorAntiga, "COLOR")
+    .setValueForMode(colecaoCorAntiga.defaultModeId, COR_ANTIGA);
+  // uma variável que não está mais na lista de tokens: o upsert não pode removê-la
+  figma.variables
+    .createVariable("token-que-saiu", colecaoCorAntiga, "COLOR")
+    .setValueForMode(colecaoCorAntiga.defaultModeId, { r: 0, g: 0, b: 0, a: 1 });
+  const colecaoMetricaAntiga = figma.variables.createVariableCollection("Nexus / Métrica");
+  figma.variables
+    .createVariable("raio-lg", colecaoMetricaAntiga, "FLOAT")
+    .setValueForMode(colecaoMetricaAntiga.defaultModeId, RAIO_ANTIGO);
 
   const mensagens: Mensagem[] = [];
   const aguardando = new Map<string, { resolver: (m: Mensagem) => void }[]>();
@@ -1255,6 +1292,133 @@ async function main() {
   console.log(`  variáveis lidas: ${variaveisLidas.length} (brand = ${String(brand?.valor ?? "—")})`);
   for (const mensagem of problemasDaVolta) console.log(`  ✗ ${mensagem}`);
 
+  // 6.9) TOKENS: a fonte única é o `globals.css` (levado no manifesto) e o
+  //      plugin faz UPSERT nas variáveis. A prova tem duas partes:
+  //        a) as variáveis de `Nexus / Cor` e `Nexus / Métrica` batem com os
+  //           tokens do manifesto;
+  //        b) a importação foi rodada sobre coleções semeadas com valores
+  //           ANTIGOS (ver o topo de `main`): cada variável pré-existente tem de
+  //           ter CONVERGIDO para o valor atual — antes desta mudança os tokens
+  //           viviam copiados no plugin e ficavam desatualizados.
+  //      Variável que saiu da lista de tokens é mantida (só registrada).
+  type VariavelLocal = Awaited<ReturnType<typeof figma.variables.getLocalVariablesAsync>>[number];
+  const tokenCores = dados.tokens?.cores ?? {};
+  const tokenMetricas = dados.tokens?.metricas ?? {};
+
+  const paraRgba = (hex: string) => {
+    const n = Number.parseInt(hex.replace("#", ""), 16);
+    return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+  };
+
+  const colecoesFinais = await figma.variables.getLocalVariableCollectionsAsync();
+  const variaveisFinais = await figma.variables.getLocalVariablesAsync();
+  const colecaoFinal = (nomeColecao: string) => colecoesFinais.find((c) => c.name === nomeColecao) ?? null;
+  const variaveisDa = (nomeColecao: string): VariavelLocal[] => {
+    const colecao = colecaoFinal(nomeColecao);
+    if (!colecao) return [];
+    return variaveisFinais.filter((v) => v.variableCollectionId === colecao.id);
+  };
+
+  let tokensDivergentes = 0;
+  const exemplosTokens: string[] = [];
+  const problemasDeTokens: string[] = [];
+
+  const corFinal = variaveisDa("Nexus / Cor");
+  const metricaFinal = variaveisDa("Nexus / Métrica");
+  const colecaoCorFinal = colecaoFinal("Nexus / Cor");
+  const colecaoMetricaFinal = colecaoFinal("Nexus / Métrica");
+  if (!colecaoCorFinal) problemasDeTokens.push("a coleção `Nexus / Cor` não existe");
+  if (!colecaoMetricaFinal) problemasDeTokens.push("a coleção `Nexus / Métrica` não existe");
+
+  for (const [chave, hex] of Object.entries(tokenCores)) {
+    const variavel = corFinal.find((v) => v.name === chave);
+    if (!variavel) {
+      tokensDivergentes++;
+      exemplosTokens.push(`Nexus / Cor · ${chave}: variável ausente`);
+      continue;
+    }
+    const valor = variavel.valuesByMode[colecaoCorFinal?.defaultModeId ?? ""] as
+      | { r: number; g: number; b: number }
+      | undefined;
+    const alvo = paraRgba(hex);
+    const bate =
+      !!valor &&
+      Math.abs(valor.r - alvo.r) < 0.004 &&
+      Math.abs(valor.g - alvo.g) < 0.004 &&
+      Math.abs(valor.b - alvo.b) < 0.004;
+    if (!bate) {
+      tokensDivergentes++;
+      exemplosTokens.push(
+        `Nexus / Cor · ${chave}: ${valor ? JSON.stringify(valor) : "sem valor"} ≠ ${hex}`,
+      );
+    }
+  }
+  for (const [chave, esperado] of Object.entries(tokenMetricas)) {
+    const variavel = metricaFinal.find((v) => v.name === chave);
+    if (!variavel) {
+      tokensDivergentes++;
+      exemplosTokens.push(`Nexus / Métrica · ${chave}: variável ausente`);
+      continue;
+    }
+    const valor = variavel.valuesByMode[colecaoMetricaFinal?.defaultModeId ?? ""];
+    if (typeof valor !== "number" || Math.abs(valor - esperado) > 0.01) {
+      tokensDivergentes++;
+      exemplosTokens.push(`Nexus / Métrica · ${chave}: ${String(valor)} ≠ ${esperado}`);
+    }
+  }
+
+  // a variável semeada antes da importação estava com #ff0000: continuar com
+  // esse valor significa que o upsert NÃO atualizou a existente (o defeito)
+  const brandAtual = corFinal.find((v) => v.name === "brand");
+  const brandAtualValor = brandAtual?.valuesByMode[colecaoCorFinal?.defaultModeId ?? ""] as
+    | { r: number; g: number; b: number }
+    | undefined;
+  const manteveValorAntigo =
+    !!brandAtualValor &&
+    Math.abs(brandAtualValor.r - COR_ANTIGA.r) < 0.004 &&
+    Math.abs(brandAtualValor.g - COR_ANTIGA.g) < 0.004 &&
+    Math.abs(brandAtualValor.b - COR_ANTIGA.b) < 0.004;
+  if (!tokenCores.brand) {
+    problemasDeTokens.push("o manifesto não traz o token `brand`");
+  } else if (manteveValorAntigo) {
+    problemasDeTokens.push(
+      "`brand` continuou com o valor antigo (#ff0000) — o upsert não atualizou a variável existente",
+    );
+  }
+  const raioAtual = metricaFinal.find((v) => v.name === "raio-lg");
+  const raioAtualValor = raioAtual?.valuesByMode[colecaoMetricaFinal?.defaultModeId ?? ""];
+  if (raioAtualValor === RAIO_ANTIGO && tokenMetricas["raio-lg"] !== RAIO_ANTIGO) {
+    problemasDeTokens.push(
+      "`raio-lg` continuou com o valor antigo (4) — o upsert não atualizou a variável existente",
+    );
+  }
+  const fantasma = corFinal.find((v) => v.name === "token-que-saiu");
+  if (!fantasma) {
+    problemasDeTokens.push("a variável fora da lista de tokens foi REMOVIDA (o upsert não remove)");
+  }
+  if (!mensagens.some((m) => m.tipo === "log" && m.aviso && (m.texto ?? "").indexOf("token-que-saiu") >= 0)) {
+    problemasDeTokens.push("a variável fora da lista de tokens não foi registrada no log");
+  }
+  if (tokensDivergentes > 0) {
+    problemasDeTokens.push(`${tokensDivergentes} variável(is) divergente(s) dos tokens do manifesto`);
+  }
+
+  console.log("\n── tokens (variáveis do Figma) ──");
+  console.log(
+    `  esperados pelo manifesto: ${Object.keys(tokenCores).length} cor(es), ${Object.keys(tokenMetricas).length} métrica(s)`,
+  );
+  console.log(
+    `  Nexus / Cor: ${corFinal.length} variável(is) · Nexus / Métrica: ${metricaFinal.length} variável(is)`,
+  );
+  console.log(
+    `  convergência: brand #ff0000 → ${brandAtualValor ? `#${[brandAtualValor.r, brandAtualValor.g, brandAtualValor.b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}` : "—"}` +
+      ` · raio-lg ${RAIO_ANTIGO} → ${String(raioAtualValor ?? "—")}`,
+  );
+  console.log(`  variáveis fora dos tokens (mantidas): ${fantasma ? "token-que-saiu" : "(nenhuma)"}`);
+  console.log(`  divergências: ${tokensDivergentes}`);
+  for (const exemplo of exemplosTokens.slice(0, 6)) console.log(`    · ${exemplo}`);
+  for (const mensagem of problemasDeTokens) console.log(`  ✗ ${mensagem}`);
+
   // 7) Componente com filhos POSICIONADOS (sem auto-layout) não reflui ao ser  //    redimensionado. Então a instância precisa ter EXATAMENTE a largura do
   //    mestre — foi por isso que a paginação aparecia deslocada e cortada nos
   //    modais (mestre de 1070 usado numa tabela de 664).
@@ -1554,6 +1718,7 @@ async function main() {
     mestresForaDoPacote > 0 ||
     mestresComVazamento > 0 ||
     problemasDaVolta.length > 0 ||
+    problemasDeTokens.length > 0 ||
     idsSemElemento.length > 0 ||
     erroNoPainel !== null ||
     scriptDoPainel === "" ||

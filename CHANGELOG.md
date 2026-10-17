@@ -18,9 +18,10 @@ sequência da release no mesmo dia.
   componentes casados por nome + âncora de código e telas).
 - Scripts `figma:harvest`, `figma:serve`, `figma:check`, `figma:compare`, `figma:diff`,
   `figma:fixtures` e a skill `.opencode/skills/figma-export`.
-- Verificação automática do plugin sem abrir o Figma (`figma:check`), com 13 invariantes —
+- Verificação automática do plugin sem abrir o Figma (`figma:check`), com 14 invariantes —
   incluindo a **guarda de reuso** que falha se um componente promovido perder a marca
-  `data-figma` no código.
+  `data-figma` no código e a que prova que as **variáveis do Figma convergem para os
+  tokens do `globals.css`**.
 - Infraestrutura de orquestração multiagente: agentes versionados em `.opencode/agents/`
   (orchestrator, developer, reviewer, qa, docs-keeper, release-manager).
 - Skills de processo `.opencode/skills/{orchestration,jira-smart-commits,release}/SKILL.md`.
@@ -33,6 +34,14 @@ sequência da release no mesmo dia.
 - Componentes compartilhados (`src/components/*`) receberam marcas `data-figma*`
   (atributos aditivos: não alteram comportamento nem visual) que ligam a UI aos
   componentes do design.
+- Tokens de design passaram a ter **fonte única** no `src/app/globals.css`: a colheita os
+  lê (`tools/figma-export/tokens.ts`) e os leva no manifesto, e o plugin **atualiza as
+  variáveis existentes e cria as novas** nas coleções `Nexus / Cor` e `Nexus / Métrica`
+  (upsert; nada é removido). A cópia à mão que existia em `plugin/code.js`
+  (`TOKENS_COR`/`TOKENS_METRICA`) foi removida — era ela que ficava desatualizada quando
+  o `globals.css` mudava. Foram acrescentados ao `@theme` apenas os tokens que só
+  existiam nessa cópia (`--color-branco`, `--raio-lg`, `--raio-xl`, `--raio-pill`);
+  **nenhum valor de token existente mudou**.
 
 <!--
 Categorias: Added, Changed, Deprecated, Removed, Fixed, Security.
