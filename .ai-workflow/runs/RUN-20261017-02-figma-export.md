@@ -62,8 +62,10 @@
 | Subtarefa | Run | Status | Evidência |
 |---|---|---|---|
 | Guarda de reuso (invariante #13 das marcas) | `RUN-20261017-02a` | **concluída** | `120a4a1` + `c49c647`; `figma:check` verde com `21/21 promovidos com a marca`; falha demonstrada com a marca removida |
-| Leitura de componentes (volta) no Figma real | — | **aguarda o usuário** | pendente a leitura de uma página (aba *Ler do Figma*) + `figma:diff` |
-| `figma:compare` (conferência 1:1) | — | **aguarda o usuário** | pendente importação com *conferir 1:1* |
+| Fontes → Inter (causa do desvio no 1:1) | `RUN-20261017-02b` | **concluída** | `5b1250c` + `655c8f0`; `tsc`/`eslint`/`next build` verdes; re-colheita com `Inter` em 36/36 textos |
+| Leitura de componentes (volta) no Figma real | — | **concluída (1ª leitura)** | `figma:diff` sobre a `Page 1`: componentes e telas sem diferença; 28 variáveis e 32 mestres lidos |
+| `figma:compare` (conferência 1:1) | — | **1ª medição feita; aguarda re-medição** | média 2,707%, 1/47 aprovada; causa (fontes) corrigida — falta re-importar com *conferir 1:1* e rodar de novo |
+| De-para de tokens (PT → token do app) | — | **aguarda confirmação do usuário** | 9 variáveis de design + `branco` + `raio-*`; proposta apresentada (ver MAPA §9) |
 | Versionamento (DateVer + changelog) | — | preparado | `CHANGELOG.md` com `Unreleased`; versão planejada `1.17.10.2026` |
 
 - **Pendências reais:** `figma:compare` nunca rodou de verdade; a leitura real de uma
