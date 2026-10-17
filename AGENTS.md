@@ -777,6 +777,10 @@ Regras:
    `CHANGELOG.md` no padrão Keep a Changelog 1.1.0 (pt-BR).
 6. Branches de trabalho `KAN-<n>-<slug>`; integração na `main`.
 
+A convenção detalhada de versionamento e changelog (DateVer + Keep a Changelog) está em
+`docs/VERSIONAMENTO.md`; o checklist operacional de release, em
+`.opencode/skills/release/SKILL.md`.
+
 
 <!-- BEGIN:nextjs-agent-rules -->
 
