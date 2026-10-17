@@ -20,7 +20,7 @@
 ## Rastreabilidade
 
 - **Issues Jira:** `KAN-xxx` (obrigatório para trabalho que gera commit)
-- **Referências documentais:** `docs/...`, `AGENTS.md`, `docs/agents/JIRA.MD`, RN/RF/RNF
+- **Referências documentais:** `docs/...`, `AGENTS.md`, `docs/processo/JIRA.md`, RN/RF/RNF
 - **Dependências:** outros `RUN-ID` dos quais depende
 - **Bloqueia:** outros `RUN-ID`
 

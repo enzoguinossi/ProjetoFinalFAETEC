@@ -8,12 +8,59 @@ sequência da release no mesmo dia.
 
 A convenção completa — como numerar releases do mesmo dia, como escrever uma entrada e a
 rastreabilidade versão ↔ issues ↔ commit — está em
-[`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md). O checklist de release está em
+[`docs/processo/VERSIONAMENTO.md`](docs/processo/VERSIONAMENTO.md). O checklist de release está em
 `.opencode/skills/release/SKILL.md`.
 
 ## [Unreleased]
 
-<!-- Nada pendente desde a 1.17.10.2026 — a primeira versão do projeto. -->
+### Changed
+
+- **Documentação reorganizada por assunto:** `docs/` passou a ter três pastas — `dominio/`
+  (ENTENDIMENTO, REGRAS_NEGOCIO, REQUISITOS_FUNCIONAIS, REQUISITOS_NAO_FUNCIONAIS e o novo
+  IMPLEMENTACAO), `processo/` (VERSIONAMENTO, JIRA e WORKFLOW) e `diagramas/` (classes.puml,
+  DER.puml, fluxo_atual.puml e os 6 sub-fluxos de `fluxosAtuais/`). Os **16** arquivos foram
+  movidos com `git mv` (histórico preservado) e as antigas pastas `agents/` e `puml/` sob
+  `docs/` deixaram de existir; as referências internas foram atualizadas e os caminhos antigos
+  não aparecem mais em `grep`.
+- **`docs/README.md` (novo)** — índice da documentação: o que é o projeto em uma linha, a
+  tabela pasta → documento → para quê, e a indicação de que o modelo físico
+  (`prisma/schema.prisma`) é a fonte de verdade.
+- **`docs/dominio/IMPLEMENTACAO.md` (novo)** — mapa do que **já existe no código**: os 25
+  requisitos funcionais (o `RF008` não existe e a lacuna é preservada) e os 9 requisitos não
+  funcionais classificados em implementado/parcial/não implementado, cada linha com o arquivo
+  que a sustenta, mais 4 pontos em aberto (autor das mensagens automáticas do mural, forma do
+  registro de pendência da RN003, destino de `anexo.ID_documento_fiscal` e enforcement de
+  `tipo_codigo`).
+- **`ENTENDIMENTO.md` corrigido contra o schema (52 modelos):** removida a entidade
+  inexistente `condutor` — o condutor é a flag `funcionario.condutor` e a FK
+  `remessa.ID_funcionario_condutor`; `senha_hash` passou a nullable e `senha_alterada_em` foi
+  incluído; `saldo_reservado` e `endereco.uf` acrescentados; `anexo.ID_documento_fiscal`
+  documentado como coluna sem tabela de destino; a tabela de permissões passou a refletir as
+  **68** permissões criadas por `prisma/seed.ts` (`listar`/`excluir` incluídos,
+  `perfil.desativar` → `perfil.excluir`, sem `condutor.*`); a lista de valores de `acao` da
+  auditoria passou a vir de `src/dao/_audit.ts`; a movimentação de estoque deixou de ser
+  descrita com um "tipo" que a tabela não tem; a contagem de entidades foi corrigida para 52
+  e a stack para Next.js 16 sem Chart.js; os fluxos AS-IS (`fluxo_atual.puml` e
+  `fluxosAtuais/`) passaram a ser referenciados e separados do fluxo alvo.
+- **Diagramas alinhados ao schema:** `classes.puml` ganhou as 5 classes que faltavam
+  (MovimentacaoEstoque, ReservaEstoque, UsuarioPermissao, PerfilPermissao e
+  RegistroAuditoria) e passou a ter as **52** classes dos 52 modelos; `DER.puml` passou de 54
+  para **52** entidades (sem `condutor`/`condutor_codigo`), ganhou o relacionamento
+  `nota_entrada ||--o{ chave_acesso` e os campos `uf` e `senha_alterada_em`; a multiplicidade
+  invertida de `ConversaoUnidade` e os tipos `DECIMAL` (o schema usa `Float`) foram
+  corrigidos nos dois diagramas.
+- **`AGENTS.md`, `README.md` e os documentos de processo alinhados ao repositório real:** a
+  fonte de verdade (§2) e as referências de §24 apontam para os caminhos novos; a stack virou
+  "Next.js 16" e "MySQL/MariaDB (driver `@prisma/adapter-mariadb`)"; a árvore de §3 reflete o
+  layout real (com `src/proxy.ts` e sem as pastas de API, autenticação e dashboard, nem
+  diretório de migrations) e o uso de `prisma db push`; o `README.md` da raiz ficou enxuto (o que
+  é o projeto, stack, como rodar, comandos essenciais — com `test` e `db:generate` — e um link
+  para `docs/README.md`); no `JIRA.md`, o bullet que dizia que `#time` registra worklog foi
+  corrigido, o repositório passou a ser citado como `enzoguinossi/projetofinalfaetec` e o
+  exemplo de smart commit combinado ficou correto.
+- **`REQUISITOS_FUNCIONAIS.md`:** o cabeçalho passou a registrar que **`RF008` não existe** e
+  que a lacuna é preservada de propósito (sem renumerar e sem inventar requisito) — o total é
+  25 RFs.
 
 ## [1.17.10.2026] - 2026-10-17
 

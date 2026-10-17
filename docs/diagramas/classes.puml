@@ -36,11 +36,6 @@ package "Códigos Personalizados" as Codigos {
     + codigo: String
   }
 
-  class CondutorCodigo {
-    + ID_cond_codigo: Integer
-    + codigo: String
-  }
-
   class VeiculoCodigo {
     + ID_veic_codigo: Integer
     + codigo: String
@@ -50,7 +45,6 @@ package "Códigos Personalizados" as Codigos {
   TipoCodigo "1" -- "*" DestinatarioCodigo
   TipoCodigo "1" -- "*" FornecedorCodigo
   TipoCodigo "1" -- "*" FuncionarioCodigo
-  TipoCodigo "1" -- "*" CondutorCodigo
   TipoCodigo "1" -- "*" VeiculoCodigo
 }
 
@@ -80,28 +74,21 @@ package "Funcionários" as Funcionarios {
   class Funcionario {
     + ID_funcionario: Integer
     + cargo: String
+    + condutor: Boolean
     + ativo: Boolean
   }
 
   class Usuario {
       + ID_usuario: Integer
       + login: String
-      + senha_hash: String
+      + senha_hash: String [opcional até o 1º acesso]
+      + senha_alterada_em: Timestamp
       + super_admin: Boolean
       + ultimo_acesso: Timestamp
       + ativo: Boolean
     }
 
-  class Condutor {
-    + ID_condutor: Integer
-    + numero_cnh: String
-    + categoria_cnh: String
-    + validade_cnh: Date
-    + ativo: Boolean
-  }
-
   Funcionario "1" <-- "1" Usuario : extensão >
-  Funcionario "1" <-- "0..1" Condutor : extensão >
 }
 
 ' =========================================================
@@ -137,9 +124,10 @@ package "Contato" as Contato {
     + complemento: String
     + bairro: String
     + cidade: String
+    + uf: String
     + cep: String
-    + latitude: Decimal
-    + longitude: Decimal
+    + latitude: Float
+    + longitude: Float
   }
 
   class FuncionarioTelefone {
@@ -193,7 +181,7 @@ package "Produtos e Estoque" as Produtos {
   class ConversaoUnidade {
     + ID_conversao: Integer
     + nome: String
-    + fator: Decimal
+    + fator: Float
   }
 
   class Produto {
@@ -208,14 +196,14 @@ package "Produtos e Estoque" as Produtos {
 
   class ProdutoInsumo {
     + ID_produto_insumo: Integer
-    + quantidade: Decimal
+    + quantidade: Float
     + ativo: Boolean
   }
 
   class Estoque {
       + ID_estoque: Integer
-      + quantidade_atual: Decimal
-      + saldo_reservado: Decimal
+      + quantidade_atual: Float
+      + saldo_reservado: Float
       + data_entrada: Date
       + ativo: Boolean
     }
@@ -232,27 +220,52 @@ package "Produtos e Estoque" as Produtos {
 
     class ItemInventario {
       + ID_item_inventario: Integer
-      + quantidade_sistema: Decimal
+      + quantidade_sistema: Float
     }
 
     class ContagemInventario {
       + ID_contagem_inventario: Integer
-      + quantidade_contada: Decimal
+      + quantidade_contada: Float
       + data_contagem: Timestamp
     }
 
     class AjusteInventario {
       + ID_ajuste_inventario: Integer
-      + diferenca: Decimal
+      + diferenca: Float
       + status: Enum
+    }
+
+  class MovimentacaoEstoque {
+      + ID_movimentacao: Integer
+      + quantidade: Float
+      + saldo_anterior: Float
+      + saldo_posterior: Float
+      + ID_nota_entrada: Integer
+      + ID_nota_saida: Integer
+      + ID_remessa: Integer
+      + data_hora: Timestamp
+      + observacao: Text
+    }
+
+  class ReservaEstoque {
+      + ID_reserva_estoque: Integer
+      + quantidade: Float
+      + saldo_anterior: Float
+      + saldo_posterior: Float
+      + data_hora: Timestamp
+      + observacao: Text
     }
 }
 
 Produto "1" --> "0..*" Estoque : estocado em >
 Produto "1" --> "0..*" ProdutoInsumo : pai de >
 Produto "1" <-- "*" ProdutoInsumo : filho de >
-Produto "0..1" --> "1" ConversaoUnidade : conversão padrão >
+ConversaoUnidade "1" --> "0..*" Produto : conversão padrão >
 Estoque "1" --> "*" MovimentacaoEstoque : movimenta >
+Estoque "1" --> "*" ReservaEstoque : reserva >
+NotaSaida "1" --> "*" ReservaEstoque : origina >
+Usuario "1" --> "*" MovimentacaoEstoque : registra >
+Usuario "1" --> "*" ReservaEstoque : registra >
 Inventario "1" --> "*" ItemInventario : contém >
 ItemInventario "1" --> "*" ContagemInventario : contada em >
 Funcionario "1" --> "*" ContagemInventario : realiza >
@@ -277,7 +290,7 @@ package "Logística" as Logistica {
 
     class ItemPedidoEscola {
       + ID_item_pedido_escola: Integer
-      + quantidade: Decimal
+      + quantidade: Float
     }
 
     class NotaSaida {
@@ -292,8 +305,8 @@ package "Logística" as Logistica {
 
         class ItemNotaSaida {
           + ID_item_nota_saida: Integer
-          + qtd_esperada: Decimal
-          + qtd_entregue: Decimal
+          + qtd_esperada: Float
+          + qtd_entregue: Float
         }
 
       class Remessa {
@@ -306,9 +319,9 @@ package "Logística" as Logistica {
 
     class ItemRemessa {
       + ID_item_remessa: Integer
-      + quantidade_solicitada: Decimal
-      + quantidade_separada: Decimal
-      + quantidade_entregue: Decimal
+      + quantidade_solicitada: Float
+      + quantidade_separada: Float
+      + quantidade_entregue: Float
     }
 
     class Coleta {
@@ -319,7 +332,7 @@ package "Logística" as Logistica {
 
     class ItemColeta {
       + ID_item_coleta: Integer
-      + quantidade: Decimal
+      + quantidade: Float
     }
 
   class Percurso {
@@ -375,8 +388,8 @@ Coleta "1" --> "*" ItemColeta : contém >
 Remessa "1" --> "*" Anexo : anexa >
 Estoque "1" --> "*" ItemNotaSaida : reservado em >
 Estoque "1" --> "*" ItemRemessa : expedido em >
-Condutor "1" --> "0..*" Remessa : vincula >
-Veiculo "1" --> "0..*" Remessa : vincula >
+Funcionario "0..1" --> "0..*" Remessa : conduz >
+Veiculo "0..1" --> "0..*" Remessa : vincula >
 Rota "1" --> "*" RotaRemessa : agrupa >
 Remessa "1" --> "*" RotaRemessa : alocada em >
 Percurso "1" --> "*" PercursoDestinatario : define >
@@ -403,9 +416,9 @@ package "Nota de Entrada" as NotaEntrada {
 
   class ItemNotaEntrada {
     + ID_item_nota_entrada: Integer
-    + fator_conversao: Decimal
-    + quantidade: Decimal
-    + quantidade_convertida: Decimal
+    + fator_conversao: Float
+    + quantidade: Float
+    + quantidade_convertida: Float
   }
 }
 
@@ -441,10 +454,32 @@ package "Acessos" as Acessos {
       + automatica: Boolean
       + ativo: Boolean
     }
+
+  class UsuarioPermissao {
+    + ID_usuario: Integer
+    + ID_permissao: Integer
+  }
+
+  class PerfilPermissao {
+    + ID_perfil: Integer
+    + ID_permissao: Integer
+  }
+
+  class RegistroAuditoria {
+      + ID_registro_auditoria: Integer
+      + data_hora: Timestamp
+      + acao: String
+      + entidade: String
+      + ID_entidade_afetada: Integer
+      + dados_anteriores: JSON
+      + dados_novos: JSON
+    }
 }
 
-Usuario "*" --> "*" Permissao : possui >
-Perfil "*" --> "*" Permissao : template >
+Usuario "1" --> "*" UsuarioPermissao : possui >
+Permissao "1" --> "*" UsuarioPermissao : concedida em >
+Perfil "1" --> "*" PerfilPermissao : template >
+Permissao "1" --> "*" PerfilPermissao : compõe >
 Usuario "1" --> "*" RegistroAuditoria : realiza >
 Usuario "1" --> "*" MensagemMural : publica >
 

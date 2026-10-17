@@ -51,14 +51,6 @@ entity "funcionario_codigo" as func_codigo {
   * codigo : VARCHAR <<UK>>
 }
 
-entity "condutor_codigo" as cond_codigo {
-  * ID_condutor_codigo : INT <<PK>>
-  --
-  * ID_condutor : INT <<FK>>
-  * ID_tipo_codigo : INT <<FK>>
-  * codigo : VARCHAR <<UK>>
-}
-
 entity "veiculo_codigo" as veic_codigo {
   * ID_veiculo_codigo : INT <<PK>>
   --
@@ -96,6 +88,7 @@ entity "funcionario" as funcionario {
   --
   * ID_pessoa_fisica : INT <<FK, UK>>
   cargo : VARCHAR
+  * condutor : BOOLEAN <<DEF FALSE>>
   * ativo : BOOLEAN
 }
 
@@ -104,19 +97,10 @@ entity "usuario" as usuario {
   --
   * ID_funcionario : INT <<FK, UK>>
   * login : VARCHAR <<UK>>
-  * senha_hash : VARCHAR
+  senha_hash : VARCHAR
+  senha_alterada_em : TIMESTAMP
   * super_admin : BOOLEAN <<DEF FALSE>>
   ultimo_acesso : TIMESTAMP
-  * ativo : BOOLEAN
-}
-
-entity "condutor" as condutor {
-  * ID_condutor : INT <<PK>>
-  --
-  * ID_funcionario : INT <<FK, UK>>
-  numero_cnh : VARCHAR
-  categoria_cnh : VARCHAR
-  validade_cnh : DATE
   * ativo : BOOLEAN
 }
 
@@ -184,9 +168,10 @@ entity "endereco" as endereco {
   complemento : VARCHAR
   bairro : VARCHAR
   * cidade : VARCHAR
+  uf : CHAR(2)
   cep : VARCHAR
-  latitude : DECIMAL
-  longitude : DECIMAL
+  latitude : FLOAT
+  longitude : FLOAT
 }
 
 ' =========================================================
@@ -255,7 +240,7 @@ entity "conversao_unidade" as conv {
   * ID_conversao : INT <<PK>>
   --
   * nome : VARCHAR <<UK>>
-  * fator : DECIMAL
+  * fator : FLOAT
   descricao : VARCHAR
 }
 
@@ -276,7 +261,7 @@ entity "produto_insumo" as insumo {
   --
   * ID_produto_pai : INT <<FK>>
   * ID_produto_filho : INT <<FK>>
-  * quantidade : DECIMAL
+  * quantidade : FLOAT
   * ativo : BOOLEAN
 }
 
@@ -288,8 +273,8 @@ entity "estoque" as estoque {
   * ID_estoque : INT <<PK>>
   --
   * ID_produto : INT <<FK>>
-    * quantidade_atual : DECIMAL
-    * saldo_reservado : DECIMAL
+    * quantidade_atual : FLOAT
+    * saldo_reservado : FLOAT
     * data_entrada : DATE
     * ativo : BOOLEAN
   }
@@ -303,9 +288,9 @@ entity "movimentacao_estoque" as mov {
   --
   * ID_estoque : INT <<FK>>
   * ID_usuario : INT <<FK>>
-  * quantidade : DECIMAL
-  saldo_anterior : DECIMAL
-  saldo_posterior : DECIMAL
+  * quantidade : FLOAT
+  saldo_anterior : FLOAT
+  saldo_posterior : FLOAT
   ID_nota_saida : INT <<FK>>
   ID_remessa : INT <<FK>>
   ID_nota_entrada : INT <<FK>>
@@ -323,9 +308,9 @@ entity "reserva_estoque" as reserva {
   * ID_estoque : INT <<FK>>
   * ID_nota_saida : INT <<FK>>
   * ID_usuario : INT <<FK>>
-  * quantidade : DECIMAL
-  saldo_anterior : DECIMAL
-  saldo_posterior : DECIMAL
+  * quantidade : FLOAT
+  saldo_anterior : FLOAT
+  saldo_posterior : FLOAT
   * data_hora : TIMESTAMP
   observacao : TEXT
 }
@@ -351,7 +336,7 @@ entity "item_inventario" as item_inv {
   --
   * ID_inventario : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * quantidade_sistema : DECIMAL
+  * quantidade_sistema : FLOAT
   observacao : TEXT
 }
 
@@ -360,7 +345,7 @@ entity "contagem_inventario" as contagem {
   --
   * ID_item_inventario : INT <<FK>>
   * ID_funcionario : INT <<FK>>
-  * quantidade_contada : DECIMAL
+  * quantidade_contada : FLOAT
   * data_contagem : TIMESTAMP
   observacao : TEXT
 }
@@ -370,7 +355,7 @@ entity "ajuste_inventario" as ajuste_inv {
   --
   * ID_inventario : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * diferenca : DECIMAL
+  * diferenca : FLOAT
   * status : ENUM(PENDENTE, APROVADO, REJEITADO)
   ID_usuario_aprovacao : INT <<FK>>
   data_aprovacao : TIMESTAMP
@@ -396,7 +381,7 @@ entity "item_pedido_escola" as item_pedido {
   --
   * ID_pedido_escola : INT <<FK>>
   * ID_produto : INT <<FK>>
-  * quantidade : DECIMAL
+  * quantidade : FLOAT
   observacao : TEXT
 }
 
@@ -421,8 +406,8 @@ entity "item_nota_saida" as item_nota {
   --
   * ID_nota_saida : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * qtd_esperada : DECIMAL
-  * qtd_entregue : DECIMAL
+  * qtd_esperada : FLOAT
+  * qtd_entregue : FLOAT
   observacao : TEXT
 }
 
@@ -437,7 +422,7 @@ entity "remessa" as remessa {
   * ID_destinatario : INT <<FK>>
   * data_criacao : TIMESTAMP
   * status : StatusRemessa
-  ID_condutor : INT <<FK>>
+  ID_funcionario_condutor : INT <<FK>>
   ID_veiculo : INT <<FK>>
   * urgente : BOOLEAN
   observacao : TEXT
@@ -448,9 +433,9 @@ entity "item_remessa" as item_rem {
   --
   * ID_remessa : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * quantidade_solicitada : DECIMAL
-  quantidade_separada : DECIMAL
-  quantidade_entregue : DECIMAL
+  * quantidade_solicitada : FLOAT
+  quantidade_separada : FLOAT
+  quantidade_entregue : FLOAT
 }
 
 ' =========================================================
@@ -471,7 +456,7 @@ entity "item_coleta" as item_coleta {
   --
   * ID_coleta : INT <<FK>>
   * ID_estoque : INT <<FK>>
-  * quantidade : DECIMAL
+  * quantidade : FLOAT
 }
 
 ' =========================================================
@@ -550,9 +535,9 @@ entity "item_nota_entrada" as item_nota_entrada {
   --
   * ID_nota_entrada : INT <<FK>>
   * ID_produto : INT <<FK>>
-  * fator_conversao : DECIMAL
-  * quantidade : DECIMAL
-  * quantidade_convertida : DECIMAL
+  * fator_conversao : FLOAT
+  * quantidade : FLOAT
+  * quantidade_convertida : FLOAT
   observacao : TEXT
 }
 
@@ -568,7 +553,7 @@ entity "anexo" as anexo {
   tipo_mime : VARCHAR
   * data_upload : TIMESTAMP
   ID_remessa : INT <<FK>>
-  ID_documento_fiscal : INT <<FK>>
+  ID_documento_fiscal : INT
   * ativo : BOOLEAN
 }
 
@@ -643,20 +628,17 @@ tipo_codigo ||--o{ produto_codigo
 tipo_codigo ||--o{ dest_codigo
 tipo_codigo ||--o{ forn_codigo
 tipo_codigo ||--o{ func_codigo
-tipo_codigo ||--o{ cond_codigo
 tipo_codigo ||--o{ veic_codigo
 
 produto ||--o{ produto_codigo
 destinatario ||--o{ dest_codigo
 fornecedor ||--o{ forn_codigo
 funcionario ||--o{ func_codigo
-condutor ||--o{ cond_codigo
 veiculo ||--o{ veic_codigo
 
 ' Pessoas
 pf ||--|| funcionario
 funcionario ||--o| usuario
-funcionario ||--o| condutor
 
 pj ||--|| fornecedor
 pj ||--|| destinatario
@@ -708,7 +690,7 @@ nota ||--o{ coleta
 nota ||--o{ reserva
 remessa ||--|{ item_rem
 coleta ||--|{ item_coleta
-condutor ||--o{ remessa
+funcionario ||--o{ remessa
 veiculo ||--o{ remessa
 
 ' Percurso / Rota
@@ -721,6 +703,7 @@ remessa ||--o{ rota_rem
 ' Nota de Entrada
 fornecedor ||--o{ nota_entrada
 nota_entrada ||--|{ item_nota_entrada
+nota_entrada ||--o{ chave_acesso
 
 ' Anexos
 remessa ||--o{ anexo

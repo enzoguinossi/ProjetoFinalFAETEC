@@ -45,12 +45,11 @@ Um sistema web que centraliza:
 
 | Camada | Tecnologia |
 |--------|-----------|
-| **Stack** | Next.js 14+ (App Router) — Full Stack |
+| **Stack** | Next.js 16 (App Router) — Full Stack |
 | **ORM** | Prisma 7 |
-| **Banco de Dados** | MySQL |
+| **Banco de Dados** | MySQL/MariaDB (driver `@prisma/adapter-mariadb`) |
 | **Autenticação** | Feita na mão (bcrypt + JWT via biblioteca `jose`, HS256) |
 | **Versionamento** | GitHub |
-| **Gráficos** | Chart.js |
 
 
 ---
@@ -58,34 +57,34 @@ Um sistema web que centraliza:
 ## 2. Estrutura do Projeto
 
 ```
-projeto-final-faetec/
+projetofinalfaetec/
 ├── src/
-│   ├── app/
-│   │   ├── api/           # Route Handlers (API)
-│   │   ├── (auth)/        # Login e autenticação
-│   │   ├── (dashboard)/   # Páginas protegidas do sistema
-│   │   ├── layout.tsx     # Layout raiz
-│   │   └── page.tsx       # Página inicial
+│   ├── app/               # App Router: páginas, layouts e Server Actions (um diretório por módulo)
 │   ├── components/        # Componentes React reutilizáveis
 │   ├── dao/               # Data Access Objects (Prisma queries)
 │   ├── services/          # Lógica de negócio
 │   ├── lib/               # Utilitários e helpers
-│   └── types/             # Interfaces e tipos TypeScript
+│   ├── types/             # Interfaces e tipos TypeScript
+│   └── proxy.ts           # Proteção das rotas privadas (sessão)
 ├── prisma/
-│   ├── schema.prisma      # Modelo de dados (54 entidades)
-│   ├── seed.ts            # Seed inicial
-│   └── migrations/        # Migrações do banco
+│   ├── schema.prisma      # Modelo de dados (52 entidades)
+│   └── seed.ts            # Seed de referência
 ├── prisma.config.ts       # Configuração do Prisma 7
-├── docs/                  # Documentação e diagramas
-│   ├── ENTENDIMENTO.md
-│   └── puml/
-│       ├── classes.puml   # Diagrama de classes conceitual
-│       └── DER.puml       # Diagrama Entidade-Relacionamento
+├── docs/                  # Documentação (ver docs/README.md)
+│   ├── dominio/           # ENTENDIMENTO, REGRAS_NEGOCIO, REQUISITOS_*, IMPLEMENTACAO
+│   ├── processo/          # VERSIONAMENTO, JIRA, WORKFLOW
+│   └── diagramas/         # classes.puml, DER.puml, fluxo_atual.puml, fluxosAtuais/
+├── tests/                 # Testes automatizados (Vitest)
+├── scripts/               # Scripts de apoio ao workflow
+├── tools/                 # Ferramental (exportação para o Figma)
 ├── public/                # Arquivos estáticos
 ├── next.config.ts         # Configuração do Next.js
 ├── package.json
 └── tsconfig.json
 ```
+
+> O projeto **não versiona migrations**: o schema é aplicado ao banco com `prisma db push`
+> (`npm run db:push` / `npm run db:setup`), não com `prisma migrate`.
 
 ---
 
@@ -98,6 +97,8 @@ projeto-final-faetec/
 - **Hard Delete é proibido**: nada pode ser excluído fisicamente, apenas desativado
 - **Nomenclatura DB**: `snake_case`
 - **Nomenclatura TS**: `camelCase`
+- **Tipos numéricos**: quantidades, saldos, fatores de conversão e coordenadas são `Float`
+  no schema Prisma (`DOUBLE` no MySQL); este documento os escreve como `FLOAT`
 
 ---
 
@@ -128,7 +129,6 @@ produto_codigo        → ID_produto FK, ID_tipo_codigo FK, codigo VARCHAR UNIQU
 destinatario_codigo   → ID_destinatario FK, ID_tipo_codigo FK, codigo VARCHAR UNIQUE
 fornecedor_codigo     → ID_fornecedor FK, ID_tipo_codigo FK, codigo VARCHAR UNIQUE
 funcionario_codigo    → ID_funcionario FK, ID_tipo_codigo FK, codigo VARCHAR UNIQUE
-condutor_codigo       → ID_condutor FK, ID_tipo_codigo FK, codigo VARCHAR UNIQUE
 veiculo_codigo        → ID_veiculo FK, ID_tipo_codigo FK, codigo VARCHAR UNIQUE
 ```
 
@@ -159,6 +159,7 @@ funcionario
 ├── ID_funcionario      INT PK auto_increment
 ├── ID_pessoa_fisica    INT FK UNIQUE NOT NULL
 ├── cargo               VARCHAR
+├── condutor            BOOLEAN DEFAULT FALSE   ← flag: o funcionário pode dirigir
 └── ativo               BOOLEAN DEFAULT TRUE
 ```
 
@@ -166,6 +167,9 @@ Regras:
 - Todo funcionário É uma pessoa física
 - Nem toda pessoa física é funcionário
 - FK 1:1 garante que cada PF pode ter no máximo um funcionário
+- **Ser condutor é uma flag do próprio funcionário** (`funcionario.condutor`) — não existe
+  tabela `condutor`, nem dados de CNH no modelo. A remessa aponta para o funcionário
+  condutor pela FK `remessa.ID_funcionario_condutor → funcionario` (opcional)
 
 #### 3.3.2 Usuário (1:1 com Funcionário — opcional)
 
@@ -174,7 +178,7 @@ usuario
 ├── ID_usuario          INT PK auto_increment
 ├── ID_funcionario      INT FK UNIQUE NOT NULL  ← só pode ser funcionário
 ├── login               VARCHAR NOT NULL UNIQUE
-├── senha_hash          VARCHAR NOT NULL
+├── senha_hash          VARCHAR NULL              ← nulo até o primeiro acesso definir a senha
 └── ativo               BOOLEAN DEFAULT TRUE
 ```
 
@@ -182,20 +186,26 @@ Regras:
 - **Todo usuário DEVE ser um funcionário cadastrado**
 - Nem todo funcionário é usuário (ex: motorista só aparece nas remessas, sem login)
 - FK 1:1 para Funcionario — um funcionário pode ter no máximo um usuário
+- `senha_hash` é **nullable**: o usuário é criado sem senha e o campo só é preenchido no
+  fluxo de definição de senha (primeiro acesso ou redefinição). Enquanto for nulo, o login
+  é recusado e o sistema encaminha o usuário para definir a senha
 
-#### 3.3.3 Condutor (1:1 com Funcionário — marcador)
+#### 3.3.3 Condutor — flag do funcionário (não é entidade)
+
+Não existe tabela `condutor`. O papel de condutor é a flag booleana
+`funcionario.condutor` (default `FALSE`), marcada no cadastro do funcionário; a remessa
+guarda **quem** dirigiu em `remessa.ID_funcionario_condutor`, uma FK opcional para
+`funcionario`:
 
 ```
-condutor
-├── ID_condutor         INT PK auto_increment
-├── ID_funcionario      INT FK UNIQUE NOT NULL  ← só pode ser funcionário
-└── ativo               BOOLEAN DEFAULT TRUE
+remessa
+├── ID_funcionario_condutor  INT FK → funcionario NULL   ← quem dirigiu a entrega
 ```
 
 Regras:
-- **Todo condutor DEVE ser um funcionário cadastrado**
-- Um funcionário pode ou não ser condutor
-- FK 1:1 para Funcionario
+- Só um funcionário cadastrado pode ser condutor de uma remessa
+- Um funcionário pode ou não estar marcado como condutor
+- Não há atributos próprios de condutor (CNH, categoria, validade) no modelo
 
 #### 3.3.4 Fornecedor (1:1 com Pessoa Jurídica)
 
@@ -260,9 +270,10 @@ endereco
 ├── complemento         VARCHAR
 ├── bairro              VARCHAR
 ├── cidade              VARCHAR NOT NULL
+├── uf                  CHAR(2)                    ← opcional
 ├── cep                 VARCHAR
-├── latitude            DECIMAL          ← para mapa futuro
-└── longitude           DECIMAL          ← para mapa futuro
+├── latitude            FLOAT          ← para mapa futuro
+└── longitude           FLOAT          ← para mapa futuro
 ```
 
 Quem usa:
@@ -296,13 +307,13 @@ Tabela standalone (não vinculada a um produto específico):
 ```
 conversao_unidade
 ├── ID_conversao       INT PK auto_increment
-├── nome               VARCHAR NOT NULL UNIQUE  ← 'CX20', 'PCT10', 'UN', 'RESMA'
-├── fator              DECIMAL NOT NULL          ← 20, 10, 1
+├── nome               VARCHAR NOT NULL UNIQUE  ← nome livre (o seed cria UNIDADE, PACOTE e CAIXA)
+├── fator              FLOAT NOT NULL          ← 1, 10, 50 no seed
 └── descricao          VARCHAR
 ```
 
 Regras:
-- O nome é livre — o cliente cria conforme necessidade (ex: "CX20" = caixa com 20 unidades)
+- O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
 - O fator sempre **multiplica** a quantidade na entrada
 - Ao criar um documento de entrada, o usuário pode selecionar qualquer conversão
 - Se o produto tiver `ID_conversao_padrao`, esse valor é pré-selecionado (economiza cliques)
@@ -318,7 +329,7 @@ produto_insumo
 ├── ID_produto_insumo   INT PK auto_increment
 ├── ID_produto_pai      INT FK → produto    ← ex: "Kit Escolar"
 ├── ID_produto_filho    INT FK → produto    ← ex: "Borracha Individual"
-├── quantidade          DECIMAL NOT NULL    ← ex: 20 (1 kit = 20 borrachas)
+├── quantidade          FLOAT NOT NULL    ← ex: 20 (1 kit = 20 borrachas)
 └── ativo               BOOLEAN DEFAULT TRUE
 ```
 
@@ -330,7 +341,8 @@ Regras:
 - **Fluxo de desmontagem:** ao selecionar "desmontar" no sistema:
   1. Dá baixa no estoque do produto pai (`quantidade_atual -= X`)
   2. Gera entrada no estoque de cada filho (`quantidade_atual += X * quantidade_insumo`)
-  3. Registra movimentação do tipo específico (desmontagem)
+  3. Registra as movimentações correspondentes (baixa do pai e entrada dos filhos) — sem
+     coluna de tipo: a natureza é inferida pelas notas (`tipo = 'DESMONTAGEM'`)
 
 ---
 
@@ -340,13 +352,17 @@ Regras:
 estoque (saldo real — controle de quantidade)
 ├── ID_estoque            INT PK auto_increment
 ├── ID_produto            INT FK NOT NULL
-├── quantidade_atual      DECIMAL NOT NULL          ← saldo físico real no galpão
+├── quantidade_atual      FLOAT NOT NULL          ← saldo físico real no galpão
+├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 
 *Cálculo do saldo disponível:*
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
+
+`quantidade_atual` e `saldo_reservado` convivem no mesmo registro: a baixa física mexe no
+primeiro, a reserva mexe no segundo (vide §3.8.1).
 
 Regras:
 - Produtos perecíveis possuem `data_validade` no cadastro do produto (menor validade disponível)
@@ -358,7 +374,7 @@ Regras:
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
-| Entrada de mercadoria | Cria `movimentacao_estoque` ENTRADA | `quantidade_atual += X` |
+| Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += X` |
 | Cria Nota Saída | Cria `reserva_estoque` | `saldo_reservado += X` |
 | Cancelamento de Nota | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
 | Remessa finalizada (total/parcial) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
@@ -376,9 +392,9 @@ movimentacao_estoque
 ├── ID_movimentacao       INT PK auto_increment
 ├── ID_estoque            INT FK NOT NULL
 ├── ID_usuario            INT FK NOT NULL
-├── quantidade            DECIMAL NOT NULL         ← positivo = entrada, negativo = saída
-├── saldo_anterior        DECIMAL                  ← snapshot do quantidade_atual antes
-├── saldo_posterior       DECIMAL                  ← snapshot do quantidade_atual depois
+├── quantidade            FLOAT NOT NULL         ← positivo = entrada, negativo = saída
+├── saldo_anterior        FLOAT                  ← snapshot do quantidade_atual antes
+├── saldo_posterior       FLOAT                  ← snapshot do quantidade_atual depois
 ├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
 ├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída (apenas baixas reais)
 ├── ID_remessa            INT FK NULL              ← veio de uma remessa
@@ -408,9 +424,9 @@ reserva_estoque
 ├── ID_estoque             INT FK NOT NULL
 ├── ID_nota_saida          INT FK NOT NULL
 ├── ID_usuario             INT FK NOT NULL
-├── quantidade             DECIMAL NOT NULL         ← positiva = reservou, negativa = liberou
-├── saldo_anterior         DECIMAL                  ← snapshot do saldo_reservado antes
-├── saldo_posterior        DECIMAL                  ← snapshot do saldo_reservado depois
+├── quantidade             FLOAT NOT NULL         ← positiva = reservou, negativa = liberou
+├── saldo_anterior         FLOAT                  ← snapshot do saldo_reservado antes
+├── saldo_posterior        FLOAT                  ← snapshot do saldo_reservado depois
 ├── data_hora              TIMESTAMP NOT NULL
 └── observacao             TEXT
 ```
@@ -479,14 +495,14 @@ item_inventario
 ├── ID_item_inventario      INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
 ├── ID_estoque            INT FK NOT NULL
-├── quantidade_sistema      DECIMAL NOT NULL   ← snapshot congelado na abertura
+├── quantidade_sistema      FLOAT NOT NULL   ← snapshot congelado na abertura
 └── observacao              TEXT
 
 contagem_inventario         ← cada funcionário conta
 ├── ID_contagem_inventario  INT PK auto_increment
 ├── ID_item_inventario      INT FK NOT NULL
 ├── ID_funcionario          INT FK → funcionario NOT NULL  ← quem contou
-├── quantidade_contada      DECIMAL NOT NULL
+├── quantidade_contada      FLOAT NOT NULL
 ├── data_contagem           TIMESTAMP
 └── observacao              TEXT
 
@@ -494,7 +510,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 ├── ID_ajuste_inventario    INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
 ├── ID_estoque            INT FK NOT NULL
-├── diferenca               DECIMAL NOT NULL
+├── diferenca               FLOAT NOT NULL
 ├── status                  ENUM('PENDENTE','APROVADO','REJEITADO')
 ├── ID_usuario_aprovacao    INT FK → usuario NULL
 ├── data_aprovacao          TIMESTAMP NULL
@@ -510,7 +526,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 | **Múltiplas contagens** | Vários funcionários contam o mesmo item | Cada contagem vira um registro em `contagem_inventario`. |
 | **Finalizar contagem** | Usuário encerra a contagem | status = AGUARDANDO_APROVACAO. Sistema calcula média das contagens e dispara pendências de ajuste |
 | **Revisão** | Aprovador vê planilha comparativa: `quantidade_sistema` + contagens individuais + média | Pode escolher uma contagem específica ou usar a média |
-| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` tipo `AJUSTE_INVENTARIO` com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
+| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada`, `ID_nota_saida` nem `ID_remessa` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
 | **Finalização** | Inventário é encerrado | status = FINALIZADO. Movimentações dos produtos DESBLOQUEADAS |
 
 #### 3.9.2 Regras do Inventário
@@ -579,7 +595,7 @@ item_pedido_escola
 ├── ID_item_pedido_escola   INT PK auto_increment
 ├── ID_pedido_escola        INT FK NOT NULL
 ├── ID_produto              INT FK NOT NULL
-├── quantidade              DECIMAL NOT NULL
+├── quantidade              FLOAT NOT NULL
 └── observacao              TEXT
 ```
 
@@ -596,7 +612,7 @@ Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**.
 ```
 nota_saida
 ├── ID_nota_saida           INT PK auto_increment
-├── ID_pedido_escola        INT FK NULL
+├── ID_pedido_escola        INT FK NULL UNIQUE  ← no máximo uma nota por pedido
 ├── ID_destinatario         INT FK NOT NULL
 ├── data_criacao            TIMESTAMP NOT NULL
 ├── tipo                    ENUM('SAIDA','DESMONTAGEM','CONSUMO_INTERNO','AVARIA')
@@ -615,8 +631,8 @@ item_nota_saida
 ├── ID_item_nota_saida      INT PK auto_increment
 ├── ID_nota_saida           INT FK NOT NULL
 ├── ID_estoque              INT FK NOT NULL
-├── qtd_esperada            DECIMAL NOT NULL
-├── qtd_entregue            DECIMAL NOT NULL DEFAULT 0
+├── qtd_esperada            FLOAT NOT NULL
+├── qtd_entregue            FLOAT NOT NULL DEFAULT 0
 └── observacao              TEXT
 ```
 
@@ -643,7 +659,7 @@ remessa
                               'FINALIZADO_TOTAL',
                               'FINALIZADO_PARCIAL'
                             )
-├── ID_condutor            INT FK → condutor NULL
+├── ID_funcionario_condutor INT FK → funcionario NULL   ← quem dirigiu (não há tabela condutor)
 ├── ID_veiculo             INT FK → veiculo NULL
 ├── urgente                BOOLEAN DEFAULT FALSE
 └── observacao             TEXT
@@ -652,9 +668,9 @@ item_remessa
 ├── ID_item_remessa        INT PK auto_increment
 ├── ID_remessa             INT FK NOT NULL
 ├── ID_estoque            INT FK NOT NULL
-├── quantidade_solicitada  DECIMAL NOT NULL
-├── quantidade_separada    DECIMAL
-├── quantidade_entregue    DECIMAL
+├── quantidade_solicitada  FLOAT NOT NULL
+├── quantidade_separada    FLOAT
+├── quantidade_entregue    FLOAT
 ```
 
 Regras:
@@ -677,7 +693,7 @@ item_coleta
 ├── ID_item_coleta          INT PK auto_increment
 ├── ID_coleta               INT FK NOT NULL
 ├── ID_estoque              INT FK NOT NULL
-├── quantidade              DECIMAL NOT NULL
+├── quantidade              FLOAT NOT NULL
 ```
 
 Regras:
@@ -697,7 +713,7 @@ rota_remessa
 
 A PK independente permite que **a mesma remessa apareça em rotas diferentes** (ex: tentativa falhou no dia X, entra na rota do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
 
-#### 3.11.4 Ciclo de Vida Completo
+#### 3.11.5 Ciclo de Vida Completo
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -762,9 +778,9 @@ item_nota_entrada
 ├── ID_item_nota_entrada  INT PK auto_increment
 ├── ID_nota_entrada       INT FK NOT NULL
 ├── ID_produto            INT FK NOT NULL
-├── fator_conversao       DECIMAL NOT NULL DEFAULT 1  ← fator aplicado (a unidade não é guardada)
-├── quantidade            DECIMAL NOT NULL         ← qtd recebida (ex: 10 caixas)
-├── quantidade_convertida DECIMAL NOT NULL         ← qtd * fator (ex: 10 * 20 = 200)
+├── fator_conversao       FLOAT NOT NULL DEFAULT 1  ← fator aplicado (a unidade não é guardada)
+├── quantidade            FLOAT NOT NULL         ← qtd recebida (ex: 10 caixas)
+├── quantidade_convertida FLOAT NOT NULL         ← qtd * fator (ex: 10 * 20 = 200)
 └── observacao            TEXT
 ```
 
@@ -775,7 +791,8 @@ Regras:
 - Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:
   1. Cria/atualiza `estoque` com `quantidade_atual += quantidade_convertida`
-  2. Cria `movimentacao_estoque` tipo `ENTRADA`
+  2. Cria `movimentacao_estoque` vinculada à nota (`ID_nota_entrada`) — a movimentação **não
+     tem coluna de tipo**; a natureza de entrada é inferida pela FK e por `nota_entrada.tipo`
 - `data_validade` (quando aplicável) é atualizada manualmente no cadastro do produto pelo Jonathan
 
 ---
@@ -803,9 +820,13 @@ anexo
 ├── tipo_mime              VARCHAR
 ├── data_upload            TIMESTAMP
 ├── ID_remessa             INT FK → remessa NULL
-├── ID_documento_fiscal    INT FK → documento_fiscal NULL
+├── ID_documento_fiscal    INT NULL   ← coluna reservada: NÃO existe tabela/relação de destino
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
+
+> `ID_documento_fiscal` existe no schema como inteiro opcional, **sem** modelo
+> `documento_fiscal` e **sem** FK. É uma coluna reservada para uma futura entidade de
+> documento fiscal — hoje nenhum código a preenche.
 
 ---
 
@@ -823,26 +844,28 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões do MVP:
+Permissões criadas por `prisma/seed.ts` (**68** no total):
 
-| Entidade | Ações CRUD |
-|----------|-----------|
-| `usuario` | criar, alterar, consultar, desativar |
-| `funcionario` | criar, alterar, consultar, desativar |
-| `destinatario` | criar, alterar, consultar, desativar |
-| `fornecedor` | criar, alterar, consultar, desativar |
-| `condutor` | criar, alterar, consultar, desativar |
-| `veiculo` | criar, alterar, consultar, desativar |
-| `produto` | criar, alterar, consultar, desativar |
+| Entidade | Ações |
+|----------|-------|
+| `usuario` | listar, criar, alterar, consultar, desativar, excluir |
+| `funcionario` | listar, criar, alterar, consultar, desativar, excluir |
+| `destinatario` | listar, criar, alterar, consultar, desativar, excluir |
+| `fornecedor` | listar, criar, alterar, consultar, desativar, excluir |
+| `veiculo` | listar, criar, alterar, consultar, desativar, excluir |
+| `produto` | listar, criar, alterar, consultar, desativar, excluir |
+| `perfil` | listar, criar, alterar, consultar, excluir |
 | `estoque` | entrada, saida, ver_saldo |
 | `nota_entrada` | criar, alterar, consultar, cancelar |
 | `nota_saida` | criar, alterar, consultar, cancelar |
 | `remessa` | criar, alterar_status, finalizar |
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
-| `perfil` | criar, alterar, consultar, desativar |
-| `unidade_conversao` | criar, alterar, consultar, excluir (sem desativar) |
+| `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
 | `mural` | criar, alterar, excluir |
+
+> Perfil **não é desativado**: `perfil.excluir` é exclusão física (`src/services/permissao.ts`).
+> O seed remove a permissão obsoleta `perfil.desativar` caso ela exista no banco.
 
 #### 3.15.2 Perfil (Template)
 
@@ -882,7 +905,8 @@ usuario (atualizado)
 ├── ID_usuario             INT PK auto_increment
 ├── ID_funcionario         INT FK UNIQUE NOT NULL
 ├── login                  VARCHAR NOT NULL UNIQUE
-├── senha_hash             VARCHAR NOT NULL
+├── senha_hash             VARCHAR NULL              ← nulo até o primeiro acesso definir a senha
+├── senha_alterada_em      TIMESTAMP NULL            ← invalida tokens emitidos antes da troca
 ├── super_admin            BOOLEAN DEFAULT FALSE   ← flag invisível, burla permissões
 ├── ultimo_acesso          TIMESTAMP NULL
 └── ativo                  BOOLEAN DEFAULT TRUE
@@ -920,11 +944,15 @@ Regras:
 
 As seguintes entidades **não exigem permissão** para acesso, pois são dados operacionais ou de suporte:
 
-- `conversao_unidade` — livre
-- `tipo_codigo` — livre
-- `rota`, `percurso` — livre
+- `tipo_codigo` — livre (as telas de cadastro leem os tipos direto do DAO)
+- `rota`, `percurso` — livre (não há telas ainda)
 - `endereco` — vinculado à entidade que o possui
 - `telefone`, `email` — vinculado à entidade que os possui
+
+> Exceção: **`conversao_unidade` exige permissão** — o seed cria
+> `unidade_conversao.{listar,criar,alterar,consultar,excluir}` e as Server Actions de
+> `src/app/unidades/actions.ts` verificam essas permissões (aceitando também
+> `produto.criar`/`produto.alterar` para o uso dentro do cadastro de produto).
 
 ---
 
@@ -935,11 +963,18 @@ registro_auditoria
 ├── ID_registro_auditoria  INT PK auto_increment
 ├── ID_usuario             INT FK NOT NULL
 ├── data_hora              TIMESTAMP NOT NULL
-├── acao                   VARCHAR NOT NULL   ← 'CRIAR', 'ALTERAR', 'EXCLUIR', 'DESATIVAR'
+├── acao                   VARCHAR NOT NULL   ← ver lista abaixo
 ├── entidade               VARCHAR NOT NULL   ← 'Produto', 'Remessa', etc.
 ├── ID_entidade_afetada    INT                ← ID do registro afetado
 ├── dados_anteriores       JSON               ← snapshot antes da alteração
 └── dados_novos            JSON               ← snapshot depois da alteração
+```
+
+`acao` é uma coluna `VARCHAR` sem `enum` no banco; os valores usados pelo sistema são os do
+tipo `AcaoAuditoria`, definido em `src/dao/_audit.ts`:
+
+```text
+CRIAR · ALTERAR · DESATIVAR · EXCLUIR · LOGIN · LOGIN_FALHA · LOGOUT · DEFINIR_SENHA
 ```
 
 Regra crítica:
@@ -955,7 +990,7 @@ Regra crítica:
 ```
 mensagem_mural
 ├── ID_mensagem_mural      INT PK auto_increment
-├── ID_usuario             INT FK NOT NULL    ← quem publicou (NULL se automática do sistema?)
+├── ID_usuario             INT FK NOT NULL    ← quem publicou (a FK é obrigatória: não há mensagem sem autor)
 ├── titulo                 VARCHAR
 ├── conteudo               TEXT NOT NULL
 ├── data_publicacao        TIMESTAMP NOT NULL
@@ -969,6 +1004,9 @@ Regras:
 - Mensagens manuais: exigem permissão `mural.criar`
 - A lógica de geração automática deve ser reutilizável para futuros alertas
 - A data de expiração controla quando a mensagem some do mural
+- **Ponto em aberto:** o schema exige `ID_usuario` (FK `NOT NULL`) mesmo para mensagem
+  automática, mas o modelo não define **qual** usuário responde por uma mensagem gerada pelo
+  sistema. A decisão não está tomada — ver `dominio/IMPLEMENTACAO.md` §"Pontos em aberto".
 
 ### 3.18 Bloco: Relatórios (Consultas)
 
@@ -990,3 +1028,11 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 > - [Requisitos Funcionais](REQUISITOS_FUNCIONAIS.md) — 25 RFs
 > - [Regras de Negócio](REGRAS_NEGOCIO.md) — 5 RNs
 > - [Requisitos Não Funcionais](REQUISITOS_NAO_FUNCIONAIS.md) — 9 RNFs
+> - [Implementação](IMPLEMENTACAO.md) — o que já existe no código, requisito a requisito
+> - [`../diagramas/classes.puml`](../diagramas/classes.puml) — modelo conceitual
+> - [`../diagramas/DER.puml`](../diagramas/DER.puml) — modelo entidade-relacionamento
+> - [`../diagramas/fluxo_atual.puml`](../diagramas/fluxo_atual.puml) e
+>   [`../diagramas/fluxosAtuais/`](../diagramas/fluxosAtuais/) (6 sub-fluxos) — o fluxo
+>   **AS-IS manual** descrito em §1.1 (papel, Trello, Excel, celular). **Não** representam o
+>   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → reserva → remessa → rota →
+>   percurso → entrega → baixa)

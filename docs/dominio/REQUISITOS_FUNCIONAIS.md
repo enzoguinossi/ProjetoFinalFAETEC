@@ -1,5 +1,10 @@
 # Requisitos Funcionais — Projeto Nexus (Revisão 02/09)
 
+> **Numeração:** o projeto tem **25 requisitos funcionais**, de `RF001` a `RF025`. O ID
+> **`RF008` não existe** — a lacuna entre `RF007` e `RF009` é **preservada de propósito**
+> (não renumerar, não preencher com um requisito novo). A numeração é estável para não
+> quebrar a rastreabilidade já registrada em commits e no changelog.
+
 ## Módulo 1: Gestão de Acessos e Usuários
 
 | ID | Título | Descrição | Prioridade |

@@ -26,7 +26,7 @@ se qualquer verificação automática falhar.
 | 8 | Paralelismo não sobrescreve | escritor único do estado; um arquivo de run por execução | Auto |
 | 9 | QA roda antes da conclusão | checklist de release e ciclo citam QA | Auto |
 | 10 | Docs/changelog só com mudança real | changelog Keep a Changelog com `Unreleased`; regras do docs-keeper | Auto |
-| 11 | Associações Jira verificáveis | skill aponta para `docs/agents/JIRA.MD` (fonte única) | Auto |
+| 11 | Associações Jira verificáveis | skill aponta para `docs/processo/JIRA.md` (fonte única) | Auto |
 | 12 | Release não conclui sem critérios | checklist obrigatório + condições de bloqueio | Auto |
 
 ## Simulações (operações destrutivas/externas)

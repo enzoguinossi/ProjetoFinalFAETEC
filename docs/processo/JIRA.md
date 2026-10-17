@@ -180,7 +180,7 @@ O Smart Commit permite executar ações no Jira diretamente da mensagem de commi
 |------|---------|---------|
 | Comentar no issue | `KEY #comment <texto>` | `KAN-123 #comment ajuste no cálculo do frete` |
 | Transicionar para concluído | `KEY #resolve` ou `KEY #close` | `KAN-123 #resolve` |
-| Combinar ações | `KEY #comment <texto>` | `KAN-123 #comment finalizado` |
+| Combinar ações | `KEY #comment <texto> #resolve` | `KAN-123 #comment finalizado #resolve` |
 
 > **`#time` não é suportado.** O registro de horas deve ser feito pela operação de worklog do MCP (`addOrEditJiraIssueWorklog`), não pela mensagem de commit nem por comentário.
 
@@ -201,11 +201,12 @@ Após o push, o GitHub for Atlassian app processa os Smart Commits e:
 - Adiciona o commit à **development panel** do issue no Jira
 - Atualiza o **status** se `#resolve` foi usado
 - Adiciona **comentário** se `#comment` foi usado
-- Registra **worklog** se `#time` foi usado
+- **`#time` não é processado** — o registro de horas só acontece pelo worklog do MCP
+  (`addOrEditJiraIssueWorklog`)
 
 #### Configuração
 
-A integração GitHub ↔ Jira foi configurada através do app **GitHub for Atlassian** disponível no marketplace do Atlassian. A organização `enzoguinossi/ProjetoFinalFAETEC` está conectada ao site `projeto-final.atlassian.net` com escopo de leitura e escrita nos repositórios do projeto.
+A integração GitHub ↔ Jira foi configurada através do app **GitHub for Atlassian** disponível no marketplace do Atlassian. O usuário/repositório `enzoguinossi/projetofinalfaetec` está conectado ao site `projeto-final.atlassian.net` com escopo de leitura e escrita nos repositórios do projeto.
 
 ### Releases, versões e issues
 
@@ -221,4 +222,4 @@ Regras:
 - não registrar horas nem comentar em issues como parte do release sem aprovação prévia.
 
 O fluxo multiagente que conecta Jira, Git, worktrees, DateVer e changelog está em
-`docs/agents/WORKFLOW.md`.
+`processo/WORKFLOW.md`.

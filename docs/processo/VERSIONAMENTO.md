@@ -13,8 +13,8 @@ Regras operacionais **não** moram aqui — para não duplicar:
 - **checklist de release** (curto, o que fazer na hora de publicar):
   `.opencode/skills/release/SKILL.md`;
 - **Jira** (consultar issue, smart commits, worklog, versão de projeto):
-  `docs/agents/JIRA.MD`;
-- **Jira · Git · worktrees · versão** no fluxo multiagente: `docs/agents/WORKFLOW.md`;
+  `docs/processo/JIRA.md`;
+- **Jira · Git · worktrees · versão** no fluxo multiagente: `docs/processo/WORKFLOW.md`;
 - **o papel de quem prepara a release**: `.opencode/agents/release-manager.md`.
 
 ---
@@ -90,7 +90,7 @@ No `CHANGELOG.md` a mais recente fica acima:
 5. Não invente data "bonita" nem versão retroativa: a versão registra o dia real em que a
    release foi feita.
 6. A versão fica associada às **issues** incluídas nela. A forma de relacionar (versão de
-   projeto no Jira, quando aplicável) está em `docs/agents/JIRA.MD` §"Releases, versões e
+   projeto no Jira, quando aplicável) está em `docs/processo/JIRA.md` §"Releases, versões e
    issues" — não repetida aqui.
 7. **Não se cria branch por versão.** O projeto mantém **só a `main`** como branch de
    integração: a tag `vN.DD.MM.YYYY` é criada **direto na `main`**, no commit do release.
@@ -118,7 +118,7 @@ O formato segue [Keep a Changelog 1.1.0 (pt-BR)](https://keepachangelog.com/pt-B
 e o versionamento adota **DateVer** `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`), em que `N` é a
 sequência da release no mesmo dia.
 
-A convenção detalhada está em [`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md).
+A convenção detalhada está em [`docs/processo/VERSIONAMENTO.md`](docs/processo/VERSIONAMENTO.md).
 
 ## [Unreleased]
 ```
@@ -223,7 +223,7 @@ Regras:
 - **toda** entrada de changelog corresponde a pelo menos uma issue e a pelo menos um
   commit; **toda** issue da versão tem pelo menos um commit associado;
 - o formato da mensagem de commit, o smart commit e o worklog estão em
-  `docs/agents/JIRA.MD` — não os repita aqui;
+  `docs/processo/JIRA.md` — não os repita aqui;
 - o changelog **não** é o log de commits: ele conta as mudanças notáveis, que muitas
   vezes vêm de vários commits.
 

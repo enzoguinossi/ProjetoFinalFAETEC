@@ -27,14 +27,17 @@ Ao trabalhar no projeto, siga esta prioridade:
 
 1. **Código existente e configuração atual do projeto**
 2. `prisma/schema.prisma` — modelo físico atual do banco
-3. `docs/REGRAS_NEGOCIO.md` — regras de negócio
-4. `docs/REQUISITOS_FUNCIONAIS.md` — requisitos funcionais
-5. `docs/REQUISITOS_NAO_FUNCIONAIS.md` — requisitos não funcionais
-6. `docs/ENTENDIMENTO.md` — entendimento detalhado do domínio e da modelagem
-7. `docs/puml/classes.puml` — modelo conceitual
-8. `docs/puml/DER.puml` — modelo entidade-relacionamento
-9. `docs/fluxo_atual.puml` — fluxo operacional
-10. Histórico da conversa — somente como contexto adicional
+3. `docs/dominio/REGRAS_NEGOCIO.md` — regras de negócio
+4. `docs/dominio/REQUISITOS_FUNCIONAIS.md` — requisitos funcionais
+5. `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md` — requisitos não funcionais
+6. `docs/dominio/ENTENDIMENTO.md` — entendimento detalhado do domínio e da modelagem
+7. `docs/dominio/IMPLEMENTACAO.md` — o que já existe no código (estado atual, não especificação)
+8. `docs/diagramas/classes.puml` — modelo conceitual
+9. `docs/diagramas/DER.puml` — modelo entidade-relacionamento
+10. `docs/diagramas/fluxo_atual.puml` e `docs/diagramas/fluxosAtuais/*.puml` — fluxo operacional **AS-IS manual** (não é o fluxo alvo do sistema)
+11. Histórico da conversa — somente como contexto adicional
+
+O índice da documentação é `docs/README.md`.
 
 Se houver divergência entre a conversa e os arquivos atuais do projeto, **considere o estado atual do repositório como fonte de verdade** e informe a divergência.
 
@@ -46,39 +49,43 @@ Não invente entidades, campos, relações, regras ou fluxos que não estejam do
 
 A aplicação é uma aplicação web Full Stack baseada em:
 
-* Next.js 14+ com App Router;
+* Next.js 16 com App Router;
 * TypeScript;
 * Prisma 7;
-* MySQL;
+* MySQL/MariaDB (driver `@prisma/adapter-mariadb`);
 * autenticação própria com BCrypt + JWT (biblioteca `jose`, HS256);
 * Git/GitHub.
 
-A estrutura conceitual esperada é:
+A estrutura real do projeto é:
 
 ```text
 src/
-├── app/
-│   ├── api/
-│   ├── (auth)/
-│   └── (dashboard)/
-├── components/
-├── dao/
-├── services/
-├── lib/
-└── types/
+├── app/            # App Router: páginas, layouts e Server Actions (um diretório por módulo)
+├── components/     # componentes React reutilizáveis
+├── dao/            # Data Access Objects (Prisma queries)
+├── services/       # regras de negócio
+├── lib/            # utilitários e infraestrutura compartilhada
+├── types/          # tipos TypeScript compartilhados
+└── proxy.ts        # proteção das rotas privadas (sessão)
 
 prisma/
-├── schema.prisma
-├── seed.ts
-└── migrations/
+├── schema.prisma   # modelo físico (52 entidades)
+└── seed.ts         # seed de referência
 
 docs/
-├── ENTENDIMENTO.md
-├── REGRAS_NEGOCIO.md
-├── REQUISITOS_FUNCIONAIS.md
-├── REQUISITOS_NAO_FUNCIONAIS.md
-└── puml/
+├── README.md       # índice
+├── dominio/        # ENTENDIMENTO, REGRAS_NEGOCIO, REQUISITOS_*, IMPLEMENTACAO
+├── processo/       # VERSIONAMENTO, JIRA, WORKFLOW
+└── diagramas/      # classes.puml, DER.puml, fluxo_atual.puml, fluxosAtuais/
+
+tests/              # testes automatizados (Vitest)
+scripts/            # scripts de apoio ao workflow
+tools/              # ferramental (exportação para o Figma)
 ```
+
+Não existe `src/app/api/`: a interface consome Server Actions e DAOs diretamente (ver §15).
+O projeto **não versiona migrations** — o schema é aplicado com `prisma db push`
+(`npm run db:push` / `npm run db:setup`), não com `prisma migrate`.
 
 Antes de assumir que essa estrutura continua válida, verifique o estado real do repositório.
 
@@ -138,7 +145,7 @@ Antes de alterar o schema:
 1. leia o schema atual;
 2. identifique as relações afetadas;
 3. verifique o impacto no código existente;
-4. verifique migrations existentes;
+4. aplique a mudança com `prisma db push` (`npm run db:push`) — o projeto **não usa migrations**;
 5. avalie o impacto sobre integridade e histórico;
 6. só então altere o schema.
 
@@ -611,7 +618,7 @@ npm run build
 
 ou os comandos equivalentes definidos em `package.json`.
 
-Para alterações de banco, valide também Prisma, migrations e conexão com MySQL conforme o workflow atual do projeto.
+Para alterações de banco, valide também o schema Prisma (`npm run db:generate` + `npm run db:push`) e a conexão com o banco conforme o workflow atual do projeto.
 
 ### Etapa 5 — Revisar
 
@@ -676,9 +683,10 @@ A conversa fornece contexto temporário.
 Se uma informação importante precisar continuar válida entre sessões, ela deve ser registrada no arquivo apropriado do repositório:
 
 * regra de desenvolvimento → `AGENTS.md`;
-* regra de negócio → `docs/REGRAS_NEGOCIO.md`;
-* requisito → `docs/REQUISITOS_FUNCIONAIS.md` ou `docs/REQUISITOS_NAO_FUNCIONAIS.md`;
-* entendimento/modelagem → `docs/ENTENDIMENTO.md`;
+* regra de negócio → `docs/dominio/REGRAS_NEGOCIO.md`;
+* requisito → `docs/dominio/REQUISITOS_FUNCIONAIS.md` ou `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md`;
+* entendimento/modelagem → `docs/dominio/ENTENDIMENTO.md`;
+* o que já existe no código → `docs/dominio/IMPLEMENTACAO.md`;
 * modelo físico → `prisma/schema.prisma`;
 * arquitetura real → código/configuração atual.
 
@@ -748,7 +756,7 @@ KAN-123 #comment ajuste no cálculo do frete
 5. **Nunca comentar em uma task sem antes propor o conteúdo ao usuário e obter aprovação.** Nenhum comentário deve ser publicado automaticamente.
 6. **Registrar tempo apenas via worklog do MCP** (`addOrEditJiraIssueWorklog`), nunca por comentário ou `#time`.
 
-As regras completas de integração com o Jira estão em `docs/agents/JIRA.MD`.
+As regras completas de integração com o Jira estão em `docs/processo/JIRA.md`.
 
 Quando o MCP do Jira estiver disponível, seguir essas regras antes de
 iniciar alterações significativas e ao finalizar o trabalho.
@@ -759,7 +767,7 @@ iniciar alterações significativas e ao finalizar o trabalho.
 
 O trabalho é orquestrado por agentes versionados em `.opencode/agents/` (orquestrador +
 subagentes especializados), com **estado persistente** em `.ai-workflow/` e skills de
-processo em `.opencode/skills/`. O fluxo completo está em `docs/agents/WORKFLOW.md`; o
+processo em `.opencode/skills/`. O fluxo completo está em `docs/processo/WORKFLOW.md`; o
 estado corrente, em `.ai-workflow/PROJECT_STATE.md`.
 
 Regras:
@@ -778,7 +786,7 @@ Regras:
 6. Branches de trabalho `KAN-<n>-<slug>`; integração na `main`.
 
 A convenção detalhada de versionamento e changelog (DateVer + Keep a Changelog) está em
-`docs/VERSIONAMENTO.md`; o checklist operacional de release, em
+`docs/processo/VERSIONAMENTO.md`; o checklist operacional de release, em
 `.opencode/skills/release/SKILL.md`.
 
 

@@ -7,7 +7,7 @@ reinicialização de sessão ou falha de um agente — **sem depender do histór
 conversa**.
 
 > Fonte de verdade do projeto (código, `prisma/schema.prisma`, `docs/`, `AGENTS.md`,
-> `docs/agents/JIRA.MD`) continua tendo prioridade sobre qualquer relatório de agente.
+> `docs/processo/JIRA.md`) continua tendo prioridade sobre qualquer relatório de agente.
 > Um relatório de agente **não é prova** de que uma operação de Git ou Jira aconteceu.
 
 ## Estrutura

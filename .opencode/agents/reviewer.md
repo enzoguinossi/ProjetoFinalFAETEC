@@ -25,7 +25,7 @@ O contrato da tarefa indicada, o `git diff`/`git log` do run, a fonte de verdade
 
 - Correção: o código faz o que o critério de aceite pede.
 - Regressões e casos-limite (nulos, conversão de unidade, transações incompletas).
-- **Regras de negócio** (`docs/REGRAS_NEGOCIO.md`): RN001 só avisa; RN003 pendência de
+- **Regras de negócio** (`docs/dominio/REGRAS_NEGOCIO.md`): RN001 só avisa; RN003 pendência de
   entrega parcial; RN004 histórico imutável; RN005 inventário exige aprovação.
 - Integridade de estoque: `quantidade_atual`, `saldo_reservado`, `saldo_disponivel` e a
   distinção entrada/reserva/baixa.

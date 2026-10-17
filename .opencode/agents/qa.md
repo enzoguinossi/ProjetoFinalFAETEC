@@ -18,7 +18,7 @@ pode ajustar/verificar **testes** (`tests/**`), mas não altera o código de pro
 
 ## Fontes de contexto autorizadas
 
-O contrato da tarefa, os critérios de aceite, `AGENTS.md`, `docs/REGRAS_NEGOCIO.md` e o
+O contrato da tarefa, os critérios de aceite, `AGENTS.md`, `docs/dominio/REGRAS_NEGOCIO.md` e o
 código/testes afetados. Você valida contra o que o projeto exige, não contra o que o
 implementador afirmou.
 

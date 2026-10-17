@@ -1,7 +1,7 @@
 # Workflow multiagente — Nexus
 
 Este documento explica **como** o trabalho é orquestrado por agentes no Nexus. Ele não
-substitui `AGENTS.md` (convenções) nem `docs/agents/JIRA.MD` (regras de Jira): complementa.
+substitui `AGENTS.md` (convenções) nem `docs/processo/JIRA.md` (regras de Jira): complementa.
 
 ## Visão geral
 
@@ -46,7 +46,7 @@ Siga `.ai-workflow/README.md`: ler `PROJECT_STATE.md` → `git status`/`git work
 
 | Elo | Regra |
 |---|---|
-| **Jira ↔ commit** | chave no início da mensagem (`KAN-123: ...`); smart commits pelo app GitHub for Atlassian. Fonte: `docs/agents/JIRA.MD`. |
+| **Jira ↔ commit** | chave no início da mensagem (`KAN-123: ...`); smart commits pelo app GitHub for Atlassian. Fonte: `docs/processo/JIRA.md`. |
 | **Git ↔ entrega** | branch de integração `main`; branches de trabalho `KAN-<n>-<slug>`; cada run registra o commit-base. |
 | **Worktrees** | trabalho paralelo em worktree próprio por tarefa. Criar worktree **não** carrega alterações não commitadas — commite antes de mover. |
 | **DateVer** | versão `N.DD.MM.YYYY`, tag `vN.DD.MM.YYYY` (N começa em 1). |

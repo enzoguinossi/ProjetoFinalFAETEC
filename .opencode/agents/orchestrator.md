@@ -24,9 +24,9 @@ técnico.
 
 ## Fonte de verdade (nesta ordem)
 
-Código atual → `prisma/schema.prisma` → `docs/REGRAS_NEGOCIO.md` →
-`docs/REQUISITOS_FUNCIONAIS.md` → `docs/REQUISITOS_NAO_FUNCIONAIS.md` →
-`docs/ENTENDIMENTO.md` → `AGENTS.md` → `docs/agents/JIRA.MD` → histórico da conversa
+Código atual → `prisma/schema.prisma` → `docs/dominio/REGRAS_NEGOCIO.md` →
+`docs/dominio/REQUISITOS_FUNCIONAIS.md` → `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md` →
+`docs/dominio/ENTENDIMENTO.md` → `AGENTS.md` → `docs/processo/JIRA.md` → histórico da conversa
 (só contexto). O repositório vence a conversa.
 
 ## Responsabilidades

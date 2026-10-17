@@ -5,7 +5,7 @@ description: Uso do Jira e das mensagens de commit do Nexus — chave da issue, 
 
 # Jira e smart commits — Nexus
 
-A **fonte única de regras** é `docs/agents/JIRA.MD`. Leia-a antes de qualquer operação e
+A **fonte única de regras** é `docs/processo/JIRA.md`. Leia-a antes de qualquer operação e
 **não duplique** o conteúdo aqui — esta skill só resume o que importa para decidir rápido.
 
 ## Decisões rápidas

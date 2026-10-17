@@ -31,10 +31,10 @@ que foi efetivamente implementado e validado**. Você não altera código de pro
 
 1. Ler a mudança aprovada (contrato, `git diff`, resultado do QA).
 2. Identificar **quais documentos** foram afetados:
-   - modelo físico → `prisma/schema.prisma` é a fonte; `docs/ENTENDIMENTO.md` e
-     `docs/puml/{classes,DER}.puml` refletem o modelo;
-   - regra/requisito → `docs/REGRAS_NEGOCIO.md` / `docs/REQUISITOS_*.md`;
-   - comportamento/uso → `README.md` e `docs/agents/**`.
+   - modelo físico → `prisma/schema.prisma` é a fonte; `docs/dominio/ENTENDIMENTO.md` e
+     `docs/diagramas/{classes,DER}.puml` refletem o modelo;
+   - regra/requisito → `docs/dominio/REGRAS_NEGOCIO.md` / `docs/dominio/REQUISITOS_*.md`;
+   - comportamento/uso → `README.md` e `docs/processo/**`.
 3. Atualizar só o necessário; **não duplicar** regra já existente em outro arquivo —
    referencie.
 4. `CHANGELOG.md`: registrar a mudança em `Unreleased` (ou na versão), na categoria certa

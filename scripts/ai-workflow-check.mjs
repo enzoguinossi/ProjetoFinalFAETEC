@@ -111,8 +111,8 @@ check(10, "Changelog no padrão e com Unreleased",
 
 // ---- 11) Associação Jira verificável ---------------------------------------
 check(11, "Regras de Jira com fonte única",
-  has(read(".opencode/skills/jira-smart-commits/SKILL.md"), /docs\/agents\/JIRA\.MD/i) && existsSync(p("docs/agents/JIRA.MD")),
-  "skill referencia docs/agents/JIRA.MD (sem duplicar)");
+  has(read(".opencode/skills/jira-smart-commits/SKILL.md"), /docs\/processo\/JIRA\.md/i) && existsSync(p("docs/processo/JIRA.md")),
+  "skill referencia docs/processo/JIRA.md (sem duplicar)");
 
 // ---- 12) Release não conclui sem critérios ---------------------------------
 check(12, "Release bloqueada sem critérios",
