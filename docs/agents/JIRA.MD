@@ -65,6 +65,27 @@ Para alterações que possam abranger mais de um arquivo, módulo ou camada da a
 
 Evitar criar trabalho duplicado quando já existir uma tarefa correspondente.
 
+### Criar e alterar tasks
+
+O agente **não cria nem altera uma task no Jira por conta própria**.
+
+Antes de criar uma issue — ou de alterar título, descrição ou critérios de aceite de uma
+existente — o agente deve **mostrar ao usuário o texto exato** (`summary` e `description`
+completos, como vão ficar no Jira) e **aguardar a aprovação**. Só depois da aprovação a
+issue é criada ou alterada. Nada é publicado às cegas.
+
+Formato do texto (curto e objetivo — foi o que faltou nas primeiras tasks):
+
+- **summary** — uma linha, começando pelo **resultado** ("Exportação de telas para o
+  Figma…"), não pelo processo ("Implementar…"); sem jargão interno.
+- **description** — nesta ordem, e sem encher:
+  1. **Objetivo** — o que passa a existir, em uma ou duas frases.
+  2. **Escopo** — o que entra; o que fica de fora, quando ajudar a delimitar.
+  3. **Critérios de aceite** — verificáveis, em lista.
+  4. **Referências** — arquivos/regras do repositório que valem para a task.
+
+Não invente escopo, requisito ou critério que não esteja no repositório.
+
 ### Comentários em issues
 
 O agente **não deve adicionar comentários automaticamente** a issues do Jira.

@@ -73,7 +73,7 @@ esteja no banco.
   (`npm run db:setup`) popula apenas dados de referência (tipos de código, permissões,
   perfis-template e unidades de conversão) e o Super Admin nasce no fluxo de primeiro acesso.
   (KAN-164)
-- **Testes:** 18 arquivos e 165 testes cobrindo DAOs, serviços e bibliotecas (`npm test`,
+- **Testes:** 18 arquivos e 165 testes cobrindo DAOs, serviços e b ibliotecas (`npm test`,
   Vitest), executados no CI em `.github/workflows/tests.yml`. (KAN-146)
 - **Ferramenta de exportação para o Figma (`tools/figma-export`):** plugin local +
   servidor local (sem o MCP oficial), colheita de 47 telas com Playwright e reconstrução
