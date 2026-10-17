@@ -286,14 +286,23 @@ tem dentes: reintroduzir o ramo antigo ("reaproveita sem atualizar") deixa o
 `npm run figma:harvest`. Os tokens que só existiam na cópia do plugin entraram no
 `@theme` (`--color-branco`, `--raio-lg/xl/pill`); nenhum valor existente mudou.
 
-**Verificado (compare, 1ª execução real)**: `npm run figma:compare` rodou com uma
-importação real (conferir 1:1) — **média 2,707%**, 1/47 dentro do limite de 0,5%
-(`acesso__login` 0,458%). A causa raiz **não** era leiaute: era fonte. Foi corrigida em
-`src/app/layout.tsx` (Inter de `next/font/google`, variável `--font-inter`),
-`src/app/globals.css` (`--font-sans`/`--font-display` → `var(--font-inter)`) e
-`src/components/sidebar-config.ts` (saiu o `Roboto`). A re-colheita confirma o
-navegador pintando **Inter** (36/36 textos em `usuarios__lista`). **Falta re-medir**:
-re-importar no Figma com *conferir 1:1* e rodar `npm run figma:compare` de novo.
+**Verificado (compare, 2 execuções reais)**: `npm run figma:compare` rodou com
+importações reais (conferir 1:1). 1ª: **média 2,707%**, 1/47 dentro de 0,5%. Depois de
+carregar Inter e padronizar as fontes: **média 2,502%** (1/47) — melhora real, mas pequena.
+
+**Diagnóstico do resíduo (não é leiaute nem cor)**: no recorte 1:1 as telas são
+visualmente idênticas; a luma global é igual (ex.: 233,41 vs 233,50) e os pixels
+divergentes se dividem ~50/50 entre "referência mais escura" e "mais clara" — assinatura
+de **rasterização de borda** (Chromium/DirectWrite vs renderizador do Figma), não de peso,
+cor ou deslocamento. Testes que confirmam: (a) deslocar a verify em ±1–2 px **não** melhora;
+(b) reduzir para 1× (CSS) **piora** (3,387%); (c) blur σ=1 não separa o ruído (2,4–3,7%)
+de um deslocamento real de 2 px (3,17%). Conclusão: o limite de **0,5% não é atingível**
+com comparação pixel a pixel entre dois renderizadores; o mapa de diff continua sendo o
+sinal útil (é o esqueleto de glifos/ícones/bordas).
+
+**Pendente (decisão)**: o que fazer com o limite do `compare` — recalibrar com
+justificativa, trocar a métrica por uma tolerante a antialias (ex.: SSIM) ou afinar o
+renderizador do Chromium na colheita. Ver os runs em `.ai-workflow/runs/`.
 
 **Verificado (volta, 1ª leitura real)**: a aba *Ler do Figma* leu a `Page 1` de verdade
 (28 variáveis, 32 mestres). Componentes e telas: **nenhuma diferença**. O que aparece
