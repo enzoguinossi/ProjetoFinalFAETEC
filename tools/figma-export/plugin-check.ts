@@ -661,12 +661,23 @@ function criarFigmaMock() {
 
 /* ══════════════════════════════ fetch simulado ══════════════════════════════ */
 
-function criarFetch(outDir: string, registros: { verificacoes: string[]; snapshots: Map<string, unknown> }) {
+function criarFetch(
+  outDir: string,
+  registros: { verificacoes: string[]; snapshots: Map<string, unknown> },
+  /**
+   * Falhas FORÇADAS pela verificação. O `catch` do plugin só é exercitado quando
+   * algo falha de verdade — e o mock sempre respondia 200. Assim a invariante
+   * pode provar que uma cena que não carrega e uma conferência que não envia são
+   * registradas com a mensagem real, sem derrubar a importação.
+   */
+  falhas: { cena?: string; verify?: boolean } = {},
+) {
   return async function fetchMock(url: string, init?: { method?: string; body?: unknown }) {
     const caminho = new URL(url).pathname.replace(/^\/export\//, "").replace(/^\//, "");
 
     if (init && init.method === "POST" && url.includes("/verify/")) {
       registros.verificacoes.push(decodeURIComponent(url.split("/verify/")[1]));
+      if (falhas.verify) throw new Error("servidor de conferência indisponível (falha forçada)");
       return resposta(new Uint8Array([1, 2, 3]), 200);
     }
 
@@ -675,6 +686,11 @@ function criarFetch(outDir: string, registros: { verificacoes: string[]; snapsho
       const pagina = decodeURIComponent(url.split("/snapshot/")[1]);
       registros.snapshots.set(pagina, JSON.parse(String(init.body)));
       return resposta(null, 200);
+    }
+
+    // cena marcada para falhar: `buscarJson` transforma o 500 em erro real
+    if (falhas.cena && caminho === falhas.cena) {
+      return resposta(null, 500);
     }
 
     const arquivo = path.join(outDir, caminho);
@@ -804,6 +820,23 @@ async function main() {
   const cenas = dados.scenes;
   console.log(`🧪 Verificando o plugin com ${cenas.length} cenário(s)\n`);
 
+  // O manifesto só lista cenas capturadas, mas uma colheita interrompida ou um
+  // manifesto antigo pode apontar para arquivos que não existem. Falhar aqui com
+  // uma mensagem clara — em vez de estourar ENOENT no primeiro `readFileSync` ou
+  // deixar o mock devolver 404 sem explicação.
+  const semArquivo = cenas.filter(
+    (cena) => !existsSync(path.join(OUT_DIR, cena.file)) || !existsSync(path.join(OUT_DIR, cena.refImage)),
+  );
+  if (semArquivo.length > 0) {
+    const exemplos = semArquivo.slice(0, 3).map((c) => c.id).join(", ");
+    console.error(
+      `❌ O manifesto aponta ${semArquivo.length} cena(s) sem arquivo em out/figma-export ` +
+        `(${exemplos}${semArquivo.length > 3 ? ", …" : ""}).\n` +
+        "   Rode: npm run figma:harvest",
+    );
+    process.exit(1);
+  }
+
   // Os tokens de design vêm do `globals.css` (fonte única) pelo manifesto: sem
   // eles o plugin não tem como acertar as variáveis do Figma — colheita antiga
   // aqui é falha clara, não aviso.
@@ -815,6 +848,8 @@ async function main() {
 
   const { figma } = criarFigmaMock();
   const registros = { verificacoes: [] as string[], snapshots: new Map<string, unknown>() };
+  /** Ligado só na invariante de resiliência (item 1) — ver o fim de `main`. */
+  const falhasForcadas: { cena?: string; verify?: boolean } = {};
   const codigo = readFileSync(path.join(TOOL_DIR, "plugin", "code.js"), "utf8");
 
   // ── estado de uma execução ANTERIOR do plugin ──
@@ -868,7 +903,7 @@ async function main() {
 
   const contexto = {
     figma,
-    fetch: criarFetch(OUT_DIR, registros),
+    fetch: criarFetch(OUT_DIR, registros, falhasForcadas),
     console,
     URL,
     Uint8Array,
@@ -941,7 +976,7 @@ async function main() {
       ` → ${depoisLayout.w}px após layoutMode`,
   );
 
-  // 1) catálogo
+  // passo 1 — catálogo
   const esperaCatalogo = esperar("manifesto");
   await onmessage({ type: "carregar", base: "http://localhost:5178/export" });
   const catalogo = await esperaCatalogo;
@@ -951,7 +986,7 @@ async function main() {
   }
   console.log(`✓ manifesto carregado (${catalogo.manifesto?.scenes.length} telas)`);
 
-  // 2) importação completa
+  // passo 2 — importação completa
   const antes = Date.now();
   const esperaFim = esperar("fim", 600_000);
   await onmessage({
@@ -970,7 +1005,7 @@ async function main() {
 
   console.log(`✓ importação concluída em ${segundos}s → ${resultado.mensagem}`);
 
-  // 3) inventário do que foi construído
+  // passo 3 — inventário do que foi construído
   const paginas = figma.root.children;
   let componentes = 0;
   let instancias = 0;
@@ -1036,7 +1071,7 @@ async function main() {
     for (const log of avisosPlugin.slice(0, 20)) console.log(`  ⚠ ${log.texto}`);
   }
 
-  // 4) prova de que as sobrescritas de texto realmente chegam às instâncias:
+  // #9 (tabela §6) — as sobrescritas de texto têm de chegar às instâncias:
   //    textos que só existem em UMA tela têm de aparecer dentro de instâncias.
   const todasInstancias: No[] = [];
   for (const pagina of paginas) coletarInstancias(pagina, todasInstancias);
@@ -1063,9 +1098,9 @@ async function main() {
   }
   console.log(`  (${textosEmInstancias.size} textos distintos em ${todasInstancias.length} instâncias)`);
 
-  // 5) tamanho exato dos mestres: cada componente tem de ter a largura/altura
-  //    medidas no DOM. Foi assim que se descobriu que o auto-layout encolhia
-  //    os quadros (layoutMode faz o quadro abraçar o conteúdo).
+  // #7 (tabela §6) — tamanho exato dos mestres: cada componente tem de ter a
+  //    largura/altura medidas no DOM. Foi assim que se descobriu que o auto-layout
+  //    encolhia os quadros (layoutMode faz o quadro abraçar o conteúdo).
   const esperadoPorComponente = new Map<string, Set<string>>();
   for (const cena of cenas) {
     const cenaJson = JSON.parse(
@@ -1177,8 +1212,9 @@ async function main() {
       ` (${larguraViewport.width}×${larguraViewport.height})`,
   );
 
-  // 6) Button: precisa expor as propriedades de ícone (esquerda, direita, nenhum,
-  //    só ícone) em vez de trazer o ícone embutido no mestre.
+  // Button (modelo do componente, não numerado na §6): precisa expor as
+  //    propriedades de ícone (esquerda, direita, nenhum, só ícone) em vez de
+  //    trazer o ícone embutido no mestre.
   const mestresButton = mestres.filter((m) => m.name.startsWith("Button"));
   const definicoesButton = mestresButton.length
     ? Object.keys((mestresButton[0] as unknown as NoComponente).componentPropertyDefinitions)
@@ -1207,9 +1243,9 @@ async function main() {
     }
   }
 
-  // 6) Cada elemento do DOM tem de aparecer UMA vez na cena. Um nó içado que
-  //    volta para o pai (modais/avisos de posição fixa) entra duplicado — foi
-  //    assim que apareceu o modal repetido nas telas de edição.
+  // #2 (tabela §6) — cada elemento do DOM tem de aparecer UMA vez na cena. Um nó
+  //    içado que volta para o pai (modais/avisos de posição fixa) entra duplicado —
+  //    foi assim que apareceu o modal repetido nas telas de edição.
   let duplicados = 0;
   const exemplosDuplicados: string[] = [];
   for (const cena of cenas) {
@@ -1236,7 +1272,7 @@ async function main() {
   console.log(`  elementos repetidos nas cenas: ${duplicados}`);
   for (const exemplo of exemplosDuplicados) console.log(`    · ${exemplo}`);
 
-  // 6.5) A VOLTA: ler uma página do Figma e conferir o que o plugin serializa.
+  // #12 (tabela §6) — A VOLTA: ler uma página do Figma e conferir o que o plugin serializa.
   //      É o caminho do `figma:diff`; sem esta prova, a volta só seria testada
   //      quando alguém a tentasse dentro do Figma.
   const esperaPaginas = esperar("paginas");
@@ -1292,7 +1328,7 @@ async function main() {
   console.log(`  variáveis lidas: ${variaveisLidas.length} (brand = ${String(brand?.valor ?? "—")})`);
   for (const mensagem of problemasDaVolta) console.log(`  ✗ ${mensagem}`);
 
-  // 6.9) TOKENS: a fonte única é o `globals.css` (levado no manifesto) e o
+  // #14 (tabela §6) — TOKENS: a fonte única é o `globals.css` (levado no manifesto) e o
   //      plugin faz UPSERT nas variáveis. A prova tem duas partes:
   //        a) as variáveis de `Nexus / Cor` e `Nexus / Métrica` batem com os
   //           tokens do manifesto;
@@ -1419,9 +1455,10 @@ async function main() {
   for (const exemplo of exemplosTokens.slice(0, 6)) console.log(`    · ${exemplo}`);
   for (const mensagem of problemasDeTokens) console.log(`  ✗ ${mensagem}`);
 
-  // 7) Componente com filhos POSICIONADOS (sem auto-layout) não reflui ao ser  //    redimensionado. Então a instância precisa ter EXATAMENTE a largura do
-  //    mestre — foi por isso que a paginação aparecia deslocada e cortada nos
-  //    modais (mestre de 1070 usado numa tabela de 664).
+  // #3 (tabela §6; com #5, #6, #8 e #10 abaixo) — Componente com filhos POSICIONADOS
+  //    (sem auto-layout) não reflui ao ser redimensionado. Então a instância precisa
+  //    ter EXATAMENTE a largura do mestre — foi por isso que a paginação aparecia
+  //    deslocada e cortada nos modais (mestre de 1070 usado numa tabela de 664).
   let largurasIncompativeis = 0;
   const mestresAninhados: string[] = [];
   // Todo mestre precisa da âncora de origem na descrição: `Origem: <arquivo>`.
@@ -1463,8 +1500,8 @@ async function main() {
     for (const filho of pagina.children) conferir(filho);
   }
 
-  // 8) Texto de campo de formulário precisa ficar CENTRALIZADO na vertical. O
-  //    ramo de largura automática vencia o `CENTER` e o texto subia ~7px.
+  // #4 (tabela §6) — Texto de campo de formulário precisa ficar CENTRALIZADO na
+  //    vertical. O ramo de largura automática vencia o `CENTER` e o texto subia ~7px.
   let camposDesalinhados = 0;
   const conferirCampos = (no: No) => {
     if (no.type === "FRAME" && ["input", "textarea", "select"].includes(no.name)) {
@@ -1615,8 +1652,9 @@ async function main() {
     console.log(`  ✗ pacotes faltando: ${pacotesFaltando.join(", ")}`);
   }
 
-  // 13) O painel (`ui.html`) e o plugin precisam estar de acordo: um `id` digitado
-  //     errado é um botão morto, e isso só apareceria dentro do Figma.
+  // apoio (não numerado na §6) — O painel (`ui.html`) e o plugin precisam estar de
+  //     acordo: um `id` digitado errado é um botão morto, e isso só apareceria
+  //     dentro do Figma.
   const painel = readFileSync(path.join(TOOL_DIR, "plugin", "ui.html"), "utf8");
   const idsNoPainel = new Set([...painel.matchAll(/id="([^"]+)"/g)].map((achado) => achado[1]));
   const idsUsados = [...new Set([...painel.matchAll(/\$\("([^"]+)"\)/g)].map((achado) => achado[1]))];
@@ -1636,7 +1674,7 @@ async function main() {
   if (erroNoPainel) console.log(`  ✗ erro de sintaxe no script: ${erroNoPainel}`);
   if (!scriptDoPainel) console.log("  ✗ o ui.html não tem <script>");
 
-  // 13) Guarda de reuso: todo componente promovido precisa continuar MARCADO no
+  // #13 (tabela §6) — Guarda de reuso: todo componente promovido precisa continuar MARCADO no
   //     código. O `data-figma` é o único vínculo entre a UI e o design e não tem
   //     efeito visual, então some numa refatoração sem ninguém notar — o
   //     componente deixa de ser promovido e a tela perde o reuso. Aqui isso vira
@@ -1694,18 +1732,22 @@ async function main() {
       (avisosDeReuso.length ? ` · ${avisosDeReuso.length} marca(s) sem âncora (aviso)` : ""),
   );
 
-  // 14) FIDELIDADE DA MONTAGEM — quatro defeitos de reconstrução (KAN-166).
+  // 15)–18) FIDELIDADE DA MONTAGEM — quatro defeitos de reconstrução (KAN-166),
+  //         um por invariante da tabela §6 do MAPA: #15 dois `grow` no mesmo frame,
+  //         #16 `grow` com sobra, #17 paginação em duas linhas, #18 geometria da
+  //         instância contra a ocorrência.
   //
   //     Cada regra existe porque o Figma não é o navegador: o auto-layout dele não
   //     tem PESO de `flex-grow`; um texto re-quebra pela largura da caixa; um mestre
   //     vem de UMA ocorrência (a mais completa); e "Fill" divide a sobra por igual.
-  //     As regras valem sobre as CENAS (o que a colheita mediu) e sobre a árvore
-  //     construída.
-  let framesComDoisGrow = 0; // (a) com dois filhos que crescem, o Figma divide igual
-  let growComSobra = 0; // (b) sobra no eixo principal = marca de invólucro colapsado
-  let paginacaoQuebrada = 0; // (c) "1 de 0" em duas linhas na cena
-  let paginacaoRequebra = 0; // (c) texto de paginação que o Figma pode re-quebrar
-  let geometriaDeInstancia = 0; // (d) filho de instância com tamanho de outra ocorrência
+  //     As regras valem sobre as CENAS (o que a colheita mediu) e sobre a ÁRVORE
+  //     construída (o que o plugin de fato montou).
+  let framesComDoisGrow = 0; // #15: com dois filhos que crescem, o Figma divide igual
+  let growComSobra = 0; // #16: sobra no eixo principal = marca de invólucro colapsado
+  let paginacaoQuebrada = 0; // #17: "1 de 0" em duas linhas na cena
+  let paginacaoRequebra = 0; // #17: texto de paginação que o Figma pode re-quebrar
+  let geometriaDeInstancia = 0; // #18: filho de instância com tamanho de outra ocorrência
+  let pareamentosSemAlvo = 0; // #18: nó/spec sem par — falso negativo do pareamento
   const exemplosMontagem: string[] = [];
   const registrarMontagem = (texto: string) => {
     if (exemplosMontagem.length < 12) exemplosMontagem.push(texto);
@@ -1771,7 +1813,7 @@ async function main() {
     visitarMontagem(cenaJson.root, cena.id, "");
   }
 
-  // (c) na árvore: o texto de paginação precisa sair com largura automática
+  // #17 na árvore: o texto de paginação precisa sair com largura automática
   //     (`WIDTH_AND_HEIGHT`) — com `HEIGHT` o Figma re-quebra pela largura da caixa
   //     e o "0" cai para a linha de baixo.
   const conferirPaginacao = (no: No) => {
@@ -1788,7 +1830,46 @@ async function main() {
     for (const raiz of pagina.children) conferirPaginacao(raiz);
   }
 
-  // (d) Dentro de uma instância, o filho tem o tamanho da ocorrência DESTA tela: o
+  // #15/#16 na ÁRVORE construída: a cena prova o que o WALKER marcou; a árvore
+  // prova o que o PLUGIN montou. Um bug do plugin que pusesse dois `layoutGrow`
+  // (ou um `layoutGrow` absorvendo sobra) passava pela cena sem ser visto.
+  // Instâncias ficam de fora: os filhos delas vêm CLONADOS do mestre (de outra
+  // ocorrência), então o "tamanho vs. sobra" ali não é do construtor, e sim do
+  // mestre — que é conferido como COMPONENTE.
+  const conferirGrowArvore = (no: No, caminho: string): void => {
+    if (no.layoutMode !== "NONE" && no.type !== "INSTANCE") {
+      const horizontal = no.layoutMode === "HORIZONTAL";
+      // Filhos invisíveis não participam do layout (como no Figma real).
+      const filhos = no.children.filter((filho) => filho.visible);
+      const crescem = filhos.filter((filho) => filho.layoutGrow > 0);
+      if (crescem.length > 1) {
+        framesComDoisGrow++;
+        registrarMontagem(`(a) árvore ${caminho}: ${crescem.length} filhos com layoutGrow`);
+      }
+      if (crescem.length) {
+        const principal = horizontal ? no.width : no.height;
+        const padding = horizontal
+          ? no.paddingLeft + no.paddingRight
+          : no.paddingTop + no.paddingBottom;
+        let conteudo = 0;
+        for (const filho of filhos) conteudo += horizontal ? filho.width : filho.height;
+        const sobra =
+          principal - padding - conteudo - no.itemSpacing * Math.max(0, filhos.length - 1);
+        if (sobra > 2.5) {
+          growComSobra++;
+          registrarMontagem(
+            `(b) árvore ${caminho}: layoutGrow com ${Math.round(sobra)}px de sobra`,
+          );
+        }
+      }
+    }
+    for (const filho of no.children) conferirGrowArvore(filho, `${caminho}/${filho.name}`);
+  };
+  for (const pagina of paginas) {
+    for (const raiz of pagina.children) conferirGrowArvore(raiz, pagina.name);
+  }
+
+  // #18 (d) Dentro de uma instância, o filho tem o tamanho da ocorrência DESTA tela: o
   //     mestre vem da ocorrência mais completa, e a altura de um contêiner de texto
   //     (a mensagem do `ConfirmDialog`) escorregava de lá, empurrando a barra de
   //     botões para baixo. Filho com `grow`/`hug` fica de fora: nesses o tamanho é
@@ -1796,6 +1877,7 @@ async function main() {
   const paresDeFilhos = (
     nos: No[],
     specs: Record<string, unknown>[],
+    aoFaltar?: (spec: Record<string, unknown>) => void,
   ): [No, Record<string, unknown>][] => {
     const saida: [No, Record<string, unknown>][] = [];
     let i = 0;
@@ -1805,6 +1887,10 @@ async function main() {
       let k = i;
       while (k < nos.length && (nos[k].type === "TEXT" ? "text" : "caixa") !== esperado) k++;
       if (k >= nos.length) {
+        // Nenhum filho da categoria esperada: sem par não há como conferir a
+        // geometria. Pular em silêncio seria um falso negativo — a invariante
+        // existe justamente para o filho que devia ser conferido.
+        aoFaltar?.(specs[j]);
         j++;
         continue;
       }
@@ -1839,14 +1925,27 @@ async function main() {
     }
     const specs = (spec.children ?? []) as Record<string, unknown>[];
     const aninhado = dentroDeInstancia || no.type === "INSTANCE";
-    for (const [filho, filhoSpec] of paresDeFilhos(no.children, specs)) {
+    const pares = paresDeFilhos(no.children, specs, (specSemPar) => {
+      pareamentosSemAlvo++;
+      registrarMontagem(
+        `(d) ${cenaId} ${caminho}: sem filho ${specSemPar.kind === "text" ? "de texto" : "de caixa"}` +
+          ` para "${String(specSemPar.name)}"`,
+      );
+    });
+    for (const [filho, filhoSpec] of pares) {
       conferirGeometria(filho, filhoSpec, aninhado, cenaId, `${caminho}/${String(filhoSpec.name)}`);
     }
   };
 
   for (const raiz of raizesEdit) {
     const cena = cenas.find((c) => `${c.id} · EDIT` === raiz.name);
-    if (!cena) continue;
+    if (!cena) {
+      // Um quadro `· EDIT` sem cena no manifesto não pode ser conferido: falha
+      // em vez de pular (era o mesmo falso negativo do pareamento).
+      pareamentosSemAlvo++;
+      registrarMontagem(`(d) árvore: quadro "${raiz.name}" não tem cena no manifesto`);
+      continue;
+    }
     const cenaJson = JSON.parse(readFileSync(path.join(OUT_DIR, cena.file), "utf8")) as {
       root: Record<string, unknown>;
     };
@@ -1859,7 +1958,104 @@ async function main() {
   console.log(`  textos de paginação em duas linhas (cena): ${paginacaoQuebrada}`);
   console.log(`  textos de paginação que o Figma pode re-quebrar: ${paginacaoRequebra}`);
   console.log(`  filhos de instância com o tamanho de outra ocorrência: ${geometriaDeInstancia}`);
+  console.log(`  pares sem alvo no pareamento (#18): ${pareamentosSemAlvo}`);
   for (const exemplo of exemplosMontagem) console.log(`    · ${exemplo}`);
+
+  // resiliência da importação (guarda extra — não é invariante numerada na §6;
+  //     regressão do `catch` sem binding — KAN-166).
+  //
+  //     O `catch {` sem binding fazia `textoDoErro(erro)` lançar um ReferenceError
+  //     ("erro is not defined") DENTRO do `catch`, derrubando a importação inteira
+  //     e escondendo a causa real. O mock sempre respondia 200, então o caminho de
+  //     falha nunca era exercitado. Aqui ele é FORÇADO: uma cena não carrega
+  //     (HTTP 500) e a conferência 1:1 de outra não envia.
+  //
+  //     Exigimos: (1) a importação CONTINUA e termina; (2) a cena que falhou é
+  //     registrada com a mensagem REAL; (3) a conferência que falhou também; e
+  //     (4) em lugar nenhum aparece o ReferenceError que mascarava a causa.
+  let falhouResiliencia = 0;
+  const problemasDeResiliencia: string[] = [];
+  const registrarResiliencia = (mensagem: string) => {
+    falhouResiliencia++;
+    problemasDeResiliencia.push(mensagem);
+  };
+  const cenaQueFalha = cenas[0];
+  const cenaQueVerifica = cenas[1];
+  if (!cenaQueFalha || !cenaQueVerifica) {
+    registrarResiliencia("o manifesto precisa de ao menos 2 cenas para a prova de resiliência");
+  } else {
+    // Só as mensagens DESTA importação contam: a importação principal, acima,
+    // já registrou um "✓ <id>" para todas as cenas.
+    const inicioResiliencia = mensagens.length;
+    falhasForcadas.cena = cenaQueFalha.file;
+    falhasForcadas.verify = true;
+    let fimResiliencia: Mensagem | null = null;
+    try {
+      const esperaFimResiliencia = esperar("fim", 300_000);
+      await onmessage({
+        type: "importar",
+        base: "http://localhost:5178/export",
+        cenas: [cenaQueFalha, cenaQueVerifica],
+        opcoes: { modo: "ambos", pagina: "Nexus Export", substituir: true, verificar: true },
+      });
+      fimResiliencia = await esperaFimResiliencia;
+    } catch (erro) {
+      registrarResiliencia(
+        `a importação não terminou (tempo esgotado): ${
+          erro instanceof Error ? erro.message : String(erro)
+        }`,
+      );
+    } finally {
+      falhasForcadas.cena = undefined;
+      falhasForcadas.verify = undefined;
+    }
+
+    if (fimResiliencia) {
+      const novas = mensagens.slice(inicioResiliencia);
+      const texto = (m: Mensagem | null) => m?.texto ?? "";
+      const erroDaCena = novas.find(
+        (m) => m.tipo === "log" && m.erro && texto(m).includes(cenaQueFalha.id) &&
+          !texto(m).includes("(biblioteca)"),
+      );
+      const cenaQuePassou = novas.find(
+        (m) => m.tipo === "log" && !m.erro && texto(m).includes("✓ " + cenaQueVerifica.id),
+      );
+      const erroDaConferencia = novas.find(
+        (m) =>
+          m.tipo === "log" && m.erro && texto(m).includes("conferência 1:1") &&
+          texto(m).includes(cenaQueVerifica.id),
+      );
+      const tudo = novas.map((m) => `${texto(m)} ${m.mensagem ?? ""}`).join("\n");
+
+      if (fimResiliencia.ok !== false) {
+        registrarResiliencia("o `fim` veio com ok=true apesar da cena que falhou");
+      }
+      if (!/HTTP \d/.test(texto(erroDaCena ?? null))) {
+        registrarResiliencia(
+          "a cena que falhou não foi registrada com a causa real (esperado HTTP 500)",
+        );
+      }
+      if (!cenaQuePassou) {
+        registrarResiliencia("a importação não continuou após a cena que falhou");
+      }
+      if (!erroDaConferencia) {
+        registrarResiliencia("a conferência 1:1 que falhou não foi registrada");
+      }
+      if (/erro is not defined|ReferenceError/i.test(tudo)) {
+        registrarResiliencia(
+          "apareceu um ReferenceError (catch sem binding): o erro real foi mascarado",
+        );
+      }
+    }
+  }
+
+  console.log("\n── resiliência da importação (KAN-166) ──");
+  console.log(
+    `  cena forçada a falhar: ${cenaQueFalha?.id ?? "—"}` +
+      ` · conferência forçada a falhar: ${cenaQueVerifica?.id ?? "—"}`,
+  );
+  console.log(`  defeitos de resiliência: ${falhouResiliencia}`);
+  for (const mensagem of problemasDeResiliencia) console.log(`  ✗ ${mensagem}`);
 
   const falhou =
     problemas.length > 0 ||
@@ -1895,7 +2091,9 @@ async function main() {
     growComSobra > 0 ||
     paginacaoQuebrada > 0 ||
     paginacaoRequebra > 0 ||
-    geometriaDeInstancia > 0;
+    geometriaDeInstancia > 0 ||
+    pareamentosSemAlvo > 0 ||
+    falhouResiliencia > 0;
   console.log("");
   console.log(falhou ? "❌ verificação encontrou problemas" : "✅ plugin verificado sem problemas");
   process.exit(falhou ? 1 : 0);

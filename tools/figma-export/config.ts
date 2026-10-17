@@ -51,6 +51,18 @@ function loadEnvFile(file: string, force: boolean) {
 loadEnvFile(path.join(ROOT, ".env"), false);
 loadEnvFile(path.join(TOOL_DIR, ".env"), true);
 
+/**
+ * `DATABASE_URL` da **aplicação** — o "banco-base" — capturada no carregamento
+ * deste módulo, antes de `bootstrap.ts` redirecioná-la para o banco isolado.
+ *
+ * É contra este nome que os fixtures conferem se **não** vão apagar dados de
+ * desenvolvimento (ver `exigirBancoIsolado` em `fixtures.ts`). Como o processo da
+ * colheita já roda com a variável redirecionada, quem o chama (os fixtures) é
+ * spawnado sem a `DATABASE_URL` do banco de exportação, para que o filho a
+ * resolva do `.env` — exatamente como numa execução direta.
+ */
+export const BASE_DATABASE_URL: string = process.env.DATABASE_URL ?? "";
+
 function intEnv(name: string, fallback: number): number {
   const raw = process.env[name];
   const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
@@ -98,11 +110,3 @@ export function exportDatabaseUrl(): string {
   url.pathname = `/${EXPORT_DB_NAME}`;
   return url.toString();
 }
-
-/** `process.env` com a `DATABASE_URL` apontada para o banco da exportação. */
-export function exportDbEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, DATABASE_URL: exportDatabaseUrl() };
-}
-
-/** Confirmação obrigatória para apagar o banco da exportação. */
-export const GUARD_RESET = "FIGMA_EXPORT_RESET";

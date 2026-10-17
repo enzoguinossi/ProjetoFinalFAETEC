@@ -116,13 +116,31 @@ async function encerrarApp(child: ChildProcess) {
   await new Promise((resolver) => setTimeout(resolver, 200));
 }
 
-/** Roda um script Node do projeto herdando o ambiente (já apontado ao banco de exportação). */
-async function rodar(rotulo: string, argumentos: string[]): Promise<void> {
+/**
+ * Roda um script Node do projeto herdando o ambiente.
+ *
+ * `apontarParaExportacao` (padrão): passa a `DATABASE_URL` já redirecionada para
+ * o banco de exportação — é o que `prisma db push` e o seed precisam.
+ *
+ * Os **fixtures** passam `false`: eles importam o `bootstrap` (que resolve o
+ * banco sozinho) e precisam da `DATABASE_URL` ORIGINAL para provar que o banco
+ * derivado é isolado. O processo da colheita já a tem redirecionada, então ela é
+ * REMOVIDA do ambiente do filho — que a resolve do `.env`, como numa execução
+ * direta de `npm run figma:fixtures`.
+ */
+async function rodar(
+  rotulo: string,
+  argumentos: string[],
+  apontarParaExportacao = true,
+): Promise<void> {
   log(`▶️  ${rotulo}`);
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  if (apontarParaExportacao) env.DATABASE_URL = exportDatabaseUrl();
+  else delete env.DATABASE_URL;
   await new Promise<void>((resolve, reject) => {
     const child = spawn(process.execPath, argumentos, {
       cwd: ROOT,
-      env: { ...process.env, DATABASE_URL: exportDatabaseUrl() },
+      env,
       stdio: "inherit",
     });
     child.on("exit", (code) =>
@@ -145,18 +163,19 @@ async function garantirSeed(): Promise<void> {
 }
 
 async function limparCadastros(): Promise<void> {
-  await rodar("Limpando cadastros (banco sem administrador)", [
-    TSX,
-    path.join(TOOL_DIR, "fixtures.ts"),
-    "--clean",
-  ]);
+  await rodar(
+    "Limpando cadastros (banco sem administrador)",
+    [TSX, path.join(TOOL_DIR, "fixtures.ts"), "--clean"],
+    false,
+  );
 }
 
 async function aplicarFixtures(): Promise<void> {
-  await rodar("Aplicando fixtures no banco de exportação", [
-    TSX,
-    path.join(TOOL_DIR, "fixtures.ts"),
-  ]);
+  await rodar(
+    "Aplicando fixtures no banco de exportação",
+    [TSX, path.join(TOOL_DIR, "fixtures.ts")],
+    false,
+  );
 }
 
 /* ══════════════════════════════ motor de captura ══════════════════════════════ */
@@ -485,12 +504,17 @@ async function main() {
   // Os tokens de design vêm do `globals.css` (fonte única): o plugin os aplica
   // como variáveis no Figma, atualizando os existentes e criando os novos.
   const tokens = lerTokensGlobais();
+  // Só as cenas EFETIVAMENTE capturadas entram no manifesto: uma cena que falhou
+  // não tem `scenes/<slug>.json` nem `screens/<slug>.png`, e listá-la faria os
+  // consumidores (`figma:check`, `figma:serve`) estourarem com ENOENT em vez de
+  // lidarem com uma colheita parcial.
+  const capturadas = new Set(resultados.map((r) => r.ids));
   const manifesto = {
     generatedAt: new Date().toISOString(),
     viewport: VIEWPORT,
     scale: DEVICE_SCALE,
     sceneServer: `http://localhost:${SERVER_PORT}`,
-    scenes: escopo.map((c) => ({
+    scenes: escopo.filter((c) => capturadas.has(c.id)).map((c) => ({
       id: c.id,
       title: c.title,
       group: c.group,
@@ -519,6 +543,7 @@ async function main() {
   if (falhas.length) {
     log(`❌ ${falhas.length} cenário(s) falharam:`);
     for (const falha of falhas) log(`   • ${falha.id}: ${falha.erro}`);
+    log(`   (o manifesto lista só as ${resultados.length} cena(s) capturada(s))`);
     process.exitCode = 1;
   }
   log(`\nManifesto: ${path.relative(ROOT, SCENES_FILE)}`);

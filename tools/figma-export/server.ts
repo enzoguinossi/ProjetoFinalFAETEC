@@ -165,7 +165,10 @@ const servidor = createServer(async (req, res) => {
   res.end(conteudo);
 });
 
-servidor.listen(SERVER_PORT, () => {
+// Escuta só no loopback: o servidor entrega cenas e ACEITA ESCRITA sem
+// autenticação (`POST /verify`, `POST /snapshot`); exposto na rede, qualquer
+// host na LAN poderia injetar arquivos em `out/figma-export`.
+servidor.listen(SERVER_PORT, "127.0.0.1", () => {
   const manifesto = path.join(OUT_DIR, "scenes.json");
   console.log(`🌐 Servidor de exportação em http://localhost:${SERVER_PORT}`);
   console.log(`   cenas:    http://localhost:${SERVER_PORT}/export/scenes.json`);

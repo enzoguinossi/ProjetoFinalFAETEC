@@ -23,7 +23,7 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   componentes casados por nome + âncora de código e telas).
 - Scripts `figma:harvest`, `figma:serve`, `figma:check`, `figma:compare`, `figma:diff`,
   `figma:fixtures` e a skill `.opencode/skills/figma-export`.
-- Verificação automática do plugin sem abrir o Figma (`figma:check`), com 14 invariantes —
+- Verificação automática do plugin sem abrir o Figma (`figma:check`), com 18 invariantes —
   incluindo a **guarda de reuso** que falha se um componente promovido perder a marca
   `data-figma` no código e a que prova que as **variáveis do Figma convergem para os
   tokens do `globals.css`**.
@@ -42,7 +42,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 - Componentes compartilhados (`src/components/*`) receberam marcas `data-figma*`
   (atributos aditivos: não alteram comportamento nem visual) que ligam a UI aos
-  componentes do design.
+  componentes do design. Na mesma entrega houve uma **mudança visual pretendida**: a
+  fonte **Inter** passou a ser carregada com `next/font/google` e `--font-sans`,
+  `--font-display` e a sidebar passaram a apontar para ela — antes não havia fonte
+  carregada, o navegador pintava Arial/Segoe UI e o `figma:compare` divergia em todas
+  as telas.
 - Tokens de design passaram a ter **fonte única** no `src/app/globals.css`: a colheita os
   lê (`tools/figma-export/tokens.ts`) e os leva no manifesto, e o plugin **atualiza as
   variáveis existentes e cria as novas** nas coleções `Nexus / Cor` e `Nexus / Métrica`
@@ -73,7 +77,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
     pela grade ficava com `grow` mesmo sem o navegador tê-lo crescido; no Figma o "Fill"
     absorvia os 233px de sobra e os campos seguintes saíam do recorte do modal.
 - `figma:check`: quatro invariantes novas de **fidelidade da montagem** (15–18), uma por
-  defeito, cada uma provada com o defeito reintroduzido. Nenhum arquivo de `src/**` mudou.
+  defeito, cada uma provada com o defeito reintroduzido. Os quatro eram erros de
+  **reconstrução**: nenhum arquivo de `src/**` mudou por causa deles (a mudança visual do
+  `src/**` nesta entrega é a fonte Inter, em *Changed*).
+- Exportação para o Figma — **endurecimento pós-revisão** (KAN-166): o plugin não derruba
+  mais a importação num `catch` sem binding (uma cena que não carrega ou uma conferência 1:1
+  que não envia passam a ser **registradas com a mensagem real** e a importação continua); o
+  manifesto lista **só as cenas capturadas** e o `figma:check` falha com mensagem clara
+  ("rode `npm run figma:harvest`") em vez de `ENOENT`; o servidor local escuta em
+  **`127.0.0.1`**; os fixtures **recusam** rodar contra o banco da aplicação; e as
+  invariantes 15/16 passam a valer também sobre a **árvore** montada (não só a cena), com um
+  alvo de pareamento ausente virando falha em vez de ser pulado.
 
 <!--
 Categorias: Added, Changed, Deprecated, Removed, Fixed, Security.
