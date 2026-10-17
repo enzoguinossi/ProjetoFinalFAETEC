@@ -33,8 +33,8 @@ estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 
 ## Bloqueios e dependências
 
-- **Publicação pendente de aprovação:** `git push origin main` + `git push origin
-  v1.17.10.2026` ainda **não** executados (a tag existe só localmente).
+- Nenhum bloqueio. **Publicação autorizada pelo usuário em 2026-10-17** e executada na
+  sequência (`git push origin main` + `git push origin v1.17.10.2026`).
 
 ## Trabalho existente a preservar
 
@@ -69,7 +69,7 @@ estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 
 ## Próximas ações
 
-1. **Publicar** (com aprovação): `git push origin main` + `git push origin v1.17.10.2026`.
-2. Definir o destino de `figma-export` (branch/worktree já integrados) e de `gravacao`.
-3. **Sessão nova:** revisar documentação e fluxos; iniciar a **movimentação de estoque**
-   (KAN-140), com task criada pelo formato novo do `docs/agents/JIRA.MD`.
+1. Definir o destino de `figma-export` (branch/worktree já integrados) e de `gravacao`.
+2. **Sessão nova:** revisar documentação e fluxos; iniciar a **movimentação de estoque**
+   (KAN-140), com a task criada pelo formato novo do `docs/agents/JIRA.MD` (texto exato
+   mostrado ao usuário antes de criar).
