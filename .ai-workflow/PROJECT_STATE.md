@@ -22,7 +22,8 @@ com agentes, estado persistente, contratos, Jira, Git/worktrees, DateVer e chang
 
 | Run | Objetivo | Agente | Status | Branch/worktree | Issue |
 |---|---|---|---|---|---|
-| RUN-20261017-01 | Infraestrutura de orquestração multiagente | orchestrator | em andamento | `main` (checkout principal) | KAN-165 |
+| RUN-20261017-01 | Infraestrutura de orquestração multiagente | orchestrator | concluído | `main` (checkout principal) | KAN-165 |
+| RUN-20261017-02 | Ferramenta de exportação para o Figma (fechamento) | orchestrator | em andamento | `figma-export` (worktree) | KAN-166 |
 
 ## Bloqueios e dependências
 
@@ -58,7 +59,9 @@ com agentes, estado persistente, contratos, Jira, Git/worktrees, DateVer e chang
 
 ## Próximas ações
 
-1. Verificação manual de runtime: abrir uma sessão-filha real e retomar em sessão nova.
-2. Revisar/commitar o WIP do worktree `figma-export` (branch dele), conforme decisão (B).
-3. Próximas entregas: usar o fluxo orquestrado (contrato → developer → reviewer → qa →
-   docs-keeper → release-manager), com `.ai-workflow/runs/` por tarefa.
+1. **KAN-166** — fechar a ferramenta Figma: guarda de reuso (invariante nova que trava a
+   perda de marcas `data-figma*`), leitura de componentes (a volta) no Figma real e
+   `npm run figma:compare` dentro do limite.
+2. **Primeiro release** DateVer `1.17.10.2026` (tag `v1.17.10.2026`) com changelog, quando
+   os critérios de KAN-166 forem cumpridos.
+3. Verificação manual de runtime da arquitetura (sessão-filha real; retomar em sessão nova).
