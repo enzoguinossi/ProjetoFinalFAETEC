@@ -36,10 +36,15 @@
   banco isolado `nexus_figma_export`).
 - **Critérios de aceite:** ver KAN-166.
   1. `npm run figma:check` limpo, com uma **invariante nova** que trave a perda de marcas
-     `data-figma*` (guarda de reuso).
-  2. A volta exercitada no Figma real + `npm run figma:diff` conferido.
-  3. `npm run figma:compare` executado dentro do limite de 0,5%.
-  4. Primeiro release versionado (DateVer) com changelog.
+     `data-figma*` (guarda de reuso). ✅
+  2. A volta exercitada no Figma real + `npm run figma:diff` conferido. ✅
+  3. `npm run figma:compare` executado dentro do limite de 0,5%. ⚠️ **dispensado pelo
+     usuário em 2026-10-17**: o limite **não é atingível** entre renderizadores (o resíduo
+     de ~2,4% é rasterização de texto — Chromium vs Figma; ver MAPA §9). O valor numérico
+     passa a ser um portão de sanidade, e a evidência de fidelidade é o **mapa de diff**
+     (`out/figma-export/diff/<tela>.png`) revisado por uma pessoa — foi assim que os
+     quatro defeitos de reconstrução foram encontrados.
+  4. Primeiro release versionado (DateVer) com changelog. ✅
 
 ## Ambiente
 
@@ -49,24 +54,30 @@
 
 ## Resultado (preenchido pelo executor)
 
-- **Status:** em andamento (1 de 3 concluída)
-- **Commit de preservação do WIP:** `0dfd6e5` (KAN-166) — 42 arquivos, o ferramental
-  completo (`tools/figma-export/**` + skill + marcas `data-figma*`).
-- **Integração:** `614205a` (merge da `main` — traz agentes e `.ai-workflow` para a branch).
-- **Evidência de base:** `npm run figma:check` limpo — 53/53 componentes com tamanho
-  medido e âncora, 47/47 telas em 1366×768, 0 duplicações, volta lendo 1.469 instâncias
-  (45 com âncora) e 19 variáveis.
+- **Status:** **concluído** — correções, revisão independente e QA executados; endurecimento aplicado.
+- **WIP preservado:** `0dfd6e5` · **integração da infra na branch:** `614205a`
 
 ### Subtarefas
 
 | Subtarefa | Run | Status | Evidência |
 |---|---|---|---|
-| Guarda de reuso (invariante #13 das marcas) | `RUN-20261017-02a` | **concluída** | `120a4a1` + `c49c647`; `figma:check` verde com `21/21 promovidos com a marca`; falha demonstrada com a marca removida |
-| Fontes → Inter (causa do desvio no 1:1) | `RUN-20261017-02b` | **concluída** | `5b1250c` + `655c8f0`; `tsc`/`eslint`/`next build` verdes; re-colheita com `Inter` em 36/36 textos |
-| Leitura de componentes (volta) no Figma real | — | **concluída (1ª leitura)** | `figma:diff` sobre a `Page 1`: componentes e telas sem diferença; 28 variáveis e 32 mestres lidos |
-| `figma:compare` (conferência 1:1) | — | **1ª medição feita; aguarda re-medição** | média 2,707%, 1/47 aprovada; causa (fontes) corrigida — falta re-importar com *conferir 1:1* e rodar de novo |
-| De-para de tokens (PT → token do app) | — | **aguarda confirmação do usuário** | 9 variáveis de design + `branco` + `raio-*`; proposta apresentada (ver MAPA §9) |
-| Versionamento (DateVer + changelog) | — | preparado | `CHANGELOG.md` com `Unreleased`; versão planejada `1.17.10.2026` |
+| Guarda de reuso (invariante #13 das marcas) | `RUN-20261017-02a` | **concluída** | `120a4a1` + `c49c647`; `21/21 promovidos com a marca`; falha demonstrada |
+| Fontes → Inter (causa do desvio no 1:1) | `RUN-20261017-02b` | **concluída** | `5b1250c` + `655c8f0`; `tsc`/`eslint`/`build` verdes; `Inter` em 36/36 textos |
+| Leitura de componentes (volta) no Figma real | — | **concluída** | `figma:diff` sobre a `Page 1`: componentes e telas sem diferença |
+| `figma:compare` (conferência 1:1) | — | **dispensado** | 3 medições: 2,707% → 2,502% → **2,421%**; limite de 0,5% inatingível (MAPA §9) |
+| Tokens com fonte única + upsert no plugin | `RUN-20261017-02c` | **concluída** | `2619971` + `83cc912`; 14 cores + 5 métricas do `globals.css` |
+| 4 defeitos de reconstrução | `RUN-20261017-02d` | **concluída** | `2f8d99d` + `12cde68`; invariantes 15–18 |
+| Endurecimento pós-revisão | `RUN-20261017-02e` | **concluída** | `67e1024` + `f7c50e5`; 6 achados corrigidos |
+| Versionamento (DateVer + changelog) | — | **concluído** | `docs/VERSIONAMENTO.md`; fuso `America/Sao_Paulo` (`25fa7b2`) |
 
-- **Pendências reais:** `figma:compare` nunca rodou de verdade; a leitura real de uma
-  página não foi exercitada no Figma — ambas dependem do Figma do usuário (MAPA §9).
+### Revisão e QA
+
+- **Reviewer:** 1 bloqueante (critério #3 não cumprido → **dispensado pelo usuário**) e 8 não
+  bloqueantes; os acionáveis viraram o `RUN-20261017-02e`.
+- **QA:** 6/6 critérios verificáveis passaram; sem regressões (`npm test` 165/165, `tsc`,
+  `eslint`, `build`, `figma:check`, `figma:harvest` 47/47).
+- **Limitações aceitas:** (a) limite do `compare` (acima); (b) resíduo de padding do
+  `ConfirmDialog` — os designers ajustam manualmente; (c) 2 telas usam `monospace`
+  (`LoginForm.tsx`) e o plugin mapeia para Inter.
+
+- **Pendências:** nenhuma bloqueante para o release.
