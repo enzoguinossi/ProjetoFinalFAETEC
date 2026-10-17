@@ -341,9 +341,22 @@ de um deslocamento real de 2 px (3,17%). Conclusão: o limite de **0,5% não é 
 com comparação pixel a pixel entre dois renderizadores; o mapa de diff continua sendo o
 sinal útil (é o esqueleto de glifos/ícones/bordas).
 
-**Pendente (decisão)**: o que fazer com o limite do `compare` — recalibrar com
-justificativa, trocar a métrica por uma tolerante a antialias (ex.: SSIM) ou afinar o
-renderizador do Chromium na colheita. Ver os runs em `.ai-workflow/runs/`.
+**Limitações aceitas (2026-10-17)** — decididas com o usuário, para o 1º release:
+
+- **Limite do `compare`:** o resíduo de ~2,4% é rasterização entre renderizadores e **não**
+  é atingível o limite de 0,5%. Tentativas descartadas: blur σ=1, SSIM e média por blocos
+  (1/4, 1/8, 1/16) — nenhuma separa ruído de defeito pequeno; só troca de cor se destaca.
+  O valor numérico continua sendo um **portão de sanidade**; a **evidência de fidelidade é
+  o mapa de diff (`out/figma-export/diff/<tela>.png`) olhado por uma pessoa** — foi assim
+  que os quatro defeitos de reconstrução foram encontrados.
+- **Padding do `ConfirmDialog`:** mesmo após a correção da ocorrência-base (§8), sobra um
+  resíduo pequeno no espaçamento. Aceito: os designers ajustam manualmente se alterarem
+  essas telas.
+
+**Corrigido (4 defeitos de reconstrução, achados na revisão visual da REF)**: `grow` sem
+peso dividindo a linha CEP/UF em colunas iguais · paginação `"N de N"` re-quebrando linha ·
+`ConfirmDialog` com o tamanho da ocorrência mais completa · `flex-grow` de campo em coluna
+de grade esticada virando "Fill". Invariantes **15–18** em `plugin-check.ts` (ver §6).
 
 **Verificado (volta, 1ª leitura real)**: a aba *Ler do Figma* leu a `Page 1` de verdade
 (28 variáveis, 32 mestres). Componentes e telas: **nenhuma diferença**. O que aparece
