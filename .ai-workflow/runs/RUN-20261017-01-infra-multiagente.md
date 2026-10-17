@@ -43,9 +43,22 @@
 
 ## Resultado (preenchido pelo executor)
 
-- **Status:** em andamento
-- **Arquivos alterados:** (preencher)
-- **Testes:** (preencher)
-- **Commit SHA:** (preencher)
-- **Riscos/pendências:** cenários de runtime (abrir sessão-filho; retomar em sessão nova)
-  ficam como verificação manual; o restante é automatizado.
+- **Status:** concluído (E1–E8)
+- **Arquivos alterados:** 20 arquivos — `.ai-workflow/**` (6), `.opencode/agents/**` (6),
+  `.opencode/skills/**` (3), `CHANGELOG.md`, `docs/agents/WORKFLOW.md`,
+  `scripts/ai-workflow-check.mjs`, `AGENTS.md` (seção nova), `docs/agents/JIRA.MD` (seção nova).
+- **Testes e resultado:**
+  - `node scripts/ai-workflow-check.mjs` → **13/13 automáticos ok, 2 manuais, 0 falhas**.
+  - `npx eslint scripts/ai-workflow-check.mjs` → 0 problemas.
+  - `opencode debug agents` → 6 agentes descobertos (`orchestrator` primary; demais subagent).
+- **Commit SHA:** `9cc6845` (branch `main`).
+- **Riscos/pendências:** cenários de runtime (abrir uma sessão-filho real; reconstruir estado
+  em sessão nova) permanecem como verificação manual, conforme
+  `.ai-workflow/ARCHITECTURE_TESTS.md`.
+
+## Verificação do Orquestrador (não confiar só no relatório)
+
+- [x] `git status` confere com "arquivos alterados"
+- [x] commit `9cc6845` existe no repositório
+- [x] issue `KAN-165` existe e corresponde
+- [x] testes citados realmente passaram

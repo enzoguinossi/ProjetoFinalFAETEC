@@ -39,25 +39,26 @@ com agentes, estado persistente, contratos, Jira, Git/worktrees, DateVer e chang
 
 ## Git (verificado no checkpoint)
 
-- `main` = `f17a671`, **3 commits à frente** de `origin/main` (`2125cbd`, `fe95544`, `f17a671`).
+- `main` = `9cc6845` (infra da orquestração) sobre `f17a671`; `origin/main` ainda em `3a3c352`.
 - Worktrees: principal, `KAN-140-modulo-estoque`, `figma-export`, `gravacao`.
-- Sem tags. Sem `CHANGELOG.md` (antes desta tarefa).
+- Sem tags ainda. `CHANGELOG.md` criado nesta tarefa (seção `Unreleased`).
 
 ## Último checkpoint válido
 
-- Fase 1 (auditoria) concluída e aprovada pelo usuário em 2026-10-17.
+- 2026-10-17 — Fase 1 (auditoria) concluída e aprovada pelo usuário.
+- 2026-10-17 — E1–E8 implementadas e commitadas em `9cc6845` (KAN-165).
 - Decisões: (1) state versionado/commitado; (2) integração na `main`; (3) agentes no repo;
   (4) `figma-export` revisar depois; (5) DateVer com N=1; (6) não deletar `modulo-estoque`.
 
 ## Testes executados
 
-- Estrutura da arquitetura: `node scripts/ai-workflow-check.mjs` (ver
-  `.ai-workflow/ARCHITECTURE_TESTS.md`).
+- `node scripts/ai-workflow-check.mjs` → 13/13 automáticos ok, 2 manuais, 0 falhas.
+- `npx eslint scripts/ai-workflow-check.mjs` → 0 problemas.
+- `opencode debug agents` → 6 agentes do projeto descobertos.
 
 ## Próximas ações
 
-1. Definir a chave Jira desta entrega.
-2. Commitar E1–E3 (estado + agentes + skills).
-3. Commitar E4–E6 (Jira doc + changelog + política em `AGENTS.md`).
-4. Commitar E7–E8 (testes da arquitetura + docs/apresentação).
-5. Executar `scripts/ai-workflow-check.mjs` e registrar evidências.
+1. Verificação manual de runtime: abrir uma sessão-filha real e retomar em sessão nova.
+2. Revisar/commitar o WIP do worktree `figma-export` (branch dele), conforme decisão (B).
+3. Próximas entregas: usar o fluxo orquestrado (contrato → developer → reviewer → qa →
+   docs-keeper → release-manager), com `.ai-workflow/runs/` por tarefa.
