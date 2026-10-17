@@ -203,6 +203,7 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | 10 | Todo mestre tem **âncora de origem** na descrição (`Origem: <arquivo>`) | sem ela a volta fica cega: o `diff` não sabe em que arquivo mexer |
 | 11 | O `diff` não pode reportar canto reto como diferença (`raio` 0 ↔ ausente) | senão todo componente de canto reto aparecia como mudança |
 | 12 | A **volta** funciona: listar páginas, ler uma página, serializar instâncias com âncora e variáveis | era o único caminho que só seria testado dentro do Figma |
+| 13 | Todo componente de `COMPONENTES` tem **âncora em `ORIGEM`** e a **marca `data-figma` no arquivo apontado** (atributo JSX ou chave de objeto); marca no app sem âncora vira aviso, não falha | o `data-figma*` não altera nada visual: mexer num elemento e perder a marca tira o componente da biblioteca sem ninguém notar, e sem âncora a volta do `diff` fica cega |
 
 ## 7. Armadilhas da API do Figma (todas já custaram tempo)
 
@@ -255,9 +256,11 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 ## 9. Estado atual e pendências
 
 **Verificado**: `npm run figma:check` limpo (53/53 componentes com o tamanho de
-ocorrência real e âncora de origem, 47/47 telas em 1366×768, 0 duplicações, 0 larguras
-incompatíveis, 0 campos desalinhados, 0 mestres aninhados, 0 formulários sem fundo,
-0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint` e os 165 testes da app passando.
+ocorrência real e âncora de origem, 21/21 promovidos de `COMPONENTES` com a marca
+`data-figma` no arquivo de `ORIGEM` — invariante #13 —, 47/47 telas em 1366×768,
+0 duplicações, 0 larguras incompatíveis, 0 campos desalinhados, 0 mestres aninhados,
+0 formulários sem fundo, 0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint` e os
+165 testes da app passando.
 
 **Pendente**: o `npm run figma:compare` **nunca rodou de verdade** — depende de uma
 importação com **conferir 1:1** para popular `out/figma-export/verify/`. A rota do
