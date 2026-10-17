@@ -10,11 +10,12 @@
  *
  * Uso: npm run figma:check
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 
-import { OUT_DIR, TOOL_DIR } from "./config";
+import { OUT_DIR, ROOT, TOOL_DIR } from "./config";
+import { ORIGEM } from "./origem";
 
 /* ══════════════════════════════ mock da API ══════════════════════════════ */
 
@@ -707,6 +708,52 @@ function resposta(bytes: Uint8Array | null, status: number) {
       return bytes ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) : new ArrayBuffer(0);
     },
   };
+}
+
+/* ═══════════════════════ marcas `data-figma` no app ═══════════════════════ */
+
+/**
+ * Nomes marcados com `data-figma` em um arquivo do app. Aceita as formas que o
+ * código usa:
+ *
+ *   data-figma="Nome"        (atributo JSX)
+ *   data-figma={'Nome'}      (expressão JSX)
+ *   data-figma={"Nome"}
+ *   "data-figma": "Nome"     (chave de objeto — é assim que o Button monta as marcas)
+ *
+ * Os atributos derivados (`data-figma-variant`, `-state`, …) são ignorados: a
+ * marca só é lida quando `data-figma` vem seguido de `=` ou `:`, nunca de `-`.
+ */
+function marcasDoArquivo(conteudo: string): Set<string> {
+  const marcas = new Set<string>();
+  const padroes = [
+    /\bdata-figma\s*=\s*(?:"([^"]+)"|'([^']+)'|\{\s*(?:"([^"]+)"|'([^']+)')\s*\})/g,
+    /["']data-figma["']\s*:\s*(?:"([^"]+)"|'([^']+)')/g,
+  ];
+  for (const padrao of padroes) {
+    for (const achado of conteudo.matchAll(padrao)) {
+      const nome = achado[1] ?? achado[2] ?? achado[3] ?? achado[4];
+      if (nome) marcas.add(nome);
+    }
+  }
+  return marcas;
+}
+
+/** Arquivos `.ts`/`.tsx` de um diretório, recursivamente. */
+function arquivosFonte(raiz: string): string[] {
+  const saida: string[] = [];
+  for (const entrada of readdirSync(raiz, { withFileTypes: true })) {
+    if (entrada.name.startsWith(".") || entrada.name === "node_modules") continue;
+    const caminho = path.join(raiz, entrada.name);
+    if (entrada.isDirectory()) saida.push(...arquivosFonte(caminho));
+    else if (/\.tsx?$/.test(entrada.name)) saida.push(caminho);
+  }
+  return saida;
+}
+
+/** Caminho relativo à raiz, sempre com `/` (o mesmo formato de `origem.ts`). */
+function caminhoRelativo(caminho: string): string {
+  return path.relative(ROOT, caminho).split(path.sep).join("/");
 }
 
 /* ══════════════════════════════ execução ══════════════════════════════ */
@@ -1425,6 +1472,64 @@ async function main() {
   if (erroNoPainel) console.log(`  ✗ erro de sintaxe no script: ${erroNoPainel}`);
   if (!scriptDoPainel) console.log("  ✗ o ui.html não tem <script>");
 
+  // 13) Guarda de reuso: todo componente promovido precisa continuar MARCADO no
+  //     código. O `data-figma` é o único vínculo entre a UI e o design e não tem
+  //     efeito visual, então some numa refatoração sem ninguém notar — o
+  //     componente deixa de ser promovido e a tela perde o reuso. Aqui isso vira
+  //     falha (e não aviso), porque o componente promovido existe *por causa*
+  //     da marca. Marca sem âncora em ORIGEM é o inverso: aviso, não falha.
+  const promovidos = vm.runInContext("COMPONENTES", contexto) as string[];
+  let comAncora = 0;
+  let comMarca = 0;
+  const semMarca: string[] = [];
+  for (const nome of promovidos) {
+    const arquivo = ORIGEM[nome];
+    if (!arquivo) {
+      problema(`marca (reuso): "${nome}" está em COMPONENTES mas não tem âncora em ORIGEM`);
+      semMarca.push(`${nome} (sem âncora em ORIGEM)`);
+      continue;
+    }
+    comAncora++;
+    const caminho = path.join(ROOT, arquivo);
+    if (!existsSync(caminho)) {
+      problema(`marca (reuso): a âncora de "${nome}" aponta para arquivo inexistente: ${arquivo}`);
+      semMarca.push(`${nome} (arquivo ausente: ${arquivo})`);
+      continue;
+    }
+    if (!marcasDoArquivo(readFileSync(caminho, "utf8")).has(nome)) {
+      problema(`marca (reuso): "${nome}" perdeu o data-figma em ${arquivo}`);
+      semMarca.push(`${nome} (${arquivo})`);
+      continue;
+    }
+    comMarca++;
+  }
+
+  const marcadosNoApp = new Map<string, string[]>();
+  for (const arquivo of arquivosFonte(path.join(ROOT, "src"))) {
+    for (const nome of marcasDoArquivo(readFileSync(arquivo, "utf8"))) {
+      const arquivos = marcadosNoApp.get(nome) ?? [];
+      arquivos.push(caminhoRelativo(arquivo));
+      marcadosNoApp.set(nome, arquivos);
+    }
+  }
+  const avisosDeReuso: string[] = [];
+  for (const nome of [...marcadosNoApp.keys()].filter((n) => !ORIGEM[n]).sort()) {
+    const aviso = `marca (reuso): "${nome}" aparece em ${marcadosNoApp.get(nome)!.join(", ")} mas não tem âncora em ORIGEM`;
+    avisosDeReuso.push(aviso);
+    avisos.push(aviso);
+  }
+
+  console.log("\n── marcas (reuso) ──");
+  console.log(
+    `  componentes promovidos: ${promovidos.length} · com âncora em ORIGEM: ${comAncora} · com marca no código: ${comMarca}`,
+  );
+  for (const entrada of semMarca) console.log(`  ✗ ${entrada}`);
+  for (const aviso of avisosDeReuso) console.log(`  ⚠ ${aviso}`);
+  console.log(
+    `  ${comMarca}/${promovidos.length} promovidos com a marca` +
+      (avisosDeReuso.length ? ` · ${avisosDeReuso.length} marca(s) sem âncora (aviso)` : ""),
+  );
+
   const falhou =
     problemas.length > 0 ||
     !resultado.ok ||
@@ -1452,6 +1557,7 @@ async function main() {
     idsSemElemento.length > 0 ||
     erroNoPainel !== null ||
     scriptDoPainel === "" ||
+    semMarca.length > 0 ||
     setasFaltando.length > 0;
   console.log("");
   console.log(falhou ? "❌ verificação encontrou problemas" : "✅ plugin verificado sem problemas");
