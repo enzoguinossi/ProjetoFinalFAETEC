@@ -93,10 +93,11 @@ No `CHANGELOG.md` a mais recente fica acima:
    projeto no Jira, quando aplicável) está em `docs/agents/JIRA.MD` §"Releases, versões e
    issues" — não repetida aqui.
 
-> **Fuso de referência (pendente de formalização):** a referência Date-Ver recomenda
-> documentar qual fuso define "o dia" da release. O projeto ainda não fixou isso; até a
-> decisão ser registrada aqui, vale a **data local** do dia em que a release foi
-> publicada.
+> **Fuso de referência:** o dia da release é o de **`America/Sao_Paulo`** (fuso de
+> Brasília, UTC−03:00) — é o fuso do projeto e o mesmo já usado na colheita da exportação
+> para o Figma. A referência Date-Ver recomenda fixar isso, e fica fixado aqui.
+> Observação: **não existe** o identificador IANA `America/Brasilia`; o que cobre Brasília
+> é `America/Sao_Paulo`.
 
 ---
 
