@@ -6,6 +6,11 @@ O formato segue [Keep a Changelog 1.1.0 (pt-BR)](https://keepachangelog.com/pt-B
 e o versionamento adota **DateVer** `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`), em que `N` é a
 sequência da release no mesmo dia.
 
+A convenção completa — como numerar releases do mesmo dia, como escrever uma entrada e a
+rastreabilidade versão ↔ issues ↔ commit — está em
+[`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md). O checklist de release está em
+`.opencode/skills/release/SKILL.md`.
+
 ## [Unreleased]
 
 ### Added
@@ -28,6 +33,10 @@ sequência da release no mesmo dia.
 - Estado persistente `.ai-workflow/` (`PROJECT_STATE.md`, `contracts/`, `runs/`,
   `decisions/`) e ADR 0001.
 - Convenção de versionamento DateVer `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`) e este changelog.
+- `docs/VERSIONAMENTO.md`: fonte detalhada da convenção de versionamento e changelog
+  (DateVer + Keep a Changelog 1.1.0 pt-BR), com exemplos de releases no mesmo dia,
+  escrita de entradas, rastreabilidade versão ↔ issues ↔ commit e o que nunca fazer.
+  Referenciado no cabeçalho do `CHANGELOG.md`, no `README.md` e no `AGENTS.md`. (KAN-166)
 
 ### Changed
 

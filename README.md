@@ -62,6 +62,8 @@ projeto-final-faetec/
 - [`docs/REQUISITOS_NAO_FUNCIONAIS.md`](docs/REQUISITOS_NAO_FUNCIONAIS.md) — 9 RNFs
 - [`docs/puml/classes.puml`](docs/puml/classes.puml) — Diagrama de classes conceitual
 - [`docs/puml/DER.puml`](docs/puml/DER.puml) — Diagrama Entidade-Relacionamento físico
+- [`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md) — Versionamento DateVer e changelog
+  ([`CHANGELOG.md`](CHANGELOG.md))
 
 ## Desenvolvimento
 
