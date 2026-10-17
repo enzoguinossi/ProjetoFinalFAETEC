@@ -17,6 +17,13 @@
   --color-warning: #d97706;
   --color-cancel: #ff383c;
   --color-cancel-hover: #ff0000;
+  --color-branco: #ffffff;
+
+  /* Medidas usadas nas marcações `data-figma*`/design: o plugin do Figma lê os
+     tokens daqui (fonte única), então não podem existir só na cópia do plugin. */
+  --raio-lg: 8px;
+  --raio-xl: 20px;
+  --raio-pill: 26px;
 }
 
 :root {

@@ -37,6 +37,7 @@ import {
 import { GLOBAL_HIDE, selecionar, type Scenario, type ScenarioStep } from "./scenarios";
 import { COOKIE_NAME, criarSessao } from "./session";
 import { ORIGEM } from "./origem";
+import { lerTokensGlobais } from "./tokens";
 
 /* ══════════════════════════════ argumentos ══════════════════════════════ */
 
@@ -470,6 +471,9 @@ async function main() {
   }
 
   /* ── manifesto ── */
+  // Os tokens de design vêm do `globals.css` (fonte única): o plugin os aplica
+  // como variáveis no Figma, atualizando os existentes e criando os novos.
+  const tokens = lerTokensGlobais();
   const manifesto = {
     generatedAt: new Date().toISOString(),
     viewport: VIEWPORT,
@@ -487,10 +491,14 @@ async function main() {
     // O plugin carimba a descrição de cada mestre com o caminho do código, e o
     // `figma:diff` usa a mesma tabela para apontar onde mexer.
     origem: ORIGEM,
+    tokens,
   };
   writeFileSync(SCENES_FILE, JSON.stringify(manifesto, null, 2), "utf8");
 
   log("");
+  log(
+    `🎨 tokens: ${Object.keys(tokens.cores).length} cor(es) e ${Object.keys(tokens.metricas).length} métrica(s) lidas do globals.css`,
+  );
   log(`📦 ${resultados.length}/${escopo.length} cenários capturados`);
   const avisos = resultados.flatMap((r) => r.warnings);
   if (avisos.length) {

@@ -72,6 +72,7 @@ arquivo do código onde mexer) e telas. Ver §11.
 | `session.ts` | forja o JWT reaproveitando `signToken` da app (respeita o campo `sv`) |
 | `fixtures.ts` | dados ricos no banco de exportação (idempotente; apaga só o que ele cria) |
 | `origem.ts` | **âncora de código** por componente: vai para a descrição do mestre e para o `diff` |
+| `tokens.ts` | **fonte única dos tokens de design**: lê `src/app/globals.css` (`@theme` + `:root`, ignorando os aliases legados) e devolve `cores`/`metricas` para o manifesto |
 | `harvest.ts` | orquestra tudo: banco → `next dev` → Playwright → `scenes/` + `screens/` + `icons.json` |
 | `dom-walker.js` | **o coração da captura**: DOM + `getComputedStyle` → especificação de nós |
 | `server.ts` | serve `out/figma-export` com CORS `*`, recebe `/verify/<tela>` e `/snapshot/<página>` |
@@ -115,11 +116,18 @@ spec) · `aplicarLayoutBase` (a ordem crítica das dimensões) · `aplicarOverri
 **`plugin-check.ts`** — `criarFigmaMock` (a Plugin API inteira) · `criarFetch` (serve os
 arquivos) · `clonarFilhos` (instâncias) · `main` (roda a importação e as invariantes).
 
+**`tokens.ts`** — `lerTokensGlobais` (tokens do `globals.css` → `cores` por hex e
+`metricas` em px; ignora os aliases do `:root` e **falha se a tabela vier vazia**) ·
+`expandirHex` (`#abc` → `#aabbcc`) · `comoPx` (`rem`/`px`/número → px).
+
 ## 4. Contrato de dados (o que o plugin consome)
 
-`scenes.json` (manifesto) → `{ viewport, scale, sceneServer, scenes[], origem }`.
+`scenes.json` (manifesto) → `{ viewport, scale, sceneServer, scenes[], origem, tokens }`.
 `origem` é a tabela `Componente → arquivo` de `origem.ts`: o plugin a usa para
 carimbar a descrição de cada mestre e o `diff.ts` para dizer onde mexer.
+`tokens` é o resultado de `tokens.ts` sobre o `globals.css` —
+`{ cores: { <nome>: "#rrggbb" }, metricas: { <nome>: <px> } }` — e o plugin o aplica
+como variáveis no Figma (upsert).
 Cada `scenes/<tela>.json`:
 
 ```jsonc
@@ -179,8 +187,11 @@ a âncora. Variável: `{ colecao, nome, tipo, valor }` (valor do modo padrão).
   `Rótulo` (TEXT), `Mostrar rótulo` (BOOLEAN), `Mostrar ícone à esquerda/direita`
   (BOOLEAN), `Ícone esquerdo/direito` (INSTANCE_SWAP entre os 19 ícones).
   É `hug` na largura, então encolhe sozinho (caso "só ícone").
-- **Variáveis**: coleções `Nexus / Cor` e `Nexus / Métrica` derivadas de
-  `src/app/globals.css`, ligadas a fills/raios que coincidem.
+- **Variáveis**: coleções `Nexus / Cor` e `Nexus / Métrica` **derivadas dos tokens do
+  `src/app/globals.css`** (fonte única: a colheita os leva no manifesto e o plugin não
+  guarda cópia). A importação faz **upsert**: atualiza o valor de modo padrão das
+  existentes, cria as que faltam e **não remove** as que saíram da lista (só registra).
+  Ligadas a fills/raios que coincidem.
 - **Escopo**: só primitivas dos `src/components` viram componentes usados nas telas;
   compostos (`DataTable`, `Modal`, formulários) existem **só na biblioteca**
   (`SOMENTE_BIBLIOTECA`), porque o conteúdo deles varia por tela.
@@ -204,6 +215,7 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | 11 | O `diff` não pode reportar canto reto como diferença (`raio` 0 ↔ ausente) | senão todo componente de canto reto aparecia como mudança |
 | 12 | A **volta** funciona: listar páginas, ler uma página, serializar instâncias com âncora e variáveis | era o único caminho que só seria testado dentro do Figma |
 | 13 | Todo componente de `COMPONENTES` tem **âncora em `ORIGEM`** e a **marca `data-figma` no arquivo apontado** (atributo JSX ou chave de objeto); marca no app sem âncora vira aviso, não falha | o `data-figma*` não altera nada visual: mexer num elemento e perder a marca tira o componente da biblioteca sem ninguém notar, e sem âncora a volta do `diff` fica cega |
+| 14 | As variáveis de `Nexus / Cor` e `Nexus / Métrica` batem com os tokens do manifesto, uma variável **pré-existente com valor antigo converge** para o valor atual (o upsert atualiza as existentes) e o manifesto **sem `tokens` falha** mandando re-rodar a colheita | os tokens estavam copiados dentro do plugin e ficavam desatualizados quando o `globals.css` mudava — e "reaproveitar a coleção existente" sem atualizar era exatamente o defeito |
 
 ## 7. Armadilhas da API do Figma (todas já custaram tempo)
 
@@ -253,6 +265,7 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | Diff: todo token "sem equivalente no globals.css" | `lerTokensCss` guardava o nome **sem** `--` e a busca usava **com** `--` | chave normalizada com o prefixo |
 | Diff: todo componente de canto reto aparecendo como diferença | a leitura só grava `raio` quando há raio, e `undefined` ≠ `[0,0,0,0]` | normalizar 0 ↔ ausente na comparação |
 | Divergência de 1:1 em **todas** as telas (0,46%–3,89%), crescendo com a densidade de texto | a app declarava `--font-sans: "Inter"`, `font-[Roboto,sans-serif]` na sidebar e `--font-display: "SF Pro","Segoe UI"`, mas **não carregava nenhuma fonte**: o navegador pintava Arial/Segoe UI e o plugin normaliza cada família para Inter/Roboto | carregar **Inter** via `next/font/google` e apontar `--font-sans`/`--font-display` para ela; sidebar passa a usar a mesma fonte (ver §9) |
+| Variáveis do Figma com os tokens **antigos** depois de o `globals.css` mudar (e `branco`/`raio-lg/xl/pill` sem equivalente no CSS) | os tokens existiam **copiados à mão** em `plugin/code.js` (`TOKENS_COR`/`TOKENS_METRICA`) e a reimportação só *reaproveitava* as coleções, sem atualizar valor nenhum | fonte única: `globals.css` → `tokens.ts` → manifesto → `garantirVariaveis` faz **upsert** (atualiza existentes, cria novas, mantém as que saíram); invariante #14 prova a convergência |
 
 ## 9. Estado atual e pendências
 
@@ -262,6 +275,16 @@ ocorrência real e âncora de origem, 21/21 promovidos de `COMPONENTES` com a ma
 0 duplicações, 0 larguras incompatíveis, 0 campos desalinhados, 0 mestres aninhados,
 0 formulários sem fundo, 0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint`, os
 165 testes da app e `next build` passando.
+
+**Verificado (tokens, fonte única)**: a colheita leva `tokens` no manifesto
+(14 cores + 5 métricas do `globals.css`) e o `figma:check` prova a invariante #14 —
+as variáveis de `Nexus / Cor`/`Nexus / Métrica` batem com o manifesto e a importação
+**converge** uma variável semeada com valor antigo (`brand` `#ff0000` → `#1b9956`,
+`raio-lg` 4 → 8), mantendo (só registrando) as variáveis fora da lista. A invariante
+tem dentes: reintroduzir o ramo antigo ("reaproveita sem atualizar") deixa o
+`figma:check` vermelho, e um manifesto sem `tokens` falha mandando re-rodar
+`npm run figma:harvest`. Os tokens que só existiam na cópia do plugin entraram no
+`@theme` (`--color-branco`, `--raio-lg/xl/pill`); nenhum valor existente mudou.
 
 **Verificado (compare, 1ª execução real)**: `npm run figma:compare` rodou com uma
 importação real (conferir 1:1) — **média 2,707%**, 1/47 dentro do limite de 0,5%
@@ -276,8 +299,9 @@ re-importar no Figma com *conferir 1:1* e rodar `npm run figma:compare` de novo.
 (28 variáveis, 32 mestres). Componentes e telas: **nenhuma diferença**. O que aparece
 como "sem correspondência" são os mestres próprios da `Page 1` (o arquivo de trabalho dos
 designers), não cópias com os nomes do app. Tokens "sem equivalente" = 9 variáveis da
-coleção do próprio design + `branco` + `raio-lg/xl/pill` (que não existem no
-`globals.css`); as 19 variáveis `Nexus / Cor` e `Nexus / Métrica` **casam** e por isso não
+coleção do próprio design + `branco` + `raio-lg/xl/pill` (que **não existiam** no
+`globals.css` e agora existem — ver a nota de tokens acima); as 19 variáveis
+`Nexus / Cor` e `Nexus / Métrica` **casam** e por isso não
 aparecem como diferença. Ver a proposta de de-para em `.ai-workflow/runs/`.
 
 **Pendente**: re-importar no Figma com **conferir 1:1** e rodar `npm run figma:compare`
@@ -302,6 +326,7 @@ verificação vive de `figma:check` + `figma:compare`, que não dependem dele.
 | Rigor da comparação | `compare.ts` → `LIMITE_OK` / `LIMITE_CANAL` |
 | Novas invariantes | `plugin-check.ts` (e idealmente provar com um teste do teste) |
 | Origem (caminho do código) de um componente | `origem.ts` (e a marca `data-figma` no React) |
+| Tokens de design (cor/medida) | `src/app/globals.css` — **fonte única**: a colheita lê daí (`tokens.ts`) e o plugin aplica (upsert); não existe mais cópia em `plugin/code.js` |
 | O que o diff compara | `diff.ts` → `diffTokens` / `camposDoMestre` / `diffTelas` |
 | Qual página a volta lê | escolhida na aba *Ler do Figma*; o `diff` aceita o nome como argumento |
 
