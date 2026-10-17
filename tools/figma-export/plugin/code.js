@@ -1754,7 +1754,35 @@ async function aplicarAninhados(instancia, spec, caminho) {
       continue;
     }
 
+    adotarTamanhoDaOcorrencia(no, filhoSpec);
+
     if ("children" in no) await aplicarAninhados(no, filhoSpec, trilha);
+  }
+}
+
+/**
+ * Um filho de instância adota o tamanho da ocorrência DESTA tela.
+ *
+ * O mestre é construído a partir da ocorrência mais completa de todas as telas,
+ * então a altura de um filho que o texto decide — a mensagem do `ConfirmDialog`,
+ * por exemplo — vem da tela maior e sobra espaço dentro da instância: o
+ * auto-layout do pai empurra a barra de botões para baixo e o diálogo fica com um
+ * vão que a tela de referência não tem.
+ *
+ * Quem o próprio auto-layout dimensiona fica de fora: filho com `grow` (o Figma
+ * calcula pela sobra do pai) e filho com `hug` (o tamanho é intrínseco ao
+ * conteúdo). Aí o mestre é quem sabe.
+ */
+function adotarTamanhoDaOcorrencia(no, spec) {
+  if (spec.kind !== "frame" || no.type !== "FRAME") return;
+  if (spec.grow || (spec.layout && spec.layout.hug)) return;
+  if (!(spec.w > 0) || !(spec.h > 0)) return;
+  try {
+    if (Math.abs(no.width - spec.w) > 0.5 || Math.abs(no.height - spec.h) > 0.5) {
+      no.resize(spec.w, spec.h);
+    }
+  } catch {
+    /* tamanho preso ao layout: o Figma recalcula */
   }
 }
 
