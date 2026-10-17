@@ -748,10 +748,35 @@ KAN-123 #comment ajuste no cálculo do frete
 5. **Nunca comentar em uma task sem antes propor o conteúdo ao usuário e obter aprovação.** Nenhum comentário deve ser publicado automaticamente.
 6. **Registrar tempo apenas via worklog do MCP** (`addOrEditJiraIssueWorklog`), nunca por comentário ou `#time`.
 
-As regras completas de integração com o Jira estão em `docs/agents/JIRA.md`.
+As regras completas de integração com o Jira estão em `docs/agents/JIRA.MD`.
 
 Quando o MCP do Jira estiver disponível, seguir essas regras antes de
 iniciar alterações significativas e ao finalizar o trabalho.
+
+---
+
+### Arquitetura multiagente e estado persistente
+
+O trabalho é orquestrado por agentes versionados em `.opencode/agents/` (orquestrador +
+subagentes especializados), com **estado persistente** em `.ai-workflow/` e skills de
+processo em `.opencode/skills/`. O fluxo completo está em `docs/agents/WORKFLOW.md`; o
+estado corrente, em `.ai-workflow/PROJECT_STATE.md`.
+
+Regras:
+
+1. Os objetivos chegam pela sessão do **orquestrador**, que delega e consolida — não
+   absorve o trabalho técnico.
+2. Toda delegação gera um **contrato de tarefa**
+   (`.ai-workflow/contracts/TASK_CONTRACT_TEMPLATE.md`) com run id, issue Jira, escopo,
+   critérios de aceite e testes.
+3. Um relatório de agente **não é prova**: o orquestrador valida Git/Jira antes de
+   consolidar. Falha nunca é tratada como sucesso.
+4. Um run = um arquivo em `.ai-workflow/runs/`; o estado consolidado tem **escritor único**
+   (o orquestrador).
+5. Versionamento **DateVer** `N.DD.MM.YYYY` → tag `vN.DD.MM.YYYY` (N começa em 1), com
+   `CHANGELOG.md` no padrão Keep a Changelog 1.1.0 (pt-BR).
+6. Branches de trabalho `KAN-<n>-<slug>`; integração na `main`.
+
 
 <!-- BEGIN:nextjs-agent-rules -->
 

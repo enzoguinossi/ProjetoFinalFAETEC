@@ -185,3 +185,19 @@ Após o push, o GitHub for Atlassian app processa os Smart Commits e:
 #### Configuração
 
 A integração GitHub ↔ Jira foi configurada através do app **GitHub for Atlassian** disponível no marketplace do Atlassian. A organização `enzoguinossi/ProjetoFinalFAETEC` está conectada ao site `projeto-final.atlassian.net` com escopo de leitura e escrita nos repositórios do projeto.
+
+### Releases, versões e issues
+
+O versionamento usa **DateVer** `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`). Ao preparar um
+release, relacione a versão às issues incluídas (versão de projeto via
+`manageJiraProjectVersion`, quando aplicável) e às entradas do `CHANGELOG.md`.
+
+Regras:
+
+- não criar versão/tag oficial sem cumprir o checklist de release
+  (`.opencode/skills/release/SKILL.md`) e **sem aprovação do usuário**;
+- cada issue incluída na versão deve ter pelo menos um commit associado;
+- não registrar horas nem comentar em issues como parte do release sem aprovação prévia.
+
+O fluxo multiagente que conecta Jira, Git, worktrees, DateVer e changelog está em
+`docs/agents/WORKFLOW.md`.
