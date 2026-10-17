@@ -390,10 +390,21 @@ async function executarPasso(page: Page, passo: ScenarioStep, cena: Scenario) {
 
 async function novoBrowser(): Promise<Browser> {
   const canais = navegador ? [navegador] : ["chrome", "msedge"];
+  /**
+   * Flags que aproximam a rasterização de texto do Chromium da do Figma.
+   * Sem elas, o gabarito (navegador) e a reexportação (Figma) divergem ~2,5%
+   * só na borda dos glifos — o `figma:compare` não distingue isso de defeito real.
+   */
+  const args = [
+    "--disable-lcd-text", // antialias em tons de cinza, sem subpixel RGB
+    "--font-render-hinting=none", // sem hinting (o Figma não usa)
+    "--disable-font-subpixel-positioning", // posicionamento inteiro do glifo
+    "--force-color-profile=srgb", // mesmo perfil de cor
+  ];
   let ultimoErro: unknown;
   for (const channel of canais) {
     try {
-      return await chromium.launch({ channel, headless: true });
+      return await chromium.launch({ channel, headless: true, args });
     } catch (erro) {
       ultimoErro = erro;
       log(`   ⚠️  Não foi possível abrir o canal "${channel}", tentando o próximo…`);
