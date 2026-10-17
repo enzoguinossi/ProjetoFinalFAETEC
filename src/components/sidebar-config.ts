@@ -30,11 +30,11 @@ export const iconBtnCls =
   "w-12 h-12 flex items-center justify-center border-none rounded-lg bg-transparent cursor-pointer transition-[background-color] duration-[120ms] hover:bg-[#f2f4f8] [&_img]:w-6 [&_img]:h-6";
 export const navCls = "flex-1 flex flex-col min-h-0 w-full";
 export const navItemCls =
-  "flex items-center gap-2 w-full h-12 py-3 px-2 border-b border-[#f2f4f8] bg-transparent cursor-pointer font-[Roboto,sans-serif] text-base leading-none font-medium text-ink text-left transition-[background-color] duration-[120ms] box-border hover:bg-[#f2f4f8]";
+  "flex items-center gap-2 w-full h-12 py-3 px-2 border-b border-[#f2f4f8] bg-transparent cursor-pointer font-sans text-base leading-none font-medium text-ink text-left transition-[background-color] duration-[120ms] box-border hover:bg-[#f2f4f8]";
 export const navItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]! border-b-transparent";
 export const subItemsCls = "flex flex-col pl-2";
 export const subItemCls =
-  "flex items-center gap-2 w-full py-2 px-3 border-none bg-transparent cursor-pointer font-[Roboto,sans-serif] text-sm font-normal text-ink text-left transition-[background-color] duration-[120ms] rounded-md box-border hover:bg-[#f2f4f8]";
+  "flex items-center gap-2 w-full py-2 px-3 border-none bg-transparent cursor-pointer font-sans text-sm font-normal text-ink text-left transition-[background-color] duration-[120ms] rounded-md box-border hover:bg-[#f2f4f8]";
 export const subItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]!";
 export const userInfoCls =
   "flex items-center gap-[0.625rem] w-full pt-2 border-t border-border bg-transparent border-l-0 border-r-0 border-b-0 cursor-pointer font-[inherit] text-left";
