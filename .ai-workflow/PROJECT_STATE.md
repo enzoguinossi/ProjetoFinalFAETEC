@@ -1,67 +1,75 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-10-17 (RUN-20261017-01).
+> Última consolidação: 2026-10-17 (release 1.17.10.2026).
 
 ## Objetivo atual
 
-Implantar a **arquitetura de orquestração multiagente** (infraestrutura de trabalho
-com agentes, estado persistente, contratos, Jira, Git/worktrees, DateVer e changelog).
-**Não alterar lógica funcional do produto** nesta tarefa.
+**Primeira versão entregue** — release `1.17.10.2026` (tag `v1.17.10.2026`) com o sistema
+de acesso/cadastros, a infraestrutura de orquestração multiagente e a ferramenta de
+exportação para o Figma.
+
+**Próxima fase (sessão nova):** revisar documentação e fluxos e iniciar a **movimentação de
+estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 
 ## Convenções ativas
 
-- Branch de integração: **`main`**.
-- Branches de trabalho: `KAN-<n>-<slug>`.
+- Branch de integração: **`main`** — e **não se cria branch por versão**: o release é uma
+  **tag na `main`** (`vN.DD.MM.YYYY`). Ver `docs/VERSIONAMENTO.md`.
 - Agentes versionados no repositório: `.opencode/agents/*.md`.
 - Estado/contratos versionados neste diretório (`.ai-workflow/`).
-- Versionamento: **DateVer `N.DD.MM.YYYY`** → tag **`vN.DD.MM.YYYY`** (N começa em 1).
+- Versionamento: **DateVer `N.DD.MM.YYYY`** (fuso `America/Sao_Paulo`) → tag `vN.DD.MM.YYYY`.
 - Changelog: **Keep a Changelog 1.1.0 (pt-BR)** em `CHANGELOG.md`.
+- Antes de criar/alterar task no Jira: **mostrar o texto exato ao usuário**
+  (`docs/agents/JIRA.MD`).
 
 ## Runs
 
 | Run | Objetivo | Agente | Status | Branch/worktree | Issue |
 |---|---|---|---|---|---|
-| RUN-20261017-01 | Infraestrutura de orquestração multiagente | orchestrator | concluído | `main` (checkout principal) | KAN-165 |
-| RUN-20261017-02 | Ferramenta de exportação para o Figma (fechamento) | orchestrator | em andamento | `figma-export` (worktree) | KAN-166 |
+| RUN-20261017-01 | Infraestrutura de orquestração multiagente | orchestrator | concluído | `main` | KAN-165 |
+| RUN-20261017-02 | Ferramenta de exportação para o Figma (fechamento) | orchestrator | concluído | `figma-export` → `main` | KAN-166 |
+| RUN-20261017-03 | Primeiro release (`1.17.10.2026`) | release-manager | concluído | `main` | KAN-165, KAN-166 |
 
 ## Bloqueios e dependências
 
-- Nenhum bloqueio. Issue desta entrega: **KAN-165** (criada em 2026-10-17).
+- **Publicação pendente de aprovação:** `git push origin main` + `git push origin
+  v1.17.10.2026` ainda **não** executados (a tag existe só localmente).
 
 ## Trabalho existente a preservar
 
-- Worktree **`figma-export`** (suja): skill V2 `.opencode/skills/figma-export/SKILL.md`
-  + `tools/figma-export/**` (Playwright + plugin Figma). Decisão do usuário: **revisar/
-  commitar na branch dele depois** (opção B). Não tocar nesta tarefa.
+- Branch/worktree **`figma-export`**: já **integrada na `main`** (fast-forward em
+  `ed324fd`). O worktree e a branch continuam existindo; remover só com autorização.
 - Worktree **`gravacao`**: `prisma/seed-demo.ts` não rastreado. Preservar.
-- Worktree **`modulo-estoque`** (KAN-140): **desconsiderar** (refazer do zero).
+- Worktree **`modulo-estoque`** (KAN-140): **descartada** (refazer do zero).
   **Não deletar** branch nem worktree sem autorização.
 
 ## Git (verificado no checkpoint)
 
-- `main` = `9cc6845` (infra da orquestração) sobre `f17a671`; `origin/main` ainda em `3a3c352`.
-- Worktrees: principal, `KAN-140-modulo-estoque`, `figma-export`, `gravacao`.
-- Sem tags ainda. `CHANGELOG.md` criado nesta tarefa (seção `Unreleased`).
+- `main` = `ed324fd`; **tag `v1.17.10.2026`** apontando para ela (local).
+- `origin/main` ainda em `3a3c352` — dezenas de commits locais à frente (infra + Figma +
+  release).
+- Nenhuma tag de versão anterior (esta é a primeira).
 
 ## Último checkpoint válido
 
-- 2026-10-17 — Fase 1 (auditoria) concluída e aprovada pelo usuário.
-- 2026-10-17 — E1–E8 implementadas e commitadas em `9cc6845` (KAN-165).
-- Decisões: (1) state versionado/commitado; (2) integração na `main`; (3) agentes no repo;
-  (4) `figma-export` revisar depois; (5) DateVer com N=1; (6) não deletar `modulo-estoque`.
+- 2026-10-17 — release `1.17.10.2026` preparado, tag local criada e integrado na `main`.
+- KAN-165 e KAN-166 **concluídas** no Jira (KAN-166 renomeada para refletir a ferramenta).
+- Decisões registradas: state no repo; integração na `main` sem branch de versão; agentes no
+  repo; DateVer com N=1 e fuso `America/Sao_Paulo`; `modulo-estoque` descartada (não
+  deletada); texto exato no Jira antes de criar/alterar task.
 
 ## Testes executados
 
-- `node scripts/ai-workflow-check.mjs` → 13/13 automáticos ok, 2 manuais, 0 falhas.
-- `npx eslint scripts/ai-workflow-check.mjs` → 0 problemas.
-- `opencode debug agents` → 6 agentes do projeto descobertos.
+- `node scripts/ai-workflow-check.mjs` → 13/13 automáticos, 2 manuais, 0 falhas.
+- `npm test` → 165/165 (18 arquivos) · `npx tsc --noEmit` · `npx eslint .` · `npm run build`.
+- `npm run figma:check` → verde (21/21 marcas, 53 mestres, fidelidade e resiliência em 0).
+- `npm run figma:harvest` → 47/47 cenários; `figma:compare` → média 2,421% (limite de 0,5%
+  dispensado pelo usuário — resíduo de rasterização; evidência é o mapa de `diff/`).
 
 ## Próximas ações
 
-1. **KAN-166** — fechar a ferramenta Figma: guarda de reuso (invariante nova que trava a
-   perda de marcas `data-figma*`), leitura de componentes (a volta) no Figma real e
-   `npm run figma:compare` dentro do limite.
-2. **Primeiro release** DateVer `1.17.10.2026` (tag `v1.17.10.2026`) com changelog, quando
-   os critérios de KAN-166 forem cumpridos.
-3. Verificação manual de runtime da arquitetura (sessão-filha real; retomar em sessão nova).
+1. **Publicar** (com aprovação): `git push origin main` + `git push origin v1.17.10.2026`.
+2. Definir o destino de `figma-export` (branch/worktree já integrados) e de `gravacao`.
+3. **Sessão nova:** revisar documentação e fluxos; iniciar a **movimentação de estoque**
+   (KAN-140), com task criada pelo formato novo do `docs/agents/JIRA.MD`.

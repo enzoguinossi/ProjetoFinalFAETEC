@@ -92,6 +92,10 @@ No `CHANGELOG.md` a mais recente fica acima:
 6. A versão fica associada às **issues** incluídas nela. A forma de relacionar (versão de
    projeto no Jira, quando aplicável) está em `docs/agents/JIRA.MD` §"Releases, versões e
    issues" — não repetida aqui.
+7. **Não se cria branch por versão.** O projeto mantém **só a `main`** como branch de
+   integração: a tag `vN.DD.MM.YYYY` é criada **direto na `main`**, no commit do release.
+   (Branch de trabalho, quando houver, existe só para isolar a tarefa e é integrada de
+   volta — nunca uma branch por release.)
 
 > **Fuso de referência:** o dia da release é o de **`America/Sao_Paulo`** (fuso de
 > Brasília, UTC−03:00) — é o fuso do projeto e o mesmo já usado na colheita da exportação
