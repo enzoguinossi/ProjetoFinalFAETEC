@@ -115,10 +115,11 @@ spec) · `aplicarLayoutBase` (a ordem crítica das dimensões) · `aplicarOverri
 `exportarIcones` · `esperarApp`.
 
 **`plugin-check.ts`** — `criarFigmaMock` (a Plugin API inteira) · `criarFetch` (serve os
-arquivos) · `clonarFilhos` (instâncias) · `main` (roda a importação e as invariantes —
-as de **fidelidade da montagem** ficam no bloco `14)`, sobre as cenas e sobre a árvore
-construída: `grow` sem peso, `grow` com sobra, paginação em uma linha, geometria da
-instância contra a ocorrência).
+arquivos, com falhas forçadas para exercitar os `catch` do plugin) · `clonarFilhos`
+(instâncias) · `main` (roda a importação e as invariantes — as de **fidelidade da
+montagem** ficam no bloco `15–18`, sobre as cenas **e** sobre a árvore construída:
+`grow` sem peso, `grow` com sobra, paginação em uma linha, geometria da instância
+contra a ocorrência).
 
 **`tokens.ts`** — `lerTokensGlobais` (tokens do `globals.css` → `cores` por hex e
 `metricas` em px; ignora os aliases do `:root` e **falha se a tabela vier vazia**) ·
@@ -225,10 +226,10 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | 12 | A **volta** funciona: listar páginas, ler uma página, serializar instâncias com âncora e variáveis | era o único caminho que só seria testado dentro do Figma |
 | 13 | Todo componente de `COMPONENTES` tem **âncora em `ORIGEM`** e a **marca `data-figma` no arquivo apontado** (atributo JSX ou chave de objeto); marca no app sem âncora vira aviso, não falha | o `data-figma*` não altera nada visual: mexer num elemento e perder a marca tira o componente da biblioteca sem ninguém notar, e sem âncora a volta do `diff` fica cega |
 | 14 | As variáveis de `Nexus / Cor` e `Nexus / Métrica` batem com os tokens do manifesto, uma variável **pré-existente com valor antigo converge** para o valor atual (o upsert atualiza as existentes) e o manifesto **sem `tokens` falha** mandando re-rodar a colheita | os tokens estavam copiados dentro do plugin e ficavam desatualizados quando o `globals.css` mudava — e "reaproveitar a coleção existente" sem atualizar era exatamente o defeito |
-| 15 | Nenhum frame tem **mais de um filho com `grow`** | o auto-layout do Figma **não tem peso**: dois filhos "Fill" dividem a sobra por igual, enquanto o CSS divide na proporção de `flex-grow`. A linha "CEP + UF" (2:1) saiu com as duas colunas em 210px e o select da UF **por cima do botão da lupa** |
-| 16 | Um frame **com sobra no eixo principal não pode ter filho com `grow`** | um filho que cresce absorve a sobra: sobra significa que o navegador **não** o cresceu (acontece quando o item cresceria num pai que o motor não usou de fato — a coluna do formulário esticada pela grade, com 233px sobrando). No Figma o `Fill` distribuiria essa sobra e empurraria os campos seguintes **para fora do modal** |
+| 15 | Nenhum frame tem **mais de um filho com `grow`** — na **cena** e na **árvore** montada | o auto-layout do Figma **não tem peso**: dois filhos "Fill" dividem a sobra por igual, enquanto o CSS divide na proporção de `flex-grow`. A linha "CEP + UF" (2:1) saiu com as duas colunas em 210px e o select da UF **por cima do botão da lupa** |
+| 16 | Um frame **com sobra no eixo principal não pode ter filho com `grow`** — na **cena** e na **árvore** montada (instâncias de fora: os filhos vêm clonados do mestre) | um filho que cresce absorve a sobra: sobra significa que o navegador **não** o cresceu (acontece quando o item cresceria num pai que o motor não usou de fato — a coluna do formulário esticada pela grade, com 233px sobrando). No Figma o `Fill` distribuiria essa sobra e empurraria os campos seguintes **para fora do modal** |
 | 17 | Não existe texto `"N de N"` (informação de paginação) com `singleLine` falso na cena, nem com auto-resize diferente de `WIDTH_AND_HEIGHT` na árvore | o texto do JSX com várias expressões (`{a} de {b}`) vira vários nós e as caixas eram contadas como LINHAS: saía como `HEIGHT` e o Figma re-quebrava — o "0" caía para a linha de baixo |
-| 18 | Dentro de uma **instância**, todo frame pareado (sem `grow`/`hug`) tem o tamanho da **ocorrência daquela tela** (altura sempre; largura quando não é contêiner de texto) | o mestre vem da ocorrência **mais completa**: a mensagem do `ConfirmDialog` (3 linhas em outra tela) impunha 68px de altura na instância de 1–2 linhas e o auto-layout do pai empurrava a barra de botões para baixo — o vão que a REF não tem |
+| 18 | Dentro de uma **instância**, todo frame pareado (sem `grow`/`hug`) tem o tamanho da **ocorrência daquela tela** (altura sempre; largura quando não é contêiner de texto); um alvo de pareamento ausente **falha** (não é pulado) | o mestre vem da ocorrência **mais completa**: a mensagem do `ConfirmDialog` (3 linhas em outra tela) impunha 68px de altura na instância de 1–2 linhas e o auto-layout do pai empurrava a barra de botões para baixo — o vão que a REF não tem |
 
 ## 7. Armadilhas da API do Figma (todas já custaram tempo)
 
@@ -315,7 +316,8 @@ montagem"), todas em 0 — **com dentes provados**: reintroduzir cada defeito de
 `figma:check` vermelho (23 frames com dois `grow`; 3 colunas com filho `grow` e sobra de
 174–233px; 67 textos de paginação quebrados + 1 nó `HEIGHT` re-quebrável; 6 instâncias de
 `ConfirmDialog` com a mensagem de 68px contra 22,5/45px da cena) e reverter devolve o
-verde. Nenhum arquivo de `src/**` mudou: os quatro eram erros de reconstrução.
+verde. Nenhum arquivo de `src/**` mudou por causa deles: os quatro eram erros de
+reconstrução.
 
 **Verificado (tokens, fonte única)**: a colheita leva `tokens` no manifesto
 (14 cores + 5 métricas do `globals.css`) e o `figma:check` prova a invariante #14 —
@@ -327,9 +329,12 @@ tem dentes: reintroduzir o ramo antigo ("reaproveita sem atualizar") deixa o
 `npm run figma:harvest`. Os tokens que só existiam na cópia do plugin entraram no
 `@theme` (`--color-branco`, `--raio-lg/xl/pill`); nenhum valor existente mudou.
 
-**Verificado (compare, 2 execuções reais)**: `npm run figma:compare` rodou com
+**Verificado (compare, 3 execuções reais)**: `npm run figma:compare` rodou com
 importações reais (conferir 1:1). 1ª: **média 2,707%**, 1/47 dentro de 0,5%. Depois de
-carregar Inter e padronizar as fontes: **média 2,502%** (1/47) — melhora real, mas pequena.
+carregar Inter e padronizar as fontes: **média 2,502%** (1/47) — melhora real, mas
+pequena. Depois das correções de montagem (`grow`/paginação/geometria): **média
+2,421%** (1/47) — a série é estável e confirma que o resíduo é rasterização, não
+reconstrução.
 
 **Diagnóstico do resíduo (não é leiaute nem cor)**: no recorte 1:1 as telas são
 visualmente idênticas; a luma global é igual (ex.: 233,41 vs 233,50) e os pixels
@@ -352,6 +357,11 @@ sinal útil (é o esqueleto de glifos/ícones/bordas).
 - **Padding do `ConfirmDialog`:** mesmo após a correção da ocorrência-base (§8), sobra um
   resíduo pequeno no espaçamento. Aceito: os designers ajustam manualmente se alterarem
   essas telas.
+- **Fontes `monospace`:** as 2 telas de `acesso/login` (`acesso/login` e
+  `acesso/login-erro`) usam `font-family: monospace` no rodapé `V1.0.0`
+  (`src/components/LoginForm.tsx`); o plugin normaliza toda família para Inter/Roboto, então
+  essa diferença de glifo **permanece** no resíduo do `compare`. Aceito: é texto decorativo
+  e o mapa de diff mostra que não passa de glifo.
 
 **Corrigido (4 defeitos de reconstrução, achados na revisão visual da REF)**: `grow` sem
 peso dividindo a linha CEP/UF em colunas iguais · paginação `"N de N"` re-quebrando linha ·
@@ -367,8 +377,21 @@ coleção do próprio design + `branco` + `raio-lg/xl/pill` (que **não existiam
 `Nexus / Cor` e `Nexus / Métrica` **casam** e por isso não
 aparecem como diferença. Ver a proposta de de-para em `.ai-workflow/runs/`.
 
-**Pendente**: re-importar no Figma com **conferir 1:1** e rodar `npm run figma:compare`
-para medir o efeito da correção de fonte (limite aceito: 0,5% de pixels divergentes).
+**Verificado (endurecimento pós-revisão — RUN-20261017-02e, KAN-166)**: seis correções de
+robustez, com dentes provados (defeito reintroduzido → `figma:check` vermelho → revertido):
+
+- o plugin **não morre mais num `catch` sem binding**: `catch {` + `textoDoErro(erro)` dava
+  `ReferenceError` ("erro is not defined") dentro do próprio `catch`, derrubava a importação
+  e escondia a causa. Agora uma cena que não carrega e uma conferência 1:1 que não envia são
+  **registradas com a mensagem real** e a importação **continua** (falhas forçadas no mock);
+- o **manifesto lista só as cenas capturadas** e o `figma:check` **falha com mensagem clara**
+  ("rode `npm run figma:harvest`") em vez de estourar `ENOENT`;
+- o servidor local escuta em **`127.0.0.1`** (não mais em todas as interfaces);
+- os **fixtures recusam** rodar se o banco derivado for o **mesmo** da aplicação;
+- as invariantes **#15/#16 também valem sobre a árvore** montada (não só sobre a cena — a
+  cena prova o que o walker marcou, a árvore o que o plugin montou) e um **alvo de
+  pareamento ausente falha** em vez de ser pulado em silêncio (#18);
+- numeração das invariantes no `plugin-check.ts` alinhada à tabela §6 e esta nota.
 
 **Pendente (volta)**: a `Page 1` deve seguir a regra das cópias (copiar os componentes
 exportados para uma página própria e editar lá, **mantendo o nome**) para o casamento

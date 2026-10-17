@@ -2223,7 +2223,7 @@ async function montarCena(dados, cena, base, y, opcoes) {
           body: png,
         });
         estado.conferenciasEnviadas++;
-      } catch {
+      } catch (erro) {
         estado.conferenciasFalhas++;
         enviar("log", {
           texto: "  ✗ conferência 1:1 de " + cena.id + " não enviada: " + textoDoErro(erro),
@@ -2343,7 +2343,7 @@ async function importar(msg) {
       cursorY += dados.viewport.height + GAP_Y;
       feitas++;
       enviar("log", { texto: "  ✓ " + cena.id });
-    } catch {
+    } catch (erro) {
       falhas++;
       enviar("log", { texto: "  ✗ " + cena.id + ": " + textoDoErro(erro), erro: true });
     }

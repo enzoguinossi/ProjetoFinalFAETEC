@@ -15,6 +15,7 @@ import "./bootstrap";
 import bcrypt from "bcryptjs";
 
 import { prisma } from "../../src/lib/prisma";
+import { BASE_DATABASE_URL, exportDatabaseUrl } from "./config";
 import { usuarioDAO } from "../../src/dao/usuario";
 import { EXPORT_DB_NAME_SHOWN } from "./bootstrap";
 
@@ -25,6 +26,31 @@ const PERFIS_FIXTURE = ["Conferente"];
 
 /** `--clean` apenas esvazia os cadastros, deixando o banco sem administrador. */
 const APENAS_LIMPAR = process.argv.includes("--clean");
+
+/**
+ * Recusa rodar se o banco derivado para a exportação for o MESMO da aplicação.
+ *
+ * Os `deleteMany()` de `limpar()` apagam cadastros em massa (inclusive o
+ * `registroAuditoria`), o que só é aceitável no banco isolado. Sem esta guarda,
+ * um `FIGMA_EXPORT_DATABASE_URL` igual à `DATABASE_URL` apagaria os dados de
+ * desenvolvimento sem aviso.
+ */
+function exigirBancoIsolado() {
+  if (!BASE_DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL não definida — não é possível confirmar que o banco da exportação é isolado.",
+    );
+  }
+  const nomeBase = new URL(BASE_DATABASE_URL).pathname.replace(/^\//, "");
+  const nomeExportacao = new URL(exportDatabaseUrl()).pathname.replace(/^\//, "");
+  if (nomeBase === nomeExportacao) {
+    throw new Error(
+      `Recusando apagar dados: o banco da exportação ("${nomeExportacao}") é o MESMO ` +
+        `da aplicação ("${nomeBase}"). Ajuste FIGMA_EXPORT_DATABASE_URL (derivada de ` +
+        `DATABASE_URL) em tools/figma-export/.env ou na raiz.`,
+    );
+  }
+}
 
 async function limpar() {
   // ordem inversa das dependências
@@ -97,6 +123,7 @@ async function criarEndereco(dados: {
 }
 
 async function main() {
+  exigirBancoIsolado();
   console.log(`🏗️  Fixtures de exportação — banco "${EXPORT_DB_NAME_SHOWN}"\n`);
 
   await limpar();
