@@ -31,6 +31,8 @@ export default function Modal({ open, onClose, title, children, width }: ModalPr
         className="bg-white border-t-[13px] border-[#1b9956] rounded-[26px] w-[728px] max-h-[90vh] flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.15)] overflow-hidden"
         style={width ? { width } : undefined}
         onClick={(e) => e.stopPropagation()}
+        data-figma="Modal"
+        data-figma-title={title ?? ""}
       >
         {title && (
           <div className="flex items-center justify-between pt-4 px-5 shrink-0">

@@ -89,7 +89,7 @@ export default function CodigosSection({
           <Button
             label="Novo"
             iconLeft={
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" data-figma-icon="Adicionar">
                 <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             }

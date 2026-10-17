@@ -25,3 +25,8 @@ tsconfig.tsbuildinfo
 
 # Uploads em runtime (imagens convertidas para WEBP)
 /public/uploads/
+
+# Saída da exportação para o Figma (cenas, capturas e conferências)
+/out/figma-export/
+# Configuração local da exportação (pode conter a URL do banco de exportação)
+/tools/figma-export/.env

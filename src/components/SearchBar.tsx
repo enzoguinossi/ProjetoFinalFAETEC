@@ -20,13 +20,18 @@ export default function SearchBar({
   showNew = true,
 }: SearchBarProps) {
   return (
-    <div className="flex items-center gap-[0.625rem] w-full h-[2.875rem] px-[0.6875rem] box-border">
+    <div
+      className="flex items-center gap-[0.625rem] w-full h-[2.875rem] px-[0.6875rem] box-border"
+      data-figma="SearchBar"
+      data-figma-placeholder={placeholder}
+      data-figma-novo={showNew ? "true" : "false"}
+    >
       {showNew && (novoHref ? (
         <Button
           label={novoLabel}
           href={novoHref}
           iconLeft={
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" data-figma-icon="Adicionar">
               <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           }
@@ -36,7 +41,7 @@ export default function SearchBar({
           label={novoLabel}
           onClick={onNew}
           iconLeft={
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" data-figma-icon="Adicionar">
               <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           }

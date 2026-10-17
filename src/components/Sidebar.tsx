@@ -79,7 +79,11 @@ export default function Sidebar() {
     : cadastroItems.filter((i) => user?.permissoes?.includes(i.permissao));
 
   return (
-    <aside className={sidebarCls}>
+    <aside
+      className={sidebarCls}
+      data-figma="Sidebar"
+      data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
+    >
       {/* Logo */}
       <div className={logoAreaCls}>
         <img src="/logo.svg" alt="Nexus" className="w-[70.69px] h-auto" />
@@ -102,6 +106,9 @@ export default function Sidebar() {
             key={item.path}
             className={`${navItemCls} ${isActive(item.path) ? navItemActiveCls : ""}`}
             onClick={() => navigate(item.path)}
+            data-figma="SidebarItem"
+            data-figma-label={item.label}
+            data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
           >
             <img src={item.icon} alt="" className="w-6 h-6 shrink-0" />
             <span>{item.label}</span>
@@ -113,6 +120,10 @@ export default function Sidebar() {
           <button
             className={`${navItemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
             onClick={() => setCadastrosOpen(!cadastrosOpen)}
+            data-figma="SidebarGroup"
+            data-figma-label="Cadastros"
+            data-figma-variant={isCadastroItemActive ? "ativo" : "inativo"}
+            data-figma-expanded={cadastrosOpen ? "true" : "false"}
           >
             <img src="/icons/nav/cadastros.svg" alt="" className="w-6 h-6 shrink-0" />
             <span>Cadastros</span>
@@ -131,6 +142,9 @@ export default function Sidebar() {
                   key={item.path}
                   className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
                   onClick={() => navigate(item.path)}
+                  data-figma="SidebarSubItem"
+                  data-figma-label={item.label}
+                  data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
                 >
                   <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
                   <span>{item.label}</span>

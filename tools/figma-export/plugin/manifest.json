@@ -1,0 +1,13 @@
+{
+  "name": "Nexus Export",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:5178"],
+    "reasoning": "Lê as cenas exportadas da aplicação Nexus e as capturas de referência a partir do servidor local de desenvolvimento da própria equipe.",
+    "devAllowedDomains": ["http://localhost:5178"]
+  }
+}

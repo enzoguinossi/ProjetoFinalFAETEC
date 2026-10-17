@@ -34,19 +34,39 @@ export default function Button({
 }: ButtonProps) {
   const cls = `${baseCls} ${variantCls[variant]} ${disabled ? disabledCls : ""}`;
 
+  // Marcas lidas pela exportação para o Figma (ver tools/figma-export).
+  // São apenas atributos `data-*`: não alteram o comportamento nem o visual.
+  const marcas = {
+    "data-figma": "Button",
+    "data-figma-variant": variant,
+    "data-figma-state": disabled ? "desabilitado" : "padrao",
+    "data-figma-label": label,
+    // O Button é `inline-flex`: a largura vem do conteúdo, não do contêiner.
+    "data-figma-hug": "horizontal",
+  };
+
+  const conteudo = (
+    <>
+      {iconLeft && (
+        <span className={iconCls} data-figma-slot="icon-left">
+          {iconLeft}
+        </span>
+      )}
+      {label && <span data-figma-slot="label">{label}</span>}
+    </>
+  );
+
   if (href) {
     return (
-      <Link href={href} className={cls}>
-        {iconLeft && <span className={iconCls}>{iconLeft}</span>}
-        {label}
+      <Link href={href} className={cls} {...marcas}>
+        {conteudo}
       </Link>
     );
   }
 
   return (
-    <button type={type} className={cls} onClick={onClick} disabled={disabled}>
-      {iconLeft && <span className={iconCls}>{iconLeft}</span>}
-      {label}
+    <button type={type} className={cls} onClick={onClick} disabled={disabled} {...marcas}>
+      {conteudo}
     </button>
   );
 }

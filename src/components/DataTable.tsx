@@ -149,6 +149,9 @@ export default function DataTable<T extends Record<string, unknown>>({
     .concat(actions !== undefined ? "178px" : "")
     .join(" ");
 
+  /** Total de colunas (inclui a coluna de ações) — identifica a tabela no Figma. */
+  const totalColunas = columns.length + (actions !== undefined ? 1 : 0);
+
   // Garante keys únicas mesmo quando idField se repete (ex.: contatos duplicados).
   const rowKeys = useMemo(() => {
     const seen = new Map<string | number, number>();
@@ -163,6 +166,8 @@ export default function DataTable<T extends Record<string, unknown>>({
   return (
     <div
       className={`${wrapperCls} transition-opacity ${carregando ? "opacity-60" : ""}`}
+      data-figma="DataTable"
+      data-figma-hug="vertical"
     >
       <div className={scrollWrapperCls}>
         <div className={tableCls}>
@@ -170,6 +175,8 @@ export default function DataTable<T extends Record<string, unknown>>({
           <div
             className={headerCls}
             style={{ gridTemplateColumns: gridCols }}
+            data-figma="TableHeader"
+            data-figma-columns={String(totalColunas)}
           >
             {table.getHeaderGroups()[0]?.headers.map((header) => (
               <div key={header.id} className={headerCellCls}>
@@ -189,6 +196,10 @@ export default function DataTable<T extends Record<string, unknown>>({
                   key={key}
                   className={`${rowCls} ${row.index % 2 === 1 ? rowAltCls : ""}`}
                   style={{ gridTemplateColumns: gridCols }}
+                  data-figma="TableRow"
+                  data-figma-variant={row.index % 2 === 1 ? "alternada" : "normal"}
+                  data-figma-columns={String(totalColunas)}
+                  data-figma-index={String(row.index)}
                 >
                   {row.getAllCells().map((cell) => (
                     <div key={cell.id} className={cellCls}>
@@ -214,7 +225,7 @@ export default function DataTable<T extends Record<string, unknown>>({
               );
             })
           ) : (
-            <div className={emptyCls}>Nenhum registro encontrado.</div>
+            <div className={emptyCls} data-figma-part="empty">Nenhum registro encontrado.</div>
           )}
         </div>
       </div>

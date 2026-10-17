@@ -25,7 +25,7 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal open={open} onClose={onClose} width="420px" title={title}>
-      <div className={ui.form}>
+      <div className={ui.form} data-figma="ConfirmDialog" data-figma-confirm={confirmLabel}>
         <p className="m-0 font-sans text-[0.9375rem] leading-normal text-ink">
           {message}
         </p>

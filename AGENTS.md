@@ -684,6 +684,42 @@ Se uma informação importante precisar continuar válida entre sessões, ela de
 
 Não dependa da memória da sessão para preservar conhecimento essencial do projeto.
 
+### Exportação para o Figma (ferramental de design)
+
+As telas do sistema podem ser exportadas para o Figma por um plugin local — sem o MCP
+oficial. O ferramental vive em `tools/figma-export/`.
+
+**Antes de mexer nessa ferramenta, leia:**
+
+| Documento | Para quê |
+| --- | --- |
+| `tools/figma-export/MAPA.md` | arquitetura, contrato de dados, invariantes, armadilhas da API do Figma e **histórico de bugs** |
+| `tools/figma-export/README.md` | passo a passo de uso |
+| `.opencode/skills/figma-export/SKILL.md` | roteiro operacional (carregado como skill) |
+
+Pontos que afetam o trabalho no dia a dia:
+
+1. Os componentes compartilhados em `src/components/` possuem atributos `data-figma*`
+   (ex.: `data-figma="Button"`, `data-figma-variant`, `data-figma-label`,
+   `data-figma-hug`, `data-figma-slot`, `data-figma-columns`). Eles são lidos
+   pela exportação para gerar **componentes e propriedades** no Figma.
+   **Não remova nem renomeie esses atributos**: eles são a única marcação que liga a UI aos
+   componentes do design, e não alteram comportamento nem visual.
+2. Ao criar ou alterar uma primitiva compartilhada, mantenha a marcação no elemento raiz.
+3. A colheita usa um banco isolado (`nexus_figma_export`) e fixtures próprios; nunca lê nem
+   escreve no banco de desenvolvimento.
+4. Qualquer correção nessa ferramenta deve virar uma **invariante** em
+   `npm run figma:check` (que roda o plugin contra um mock da Plugin API, sem abrir o
+   Figma) — foi assim que os bugs de fidelidade foram encontrados e travados.
+5. Existe também o **caminho de volta**: os designers copiam os componentes para uma
+   página própria (`Page 1`) e editam a cópia lá (a reexportação reconstrói
+   `Nexus · Componentes` e os frames `· EDIT`/`· REF`). O plugin tem a aba **Ler do
+   Figma** e `npm run figma:diff` produz `out/figma-export/diff-design.md` dizendo o que
+   mudou em **tokens**, **componentes** (com o arquivo do código, pela âncora `Origem:`
+   na descrição de cada mestre) e **telas**. Regra que não pode quebrar: **manter o nome
+   do componente** — o casamento é por nome, não por vínculo. Detalhes em
+   `tools/figma-export/MAPA.md` §11.
+
 ### Integração GitHub + Jira (Smart Commits)
 
 Para que os commits apareçam linkados às tasks no Jira, toda mensagem de commit deve incluir a **chave do issue** correspondente no formato:
