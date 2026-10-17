@@ -252,6 +252,7 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | Compare não pareava nada | plugin enviava `usuarios%2Flista`, as capturas são `usuarios__lista` | nome derivado de `refImage` |
 | Diff: todo token "sem equivalente no globals.css" | `lerTokensCss` guardava o nome **sem** `--` e a busca usava **com** `--` | chave normalizada com o prefixo |
 | Diff: todo componente de canto reto aparecendo como diferença | a leitura só grava `raio` quando há raio, e `undefined` ≠ `[0,0,0,0]` | normalizar 0 ↔ ausente na comparação |
+| Divergência de 1:1 em **todas** as telas (0,46%–3,89%), crescendo com a densidade de texto | a app declarava `--font-sans: "Inter"`, `font-[Roboto,sans-serif]` na sidebar e `--font-display: "SF Pro","Segoe UI"`, mas **não carregava nenhuma fonte**: o navegador pintava Arial/Segoe UI e o plugin normaliza cada família para Inter/Roboto | carregar **Inter** via `next/font/google` e apontar `--font-sans`/`--font-display` para ela; sidebar passa a usar a mesma fonte (ver §9) |
 
 ## 9. Estado atual e pendências
 
@@ -259,21 +260,32 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 ocorrência real e âncora de origem, 21/21 promovidos de `COMPONENTES` com a marca
 `data-figma` no arquivo de `ORIGEM` — invariante #13 —, 47/47 telas em 1366×768,
 0 duplicações, 0 larguras incompatíveis, 0 campos desalinhados, 0 mestres aninhados,
-0 formulários sem fundo, 0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint` e os
-165 testes da app passando.
+0 formulários sem fundo, 0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint`, os
+165 testes da app e `next build` passando.
 
-**Pendente**: o `npm run figma:compare` **nunca rodou de verdade** — depende de uma
-importação com **conferir 1:1** para popular `out/figma-export/verify/`. A rota do
-servidor já foi testada com um POST real (ok). Limite aceito: 0,5% de pixels divergentes.
+**Verificado (compare, 1ª execução real)**: `npm run figma:compare` rodou com uma
+importação real (conferir 1:1) — **média 2,707%**, 1/47 dentro do limite de 0,5%
+(`acesso__login` 0,458%). A causa raiz **não** era leiaute: era fonte. Foi corrigida em
+`src/app/layout.tsx` (Inter de `next/font/google`, variável `--font-inter`),
+`src/app/globals.css` (`--font-sans`/`--font-display` → `var(--font-inter)`) e
+`src/components/sidebar-config.ts` (saiu o `Roboto`). A re-colheita confirma o
+navegador pintando **Inter** (36/36 textos em `usuarios__lista`). **Falta re-medir**:
+re-importar no Figma com *conferir 1:1* e rodar `npm run figma:compare` de novo.
 
-**Pendente (volta)**: a leitura real de uma página do Figma (aba *Ler do Figma*) ainda
-não foi exercitada no Figma. O que **está** verificado: o `figma:check` roda a leitura de
-`Nexus Export` no mock (94 nós na raiz, 47 quadros `· EDIT`, 1.469 instâncias, 45 com
-âncora de código, 19 variáveis) e o `diff` foi conferido com um **snapshot sintético**
-gerado da colheita, com edições propositais (raio, preenchimento, tamanho de texto, cor
-de token, tela redimensionada, componente inexistente), reportando exatamente elas — foi
-assim que os dois bugs do diff acima apareceram. O que falta é o casamento real com a
-`Page 1` (cópias editadas pelos designers).
+**Verificado (volta, 1ª leitura real)**: a aba *Ler do Figma* leu a `Page 1` de verdade
+(28 variáveis, 32 mestres). Componentes e telas: **nenhuma diferença**. O que aparece
+como "sem correspondência" são os mestres próprios da `Page 1` (o arquivo de trabalho dos
+designers), não cópias com os nomes do app. Tokens "sem equivalente" = 9 variáveis da
+coleção do próprio design + `branco` + `raio-lg/xl/pill` (que não existem no
+`globals.css`); as 19 variáveis `Nexus / Cor` e `Nexus / Métrica` **casam** e por isso não
+aparecem como diferença. Ver a proposta de de-para em `.ai-workflow/runs/`.
+
+**Pendente**: re-importar no Figma com **conferir 1:1** e rodar `npm run figma:compare`
+para medir o efeito da correção de fonte (limite aceito: 0,5% de pixels divergentes).
+
+**Pendente (volta)**: a `Page 1` deve seguir a regra das cópias (copiar os componentes
+exportados para uma página própria e editar lá, **mantendo o nome**) para o casamento
+render; e o de-para de tokens (PT → token do app) precisa ser confirmado pelo usuário.
 
 **Observações**: o MCP oficial do Figma está bloqueado (limite do plano Starter) — a
 verificação vive de `figma:check` + `figma:compare`, que não dependem dele.
