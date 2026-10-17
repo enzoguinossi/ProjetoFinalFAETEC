@@ -58,7 +58,7 @@ export default function DestinatarioForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={ui.form}>
+    <form onSubmit={handleSubmit} className={ui.form} data-figma="FormularioDestinatario" data-figma-hug="vertical">
       <div className="grid grid-cols-[1fr_1fr] gap-6 items-stretch">
         <div className="flex flex-col gap-4">
           {isEdit && (

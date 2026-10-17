@@ -41,7 +41,7 @@ export default function PerfilForm({ open, onClose, onConfirm, perfis }: PerfilF
 
   return (
     <Modal open={open} onClose={handleClose} width="440px">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4" data-figma="FormularioPerfil" data-figma-hug="vertical">
         <div className={ui.field}>
           <label className={ui.label}>Perfil</label>
           <select

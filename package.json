@@ -17,7 +17,13 @@
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "setup": "npm install && npm run db:setup"
+    "setup": "npm install && npm run db:setup",
+    "figma:harvest": "tsx tools/figma-export/harvest.ts",
+    "figma:serve": "tsx tools/figma-export/server.ts",
+    "figma:check": "tsx tools/figma-export/plugin-check.ts",
+    "figma:compare": "tsx tools/figma-export/compare.ts",
+    "figma:diff": "tsx tools/figma-export/diff.ts",
+    "figma:fixtures": "tsx tools/figma-export/fixtures.ts"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.9.1",
@@ -43,6 +49,7 @@
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.8",
+    "playwright-core": "^1.64.1",
     "prisma": "^7.9.1",
     "tsx": "^4.23.13",
     "typescript": "^6.0.3",

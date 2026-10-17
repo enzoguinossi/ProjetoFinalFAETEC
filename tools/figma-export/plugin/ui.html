@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        --brand: #1b9956;
+        --brand-hover: #15844a;
+        --ink: #21272a;
+        --muted: #697077;
+        --border: #dde1e6;
+        --hover: #f2f4f8;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        font-family: Inter, -apple-system, "Segoe UI", sans-serif;
+        font-size: 12px;
+        color: var(--ink);
+        display: flex;
+        flex-direction: column;
+        background: var(--figma-color-bg, #fff);
+      }
+      header {
+        padding: 12px 14px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      h1 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+      header p { margin: 0; color: var(--muted); font-size: 11px; }
+
+      .abas { display: flex; gap: 6px; padding: 10px 14px 0; }
+      .aba {
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .aba.ativa { background: var(--hover); color: var(--ink); border-color: var(--brand); }
+      [hidden] { display: none !important; }
+      /* cada aba é uma coluna: é o que deixa a lista rolar e o rodapé ficar no fim */
+      #aba-exportar, #aba-ler { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+      .campo { padding: 10px 14px 0; }
+      label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 11px; }
+      input[type="text"], select {
+        width: 100%;
+        height: 30px;
+        padding: 0 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font: inherit;
+        background: #fff;
+        color: inherit;
+      }
+      input[type="text"]:focus, select:focus { outline: none; border-color: var(--brand); }
+
+      .linha { display: flex; gap: 8px; }
+      .linha > div { flex: 1; }
+
+      button {
+        font: inherit;
+        font-weight: 600;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      button.primario { background: var(--brand); color: #fff; }
+      button.primario:hover { background: var(--brand-hover); }
+      button.secundario { background: transparent; color: var(--brand); border-color: var(--border); }
+      button.secundario:hover { background: var(--hover); }
+      button:disabled { opacity: 0.5; cursor: default; }
+
+      .lista {
+        flex: 1;
+        overflow-y: auto;
+        margin: 10px 14px 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .lista .vazio { padding: 14px; color: var(--muted); }
+      .grupo { border-bottom: 1px solid var(--border); }
+      .grupo:last-child { border-bottom: none; }
+      .grupo > .titulo {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 9px;
+        background: var(--hover);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+      }
+      .item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 9px 5px 22px;
+        cursor: pointer;
+      }
+      .item:hover { background: var(--hover); }
+      .item span.rota { color: var(--muted); margin-left: auto; font-size: 10px; }
+      .marcadores { display: flex; gap: 8px; margin: 8px 14px 0; }
+      .marcadores a { color: var(--brand); cursor: pointer; font-size: 11px; }
+
+      .opcoes { padding: 8px 14px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+      .check { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+      .check input { margin: 0; }
+
+      footer { padding: 10px 14px 12px; border-top: 1px solid var(--border); margin-top: 10px; }
+      .barra { height: 4px; border-radius: 2px; background: var(--hover); overflow: hidden; margin-bottom: 6px; }
+      .barra > div { height: 100%; width: 0; background: var(--brand); transition: width 0.15s; }
+      #status { font-size: 10px; color: var(--muted); margin-bottom: 8px; }
+      #log {
+        max-height: 108px;
+        overflow-y: auto;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 10px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--muted);
+      }
+      #log .erro { color: #da1e28; }
+      #log .aviso { color: #d97706; }
+      .acoes { display: flex; gap: 8px; }
+      .acoes button { flex: 1; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Nexus Export</h1>
+      <p>Reconstrói as telas do sistema como vetores editáveis.</p>
+    </header>
+
+    <div class="abas">
+      <button id="abaExportar" class="aba ativa">Exportar</button>
+      <button id="abaLer" class="aba">Ler do Figma</button>
+    </div>
+
+    <div id="aba-exportar">
+      <div class="campo">
+        <label for="base">Servidor local da exportação</label>
+        <input id="base" type="text" value="http://localhost:5178/export" />
+      </div>
+
+      <div class="campo">
+        <button id="carregar" class="secundario" style="width: 100%">Carregar telas</button>
+      </div>
+
+    <div class="marcadores">
+      <a id="todas">marcar todas</a>
+      <a id="nenhuma">desmarcar</a>
+    </div>
+
+    <div class="lista" id="lista">
+      <div class="vazio">Clique em “Carregar telas” (o servidor precisa estar rodando).</div>
+    </div>
+
+    <div class="opcoes">
+      <div style="flex: 1; min-width: 150px">
+        <label for="modo">O que importar</label>
+        <select id="modo">
+          <option value="ambos">Editável + referência</option>
+          <option value="edit">Só o editável</option>
+          <option value="ref">Só a referência (PNG)</option>
+        </select>
+      </div>
+      <div style="flex: 1; min-width: 150px">
+        <label for="pagina">Página do Figma</label>
+        <input id="pagina" type="text" value="Nexus Export" />
+      </div>
+    </div>
+
+    <div class="opcoes">
+      <label class="check"><input id="substituir" type="checkbox" checked /> substituir importação anterior</label>
+      <label class="check"><input id="verificar" type="checkbox" /> conferir 1:1 (lento)</label>
+    </div>
+
+    <footer>
+      <div class="barra"><div id="progresso"></div></div>
+      <div id="status">Nenhuma tela carregada.</div>
+      <div id="log"></div>
+      <div class="acoes" style="margin-top: 8px">
+        <button id="importar" class="primario" disabled>Importar</button>
+        <button id="cancelar" class="secundario" disabled>Cancelar</button>
+      </div>
+    </footer>
+    </div>
+
+    <div id="aba-ler" hidden>
+      <div class="campo">
+        <label for="baseLer">Servidor local</label>
+        <input id="baseLer" type="text" value="http://localhost:5178" />
+      </div>
+
+      <div class="campo">
+        <label for="paginaLer">Página onde estão as cópias editadas</label>
+        <div class="linha">
+          <div>
+            <select id="paginaLer">
+              <option value="">— carregue as páginas —</option>
+            </select>
+          </div>
+          <button id="carregarPaginas" class="secundario" style="width: 130px">Carregar páginas</button>
+        </div>
+      </div>
+
+      <div class="opcoes" style="padding-top: 10px">
+        <button id="ler" class="primario" disabled>Ler a página e enviar</button>
+        <button id="cancelarLer" class="secundario" disabled>Cancelar</button>
+      </div>
+
+      <footer>
+        <div class="barra"><div id="progressoLer"></div></div>
+        <div id="statusLer">Copie os componentes para uma página própria, edite lá e leia essa página.</div>
+        <div id="logLer"></div>
+      </footer>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let manifesto = null;
+      let selecionados = new Set();
+      let importando = false;
+
+      function log(texto, classe) {
+        const linha = document.createElement("div");
+        if (classe) linha.className = classe;
+        linha.textContent = texto;
+        $("log").appendChild(linha);
+        $("log").scrollTop = $("log").scrollHeight;
+      }
+
+      function base() {
+        return $("base").value.trim().replace(/\/+$/, "");
+      }
+
+      function carregar() {
+        $("carregar").disabled = true;
+        $("status").textContent = "Carregando catálogo…";
+        parent.postMessage({ pluginMessage: { type: "carregar", base: base() } }, "*");
+      }
+
+      function render() {
+        const lista = $("lista");
+        lista.innerHTML = "";
+        if (!manifesto || !manifesto.scenes.length) {
+          lista.innerHTML = '<div class="vazio">Nenhuma tela encontrada.</div>';
+          return;
+        }
+
+        const grupos = new Map();
+        for (const cena of manifesto.scenes) {
+          if (!grupos.has(cena.group)) grupos.set(cena.group, []);
+          grupos.get(cena.group).push(cena);
+        }
+
+        for (const [grupo, cenas] of grupos) {
+          const bloco = document.createElement("div");
+          bloco.className = "grupo";
+
+          const titulo = document.createElement("label");
+          titulo.className = "titulo";
+          const marcarGrupo = document.createElement("input");
+          marcarGrupo.type = "checkbox";
+          marcarGrupo.checked = cenas.every((c) => selecionados.has(c.id));
+          marcarGrupo.onchange = () => {
+            for (const c of cenas) {
+              if (marcarGrupo.checked) selecionados.add(c.id);
+              else selecionados.delete(c.id);
+            }
+            render();
+          };
+          titulo.appendChild(marcarGrupo);
+          titulo.appendChild(document.createTextNode(grupo + " (" + cenas.length + ")"));
+          bloco.appendChild(titulo);
+
+          for (const cena of cenas) {
+            const item = document.createElement("label");
+            item.className = "item";
+            const caixa = document.createElement("input");
+            caixa.type = "checkbox";
+            caixa.checked = selecionados.has(cena.id);
+            caixa.onchange = () => {
+              if (caixa.checked) selecionados.add(cena.id);
+              else selecionados.delete(cena.id);
+              atualizarStatus();
+            };
+            item.appendChild(caixa);
+            item.appendChild(document.createTextNode(cena.title));
+            const rota = document.createElement("span");
+            rota.className = "rota";
+            rota.textContent = cena.route;
+            item.appendChild(rota);
+            bloco.appendChild(item);
+          }
+          lista.appendChild(bloco);
+        }
+        atualizarStatus();
+      }
+
+      function atualizarStatus() {
+        const total = manifesto ? manifesto.scenes.length : 0;
+        $("status").textContent =
+          selecionados.size + " de " + total + " telas selecionadas" +
+          (manifesto ? "  ·  gerado em " + new Date(manifesto.generatedAt).toLocaleString("pt-BR") : "");
+        $("importar").disabled = importando || selecionados.size === 0;
+      }
+
+      $("carregar").onclick = carregar;
+      $("todas").onclick = () => {
+        if (!manifesto) return;
+        for (const c of manifesto.scenes) selecionados.add(c.id);
+        render();
+      };
+      $("nenhuma").onclick = () => {
+        selecionados.clear();
+        render();
+      };
+
+      $("importar").onclick = () => {
+        if (!manifesto) return;
+        const cenas = manifesto.scenes.filter((c) => selecionados.has(c.id));
+        if (!cenas.length) return;
+        importando = true;
+        $("importar").disabled = true;
+        $("cancelar").disabled = false;
+        $("log").innerHTML = "";
+        log("Importando " + cenas.length + " tela(s)…");
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "importar",
+              base: base(),
+              cenas: cenas,
+              opcoes: {
+                modo: $("modo").value,
+                pagina: $("pagina").value.trim() || "Nexus Export",
+                substituir: $("substituir").checked,
+                verificar: $("verificar").checked,
+              },
+            },
+          },
+          "*",
+        );
+      };
+
+      $("cancelar").onclick = () => parent.postMessage({ pluginMessage: { type: "cancelar" } }, "*");
+
+      /* ── abas ─────────────────────────────────────────────────────────── */
+
+      function trocarAba(qual) {
+        const exportar = qual === "exportar";
+        $("aba-exportar").hidden = !exportar;
+        $("aba-ler").hidden = exportar;
+        $("abaExportar").classList.toggle("ativa", exportar);
+        $("abaLer").classList.toggle("ativa", !exportar);
+      }
+      $("abaExportar").onclick = () => trocarAba("exportar");
+      $("abaLer").onclick = () => trocarAba("ler");
+
+      /* ── leitura (Figma → app) ────────────────────────────────────────── */
+
+      function logLer(texto, classe) {
+        const linha = document.createElement("div");
+        if (classe) linha.className = classe;
+        linha.textContent = texto;
+        $("logLer").appendChild(linha);
+        $("logLer").scrollTop = $("logLer").scrollHeight;
+      }
+
+      $("carregarPaginas").onclick = () => {
+        $("carregarPaginas").disabled = true;
+        $("statusLer").textContent = "Lendo as páginas do arquivo…";
+        parent.postMessage({ pluginMessage: { type: "paginas" } }, "*");
+      };
+
+      $("ler").onclick = () => {
+        const pagina = $("paginaLer").value;
+        if (!pagina) return;
+        $("ler").disabled = true;
+        $("cancelarLer").disabled = false;
+        $("logLer").innerHTML = "";
+        $("progressoLer").style.width = "0%";
+        const origem = $("baseLer").value.trim().replace(/\/+$/, "").replace(/\/export$/, "");
+        logLer('Lendo "' + pagina + '"…');
+        parent.postMessage(
+          { pluginMessage: { type: "ler", pagina: pagina, base: origem + "/export" } },
+          "*",
+        );
+      };
+
+      $("cancelarLer").onclick = () => parent.postMessage({ pluginMessage: { type: "cancelar" } }, "*");
+
+      window.onmessage = (evento) => {
+        const msg = evento.data.pluginMessage;
+        if (!msg) return;
+
+        if (msg.tipo === "manifesto") {
+          $("carregar").disabled = false;
+          if (!msg.ok) {
+            $("status").textContent = "Falha ao carregar.";
+            log("✗ " + msg.mensagem, "erro");
+            log("Verifique se o servidor está rodando: npm run figma:serve", "aviso");
+            return;
+          }
+          manifesto = msg.manifesto;
+          selecionados = new Set(manifesto.scenes.map((c) => c.id));
+          log("✓ " + manifesto.scenes.length + " tela(s) disponíveis.");
+          render();
+        }
+
+        if (msg.tipo === "log") log(msg.texto, msg.erro ? "erro" : msg.aviso ? "aviso" : "");
+
+        if (msg.tipo === "progresso") {
+          const total = msg.total || 1;
+          $("progresso").style.width = Math.round((msg.feito / total) * 100) + "%";
+          $("status").textContent = "Importando… " + msg.feito + "/" + total + " — " + (msg.rotulo || "");
+        }
+
+        if (msg.tipo === "fim") {
+          importando = false;
+          $("cancelar").disabled = true;
+          $("progresso").style.width = "100%";
+          $("status").textContent = msg.mensagem;
+          log((msg.ok ? "✓ " : "✗ ") + msg.mensagem, msg.ok ? "" : "erro");
+
+          // Falhas de componente vêm agrupadas: são a informação que interessa
+          // para corrigir o plugin, então ficam destacadas e fáceis de copiar.
+          if (msg.falhasDeComponente && msg.falhasDeComponente.length) {
+            log("");
+            log("Problemas de componente (" + msg.falhasDeComponente.length + "):", "erro");
+            for (const falha of msg.falhasDeComponente) log("  " + falha, "erro");
+          }
+          atualizarStatus();
+        }
+
+        if (msg.tipo === "paginas") {
+          $("carregarPaginas").disabled = false;
+          const seletor = $("paginaLer");
+          seletor.innerHTML = "";
+          if (msg.erro) {
+            logLer("✗ " + msg.erro, "erro");
+            return;
+          }
+          if (!msg.nomes.length) {
+            logLer("Nenhuma página encontrada no arquivo.");
+            return;
+          }
+          for (const nome of msg.nomes) {
+            const opcao = document.createElement("option");
+            opcao.value = nome;
+            opcao.textContent = nome;
+            seletor.appendChild(opcao);
+          }
+          // A exportação mexe em "Nexus · Componentes" e "Nexus Export";
+          // a página de trabalho dos designers é qualquer outra.
+          const preferida = msg.nomes.find((n) => n.indexOf("Nexus") !== 0);
+          seletor.value = preferida || msg.nomes[0];
+          $("ler").disabled = false;
+          $("statusLer").textContent =
+            msg.nomes.length + " página(s). Escolha a que tem as cópias editadas.";
+        }
+
+        if (msg.tipo === "logLeitura") logLer(msg.texto, msg.aviso ? "aviso" : "");
+
+        if (msg.tipo === "progressoLeitura") {
+          $("progressoLer").style.width = Math.round((msg.feito / (msg.total || 1)) * 100) + "%";
+          $("statusLer").textContent = "Lendo… " + msg.feito + "/" + msg.total;
+        }
+
+        if (msg.tipo === "leitura") {
+          $("ler").disabled = false;
+          $("cancelarLer").disabled = true;
+          $("progressoLer").style.width = msg.ok ? "100%" : "0%";
+          $("statusLer").textContent = msg.mensagem;
+          logLer((msg.ok ? "✓ " : "✗ ") + msg.mensagem, msg.ok ? "" : "erro");
+          if (msg.ok) logLer("Agora rode: npm run figma:diff");
+        }
+      };
+    </script>
+  </body>
+</html>

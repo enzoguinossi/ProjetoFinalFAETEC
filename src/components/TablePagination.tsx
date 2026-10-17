@@ -24,6 +24,10 @@ function PageButton({
       disabled={disabled}
       title={title}
       type="button"
+      data-figma="PageButton"
+      data-figma-label={title}
+      data-figma-variant={title}
+      data-figma-state={disabled ? "desabilitado" : "padrao"}
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         {paths.map((d) => (
@@ -67,7 +71,7 @@ export default function TablePagination({
   onPageSizeChange,
 }: TablePaginationProps) {
   return (
-    <div className={paginationCls}>
+    <div className={paginationCls} data-figma="TablePagination">
       <PageButton
         paths={["M12 4L8 8L12 12", "M8 4L4 8L8 12"]}
         title="Primeira página"

@@ -165,7 +165,12 @@ export default function ProdutoForm({
 
   return (
     <>
-      <form className="flex flex-col gap-[11px] p-0 w-full box-border" onSubmit={handleSubmit}>
+      <form
+        className="flex flex-col gap-[11px] p-0 w-full box-border"
+        onSubmit={handleSubmit}
+        data-figma="FormularioProduto"
+        data-figma-hug="vertical"
+      >
         {/* Descrição */}
         <div className="flex flex-col gap-2">
           <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Descrição do produto</label>

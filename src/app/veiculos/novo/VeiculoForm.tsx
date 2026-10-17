@@ -40,7 +40,7 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
   }
 
   return (
-    <form onSubmit={handleSubmit} className={ui.form}>
+    <form onSubmit={handleSubmit} className={ui.form} data-figma="FormularioVeiculo" data-figma-hug="vertical">
       {isEdit && (
         <label className="flex items-center gap-2 font-sans text-sm cursor-pointer">
           <input type="checkbox" name="ativo" defaultChecked={initialData?.ativo} disabled={!canDeactivate} className="accent-brand" /> Ativo

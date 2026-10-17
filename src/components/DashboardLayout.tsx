@@ -13,11 +13,15 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
-    <div className="flex min-h-screen bg-white text-ink">
+    <div className="flex min-h-screen bg-white text-ink" data-figma="AppShell">
       {sidebarOpen && <Sidebar />}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Header */}
-        <header className="flex items-center gap-[0.625rem] h-[var(--header-height)] min-h-10 px-[0.1875rem] bg-brand box-border">
+        <header
+          className="flex items-center gap-[0.625rem] h-[var(--header-height)] min-h-10 px-[0.1875rem] bg-brand box-border"
+          data-figma="AppBar"
+          data-figma-title={title ?? ""}
+        >
           <button
             className="flex items-center justify-center w-9 h-9 border-none bg-transparent text-white cursor-pointer rounded-md shrink-0 transition-[background-color] duration-[120ms] hover:bg-[rgba(255,255,255,0.12)] [&_svg]:w-6 [&_svg]:h-6"
             onClick={() => setSidebarOpen(!sidebarOpen)}

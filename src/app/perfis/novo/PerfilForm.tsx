@@ -48,7 +48,7 @@ export default function PerfilForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={ui.form}>
+    <form onSubmit={handleSubmit} className={ui.form} data-figma="FormularioPerfil" data-figma-hug="vertical">
       <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
         <div className="flex flex-col gap-4">
           <div className={ui.field}>

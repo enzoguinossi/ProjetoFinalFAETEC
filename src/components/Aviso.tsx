@@ -20,6 +20,8 @@ export default function Aviso({ mensagem, tipo = "sucesso" }: Props) {
     <div
       role="alert"
       className="pointer-events-auto w-[300px] animate-[aviso-in_160ms_ease-out] overflow-hidden rounded-[10px] border border-[#5a5b5a] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
+      data-figma="Aviso"
+      data-figma-variant={tipo}
     >
       <div className={`flex h-[53px] items-center justify-center border-b border-[#5a5b5a] ${corBarra}`}>
         <div className="flex h-[33px] w-[210px] items-center justify-center rounded-[4px] border border-[#5a5b5a] shadow-[0_4px_4px_rgba(0,0,0,0.25)]">

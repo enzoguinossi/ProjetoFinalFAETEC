@@ -102,7 +102,12 @@ export default function UsuarioForm({
   }
 
   return (
-    <form className="flex flex-col gap-4 bg-white rounded-[1.25rem] p-6 w-full box-border max-w-full" onSubmit={handleSubmit}>
+    <form
+      className="flex flex-col gap-4 bg-white rounded-[1.25rem] p-6 w-full box-border max-w-full"
+      onSubmit={handleSubmit}
+      data-figma="FormularioUsuario"
+      data-figma-hug="vertical"
+    >
       <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
         {/* Coluna esquerda — dados */}
         <div className="flex flex-col gap-4">
