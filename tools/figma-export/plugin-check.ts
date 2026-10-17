@@ -1694,6 +1694,173 @@ async function main() {
       (avisosDeReuso.length ? ` · ${avisosDeReuso.length} marca(s) sem âncora (aviso)` : ""),
   );
 
+  // 14) FIDELIDADE DA MONTAGEM — quatro defeitos de reconstrução (KAN-166).
+  //
+  //     Cada regra existe porque o Figma não é o navegador: o auto-layout dele não
+  //     tem PESO de `flex-grow`; um texto re-quebra pela largura da caixa; um mestre
+  //     vem de UMA ocorrência (a mais completa); e "Fill" divide a sobra por igual.
+  //     As regras valem sobre as CENAS (o que a colheita mediu) e sobre a árvore
+  //     construída.
+  let framesComDoisGrow = 0; // (a) com dois filhos que crescem, o Figma divide igual
+  let growComSobra = 0; // (b) sobra no eixo principal = marca de invólucro colapsado
+  let paginacaoQuebrada = 0; // (c) "1 de 0" em duas linhas na cena
+  let paginacaoRequebra = 0; // (c) texto de paginação que o Figma pode re-quebrar
+  let geometriaDeInstancia = 0; // (d) filho de instância com tamanho de outra ocorrência
+  const exemplosMontagem: string[] = [];
+  const registrarMontagem = (texto: string) => {
+    if (exemplosMontagem.length < 12) exemplosMontagem.push(texto);
+  };
+
+  const visitarMontagem = (
+    no: Record<string, unknown>,
+    cenaId: string,
+    caminho: string,
+  ): void => {
+    const filhos = (no.children ?? []) as Record<string, unknown>[];
+    const layout = no.layout as { mode: string; gap: number; padding: number[] } | undefined;
+
+    if (layout) {
+      const horizontal = layout.mode === "HORIZONTAL";
+      const crescem = filhos.filter((filho) => filho.grow);
+
+      // (a) O Figma divide a sobra IGUALMENTE entre os filhos que crescem, então
+      //     uma proporção 2:1 do CSS viraria 1:1 — foi o que encolheu a coluna do
+      //     CEP para 210 e pôs o select da UF por cima do botão da lupa.
+      if (crescem.length > 1) {
+        framesComDoisGrow++;
+        registrarMontagem(`(a) ${cenaId} ${caminho}: ${crescem.length} filhos com grow`);
+      }
+
+      // (b) Um filho que cresce ABSORVE a sobra: se sobrou espaço, a marca não é
+      //     deste pai — veio de um invólucro colapsado e vale outro eixo aqui (um
+      //     campo `flex-1` de linha horizontal passava a "crescer na vertical").
+      if (crescem.length) {
+        const principal = horizontal ? Number(no.w) : Number(no.h);
+        const padding = horizontal
+          ? layout.padding[1] + layout.padding[3]
+          : layout.padding[0] + layout.padding[2];
+        let conteudo = 0;
+        for (const filho of filhos) conteudo += horizontal ? Number(filho.w) : Number(filho.h);
+        const sobra =
+          principal - padding - conteudo - layout.gap * Math.max(0, filhos.length - 1);
+        if (sobra > 2.5) {
+          growComSobra++;
+          registrarMontagem(
+            `(b) ${cenaId} ${caminho}: filho com grow e ${Math.round(sobra)}px de sobra`,
+          );
+        }
+      }
+    }
+
+    // (c) A informação da paginação é curta e não pode quebrar linha.
+    const texto = no.text as { value?: string; singleLine?: boolean } | undefined;
+    if (texto && /^\d+ de \d+$/.test(String(texto.value)) && texto.singleLine !== true) {
+      paginacaoQuebrada++;
+      registrarMontagem(`(c) ${cenaId} ${caminho}: "${String(texto.value)}" em duas linhas`);
+    }
+
+    for (const filho of filhos) {
+      visitarMontagem(filho, cenaId, `${caminho}/${String(filho.name)}`);
+    }
+  };
+
+  for (const cena of cenas) {
+    const cenaJson = JSON.parse(readFileSync(path.join(OUT_DIR, cena.file), "utf8")) as {
+      root: Record<string, unknown>;
+    };
+    visitarMontagem(cenaJson.root, cena.id, "");
+  }
+
+  // (c) na árvore: o texto de paginação precisa sair com largura automática
+  //     (`WIDTH_AND_HEIGHT`) — com `HEIGHT` o Figma re-quebra pela largura da caixa
+  //     e o "0" cai para a linha de baixo.
+  const conferirPaginacao = (no: No) => {
+    if (no.type === "TEXT") {
+      const texto = no as unknown as NoTexto;
+      if (/^\d+ de \d+$/.test(texto.characters) && texto.textAutoResize !== "WIDTH_AND_HEIGHT") {
+        paginacaoRequebra++;
+        registrarMontagem(`(c) árvore: "${texto.characters}" com auto-resize ${texto.textAutoResize}`);
+      }
+    }
+    for (const filho of no.children) conferirPaginacao(filho);
+  };
+  for (const pagina of paginas) {
+    for (const raiz of pagina.children) conferirPaginacao(raiz);
+  }
+
+  // (d) Dentro de uma instância, o filho tem o tamanho da ocorrência DESTA tela: o
+  //     mestre vem da ocorrência mais completa, e a altura de um contêiner de texto
+  //     (a mensagem do `ConfirmDialog`) escorregava de lá, empurrando a barra de
+  //     botões para baixo. Filho com `grow`/`hug` fica de fora: nesses o tamanho é
+  //     do auto-layout, não da ocorrência.
+  const paresDeFilhos = (
+    nos: No[],
+    specs: Record<string, unknown>[],
+  ): [No, Record<string, unknown>][] => {
+    const saida: [No, Record<string, unknown>][] = [];
+    let i = 0;
+    let j = 0;
+    while (i < nos.length && j < specs.length) {
+      const esperado = specs[j].kind === "text" ? "text" : "caixa";
+      let k = i;
+      while (k < nos.length && (nos[k].type === "TEXT" ? "text" : "caixa") !== esperado) k++;
+      if (k >= nos.length) {
+        j++;
+        continue;
+      }
+      saida.push([nos[k], specs[j]]);
+      i = k + 1;
+      j++;
+    }
+    return saida;
+  };
+
+  const conferirGeometria = (
+    no: No,
+    spec: Record<string, unknown>,
+    dentroDeInstancia: boolean,
+    cenaId: string,
+    caminho: string,
+  ): void => {
+    const layout = spec.layout as { hug?: boolean } | undefined;
+    if (dentroDeInstancia && no.type === "FRAME" && !spec.grow && layout?.hug !== true) {
+      // A largura de um contêiner de texto acompanha o texto (cada tela tem o seu);
+      // a altura é que não pode vir de outra ocorrência.
+      const temTexto = no.children.some((filho) => filho.type === "TEXT");
+      const difereAltura = Math.abs(no.height - Number(spec.h)) > 1;
+      const difereLargura = !temTexto && Math.abs(no.width - Number(spec.w)) > 1;
+      if (difereAltura || difereLargura) {
+        geometriaDeInstancia++;
+        registrarMontagem(
+          `(d) ${cenaId} ${caminho}: instância ${Math.round(no.width)}×${Math.round(no.height)}` +
+            ` · cena ${spec.w}×${spec.h}`,
+        );
+      }
+    }
+    const specs = (spec.children ?? []) as Record<string, unknown>[];
+    const aninhado = dentroDeInstancia || no.type === "INSTANCE";
+    for (const [filho, filhoSpec] of paresDeFilhos(no.children, specs)) {
+      conferirGeometria(filho, filhoSpec, aninhado, cenaId, `${caminho}/${String(filhoSpec.name)}`);
+    }
+  };
+
+  for (const raiz of raizesEdit) {
+    const cena = cenas.find((c) => `${c.id} · EDIT` === raiz.name);
+    if (!cena) continue;
+    const cenaJson = JSON.parse(readFileSync(path.join(OUT_DIR, cena.file), "utf8")) as {
+      root: Record<string, unknown>;
+    };
+    conferirGeometria(raiz, cenaJson.root, false, cena.id, cena.id);
+  }
+
+  console.log("\n── fidelidade da montagem (KAN-166) ──");
+  console.log(`  frames com mais de um filho que cresce: ${framesComDoisGrow}`);
+  console.log(`  filho que cresce com sobra no eixo principal: ${growComSobra}`);
+  console.log(`  textos de paginação em duas linhas (cena): ${paginacaoQuebrada}`);
+  console.log(`  textos de paginação que o Figma pode re-quebrar: ${paginacaoRequebra}`);
+  console.log(`  filhos de instância com o tamanho de outra ocorrência: ${geometriaDeInstancia}`);
+  for (const exemplo of exemplosMontagem) console.log(`    · ${exemplo}`);
+
   const falhou =
     problemas.length > 0 ||
     !resultado.ok ||
@@ -1723,7 +1890,12 @@ async function main() {
     erroNoPainel !== null ||
     scriptDoPainel === "" ||
     semMarca.length > 0 ||
-    setasFaltando.length > 0;
+    setasFaltando.length > 0 ||
+    framesComDoisGrow > 0 ||
+    growComSobra > 0 ||
+    paginacaoQuebrada > 0 ||
+    paginacaoRequebra > 0 ||
+    geometriaDeInstancia > 0;
   console.log("");
   console.log(falhou ? "❌ verificação encontrou problemas" : "✅ plugin verificado sem problemas");
   process.exit(falhou ? 1 : 0);

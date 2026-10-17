@@ -87,17 +87,18 @@ arquivo do código onde mexer) e telas. Ver §11.
 
 **`dom-walker.js`** — `walkDom` (entrada) · `parseColor`/`rgba`/`mesmaCor` (canvas como
 resolvedor de qualquer cor CSS) · `parseShadows`/`splitTopLevel` · `ownTextSpec`
-(texto próprio, input/select/placeholder/truncamento) · `unionRects`/`contentBox` ·
+(texto próprio, input/select/placeholder/truncamento) · `unionRects`/`contarLinhas`/
+`contentBox` (caixas; **linhas visuais**, não caixas de nós de texto) ·
 `styleOf`/`borderOf` (bordas por lado) · `aplicarLayout` (auto-layout + `hug` +
-`SPACE_BETWEEN` de `margin-left:auto`) · `marcasDe` (lê `data-figma*`) · `visit`/`assign`
-(içamento de `position:fixed`) · `prune`/`strip` (colapsa invólucros) · `serialize` ·
-`resolveAssets` (SVG inline e imagem como data URL).
+`SPACE_BETWEEN` de `margin-left:auto` + as duas regras do `grow`) · `marcasDe` (lê
+`data-figma*`) · `visit`/`assign` (içamento de `position:fixed`) · `prune`/`strip`
+(colapsa invólucros) · `serialize` · `resolveAssets` (SVG inline e imagem como data URL).
 
 **`plugin/code.js`** — `importar` (orquestra) · `construirBiblioteca` (ocorrência **mais
 completa**, do menor para o maior) · `garantirMestre`/`garantirIcone` · `montarButton`
 (mestre canônico do Button) · `ligarPropriedadesButton` · `construir` (nó a partir da
 spec) · `aplicarLayoutBase` (a ordem crítica das dimensões) · `aplicarOverrides`/
-`aplicarAninhados`/`aplicarPropriedadesButton` · `chaveDe`/`nomeDoMestre`/`dimensoesDe`/
+`aplicarAninhados`/`adotarTamanhoDaOcorrencia`/`aplicarPropriedadesButton` · `chaveDe`/`nomeDoMestre`/`dimensoesDe`/
 `assinaturaEstrutural`/`larguraComoDimensao` (identidade dos mestres) · `grupoDe`/
 `secaoDoGrupo`/`posicionarNaSecao`/`arrumarSecoes` (pacotes) · `garantirVariaveis`/
 `vincularVariaveis` · `limparSoltos` · `origemDoServidor` · `registrarFalha` ·
@@ -114,7 +115,10 @@ spec) · `aplicarLayoutBase` (a ordem crítica das dimensões) · `aplicarOverri
 `exportarIcones` · `esperarApp`.
 
 **`plugin-check.ts`** — `criarFigmaMock` (a Plugin API inteira) · `criarFetch` (serve os
-arquivos) · `clonarFilhos` (instâncias) · `main` (roda a importação e as invariantes).
+arquivos) · `clonarFilhos` (instâncias) · `main` (roda a importação e as invariantes —
+as de **fidelidade da montagem** ficam no bloco `14)`, sobre as cenas e sobre a árvore
+construída: `grow` sem peso, `grow` com sobra, paginação em uma linha, geometria da
+instância contra a ocorrência).
 
 **`tokens.ts`** — `lerTokensGlobais` (tokens do `globals.css` → `cores` por hex e
 `metricas` em px; ignora os aliases do `:root` e **falha se a tabela vier vazia**) ·
@@ -145,6 +149,11 @@ detectar duplicação) · `x/y/w/h` **relativos ao pai** · `style` (índice) ·
 `children`. Texto: `text.value/style/singleLine/truncated/verticalCenter`. SVG:
 `svg` (markup inline) · imagem: `imgData` (data URL). Auto-layout: `layout.mode/gap/
 padding/primaryAlign/counterAlign/hug` e, por filho, `grow`/`stretch`.
+
+`grow` é o "Fill" do Figma e vale só onde ele REPRODUZ o CSS: com um único filho que
+cresce **e** sobra para distribuir (o Figma não tem peso de `flex-grow` — dois filhos
+Fill dividem por igual — e, medido, o tamanho da ocorrência já é a verdade). Ver §6
+invariantes 15/16 e §8.
 
 **Marcas lidas do DOM** (`data-figma*`, só atributos, sem efeito visual):
 
@@ -216,6 +225,10 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | 12 | A **volta** funciona: listar páginas, ler uma página, serializar instâncias com âncora e variáveis | era o único caminho que só seria testado dentro do Figma |
 | 13 | Todo componente de `COMPONENTES` tem **âncora em `ORIGEM`** e a **marca `data-figma` no arquivo apontado** (atributo JSX ou chave de objeto); marca no app sem âncora vira aviso, não falha | o `data-figma*` não altera nada visual: mexer num elemento e perder a marca tira o componente da biblioteca sem ninguém notar, e sem âncora a volta do `diff` fica cega |
 | 14 | As variáveis de `Nexus / Cor` e `Nexus / Métrica` batem com os tokens do manifesto, uma variável **pré-existente com valor antigo converge** para o valor atual (o upsert atualiza as existentes) e o manifesto **sem `tokens` falha** mandando re-rodar a colheita | os tokens estavam copiados dentro do plugin e ficavam desatualizados quando o `globals.css` mudava — e "reaproveitar a coleção existente" sem atualizar era exatamente o defeito |
+| 15 | Nenhum frame tem **mais de um filho com `grow`** | o auto-layout do Figma **não tem peso**: dois filhos "Fill" dividem a sobra por igual, enquanto o CSS divide na proporção de `flex-grow`. A linha "CEP + UF" (2:1) saiu com as duas colunas em 210px e o select da UF **por cima do botão da lupa** |
+| 16 | Um frame **com sobra no eixo principal não pode ter filho com `grow`** | um filho que cresce absorve a sobra: sobra significa que o navegador **não** o cresceu (acontece quando o item cresceria num pai que o motor não usou de fato — a coluna do formulário esticada pela grade, com 233px sobrando). No Figma o `Fill` distribuiria essa sobra e empurraria os campos seguintes **para fora do modal** |
+| 17 | Não existe texto `"N de N"` (informação de paginação) com `singleLine` falso na cena, nem com auto-resize diferente de `WIDTH_AND_HEIGHT` na árvore | o texto do JSX com várias expressões (`{a} de {b}`) vira vários nós e as caixas eram contadas como LINHAS: saía como `HEIGHT` e o Figma re-quebrava — o "0" caía para a linha de baixo |
+| 18 | Dentro de uma **instância**, todo frame pareado (sem `grow`/`hug`) tem o tamanho da **ocorrência daquela tela** (altura sempre; largura quando não é contêiner de texto) | o mestre vem da ocorrência **mais completa**: a mensagem do `ConfirmDialog` (3 linhas em outra tela) impunha 68px de altura na instância de 1–2 linhas e o auto-layout do pai empurrava a barra de botões para baixo — o vão que a REF não tem |
 
 ## 7. Armadilhas da API do Figma (todas já custaram tempo)
 
@@ -237,6 +250,19 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 7. **Seções** (`figma.createSection`) são o "pacote"; o tamanho é calculado pelo cursor
    do próprio plugin (não depende de a seção crescer sozinha).
 8. **`figma.notify` funciona no plugin local**, mas não no `use_figma` do MCP.
+9. **`layoutGrow` não tem peso.** O Figma divide a sobra **igualmente** entre os filhos
+   "Fill" e **ignora a largura que cada um já tinha**: dois filhos Fill numa linha de
+   436px (com `gap` 16) viram 210px cada, mesmo que o CSS tivesse dado 280/140. Só é
+   fiel com **um** filho que cresce (aí a divisão é a mesma nos dois motores) e quando
+   existe sobra de verdade para distribuir — ver §6 invariantes 15/16.
+10. **Um filho de instância não reflui como no CSS.** O mestre vem de **uma**
+    ocorrência: alturas que o texto decide (a mensagem do `ConfirmDialog`) chegam à
+    instância de outra tela e o auto-layout do pai empurra o que vem depois. Quem
+    corrige é `adotarTamanhoDaOcorrencia` — §6 invariante 18.
+11. **`Range.getClientRects` conta NÓS, não linhas.** `{a} de {b}` no JSX são três nós
+    de texto e três caixas na mesma linha; `white-space` é herdado (um ancestral
+    `nowrap` proíbe a quebra em qualquer largura) e o Figma re-quebra o texto pelo
+    tamanho da caixa que recebeu — §6 invariante 17, §8.
 
 ## 8. Histórico de bugs (sintoma → causa → correção)
 
@@ -266,6 +292,10 @@ Todas são verificadas por `npm run figma:check` (e falham o comando):
 | Diff: todo componente de canto reto aparecendo como diferença | a leitura só grava `raio` quando há raio, e `undefined` ≠ `[0,0,0,0]` | normalizar 0 ↔ ausente na comparação |
 | Divergência de 1:1 em **todas** as telas (0,46%–3,89%), crescendo com a densidade de texto | a app declarava `--font-sans: "Inter"`, `font-[Roboto,sans-serif]` na sidebar e `--font-display: "SF Pro","Segoe UI"`, mas **não carregava nenhuma fonte**: o navegador pintava Arial/Segoe UI e o plugin normaliza cada família para Inter/Roboto | carregar **Inter** via `next/font/google` e apontar `--font-sans`/`--font-display` para ela; sidebar passa a usar a mesma fonte (ver §9) |
 | Variáveis do Figma com os tokens **antigos** depois de o `globals.css` mudar (e `branco`/`raio-lg/xl/pill` sem equivalente no CSS) | os tokens existiam **copiados à mão** em `plugin/code.js` (`TOKENS_COR`/`TOKENS_METRICA`) e a reimportação só *reaproveitava* as coleções, sem atualizar valor nenhum | fonte única: `globals.css` → `tokens.ts` → manifesto → `garantirVariaveis` faz **upsert** (atualiza existentes, cria novas, mantém as que saíram); invariante #14 prova a convergência |
+| CEP do destinatário/fornecedor **sem o botão da lupa** no Figma, com o select da UF 70px à esquerda | `flex-grow: 2` / `flex-grow: 1` viravam `layoutGrow = 1` nos dois filhos: o Figma não tem peso e dividiu a linha em **duas colunas iguais (210px cada)**, então a coluna do CEP encolheu com o conteúdo transbordando e o select da UF (opaco, desenhado depois) cobriu a lupa | `grow` só com **um** filho que cresce e sobra para distribuir; o tamanho medido manda (invariante #15) |
+| Paginação em duas linhas no Figma ("Página 1 de" / "0") | `{pageIndex + 1} de {pageCount}` são **três nós de texto** e `Range.getClientRects` devolvia três caixas na **mesma** linha; contadas como "linhas", o texto saía `singleLine: false` → `HEIGHT` no Figma, que re-quebra pela largura da caixa | contar **linhas visuais** (caixas agrupadas por faixa vertical) e tratar `nowrap` herdado como proibição de quebra (invariante #17) |
+| `ConfirmDialog` ("Excluir …") com um vão entre a mensagem e a barra de botões (23px a mais que a REF) | o mestre vem da ocorrência **mais completa**, onde a mensagem tem **3 linhas**: o parágrafo do mestre tem 68px de altura e a instância de 1–2 linhas herdava essa altura — o auto-layout do pai empurrava os botões | a instância adota o tamanho da **sua** ocorrência nos filhos pareados (`adotarTamanhoDaOcorrencia`, invariante #18) |
+| Modal de destinatário com os campos "empurrados" e **sumindo** no Figma (a partir de "Número/Complemento") | a coluna do formulário é um item de **grade** esticado (921px) e o campo `flex-1` (Logradouro) ficou com `grow` mesmo sem o navegador tê-lo crescido: no Figma o `Fill` absorveu os **233px** de sobra e o resto saiu do recorte do modal | `grow` não vale onde há sobra no eixo principal — o tamanho medido manda (invariante #16) |
 
 ## 9. Estado atual e pendências
 
@@ -275,6 +305,17 @@ ocorrência real e âncora de origem, 21/21 promovidos de `COMPONENTES` com a ma
 0 duplicações, 0 larguras incompatíveis, 0 campos desalinhados, 0 mestres aninhados,
 0 formulários sem fundo, 0 soltos, 0 sobreposições, 6 pacotes), `tsc`, `eslint`, os
 165 testes da app e `next build` passando.
+
+**Verificado (fidelidade da montagem, 4 defeitos reais — KAN-166)**: o usuário revisou o
+Figma contra a REF e achou quatro defeitos de **montagem** (a cena estava certa): a lupa
+do CEP coberta, a paginação em duas linhas, o vão do `ConfirmDialog` e a deriva vertical do
+modal de destinatário. Causa raiz e correção em §8; invariantes 15–18 novas. O
+`figma:check` conta as cinco regras (`figma:check` mostra a seção "fidelidade da
+montagem"), todas em 0 — **com dentes provados**: reintroduzir cada defeito deixa o
+`figma:check` vermelho (23 frames com dois `grow`; 3 colunas com filho `grow` e sobra de
+174–233px; 67 textos de paginação quebrados + 1 nó `HEIGHT` re-quebrável; 6 instâncias de
+`ConfirmDialog` com a mensagem de 68px contra 22,5/45px da cena) e reverter devolve o
+verde. Nenhum arquivo de `src/**` mudou: os quatro eram erros de reconstrução.
 
 **Verificado (tokens, fonte única)**: a colheita leva `tokens` no manifesto
 (14 cores + 5 métricas do `globals.css`) e o `figma:check` prova a invariante #14 —

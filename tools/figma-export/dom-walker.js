@@ -162,22 +162,54 @@ function walkDom(opts) {
     return out;
   }
 
-  function unionRects(rects) {    var x1 = Infinity;
-    var y1 = Infinity;
-    var x2 = -Infinity;
-    var y2 = -Infinity;
-    var lines = 0;
+  /**
+   * Quantas LINHAS as caixas ocupam — não quantas caixas.
+   *
+   * Um texto escrito como várias expressões no JSX (`{pageIndex + 1} de
+   * {pageCount}`) vira VÁRIOS nós de texto e o `Range.getClientRects` devolve uma
+   * caixa para cada nó, todas na MESMA linha: contar caixas dizia "3 linhas" para
+   * um texto de uma linha só. O texto então saía do Figma como `HEIGHT` (quebra
+   * automática) em vez de `WIDTH_AND_HEIGHT`, e o "1 de 0" da paginação caía para
+   * a linha de baixo — bastava a caixa medida ser 1px mais estreita que o desenho
+   * no Figma.
+   *
+   * Caixas na mesma faixa vertical (centros a menos de meia altura) são a mesma
+   * linha.
+   */
+  function contarLinhas(rects) {
+    var centros = [];
     for (var i = 0; i < rects.length; i++) {
       var r = rects[i];
       if (r.width <= 0 && r.height <= 0) continue;
-      lines++;
+      var centro = (r.top + r.bottom) / 2;
+      var tolerancia = Math.max(2, r.height / 2);
+      var mesma = false;
+      for (var j = 0; j < centros.length; j++) {
+        if (Math.abs(centros[j] - centro) <= tolerancia) {
+          mesma = true;
+          break;
+        }
+      }
+      if (!mesma) centros.push(centro);
+    }
+    return centros.length;
+  }
+
+  function unionRects(rects) {
+    var x1 = Infinity;
+    var y1 = Infinity;
+    var x2 = -Infinity;
+    var y2 = -Infinity;
+    for (var i = 0; i < rects.length; i++) {
+      var r = rects[i];
+      if (r.width <= 0 && r.height <= 0) continue;
       x1 = Math.min(x1, r.left);
       y1 = Math.min(y1, r.top);
       x2 = Math.max(x2, r.right);
       y2 = Math.max(y2, r.bottom);
     }
     if (!Number.isFinite(x1)) return null;
-    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1, lines: lines };
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1, lines: contarLinhas(rects) };
   }
 
   /** Caixa de conteúdo (sem borda/moldura) de um elemento. */
@@ -309,6 +341,14 @@ function walkDom(opts) {
       var nowrap = (cs.whiteSpace || "").indexOf("nowrap") >= 0 || cs.whiteSpace === "pre";
       var ellipsis = (cs.textOverflow || "").indexOf("ellipsis") >= 0;
       var cb = contentBox(el, rect, cs);
+
+      // `white-space` é HERDADO: com um ancestral `nowrap` o texto não pode
+      // quebrar em nenhuma largura. O Figma re-quebra um texto pelo tamanho da
+      // caixa, então um texto que não quebra tem de continuar numa linha
+      // (`WIDTH_AND_HEIGHT`, com a largura do próprio texto) — `pre` fica de fora
+      // porque quebra em `\n` de verdade.
+      if ((cs.whiteSpace || "").indexOf("nowrap") >= 0) single = true;
+
       if (ellipsis && nowrap) {
         truncated = true;
         // Largura = caixa de conteúdo: é exatamente onde o navegador corta e
@@ -541,6 +581,26 @@ function walkDom(opts) {
     var contentW = Math.max(0, node.box.w - pl - pr);
     var contentH = Math.max(0, node.box.h - pt - pb);
 
+    // Quantos filhos o CSS deixa crescer? (ver o `grow` no laço abaixo)
+    var quantosCrescem = 0;
+    for (var c = 0; c < filhos.length; c++) {
+      if (filhos[c].flexGrow) quantosCrescem++;
+    }
+
+    // Um filho que cresce ABSORVE a sobra do eixo principal — é o que o CSS faz, e
+    // o mesmo que o "Fill" do Figma faz quando há UM só filho que cresce. Sobrar
+    // espaço, então, quer dizer que o navegador NÃO cresceu ninguém ali (o item
+    // cresceria num pai que não é o que o motor usou de fato: o caso real é a
+    // coluna de um formulário esticada pela grade, com 233px sobrando e o campo
+    // `flex-1` medido em 72px). Nesse caso o medido manda: o `grow` empurraria o
+    // resto da tela para fora do modal.
+    var principalConteudo = horizontal ? contentW : contentH;
+    var somaPrincipal = 0;
+    for (var s = 0; s < filhos.length; s++) {
+      somaPrincipal += horizontal ? filhos[s].box.w : filhos[s].box.h;
+    }
+    var sobra = principalConteudo - somaPrincipal - gap * Math.max(0, filhos.length - 1);
+
     node.layout = {
       mode: horizontal ? "HORIZONTAL" : "VERTICAL",
       gap: gap,
@@ -556,7 +616,15 @@ function walkDom(opts) {
 
     for (var j = 0; j < filhos.length; j++) {
       var filho = filhos[j];
-      filho.grow = !!filho.flexGrow;
+      // O auto-layout do Figma não tem PESO: com mais de um filho que cresce a
+      // divisão é IGUAL, enquanto o CSS divide na proporção de `flex-grow`. Foi
+      // assim que a linha "CEP + UF" saiu errada no Figma (2:1 virou 1:1): a
+      // coluna do CEP encolheu para 210 e a da UF andou para a esquerda, com o
+      // select dela por cima do botão da lupa. Sem poder representar o peso, quem
+      // manda é o tamanho MEDIDO — o Figma só modela o crescimento quando há um
+      // único filho que cresce (aí a divisão é a mesma nas duas linguagens), e
+      // nem isso quando não há sobra para distribuir.
+      filho.grow = sobra <= 2.5 && quantosCrescem === 1 && !!filho.flexGrow;
       var tamanhoCruzado = horizontal ? filho.box.h : filho.box.w;
       var conteudoCruzado = horizontal ? contentH : contentW;
       filho.stretch =
