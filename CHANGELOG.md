@@ -13,28 +13,92 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+<!-- Nada pendente desde a 1.17.10.2026 — a primeira versão do projeto. -->
+
+## [1.17.10.2026] - 2026-10-17
+
+Primeira versão do Nexus. Como não existe versão anterior, esta seção descreve **o que o
+sistema entrega hoje**: os módulos de cadastro e de acesso, a autenticação, a trilha de
+auditoria, a infraestrutura de orquestração multiagente e a ferramenta de exportação para o
+Figma. `Changed` e `Fixed` registram as mudanças e as correções feitas até esta primeira
+publicação.
+
+O escopo desta versão é o **acesso e os cadastros**. A operação de estoque (notas de entrada e
+de saída, movimentações e reservas), as remessas e rotas, o inventário, o mural e os relatórios
+**ainda não têm telas** e não fazem parte desta publicação — embora o modelo físico deles já
+esteja no banco.
+
 ### Added
 
-- Ferramenta de exportação do Nexus para o Figma (`tools/figma-export/`): plugin local +
+- **Autenticação e sessão:** login com senha (BCrypt) e token JWT HS256 (`jose`) em cookie
+  `nexus_token`; rotas privadas protegidas por `src/proxy.ts`; a sessão é revalidada no banco a
+  cada requisição e cai quando o usuário é desativado ou a senha muda; primeiro acesso,
+  definição de senha e logout. (KAN-136, KAN-137)
+- **Usuários, perfis e permissões:** CRUD de usuários, página de perfis-template e painel de
+  permissões reutilizável; aplicar um perfil **substitui** as permissões do usuário e não cria
+  vínculo; verificação `entidade.acao` no servidor e gating na interface; Super Admin
+  (`super_admin`) imutável, com todas as permissões e fora da lista de permissões da interface.
+  (KAN-137, KAN-164)
+- **Trilha de auditoria:** `registro_auditoria` gravado na mesma transação da operação, com
+  usuário, data/hora, entidade, ID do registro afetado e snapshots JSON de antes/depois, em
+  criação, alteração, desativação e exclusão — e também em login, falha de login, logout e
+  definição de senha (`src/dao/_audit.ts`). (KAN-164)
+- **Cadastros base:** Funcionários (pessoa física, flag de condutor), Destinatários (escola ou
+  creche, com endereço obrigatório), Fornecedores e Veículos (placa, modelo e status), cada um
+  com criar/editar/visualizar em modal, busca, paginação e exclusão recusada quando existem
+  vínculos. (KAN-138, KAN-153, KAN-154, KAN-155)
+- **Códigos personalizados por entidade:** seção reutilizável no formulário, com o tipo validado
+  por cadastro e o formato conferido — EAN12/EAN13 (produto), `COD_ESCOLA`, `MATRICULA`,
+  `COD_FORNECEDOR` e `DIGITACAO` (`src/lib/codigo.ts`, `CodigosSection`). (KAN-138, KAN-139,
+  KAN-153, KAN-154, KAN-155)
+- **Contatos e endereço:** telefones (com tipo e DDD) e e-mails por entidade, com validação e
+  formatação; endereço com busca por CEP que preenche logradouro, bairro, cidade e UF
+  (`src/services/contato.ts`, `src/services/cep.ts`). (KAN-137, KAN-138, KAN-153, KAN-154)
+- **Produtos:** catálogo com descrição, foto, flags **Perecível** e **Composto**, data de
+  validade e conversão de unidade padrão; a foto entra por upload ou URL e é validada,
+  redimensionada (máx. 1024px) e convertida para WEBP; composição com insumos; a listagem mostra
+  a quantidade e a **quantidade livre** (`quantidade_atual − saldo_reservado`) somando os
+  estoques do produto. (KAN-139, KAN-164)
+- **Unidades de conversão:** cadastro standalone de nome e fator, gerenciado em modal a partir do
+  cadastro de produto. (KAN-139)
+- **Listagens e formulários padronizados:** paginação feita no servidor, busca com priorização
+  (código antes da descrição), tabela e barra de paginação compartilhadas e o mesmo fluxo de
+  criar/editar/visualizar/excluir em todas as telas de cadastro. (KAN-139, KAN-164)
+- **Interface:** Tailwind v4 com os tokens de design em `@theme` no `src/app/globals.css` e
+  biblioteca de componentes compartilhados (Button, Modal, ConfirmDialog, Aviso, DataTable,
+  Sidebar…). (KAN-137, KAN-164)
+- **Base de dados:** `prisma/schema.prisma` descreve o modelo físico do domínio — cadastros,
+  estoque e reservas, movimentações, notas de entrada e de saída, remessas, rotas e percursos,
+  inventário, permissões, auditoria e mural — com o cliente Prisma 7 sobre MySQL; o seed
+  (`npm run db:setup`) popula apenas dados de referência (tipos de código, permissões,
+  perfis-template e unidades de conversão) e o Super Admin nasce no fluxo de primeiro acesso.
+  (KAN-164)
+- **Testes:** 18 arquivos e 165 testes cobrindo DAOs, serviços e bibliotecas (`npm test`,
+  Vitest), executados no CI em `.github/workflows/tests.yml`. (KAN-146)
+- **Ferramenta de exportação para o Figma (`tools/figma-export`):** plugin local +
   servidor local (sem o MCP oficial), colheita de 47 telas com Playwright e reconstrução
   das telas como componentes reutilizáveis com propriedades, com captura 1:1 de referência.
-- **Volta (Figma → app):** aba *Ler do Figma* no plugin, leitura de página para
+  (KAN-166)
+- **Ferramenta de exportação para o Figma · volta (Figma → app):** aba *Ler do Figma* no
+  plugin, leitura de página para
   `out/figma-export/figma/<página>.json` e `figma:diff` (tokens × `globals.css`,
   componentes casados por nome + âncora de código e telas).
-- Scripts `figma:harvest`, `figma:serve`, `figma:check`, `figma:compare`, `figma:diff`,
-  `figma:fixtures` e a skill `.opencode/skills/figma-export`.
-- Verificação automática do plugin sem abrir o Figma (`figma:check`), com 18 invariantes —
-  incluindo a **guarda de reuso** que falha se um componente promovido perder a marca
-  `data-figma` no código e a que prova que as **variáveis do Figma convergem para os
-  tokens do `globals.css`**.
-- Infraestrutura de orquestração multiagente: agentes versionados em `.opencode/agents/`
-  (orchestrator, developer, reviewer, qa, docs-keeper, release-manager).
-- Skills de processo `.opencode/skills/{orchestration,jira-smart-commits,release}/SKILL.md`.
-- Estado persistente `.ai-workflow/` (`PROJECT_STATE.md`, `contracts/`, `runs/`,
-  `decisions/`) e ADR 0001.
-- Convenção de versionamento DateVer `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`) e este changelog.
-- `docs/VERSIONAMENTO.md`: fonte detalhada da convenção de versionamento e changelog
-  (DateVer + Keep a Changelog 1.1.0 pt-BR), com exemplos de releases no mesmo dia,
+- **Ferramenta de exportação para o Figma · scripts:** `figma:harvest`, `figma:serve`,
+  `figma:check`, `figma:compare`, `figma:diff`, `figma:fixtures` e a skill
+  `.opencode/skills/figma-export`.
+- **Ferramenta de exportação para o Figma · verificação sem abrir o Figma:** `figma:check`,
+  com 18 invariantes — incluindo a **guarda de reuso** que falha se um componente promovido
+  perder a marca `data-figma` no código e a que prova que as **variáveis do Figma convergem
+  para os tokens do `globals.css`**.
+- **Infraestrutura de orquestração multiagente:** agentes versionados em `.opencode/agents/`
+  (orchestrator, developer, reviewer, qa, docs-keeper, release-manager). (KAN-165)
+- **Infraestrutura de orquestração multiagente · skills:**
+  `.opencode/skills/{orchestration,jira-smart-commits,release}/SKILL.md`.
+- **Infraestrutura de orquestração multiagente · estado persistente:** `.ai-workflow/`
+  (`PROJECT_STATE.md`, `contracts/`, `runs/`, `decisions/`) e ADR 0001.
+- **Versionamento:** convenção DateVer `N.DD.MM.YYYY` (tag `vN.DD.MM.YYYY`) e este changelog.
+- **Documentação:** `docs/VERSIONAMENTO.md`, fonte detalhada da convenção de versionamento e
+  changelog (DateVer + Keep a Changelog 1.1.0 pt-BR), com exemplos de releases no mesmo dia,
   escrita de entradas, rastreabilidade versão ↔ issues ↔ commit e o que nunca fazer.
   Referenciado no cabeçalho do `CHANGELOG.md`, no `README.md` e no `AGENTS.md`. (KAN-166)
 
@@ -92,6 +156,6 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 <!--
 Categorias: Added, Changed, Deprecated, Removed, Fixed, Security.
 Não crie uma versão nova sem cumprir o checklist de release.
-Próximo release planejado: 1.17.10.2026 (tag v1.17.10.2026) — aguarda a verificação da
-volta no Figma e o `figma:compare`.
+Próximo release: sem data marcada — depende de o sistema ganhar telas para os módulos que
+ficaram fora de 1.17.10.2026 (estoque, notas, remessas e rotas, inventário, mural e relatórios).
 -->
