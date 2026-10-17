@@ -38,8 +38,9 @@ estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 
 ## Trabalho existente a preservar
 
-- Branch/worktree **`figma-export`**: já **integrada na `main`** (fast-forward em
-  `ed324fd`). O worktree e a branch continuam existindo; remover só com autorização.
+- Branch/worktree **`figma-export`**: **integrada na `main` e removida** em 2026-10-17
+  (branch e worktree apagados a pedido do usuário). Os artefatos gerados no Figma foram
+  preservados em `out/figma-export/` (ignorado pelo git).
 - Worktree **`gravacao`**: `prisma/seed-demo.ts` não rastreado. Preservar.
 - Worktree **`modulo-estoque`** (KAN-140): **descartada** (refazer do zero).
   **Não deletar** branch nem worktree sem autorização.
@@ -69,7 +70,9 @@ estoque** (KAN-140 — a branch antiga foi descartada; refazer do zero).
 
 ## Próximas ações
 
-1. Definir o destino de `figma-export` (branch/worktree já integrados) e de `gravacao`.
+1. Definir o destino de `gravacao` (worktree com `prisma/seed-demo.ts` não rastreado).
 2. **Sessão nova:** revisar documentação e fluxos; iniciar a **movimentação de estoque**
    (KAN-140), com a task criada pelo formato novo do `docs/agents/JIRA.MD` (texto exato
    mostrado ao usuário antes de criar).
+3. Registrar o **worklog** de KAN-165 e KAN-166 (horas efetivamente trabalhadas — pendente
+   de confirmação do usuário).
