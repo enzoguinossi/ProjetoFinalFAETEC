@@ -49,11 +49,22 @@
 
 ## Resultado (preenchido pelo executor)
 
-- **Status:** em andamento
+- **Status:** em andamento (1 de 3 concluída)
 - **Commit de preservação do WIP:** `0dfd6e5` (KAN-166) — 42 arquivos, o ferramental
   completo (`tools/figma-export/**` + skill + marcas `data-figma*`).
+- **Integração:** `614205a` (merge da `main` — traz agentes e `.ai-workflow` para a branch).
 - **Evidência de base:** `npm run figma:check` limpo — 53/53 componentes com tamanho
   medido e âncora, 47/47 telas em 1366×768, 0 duplicações, volta lendo 1.469 instâncias
   (45 com âncora) e 19 variáveis.
-- **Pendências conhecidas (do MAPA §9):** `figma:compare` nunca rodou de verdade; a
-  leitura real de uma página (aba *Ler do Figma*) ainda não foi exercitada no Figma.
+
+### Subtarefas
+
+| Subtarefa | Run | Status | Evidência |
+|---|---|---|---|
+| Guarda de reuso (invariante #13 das marcas) | `RUN-20261017-02a` | **concluída** | `120a4a1` + `c49c647`; `figma:check` verde com `21/21 promovidos com a marca`; falha demonstrada com a marca removida |
+| Leitura de componentes (volta) no Figma real | — | **aguarda o usuário** | pendente a leitura de uma página (aba *Ler do Figma*) + `figma:diff` |
+| `figma:compare` (conferência 1:1) | — | **aguarda o usuário** | pendente importação com *conferir 1:1* |
+| Versionamento (DateVer + changelog) | — | preparado | `CHANGELOG.md` com `Unreleased`; versão planejada `1.17.10.2026` |
+
+- **Pendências reais:** `figma:compare` nunca rodou de verdade; a leitura real de uma
+  página não foi exercitada no Figma — ambas dependem do Figma do usuário (MAPA §9).
