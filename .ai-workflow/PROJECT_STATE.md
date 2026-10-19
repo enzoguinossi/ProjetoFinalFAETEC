@@ -99,9 +99,11 @@ marcados como Importante/Desejável. Corrigido:
 `RF022` (percurso e rota) **permanece Importante** — decisão do usuário de não dividir
 rota/percurso.
 
-**Fora do escopo:** `RF025` (importação de NF-e XML) e `RNF009` (interoperabilidade XML) —
-a mesma capacidade declarada duas vezes; o RF017a cobre a necessidade manualmente. Ver
-`docs/dominio/ESCOPO_FORA.md`.
+**Fora do escopo:** `RF018` (quadro Kanban — o acompanhamento visual continua no Trello, na
+rua; sem hospedagem online exigiria um app mobile dedicado), `RF025` (importação de NF-e XML)
+e `RNF009` (interoperabilidade XML) — estes dois são a mesma capacidade declarada duas vezes,
+e o RF017a cobre a necessidade manualmente. Em consequência, o `RNF002` deixou de citar o
+Kanban. Ver `docs/dominio/ESCOPO_FORA.md`.
 
 ## Git (verificado no checkpoint)
 

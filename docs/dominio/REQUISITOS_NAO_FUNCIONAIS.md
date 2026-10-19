@@ -5,7 +5,7 @@
 | ID | Requisito | Categoria | Prioridade |
 |----|-----------|-----------|------------|
 | RNF001 | **Arquitetura Desktop Web:** Aplicação web conectada a SGBD MySQL | Arquitetura | Essencial |
-| RNF002 | **Desempenho:** Busca por código de barras ou Kanban < 2 segundos em rede local | Desempenho | Essencial |
+| RNF002 | **Desempenho:** Busca por código de barras < 2 segundos em rede local | Desempenho | Essencial |
 | RNF003 | **Usabilidade:** Interface simples e intuitiva para operadores de almoxarifado | Usabilidade | Essencial |
 | RNF004 | **Segurança/Perfis:** Acesso filtrado dinamicamente conforme perfil autenticado | Segurança | Essencial |
 | RNF005 | **Backup/Integridade:** Consistência referencial + rotinas de backup | Confiabilidade | Essencial |

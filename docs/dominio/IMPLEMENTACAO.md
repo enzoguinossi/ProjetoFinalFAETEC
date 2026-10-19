@@ -33,21 +33,21 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF016 — Baixas por consumo interno e avaria | não implementado | Nenhum fluxo de baixa por consumo/avaria |
 | RF017a — Nota de entrada | não implementado | Sem tela/serviço/DAO de nota de entrada |
 | RF017b — Nota de saída | não implementado | Sem tela/serviço/DAO de nota de saída |
-| RF018 — Quadro Kanban de remessas | não implementado | Apenas as constantes `STATUS_REMESSA` (`src/types/index.ts`); sem Kanban |
+| RF018 — Quadro Kanban de remessas | não implementado | Apenas as constantes `STATUS_REMESSA` (`src/types/index.ts`); **fora do escopo** (`ESCOPO_FORA.md`) |
 | RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia); **sem** assistente/tela; uso só em `tests/services/estoque.test.ts` |
 | RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); nada vinculado a remessa |
 | RF021 — Pendências e urgências | não implementado | Sem fluxo de pendência/urgência |
 | RF022 — Percurso e rota | não implementado | Sem tela/serviço/DAO (só as tabelas no schema) |
 | RF023 — Relatórios | não implementado | Item de menu `/relatorios` **sem página** (`src/components/sidebar-config.ts`) |
 | RF024 — Exportação de dados | não implementado | Sem geração de PDF/CSV/XLSX |
-| RF025 — Importação de NF-e (XML) | não implementado | Sem leitura de XML NF-e |
+| RF025 — Importação de NF-e (XML) | não implementado | Sem leitura de XML NF-e — **fora do escopo** (`ESCOPO_FORA.md`) |
 
 ## Requisitos não funcionais
 
 | RNF | Status | Evidência (ou ausência) |
 | --- | --- | --- |
 | RNF001 — Arquitetura web + SGBD | implementado | App Next.js e `prisma/schema.prisma` (`provider = "mysql"`) |
-| RNF002 — Desempenho (busca/Kanban < 2 s) | parcial | Busca por código priorizada em `src/dao/produto.ts`; Kanban ausente (RF018); sem medição de tempo |
+| RNF002 — Desempenho (busca por código < 2 s) | parcial | Busca por código priorizada em `src/dao/produto.ts`; o Kanban saiu do escopo (ver `ESCOPO_FORA.md`); sem medição de tempo |
 | RNF003 — Usabilidade | implementado | Telas de cadastro com componentes compartilhados (`src/components/**`, `src/app/**`) |
 | RNF004 — Segurança por perfil | implementado | `src/lib/permissoes.ts` e `src/services/permissao.ts`; gating por `entidade.acao` no servidor |
 | RNF005 — Backup e integridade | parcial | Integridade referencial pelas FKs do Prisma; **sem** rotina de backup (nenhum script em `scripts/`) |

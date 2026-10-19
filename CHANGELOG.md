@@ -125,6 +125,15 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   **com ou sem** chave de acesso NF-e. Ponteiros no cabeçalho de
   `docs/dominio/REQUISITOS_FUNCIONAIS.md` e de `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md` e
   linha nova no índice `docs/README.md`. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **`RF018` (Quadro Kanban de Remessas) passou a fora do escopo:** o acompanhamento visual já
+  é feito no **Trello**, atualizado na rua, durante as entregas, por quem executa o serviço; o
+  projeto **não tem infraestrutura para hospedar o sistema online** e permitir acesso de
+  qualquer lugar, e um Kanban servido pelo Nexus exigiria uma **interface mobile dedicada** —
+  esforço muito acima do ganho. O status de cada remessa continua registrado no modelo, para
+  consultas e relatórios. `docs/dominio/ESCOPO_FORA.md` foi reescrito para justificar cada
+  exclusão em seção própria (critério, resumo e o que atende à necessidade). Em consequência,
+  o `RNF002` deixou de citar o Kanban: o requisito de desempenho trata agora só da busca por
+  código de barras. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
 
 ### Removed
 
