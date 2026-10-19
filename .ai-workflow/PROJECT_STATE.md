@@ -1,7 +1,7 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-10-17 (revisão e reorganização da documentação).
+> Última consolidação: 2026-10-19 (revisão da documentação + decisões de modelagem).
 
 ## Objetivo atual
 
@@ -9,9 +9,13 @@
 de acesso/cadastros, a infraestrutura de orquestração multiagente e a ferramenta de
 exportação para o Figma.
 
-**Documentação revisada e reorganizada** em 2026-10-17 (commit `aaad949`): `docs/` passou
-a ter `dominio/`, `processo/` e `diagramas/`; a documentação foi confrontada com o código
-e as divergências corrigidas.
+**Documentação revisada e reorganizada** (`aaad949`): `docs/` passou a ter `dominio/`,
+`processo/` e `diagramas/`; a documentação foi confrontada com o código e as divergências
+corrigidas.
+
+**Decisões de modelagem aplicadas** (`e407b96`): a nota de saída deixou de ter
+destinatário e passou a consolidar pedidos; `mensagem_mural.ID_usuario` ficou opcional;
+`anexo.ID_documento_fiscal` foi removida. O banco está em sincronia com o schema.
 
 **Próxima fase:** iniciar a **movimentação de estoque** (KAN-140 — a branch antiga foi
 descartada; refazer do zero), com a task criada pelo formato do `docs/processo/JIRA.md`.
@@ -30,6 +34,8 @@ descartada; refazer do zero), com a task criada pelo formato do `docs/processo/J
 - **Fonte de verdade, na ordem:** código → `prisma/schema.prisma` →
   `docs/dominio/{REGRAS_NEGOCIO,REQUISITOS_FUNCIONAIS,REQUISITOS_NAO_FUNCIONAIS,ENTENDIMENTO}.md`
   → `AGENTS.md` → `docs/processo/JIRA.md` → histórico da conversa.
+- **Schema:** o projeto **não versiona migrations** — aplica com `prisma db push`
+  (`npm run db:push` / `npm run db:setup`).
 
 ## Runs
 
@@ -39,13 +45,17 @@ descartada; refazer do zero), com a task criada pelo formato do `docs/processo/J
 | RUN-20261017-02 | Ferramenta de exportação para o Figma (fechamento) | orchestrator | concluído | `figma-export` → `main` | KAN-166 |
 | RUN-20261017-03 | Primeiro release (`1.17.10.2026`) | release-manager | concluído | `main` | KAN-165, KAN-166 |
 | RUN-20261017-04 | Verificação da documentação de domínio vs. schema/código | general | concluído | `main` | — |
-| RUN-20261017-05 | Verificação do README, AGENTS e docs de processo vs. repositório | general | concluído | `main` | — |
+| RUN-20261017-05 | Verificação do README, AGENTS e docs de processo | general | concluído | `main` | — |
 | RUN-20261017-06 | Reorganização de `docs/` e correções de conteúdo | docs-keeper | concluído | `main` | — |
 | RUN-20261017-07 | Referências à documentação fora de `docs/` | developer | concluído | `main` | — |
+| RUN-20261017-08 | `mensagem_mural.ID_usuario` nullable; `anexo.ID_documento_fiscal` removida | developer | concluído | `main` | — |
+| RUN-20261017-09 | RN003 e `tipo_codigo` registrados; pontos em aberto zerados | docs-keeper | concluído | `main` | — |
+| RUN-20261017-10 | Nota de saída sem destinatário; datas; build reparado; `db push` | developer | concluído | `main` | — |
+| RUN-20261017-11 | Nota consolida pedidos (FK em `pedido_escola`) | developer | concluído | `main` | — |
 
-Os runs 04–07 não têm issue: **decisão explícita do usuário em 2026-10-17** de commitar
-sem chave. Isso é uma **exceção consciente** à regra 1 de smart commits do `AGENTS.md` —
-não é descuido, e não deve ser tomado como precedente.
+Os runs 04–11 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
+**exceção consciente** à regra 1 de smart commits do `AGENTS.md` — não é descuido e não
+deve ser tomado como precedente.
 
 ## Bloqueios e dependências
 
@@ -53,56 +63,70 @@ não é descuido, e não deve ser tomado como precedente.
 
 ## Trabalho existente a preservar
 
-- Branch/worktree **`figma-export`**: **integrada na `main` e removida** em 2026-10-17
-  (branch e worktree apagados a pedido do usuário). Os artefatos gerados no Figma foram
-  preservados em `out/figma-export/` (ignorado pelo git).
+- Branch/worktree **`figma-export`**: **integrada na `main` e removida** em 2026-10-17.
+  Os artefatos gerados no Figma foram preservados em `out/figma-export/` (ignorado pelo git).
 - Worktree **`gravacao`**: `prisma/seed-demo.ts` não rastreado. Preservar.
 - Worktree **`modulo-estoque`** (branch `KAN-140-modulo-estoque`): **descartada** (refazer
   do zero). **Não deletar** branch nem worktree sem autorização.
 
+## Decisões de modelagem de 2026-10-19
+
+| # | Decisão | Efeito no modelo |
+|---|---|---|
+| 1 | Mensagens automáticas do mural não têm autor | `mensagem_mural.ID_usuario` → opcional (`NULL` = sistema) |
+| 2 | RN003: a pendência é a remessa `PENDENTE` do split | **sem** tabela nova |
+| 3 | `anexo.ID_documento_fiscal` era coluna órfã | coluna **removida** |
+| 4 | `tipo_codigo` sem permissões é intencional | dado de referência, sem CRUD |
+| 5 | A nota de saída **não tem destinatário** | `nota_saida.ID_destinatario` removida; o destinatário fica em `remessa`/`coleta` |
+| 6 | A nota **consolida pedidos** | FK migrada para `pedido_escola.ID_nota_saida` (1:N) |
+
+Detalhe em `docs/dominio/IMPLEMENTACAO.md` §"Decisões que estavam em aberto".
+
 ## Git (verificado no checkpoint)
 
-- `main` = `aaad949` — **1 commit à frente de `origin/main`** (`6922050`), ainda **não
-  publicado**.
+- `main` = `e407b96` — **3 commits à frente de `origin/main`** (`6922050`), ainda **não
+  publicados**: `aaad949` (docs), `7424192` (estado), `e407b96` (modelo).
 - **Tag `v1.17.10.2026`** existe (local); é a única tag de versão do projeto.
-- Árvore de trabalho limpa no momento da consolidação.
+- Banco de desenvolvimento em sincronia com o schema
+  (`prisma migrate diff` → *No difference detected*).
+- Árvore de trabalho limpa.
 
 ## Último checkpoint válido
 
-- 2026-10-17 — revisão e reorganização da documentação integrada na `main` (`aaad949`).
+- 2026-10-19 — decisões de modelagem aplicadas e integradas na `main` (`e407b96`).
 - Entregue: `docs/` em `dominio/` · `processo/` · `diagramas/` (16 arquivos movidos com
-  `git mv`); `docs/README.md` e `docs/dominio/IMPLEMENTACAO.md` (novos); 25 divergências
-  de domínio (`D01`–`D25`) e 13 de processo (`F01`–`F13`) corrigidas contra o código;
-  `README.md` da raiz reduzido ao essencial; `AGENTS.md` alinhado ao repositório real.
-- Decisões registradas: state no repo; integração na `main` sem branch de versão; agentes
-  no repo; DateVer com N=1 e fuso `America/Sao_Paulo`; `modulo-estoque` descartada (não
-  deletada); texto exato no Jira antes de criar/alterar task; **commits sem chave neste
-  trabalho** (exceção aprovada pelo usuário).
-- **Uma entrada publicada do `CHANGELOG` foi preservada:** a correção de caminho dentro da
-  versão `1.17.10.2026` foi **revertida** — na data do release o arquivo estava mesmo em
-  `docs/VERSIONAMENTO.md`, e reescrever a entrada falsificaria o histórico (viola o §5 do
-  `docs/processo/VERSIONAMENTO.md`). Só o preâmbulo do arquivo foi atualizado.
+  `git mv`); `docs/README.md` e `docs/dominio/IMPLEMENTACAO.md` (novos); 25 divergências de
+  domínio (`D01`–`D25`) e 13 de processo (`F01`–`F13`) corrigidas; `README.md` reduzido ao
+  essencial; `AGENTS.md` alinhado ao repositório real; 6 decisões de modelagem aplicadas.
+- **Entradas publicadas do `CHANGELOG` preservadas:** a correção de caminho dentro da versão
+  `1.17.10.2026` foi **revertida** — reescrever a entrada falsificaria o histórico (viola o
+  §5 do `docs/processo/VERSIONAMENTO.md`). Só o preâmbulo do arquivo foi atualizado.
+- `next-env.d.ts` é gerado e alterna entre `.next/dev/types` e `.next/types` conforme o
+  comando; **não** entra em commit.
 
 ## Testes executados
 
-- `node scripts/ai-workflow-check.mjs` → **13/13 automáticos**, 2 manuais, **0 falhas**
-  (o check 11, que exige `docs/processo/JIRA.md`, passou a valer com a reorganização).
-- `npm test` → 165/165 (18 arquivos) · `npx tsc --noEmit` · `npx eslint .` · `npm run build`
-  — da release anterior; **não reexecutados** nesta revisão (não houve mudança de código).
-- `npm run figma:check` → verde (21/21 marcas, 53 mestres) — da release anterior.
-- Nesta revisão: `git status`/`git diff --stat` conferidos, `grep` de caminhos antigos
-  (nenhuma ocorrência fora do histórico de `runs/` e `decisions/`), contagens conferidas
-  por contagem real (52 modelos, 10 enums, 52 classes no `classes.puml`, 52 entidades no
-  `DER.puml`, 25 RFs, 5 RNs, 9 RNFs, 68 permissões no seed).
+- `npm test` → **165/165 (18 arquivos)** · `npm run build` → *Compiled successfully* —
+  reexecutados pelo Orquestrador no `e407b96`.
+- `node scripts/ai-workflow-check.mjs` → **13/13 automáticos**, 2 manuais, **0 falhas**.
+- `npx prisma validate` + `prisma generate` + `prisma db push` → OK; `prisma migrate diff`
+  → *No difference detected*.
+- `npx tsc --noEmit` · `npx eslint .` · `npm run figma:check` — da release anterior.
+- Correções do `npm install` nesta rodada: `playwright-core` estava declarado no
+  `package.json` e no `package-lock.json` mas **ausente de `node_modules`**, o que quebrava
+  `npm run build` em `tools/figma-export/harvest.ts`. Reinstalado; `package.json` e
+  `package-lock.json` não mudaram.
 
 ## Próximas ações
 
-1. **Publicar** o commit `aaad949` (`git push origin main`) — **requer aprovação do usuário**.
+1. **Publicar** os commits pendentes (`git push origin main`) — **requer aprovação do usuário**.
 2. Definir o destino de `gravacao` (worktree com `prisma/seed-demo.ts` não rastreado).
 3. Iniciar a **movimentação de estoque** (KAN-140), com a task criada pelo formato novo do
    `docs/processo/JIRA.md` (texto exato mostrado ao usuário antes de criar).
-4. Resolver os **4 pontos em aberto** de `docs/dominio/IMPLEMENTACAO.md` — em especial o
-   autor das mensagens automáticas do mural (`mensagem_mural.ID_usuario` é `NOT NULL`),
-   que precisa de decisão antes de implementar RF014.
-5. **Worklog registrado** em 2026-10-17 (via MCP): KAN-165 = `1h 30m` (início 13:30) ·
+4. **Ponto em aberto** antes do módulo de expedições (KAN-142 / RF017b): **como um pedido
+   entra numa nota** — se cada confirmação cria uma nota nova ou se o pedido se junta a uma
+   nota em aberto. Registrado em `docs/dominio/IMPLEMENTACAO.md` §"Pontos em aberto".
+5. Considerar `npm install` obrigatório no setup: a ausência de `playwright-core` quebra o
+   build e não é detectada até alguém rodar `npm run build`.
+6. **Worklog registrado** em 2026-10-17 (via MCP): KAN-165 = `1h 30m` (início 13:30) ·
    KAN-166 = `4h` (início 14:20), no fuso `America/Sao_Paulo`.
