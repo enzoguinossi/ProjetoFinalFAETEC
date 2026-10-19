@@ -166,10 +166,9 @@ export async function criarVeiculo(
   });
 }
 
-export async function criarNotaSaida(idDestinatario: number) {
+export async function criarNotaSaida() {
   return prismaTeste.notaSaida.create({
     data: {
-      id_destinatario: idDestinatario,
       data_criacao: new Date(),
       tipo: "SAIDA",
       status: "ABERTA",

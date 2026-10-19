@@ -15,6 +15,12 @@ O sistema deve notificar automaticamente no mural de mensagens quando produtos p
 
 Baixa parcial gera registro automático de pendência vinculado ao destinatário.
 
+**Realização no modelo (decisão do usuário, 2026-10-19):** o "registro automático de pendência"
+**é** a remessa com status `PENDENTE` criada no *split* da entrega parcial, já vinculada ao
+destinatário por `remessa.ID_destinatario` — **sem tabela nova**. O que falta entregar continua
+derivado de `item_nota_saida.qtd_esperada − qtd_entregue`. Ver
+[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.11.2.
+
 ## RN004 — Imutabilidade de Histórico
 **Prioridade:** Essencial
 

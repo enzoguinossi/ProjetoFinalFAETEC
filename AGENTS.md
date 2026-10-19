@@ -257,6 +257,8 @@ Uma entrega parcial gera uma pendência automática para os itens restantes.
 
 Os itens não entregues permanecem comprometidos conforme o modelo de reserva e podem seguir para nova remessa/rota.
 
+A "pendência" é a própria remessa `PENDENTE` criada no split (vinculada por `remessa.ID_destinatario`) — sem tabela nova. Decisão do usuário de 2026-10-19, detalhada em `docs/dominio/ENTENDIMENTO.md` §3.11.2; o sentido da regra não mudou.
+
 ## RN004 — Imutabilidade do histórico
 
 Entradas confirmadas e baixas finalizadas **não podem ser excluídas fisicamente**.

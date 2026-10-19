@@ -370,6 +370,7 @@ entity "pedido_escola" as pedido {
   * ID_pedido_escola : INT <<PK>>
   --
   * ID_destinatario : INT <<FK>>
+  ID_nota_saida : INT <<FK>>
   * data_criacao : TIMESTAMP
   * status : ENUM(PENDENTE, CONFIRMADO, RECUSADO)
   observacao : TEXT
@@ -392,8 +393,6 @@ entity "item_pedido_escola" as item_pedido {
 entity "nota_saida" as nota {
   * ID_nota_saida : INT <<PK>>
   --
-  ID_pedido_escola : INT <<FK>>
-  * ID_destinatario : INT <<FK>>
   * data_criacao : TIMESTAMP
   * tipo : ENUM(SAIDA, DESMONTAGEM, CONSUMO_INTERNO, AVARIA)
   * status : ENUM(ABERTA, EM_ANDAMENTO, BAIXA_TOTAL, BAIXA_PARCIAL, BAIXA_COM_CORTE, CANCELADA)
@@ -553,7 +552,6 @@ entity "anexo" as anexo {
   tipo_mime : VARCHAR
   * data_upload : TIMESTAMP
   ID_remessa : INT <<FK>>
-  ID_documento_fiscal : INT
   * ativo : BOOLEAN
 }
 
@@ -610,7 +608,7 @@ entity "registro_auditoria" as auditoria {
 entity "mensagem_mural" as mural {
   * ID_mensagem_mural : INT <<PK>>
   --
-  * ID_usuario : INT <<FK>>
+  ID_usuario : INT <<FK>>
   titulo : VARCHAR
   * conteudo : TEXT
   * data_publicacao : TIMESTAMP
@@ -680,14 +678,15 @@ insumo "0..*" --> "1" produto : "filho"
 ' Pedido Escola
 destinatario ||--o{ pedido
 pedido ||--|{ item_pedido
-pedido ||--o| nota
 
 ' Nota Saida / Remessa
-destinatario ||--o{ nota
+nota ||--o{ pedido
 nota ||--|{ item_nota
 nota ||--o{ remessa
 nota ||--o{ coleta
 nota ||--o{ reserva
+destinatario ||--o{ remessa
+destinatario ||--o{ coleta
 remessa ||--|{ item_rem
 coleta ||--|{ item_coleta
 funcionario ||--o{ remessa
@@ -715,6 +714,6 @@ perfil ||--o{ perfil_perm
 permissao ||--o{ perfil_perm
 usuario ||--o{ auditoria
 usuario ||--o{ mov
-usuario ||--o{ mural
+usuario |o--o{ mural
 
 @enduml

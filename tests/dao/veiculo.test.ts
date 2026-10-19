@@ -151,7 +151,7 @@ describe("veiculoDAO", () => {
     it("bloqueia exclusão quando há remessa vinculada", async () => {
       const veiculo = await criarVeiculo();
       const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida(destinatario.id_destinatario);
+      const nota = await criarNotaSaida();
       await criarRemessa({
         idNotaSaida: nota.id_nota_saida,
         idDestinatario: destinatario.id_destinatario,
@@ -191,7 +191,7 @@ describe("veiculoDAO", () => {
       const { usuario } = await criarUsuario();
       const veiculo = await criarVeiculo();
       const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida(destinatario.id_destinatario);
+      const nota = await criarNotaSaida();
       await criarRemessa({
         idNotaSaida: nota.id_nota_saida,
         idDestinatario: destinatario.id_destinatario,

@@ -174,7 +174,6 @@ model Destinatario {
   destinatarioCodigos DestinatarioCodigo[]
   emails              DestinatarioEmail[]
   telefones           DestinatarioTelefone[]
-  notasSaida          NotaSaida[]
   pedidos             PedidoEscola[]
   percursos           PercursoDestinatario[]
   remessas            Remessa[]
@@ -454,15 +453,17 @@ model AjusteInventario {
 model PedidoEscola {
   id_pedido_escola Int                @id @default(autoincrement()) @map("ID_pedido_escola")
   id_destinatario  Int                @map("ID_destinatario")
+  id_nota_saida    Int?               @map("ID_nota_saida")
   data_criacao     DateTime           @map("data_criacao") @db.Timestamp(0)
   status           StatusPedido       @map("status")
   observacao       String?            @map("observacao") @db.Text
   ativo            Boolean            @default(true) @map("ativo")
   itens            ItemPedidoEscola[]
-  notaSaida        NotaSaida?
   destinatario     Destinatario       @relation(fields: [id_destinatario], references: [id_destinatario])
+  notaSaida        NotaSaida?         @relation(fields: [id_nota_saida], references: [id_nota_saida])
 
   @@index([id_destinatario], map: "pedido_escola_ID_destinatario_fkey")
+  @@index([id_nota_saida], map: "pedido_escola_ID_nota_saida_fkey")
   @@map("pedido_escola")
 }
 
@@ -482,8 +483,6 @@ model ItemPedidoEscola {
 
 model NotaSaida {
   id_nota_saida    Int                   @id @default(autoincrement()) @map("ID_nota_saida")
-  id_pedido_escola Int?                  @unique @map("ID_pedido_escola")
-  id_destinatario  Int                   @map("ID_destinatario")
   data_criacao     DateTime              @map("data_criacao") @db.Timestamp(0)
   tipo             TipoNotaSaida         @map("tipo")
   status           StatusNotaSaida       @map("status")
@@ -492,12 +491,10 @@ model NotaSaida {
   coletas          Coleta[]
   itens            ItemNotaSaida[]
   movimentacoes    MovimentacaoEstoque[]
-  destinatario     Destinatario          @relation(fields: [id_destinatario], references: [id_destinatario])
-  pedidoEscola     PedidoEscola?         @relation(fields: [id_pedido_escola], references: [id_pedido_escola])
+  pedidos          PedidoEscola[]
   remessas         Remessa[]
   reservas         ReservaEstoque[]
 
-  @@index([id_destinatario], map: "nota_saida_ID_destinatario_fkey")
   @@map("nota_saida")
 }
 
@@ -697,7 +694,6 @@ model Anexo {
   tipo_mime           String?  @map("tipo_mime")
   data_upload         DateTime @map("data_upload") @db.Timestamp(0)
   id_remessa          Int?     @map("ID_remessa")
-  id_documento_fiscal Int?     @map("ID_documento_fiscal")
   ativo               Boolean  @default(true) @map("ativo")
   remessa             Remessa? @relation(fields: [id_remessa], references: [id_remessa])
 
@@ -764,14 +760,14 @@ model RegistroAuditoria {
 
 model MensagemMural {
   id_mensagem_mural Int       @id @default(autoincrement()) @map("ID_mensagem_mural")
-  id_usuario        Int       @map("ID_usuario")
+  id_usuario        Int?      @map("ID_usuario")
   titulo            String?   @map("titulo")
   conteudo          String    @map("conteudo") @db.Text
   data_publicacao   DateTime  @map("data_publicacao") @db.Timestamp(0)
   data_expiracao    DateTime? @map("data_expiracao") @db.Timestamp(0)
   automatica        Boolean   @default(false) @map("automatica")
   ativo             Boolean   @default(true) @map("ativo")
-  usuario           Usuario   @relation(fields: [id_usuario], references: [id_usuario])
+  usuario           Usuario?  @relation(fields: [id_usuario], references: [id_usuario])
 
   @@index([id_usuario], map: "mensagem_mural_ID_usuario_fkey")
   @@map("mensagem_mural")

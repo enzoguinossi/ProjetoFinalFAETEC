@@ -586,6 +586,7 @@ Representa o pedido que chega em **papel** da administração e é registrado no
 pedido_escola
 ├── ID_pedido_escola        INT PK auto_increment
 ├── ID_destinatario         INT FK NOT NULL
+├── ID_nota_saida           INT FK → nota_saida NULL   ← nota que consolida o pedido
 ├── data_criacao            TIMESTAMP NOT NULL
 ├── status                  ENUM('PENDENTE','CONFIRMADO','RECUSADO')
 ├── observacao              TEXT
@@ -602,18 +603,25 @@ item_pedido_escola
 Regras:
 - O pedido é apenas a solicitação — **não reserva estoque**
 - Ao confirmar, o sistema **valida o estoque** (avisa se não tiver saldo, mas permite seguir)
-- Ao confirmar, gera automaticamente uma `nota_saida` com os mesmos itens
+- Ao confirmar, o pedido é **consolidado numa `nota_saida`** — ele passa a apontar para ela por
+  `pedido_escola.ID_nota_saida` (decisão do usuário, 2026-10-19)
+- Um pedido pertence a **no máximo uma nota** (`ID_nota_saida` é `NULL` enquanto o pedido não foi
+  consolidado); a nota, por sua vez, **agrega N pedidos** (1:N)
 - Um pedido RECUSADO não gera nota
 
 #### 3.11.1 Nota Saída (Compromisso Oficial)
 
-Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**.
+Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**. A nota **não tem
+destinatário** — ela é o documento que **agrega remessas**, e são as remessas (e coletas) que
+carregam o destinatário da entrega.
+
+A nota também **consolida pedidos** (decisão do usuário, 2026-10-19): ela **agrega os pedidos**
+que consolida (1:N), e o vínculo fica em `pedido_escola.ID_nota_saida` — a nota **não** tem
+coluna de pedido. Cada pedido pertence a **no máximo uma** nota.
 
 ```
 nota_saida
 ├── ID_nota_saida           INT PK auto_increment
-├── ID_pedido_escola        INT FK NULL UNIQUE  ← no máximo uma nota por pedido
-├── ID_destinatario         INT FK NOT NULL
 ├── data_criacao            TIMESTAMP NOT NULL
 ├── tipo                    ENUM('SAIDA','DESMONTAGEM','CONSUMO_INTERNO','AVARIA')
 ├── status                  ENUM(
@@ -640,6 +648,12 @@ Regras:
 - Ao criar `item_nota_saida`, o **estoque é reservado** (`saldo_reservado += qtd_esperada`)
 - `qtd_entregue` é atualizado automaticamente conforme remessas e coletas são finalizadas
 - Se a nota for cancelada, a **reserva é liberada** (`saldo_reservado -= qtd_esperada`)
+- A nota **não tem destinatário** (decisão do usuário, 2026-10-19): é tratada como uma
+  **coleção de remessas**, e o destinatário da entrega está em `remessa.ID_destinatario` e
+  `coleta.ID_destinatario` — nunca na nota
+- A nota **agrega os pedidos** que consolida (decisão do usuário, 2026-10-19), pelo vínculo
+  `pedido_escola.ID_nota_saida`: uma nota tem **N** pedidos; um pedido está em **no máximo uma**
+  nota
 - A nota pode gerar **várias remessas** e/ou **coletas**
 - Status: ABERTA (criada), EM_ANDAMENTO (entregas em curso), BAIXA_TOTAL (tudo entregue), BAIXA_PARCIAL (parte entregue, resto vai), BAIXA_COM_CORTE (parte entregue, resto não vai), CANCELADA (nada entregue)
 
@@ -676,6 +690,11 @@ item_remessa
 Regras:
 - Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
 - Remessa PENDENTE pode ser realocada em outra rota
+- **A remessa `PENDENTE` criada no split é o "registro automático de pendência vinculado ao
+  destinatário" da RN003** (decisão do usuário, 2026-10-19): não existe tabela de pendência e
+  nenhuma é necessária — o vínculo com o destinatário é a própria coluna
+  `remessa.ID_destinatario`, e o que falta entregar continua derivado de
+  `item_nota_saida.qtd_esperada − qtd_entregue`
 
 #### 3.11.3 Coleta (Retirada Direta na Escola)
 
@@ -820,13 +839,11 @@ anexo
 ├── tipo_mime              VARCHAR
 ├── data_upload            TIMESTAMP
 ├── ID_remessa             INT FK → remessa NULL
-├── ID_documento_fiscal    INT NULL   ← coluna reservada: NÃO existe tabela/relação de destino
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-> `ID_documento_fiscal` existe no schema como inteiro opcional, **sem** modelo
-> `documento_fiscal` e **sem** FK. É uma coluna reservada para uma futura entidade de
-> documento fiscal — hoje nenhum código a preenche.
+> A antiga coluna `ID_documento_fiscal` foi **removida** do schema: era órfã (sem modelo
+> `documento_fiscal`, sem FK e sem uso no código).
 
 ---
 
@@ -944,10 +961,23 @@ Regras:
 
 As seguintes entidades **não exigem permissão** para acesso, pois são dados operacionais ou de suporte:
 
-- `tipo_codigo` — livre (as telas de cadastro leem os tipos direto do DAO)
+- `tipo_codigo` — **sem permissões, por desenho** (decisão do usuário, 2026-10-19): é dado de
+  **referência**, sem operação de escrita para autorizar. `src/dao/tipo-codigo.ts` só **lê**
+  (`list`, `listParaEntidade`, `getByNomes`), não existe tela nem Server Action de gestão, e os
+  formulários de cadastro apenas **escolhem** entre os tipos permitidos — a lista chega às
+  páginas por `listParaEntidade()` e o tipo é revalidado no servidor por `tipoPermitido()`
+  (`src/services/codigo.ts` → `src/lib/codigo.ts`). A ausência de `tipo_codigo.*` no seed é
+  consequência desse desenho, não esquecimento.
 - `rota`, `percurso` — livre (não há telas ainda)
 - `endereco` — vinculado à entidade que o possui
 - `telefone`, `email` — vinculado à entidade que os possui
+
+> **Invariante do catálogo de tipos (verificada em 2026-10-17):** os tipos de código existem em
+> dois lugares — a constante `TIPOS_CODIGO`/`TIPOS_POR_ENTIDADE` em `src/lib/codigo.ts` e as
+> **6** linhas de `tipo_codigo` criadas por `prisma/seed.ts`. **Quem manda é o TypeScript**:
+> `tiposPermitidosPara()` (usado por `listParaEntidade()`) e `tipoPermitido()` recusam um tipo
+> ausente da constante **mesmo que ele exista no banco** — acrescentar um tipo exige editar a
+> constante, não apenas inserir a linha na tabela.
 
 > Exceção: **`conversao_unidade` exige permissão** — o seed cria
 > `unidade_conversao.{listar,criar,alterar,consultar,excluir}` e as Server Actions de
@@ -990,7 +1020,7 @@ Regra crítica:
 ```
 mensagem_mural
 ├── ID_mensagem_mural      INT PK auto_increment
-├── ID_usuario             INT FK NOT NULL    ← quem publicou (a FK é obrigatória: não há mensagem sem autor)
+├── ID_usuario             INT FK NULL        ← quem publicou; NULL = mensagem gerada pelo sistema (sem autor)
 ├── titulo                 VARCHAR
 ├── conteudo               TEXT NOT NULL
 ├── data_publicacao        TIMESTAMP NOT NULL
@@ -1000,13 +1030,10 @@ mensagem_mural
 ```
 
 Regras:
-- Mensagens automáticas: geradas por **triggers/rotinas de análise**, como alertas de validade (RN002)
+- Mensagens automáticas: geradas por **triggers/rotinas de análise**, como alertas de validade (RN002) — sem autor humano (`ID_usuario = NULL` e `automatica = TRUE`)
 - Mensagens manuais: exigem permissão `mural.criar`
 - A lógica de geração automática deve ser reutilizável para futuros alertas
 - A data de expiração controla quando a mensagem some do mural
-- **Ponto em aberto:** o schema exige `ID_usuario` (FK `NOT NULL`) mesmo para mensagem
-  automática, mas o modelo não define **qual** usuário responde por uma mensagem gerada pelo
-  sistema. A decisão não está tomada — ver `dominio/IMPLEMENTACAO.md` §"Pontos em aberto".
 
 ### 3.18 Bloco: Relatórios (Consultas)
 

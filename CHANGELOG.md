@@ -30,12 +30,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   funcionais classificados em implementado/parcial/não implementado, cada linha com o arquivo
   que a sustenta, mais 4 pontos em aberto (autor das mensagens automáticas do mural, forma do
   registro de pendência da RN003, destino de `anexo.ID_documento_fiscal` e enforcement de
-  `tipo_codigo`).
+  `tipo_codigo`) — os **4 foram resolvidos pelo usuário em 2026-10-19** e a seção passou a
+  registrar as decisões (ver a entrada "`docs/dominio/IMPLEMENTACAO.md` sem pontos em aberto",
+  abaixo).
 - **`ENTENDIMENTO.md` corrigido contra o schema (52 modelos):** removida a entidade
   inexistente `condutor` — o condutor é a flag `funcionario.condutor` e a FK
   `remessa.ID_funcionario_condutor`; `senha_hash` passou a nullable e `senha_alterada_em` foi
   incluído; `saldo_reservado` e `endereco.uf` acrescentados; `anexo.ID_documento_fiscal`
-  documentado como coluna sem tabela de destino; a tabela de permissões passou a refletir as
+  então documentado como coluna sem tabela de destino (removida depois — ver `Removed`); a tabela de permissões passou a refletir as
   **68** permissões criadas por `prisma/seed.ts` (`listar`/`excluir` incluídos,
   `perfil.desativar` → `perfil.excluir`, sem `condutor.*`); a lista de valores de `acao` da
   auditoria passou a vir de `src/dao/_audit.ts`; a movimentação de estoque deixou de ser
@@ -61,6 +63,61 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 - **`REQUISITOS_FUNCIONAIS.md`:** o cabeçalho passou a registrar que **`RF008` não existe** e
   que a lacuna é preservada de propósito (sem renumerar e sem inventar requisito) — o total é
   25 RFs.
+- **`mensagem_mural.ID_usuario` passou a ser opcional:** em `prisma/schema.prisma` a coluna
+  deixou de ser `NOT NULL` (`id_usuario Int?`) e a relação com `usuario` virou opcional, para
+  permitir as mensagens automáticas do sistema (RN002/RF014) sem autor humano — `NULL` passa a
+  significar "sem autor" e a coluna `automatica` marca o caso. O `count` de
+  `src/dao/usuario.ts` (`verificarRelacionamentos`) continua correto: mensagens com `NULL` não
+  são atribuídas a nenhum usuário. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **RN003 realizada como a remessa `PENDENTE` (sem tabela nova):** o "registro automático de
+  pendência vinculado ao destinatário" da RN003 é a remessa com status `PENDENTE` criada no
+  *split* de uma entrega parcial, já vinculada por `remessa.ID_destinatario`; o que falta
+  entregar continua derivado de `item_nota_saida.qtd_esperada − qtd_entregue`. O texto da regra
+  em `docs/dominio/REGRAS_NEGOCIO.md` **não mudou de sentido** — ganhou uma linha de "Realização
+  no modelo", e `docs/dominio/ENTENDIMENTO.md` §3.11.2 passou a ligar o split à RN003. (Decisão
+  do usuário, 2026-10-19 — sem chave de issue.)
+- **`tipo_codigo` sem permissões é intencional (dado de referência):** não há CRUD, tela nem
+  Server Action de gestão — `src/dao/tipo-codigo.ts` só lê (`list`, `listParaEntidade`,
+  `getByNomes`) e os formulários apenas escolhem entre os tipos permitidos; por isso não existe
+  permissão `tipo_codigo.*` no seed. Registrada também a invariante de que o catálogo existe em
+  `TIPOS_CODIGO`/`TIPOS_POR_ENTIDADE` (`src/lib/codigo.ts`) e nas **6** linhas de `tipo_codigo`
+  criadas por `prisma/seed.ts`, e que **quem manda é o TypeScript** — `tiposPermitidosPara()` e
+  `tipoPermitido()` recusam tipo ausente da constante mesmo que exista no banco.
+  (`docs/dominio/ENTENDIMENTO.md` §3.15.6.) (Decisão do usuário, 2026-10-19 — sem chave de
+  issue.)
+- **`docs/dominio/IMPLEMENTACAO.md` sem pontos em aberto:** a seção foi substituída pelo
+  registro das **4** decisões de 2026-10-19 (autor das mensagens automáticas do mural, forma do
+  registro de pendência da RN003, destino de `anexo.ID_documento_fiscal` e enforcement de
+  `tipo_codigo`) — nenhuma delas permanece pendente.
+- **A nota de saída deixou de ter destinatário:** a coluna `nota_saida.ID_destinatario` saiu do
+  modelo em 2026-10-19 — a nota é o documento que **agrega remessas**, e são as remessas/coletas
+  que carregam o destinatário da entrega (`remessa.ID_destinatario`, `coleta.ID_destinatario`).
+  O vínculo do destinatário nas guardas de exclusão (`src/dao/destinatario.ts`) passou a ser
+  contado por **remessa e coleta** (além de pedido e percurso) — a guarda continua bloqueando a
+  remoção de um destinatário com entregas. `docs/dominio/ENTENDIMENTO.md` §3.11.1 e
+  `docs/diagramas/DER.puml` alinhados. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **A nota de saída passa a consolidar pedidos (FK invertida):** o vínculo migrou de
+  `nota_saida.ID_pedido_escola` (única, no máximo uma nota por pedido) para
+  `pedido_escola.ID_nota_saida` — uma nota agrega **N** pedidos e cada pedido pertence a **no
+  máximo uma** nota. Os vínculos existentes foram transportados para o lado novo **antes** da
+  queda da coluna antiga: **0** linhas transportadas (nenhuma das 4 notas tinha
+  `ID_pedido_escola` não nulo e a tabela `pedido_escola` estava vazia). `ENTENDIMENTO.md`
+  §3.11.0/§3.11.1 e `DER.puml` (52 entidades) alinhados; `IMPLEMENTACAO.md` ganhou o **ponto em
+  aberto** *como* o pedido entra numa nota (nota nova a cada confirmação ou juntar-se a uma nota
+  aberta) — a regra não foi inventada. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+
+### Removed
+
+- **`anexo.ID_documento_fiscal` removida do modelo:** a coluna era órfã — não existe modelo
+  `documento_fiscal`, não há FK e nenhum código em `src/**` a lê ou escreve. A remoção foi
+  precedida da conferência no banco, que deu **0** linhas com valor não nulo
+  (`SELECT COUNT(*) FROM anexo WHERE ID_documento_fiscal IS NOT NULL`). (Decisão do usuário,
+  2026-10-19 — sem chave de issue.)
+- **`nota_saida.ID_destinatario` removida do modelo:** a nota deixou de ter destinatário (ver a
+  entrada correspondente em *Changed*) e a coluna saiu de `prisma/schema.prisma`. A remoção foi
+  precedida da conferência no banco, que deu **1** linha com valor não nulo
+  (`SELECT COUNT(*) FROM nota_saida WHERE ID_destinatario IS NOT NULL`, sobre 4 notas). (Decisão
+  do usuário, 2026-10-19 — sem chave de issue.)
 
 ## [1.17.10.2026] - 2026-10-17
 

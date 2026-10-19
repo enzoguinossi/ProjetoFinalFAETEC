@@ -174,8 +174,7 @@ export class DestinatarioDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [notasSaida, pedidos, remessas, coletas, percursos] = await Promise.all([
-      client.notaSaida.count({ where: { id_destinatario: id } }),
+    const [pedidos, remessas, coletas, percursos] = await Promise.all([
       client.pedidoEscola.count({ where: { id_destinatario: id } }),
       client.remessa.count({ where: { id_destinatario: id } }),
       client.coleta.count({ where: { id_destinatario: id } }),
@@ -183,7 +182,6 @@ export class DestinatarioDAO {
     ]);
 
     const vinculos: string[] = [];
-    if (notasSaida > 0) vinculos.push(`${notasSaida} nota(s) de saída`);
     if (pedidos > 0) vinculos.push(`${pedidos} pedido(s)`);
     if (remessas > 0) vinculos.push(`${remessas} remessa(s)`);
     if (coletas > 0) vinculos.push(`${coletas} coleta(s)`);

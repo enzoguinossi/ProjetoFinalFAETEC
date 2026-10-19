@@ -56,24 +56,31 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RNF008 — Portabilidade (PDF/CSV/XLSX) | não implementado | Sem exportação em nenhum formato |
 | RNF009 — Interoperabilidade (XML NF-e) | não implementado | Sem processamento de XML NF-e |
 
+## Decisões que estavam em aberto
+
+Em **2026-10-19** o usuário decidiu os quatro pontos que este documento registrava como
+pendentes — a lista daquela rodada ficou **vazia**. (Pontos surgidos depois das decisões estão
+em "Pontos em aberto", abaixo.)
+
+1. **Autor das mensagens automáticas do mural** — `mensagem_mural.ID_usuario` passou a ser
+   **opcional**: `NULL` significa "sem autor" e a coluna `automatica` marca o caso
+   (`RUN-20261017-08`).
+2. **Forma do "registro de pendência" da RN003** — a pendência **é** a remessa com status
+   `PENDENTE` criada no split da entrega parcial, vinculada por `remessa.ID_destinatario`;
+   **sem tabela nova** (`RUN-20261017-09`; ver `ENTENDIMENTO.md` §3.11.2).
+3. **Destino de `anexo.ID_documento_fiscal`** — a coluna órfã foi **removida** do schema, em vez
+   de nascer uma entidade fiscal (`RUN-20261017-08`).
+4. **Enforcement de `tipo_codigo`** — a ausência de permissões é **intencional**: é dado de
+   referência sem operação de escrita para autorizar (`RUN-20261017-09`; ver
+   `ENTENDIMENTO.md` §3.15.6).
+
 ## Pontos em aberto
 
-Decisões que o código e o schema **não** definem — registradas aqui em vez de decididas:
+- **Como um pedido entra numa nota de saída** — a decisão do usuário de **2026-10-19** definiu
+  **que** a nota consolida pedidos (o vínculo é `pedido_escola.ID_nota_saida`, 1:N), mas **não**
+  definiu **quando** o pedido é consolidado: **criar uma nota nova a cada pedido confirmado** ou
+  **juntar o pedido a uma nota já aberta** (por exemplo, a do mesmo destinatário). A regra **não
+  foi inventada** e o fluxo de nota de saída continua **não implementado** (RF017b) — o ponto
+  fica registrado para a implementação do módulo de expedições (KAN-142 / RF017b).
+  (`RUN-20261017-11`.)
 
-1. **Autor das mensagens automáticas do mural.** `mensagem_mural.ID_usuario` é uma FK
-   `NOT NULL`, e `automatica` marca as mensagens geradas pelo sistema (RN002) — mas o modelo
-   não diz **qual** usuário responde por uma mensagem automática. Enquanto isso não for
-   definido, qualquer rotina de alerta precisa de um usuário de sistema (a criar) ou de uma
-   mudança de schema. (Ver `ENTENDIMENTO.md` §3.17.)
-2. **Forma do "registro de pendência" da RN003.** A regra fala em "registro automático de
-   pendência vinculado ao destinatário"; o modelo físico só prevê remessa com status
-   `PENDENTE` (sem tabela de pendência). Se a pendência é apenas a remessa pendente ou um
-   registro próprio, não está decidido. (Ver `REGRAS_NEGOCIO.md` RN003 e `ENTENDIMENTO.md`
-   §3.11.2/§3.11.5.)
-3. **Destino de `anexo.ID_documento_fiscal`.** A coluna existe no schema como inteiro
-   opcional, sem modelo `documento_fiscal` e sem FK, e nenhum código a preenche. Falta
-   definir se nasce uma entidade de documento fiscal ou se a coluna é removida.
-4. **Enforcement de `tipo_codigo`.** `tipo_codigo` não tem permissões no seed e é lido
-   direto pelos DAOs; `conversao_unidade` tem permissões próprias e é verificado nas Server
-   Actions. Não está registrado se a ausência de permissão para `tipo_codigo` é uma decisão
-   de produto ou uma lacuna. (Ver `ENTENDIMENTO.md` §3.15.6.)

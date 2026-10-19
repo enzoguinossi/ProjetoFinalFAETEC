@@ -146,9 +146,9 @@ describe("destinatarioDAO", () => {
       expect(resultado.vinculos).toEqual([]);
     });
 
-    it("bloqueia quando há notas, pedidos, remessas, coletas ou percursos", async () => {
+    it("bloqueia quando há pedidos, remessas, coletas ou percursos", async () => {
       const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida(destinatario.id_destinatario);
+      const nota = await criarNotaSaida();
       await criarPedidoEscola(destinatario.id_destinatario);
       await criarRemessa({
         idNotaSaida: nota.id_nota_saida,
@@ -161,7 +161,6 @@ describe("destinatarioDAO", () => {
 
       expect(resultado.podeExcluir).toBe(false);
       const texto = resultado.vinculos.join(" | ");
-      expect(texto).toContain("nota(s) de saída");
       expect(texto).toContain("pedido(s)");
       expect(texto).toContain("remessa(s)");
       expect(texto).toContain("coleta(s)");
