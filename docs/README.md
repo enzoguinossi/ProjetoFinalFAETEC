@@ -19,6 +19,7 @@ domínio, a especificação e o processo — quando um deles divergir do código
 | `dominio/` | [`REGRAS_NEGOCIO.md`](dominio/REGRAS_NEGOCIO.md) | as 5 regras de negócio (RN001–RN005) |
 | `dominio/` | [`REQUISITOS_FUNCIONAIS.md`](dominio/REQUISITOS_FUNCIONAIS.md) | os 25 requisitos funcionais (especificação) |
 | `dominio/` | [`REQUISITOS_NAO_FUNCIONAIS.md`](dominio/REQUISITOS_NAO_FUNCIONAIS.md) | os 9 requisitos não funcionais |
+| `dominio/` | [`ESCOPO_FORA.md`](dominio/ESCOPO_FORA.md) | os requisitos que **não serão implementados** (`RF025` e `RNF009`), com o critério de exclusão |
 | `processo/` | [`VERSIONAMENTO.md`](processo/VERSIONAMENTO.md) | versionamento DateVer e o padrão do changelog |
 | `processo/` | [`JIRA.md`](processo/JIRA.md) | Jira: issues, smart commits e worklog |
 | `processo/` | [`WORKFLOW.md`](processo/WORKFLOW.md) | fluxo multiagente, worktrees e rastreabilidade |

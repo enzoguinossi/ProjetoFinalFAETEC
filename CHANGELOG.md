@@ -105,6 +105,26 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   §3.11.0/§3.11.1 e `DER.puml` (52 entidades) alinhados; `IMPLEMENTACAO.md` ganhou o **ponto em
   aberto** *como* o pedido entra numa nota (nota nova a cada confirmação ou juntar-se a uma nota
   aberta) — a regra não foi inventada. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **Prioridades dos requisitos alinhadas à realidade operacional:** cinco requisitos passaram a
+  **Essencial** — `RF009` (era Desejável: é o único canal de notificação da RN002 e do `RF014`,
+  ambos Essenciais), `RF013` (era Importante: pré-requisito do `RF017a` — sem a conversão
+  caixa→unidade a entrada não registra a quantidade real), `RF016` (era Importante: é a única
+  forma de registrar saída que não é entrega — consumo interno e avaria), `RF024` (era
+  Importante: é a mesma capacidade do `RNF008`, que já é Essencial) e `RNF002` (era Importante:
+  incide sobre a busca por código de barras do `RF011`, Essencial, usada no balcão). O `RF022`
+  permanece **Importante** — o usuário decidiu **não** dividir rota/percurso. Só a coluna de
+  prioridade mudou; o texto e o escopo dos requisitos não foram alterados. (Decisão do usuário,
+  2026-10-19 — sem chave de issue.)
+- **`docs/dominio/ESCOPO_FORA.md` (novo) — os requisitos que não serão implementados:** reúne
+  `RF025` (importação de NF-e por XML) e `RNF009` (interoperabilidade, XML NF-e), ambos
+  mantidos como Desejáveis e remarcados "fora do escopo", com o critério de exclusão (nenhuma
+  regra de negócio nem requisito Essencial depende dele; a necessidade é atendida por outro
+  caminho já previsto na especificação; o custo é desproporcional ao ganho) e a observação de
+  que os dois descrevem **a mesma capacidade** e devem ser tratados como um item se voltarem
+  ao escopo. A necessidade de entrada de nota fica coberta pelo `RF017a`, que prevê a entrada
+  **com ou sem** chave de acesso NF-e. Ponteiros no cabeçalho de
+  `docs/dominio/REQUISITOS_FUNCIONAIS.md` e de `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md` e
+  linha nova no índice `docs/README.md`. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
 
 ### Removed
 

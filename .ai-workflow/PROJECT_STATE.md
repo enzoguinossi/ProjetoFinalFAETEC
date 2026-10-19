@@ -52,6 +52,7 @@ descartada; refazer do zero), com a task criada pelo formato do `docs/processo/J
 | RUN-20261017-09 | RN003 e `tipo_codigo` registrados; pontos em aberto zerados | docs-keeper | concluído | `main` | — |
 | RUN-20261017-10 | Nota de saída sem destinatário; datas; build reparado; `db push` | developer | concluído | `main` | — |
 | RUN-20261017-11 | Nota consolida pedidos (FK em `pedido_escola`) | developer | concluído | `main` | — |
+| RUN-20261019-12 | Reclassificação de requisitos e documento dos excluídos | docs-keeper | concluído | `main` | — |
 
 Os runs 04–11 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md` — não é descuido e não
@@ -81,6 +82,26 @@ deve ser tomado como precedente.
 | 6 | A nota **consolida pedidos** | FK migrada para `pedido_escola.ID_nota_saida` (1:N) |
 
 Detalhe em `docs/dominio/IMPLEMENTACAO.md` §"Decisões que estavam em aberto".
+
+## Reclassificação de requisitos (2026-10-19)
+
+A especificação se contradizia: havia requisitos Essenciais que dependiam de requisitos
+marcados como Importante/Desejável. Corrigido:
+
+| Requisito | De | Para | Por quê |
+|---|---|---|---|
+| `RF009` Mural | Desejável | **Essencial** | único canal de notificação da RN002 e do RF014 |
+| `RF013` Conversão de unidades | Importante | **Essencial** | pré-requisito do RF017a (entrada em caixa/fardo) |
+| `RF016` Consumo interno e avarias | Importante | **Essencial** | única saída que não é entrega |
+| `RF024` Exportação de dados | Importante | **Essencial** | mesma capacidade do RNF008 (já Essencial) |
+| `RNF002` Desempenho < 2 s | Importante | **Essencial** | incide na busca por código de barras (RF011) |
+
+`RF022` (percurso e rota) **permanece Importante** — decisão do usuário de não dividir
+rota/percurso.
+
+**Fora do escopo:** `RF025` (importação de NF-e XML) e `RNF009` (interoperabilidade XML) —
+a mesma capacidade declarada duas vezes; o RF017a cobre a necessidade manualmente. Ver
+`docs/dominio/ESCOPO_FORA.md`.
 
 ## Git (verificado no checkpoint)
 

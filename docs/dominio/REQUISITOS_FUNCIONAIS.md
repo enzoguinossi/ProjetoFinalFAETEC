@@ -4,6 +4,8 @@
 > **`RF008` não existe** — a lacuna entre `RF007` e `RF009` é **preservada de propósito**
 > (não renumerar, não preencher com um requisito novo). A numeração é estável para não
 > quebrar a rastreabilidade já registrada em commits e no changelog.
+>
+> **Fora do escopo:** o `RF025` não será implementado — ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md).
 
 ## Módulo 1: Gestão de Acessos e Usuários
 
@@ -21,7 +23,7 @@
 | RF005 | Gerenciar Funcionários | O sistema deve permitir o cadastro de funcionários, que estendem Pessoa Física (nome, CPF opcional). Um funcionário pode ou não ser Usuário (ter login). Um funcionário pode ser marcado como Condutor através de um checkbox no formulário. | Essencial |
 | RF006 | Gerenciar Fornecedores | O sistema deve permitir o cadastro de fornecedores, que estendem Pessoa Jurídica (CNPJ opcional). Endereço opcional em tabela separada. | Essencial |
 | RF007 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo e status (DISPONIVEL, INDISPONIVEL, EM_ROTA). | Essencial |
-| RF009 | Mural de Mensagens do Dia | O sistema deve disponibilizar um mural na tela inicial para exibição de avisos e recados diários entre a equipe, com título, conteúdo, data de publicação, data de expiração opcional e autor vinculado. | Desejável |
+| RF009 | Mural de Mensagens do Dia | O sistema deve disponibilizar um mural na tela inicial para exibição de avisos e recados diários entre a equipe, com título, conteúdo, data de publicação, data de expiração opcional e autor vinculado. | Essencial |
 
 ## Módulo 3: Controle de Estoque e Catálogo de Produtos
 
@@ -30,10 +32,10 @@
 | RF010 | Gerenciar Catálogo de Produtos | O sistema deve permitir o cadastro de produtos com descrição, foto, flags Perecível e Composto. Códigos GTIN/EAN via código personalizado (tipos EAN12 e EAN13). Conversão de unidade padrão opcional vinculada à tabela conversao_unidade. | Essencial |
 | RF011 | Leitura por Código de Barras | O sistema deve permitir a identificação de produtos por leitor de código de barras, consultando os códigos EAN12 e EAN13 cadastrados como código personalizado do produto. | Essencial |
 | RF012 | Movimentação de Estoque | O sistema deve registrar entradas (via nota de entrada com conversão de unidades), saídas (via nota de saída e remessa), transferências e ajustes de inventário. Cada movimentação gera registro auditável. | Essencial |
-| RF013 | Conversão de Unidades | Tabela standalone de conversão (não vinculada a produto). O usuário cria nomes como CX20, PCT10 ou UN. Ao dar entrada, seleciona a conversão e o sistema multiplica a quantidade. O fator pode ser editado no momento da entrada sem alterar o template. | Importante |
+| RF013 | Conversão de Unidades | Tabela standalone de conversão (não vinculada a produto). O usuário cria nomes como CX20, PCT10 ou UN. Ao dar entrada, seleciona a conversão e o sistema multiplica a quantidade. O fator pode ser editado no momento da entrada sem alterar o template. | Essencial |
 | RF014 | Alertas de Validade | O sistema deve notificar automaticamente no mural de mensagens quando produtos perecíveis estiverem a 90, 60, 45 e 30 dias do vencimento, com base na data_validade do cadastro do produto. | Essencial |
 | RF015 | Gestão de Inventário | O sistema deve permitir abertura de inventário com bloqueio de movimentação dos produtos sendo contados. Contagem cega opcional (controlada pela permissão `inventario.ver_contagem_cega`). Múltiplas contagens por item de diferentes funcionários. Aprovador vê planilha comparativa com média e contagens individuais e escolhe qual valor aplicar. Toda diferença precisa de aprovação manual. | Essencial |
-| RF016 | Baixas por Consumo Interno e Avarias | O sistema deve permitir o registro de baixa de itens destinados ao uso do próprio galpão ou danificados, gerando notas de saida. | Importante |
+| RF016 | Baixas por Consumo Interno e Avarias | O sistema deve permitir o registro de baixa de itens destinados ao uso do próprio galpão ou danificados, gerando notas de saida. | Essencial |
 
 ## Módulo 4: Gestão de Notas e Logística de Remessas
 
@@ -52,5 +54,5 @@
 | ID | Título | Descrição | Prioridade |
 |----|--------|-----------|------------|
 | RF023 | Relatórios de Movimentação | O sistema deve gerar relatórios periódicos (diários, mensais e consolidados semestrais) com filtros por período, produto, escola, motorista e veículo. Deve incluir uma listagem simplificada de todos os produtos com descrição e foto. | Essencial |
-| RF024 | Exportação de Dados | O sistema deve permitir a visualização e exportação de relatórios em formato de planilha para conferência. | Importante |
-| RF025 | Importação de NF-e (XML) | O sistema deve oferecer suporte ao pré-cadastro e entrada automatizada de produtos por meio da leitura do arquivo XML da Nota Fiscal Eletrônica. | Desejável |
+| RF024 | Exportação de Dados | O sistema deve permitir a visualização e exportação de relatórios em formato de planilha para conferência. | Essencial |
+| RF025 | Importação de NF-e (XML) | O sistema deve oferecer suporte ao pré-cadastro e entrada automatizada de produtos por meio da leitura do arquivo XML da Nota Fiscal Eletrônica. | Desejável — fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |
