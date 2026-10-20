@@ -13,6 +13,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Added
+
+- **Aba Entrada da movimentação de estoque `(KAN-140)`:** nova página `/mov-estoque` (aba
+  Entrada; Saída desabilitada para o próximo run). O formulário aceita fornecedor e data de
+  recebimento opcionais, chaves de acesso NF-e opcionais (44 caracteres, únicas), observação e
+  itens com conversão de unidade de fator editável. A gravação é uma transação única:
+  `nota_entrada`, `nota_entrada_chave_acesso`, `item_nota_entrada`, atualização de
+  `estoque.quantidade_atual` (uma linha por produto), `movimentacao_estoque` e auditoria
+  (`NotaEntrada`/`CRIAR`). Criar exige `estoque.entrada`; a entrada confirmada é imutável
+  (RN004) e a listagem é somente leitura. Código em `src/app/mov-estoque/**`,
+  `src/services/nota-entrada.ts`, `src/dao/nota-entrada.ts` e `estoqueDAO.registrarEntrada`.
+
 ### Changed
 
 - **Reserva de estoque passa a pertencer à remessa `(KAN-140)`:** `reserva_estoque` trocou a

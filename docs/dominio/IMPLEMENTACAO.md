@@ -26,12 +26,12 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF009 — Mural de mensagens | não implementado | Só um cartão **estático** no dashboard (`src/app/dashboard/page.tsx`); sem tela, serviço ou DAO de mural |
 | RF010 — Catálogo de produtos | implementado | `src/app/produtos/**`, `src/dao/produto.ts`, `src/components/UnidadesModal.tsx` |
 | RF011 — Leitura por código de barras | parcial | Busca priorizada por código em `src/dao/produto.ts` e tipos EAN em `src/dao/tipo-codigo.ts`; **sem** tela/leitor dedicado |
-| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar`) e a tabela `movimentacao_estoque`; **sem** nota de entrada/saída/transferência e sem uso fora dos testes (`tests/dao/estoque.test.ts`) |
-| RF013 — Conversão de unidades | parcial | CRUD em `src/app/unidades/actions.ts`, `src/dao/conversao-unidade.ts` e `src/components/UnidadesModal.tsx`; a multiplicação na entrada depende de RF012/RF017a, que não existem |
+| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar` e `registrarEntrada`); entrada pela tela `/mov-estoque` (RF017a) atualiza `quantidade_atual` e grava `movimentacao_estoque`; **sem** nota de saída/transferência |
+| RF013 — Conversão de unidades | implementado | CRUD em `src/app/unidades/actions.ts`, `src/dao/conversao-unidade.ts` e `src/components/UnidadesModal.tsx`; a entrada calcula `quantidade_convertida = quantidade × fator` com fator editável no formulário (`src/services/nota-entrada.ts`) |
 | RF014 — Alertas de validade | não implementado | Nenhuma rotina gera alerta a partir de `produto.data_validade` |
 | RF015 — Gestão de inventário | não implementado | Sem código de inventário em `src/app`, `src/services` ou `src/dao` (só as tabelas no schema) |
 | RF016 — Baixas por consumo interno e avaria | não implementado | Nenhum fluxo de baixa por consumo/avaria |
-| RF017a — Nota de entrada | não implementado | Sem tela/serviço/DAO de nota de entrada |
+| RF017a — Nota de entrada | implementado | Página `/mov-estoque` (aba Entrada) em `src/app/mov-estoque/**`, `src/services/nota-entrada.ts` e `src/dao/nota-entrada.ts`; grava nota, chaves, itens, estoque, movimentação e auditoria em transação única; entrada confirmada é imutável (sem edição/exclusão) |
 | RF017b — Nota de saída | não implementado | Sem tela/serviço/DAO de nota de saída |
 | RF018 — Quadro Kanban de remessas | não implementado | Apenas as constantes `STATUS_REMESSA` (`src/types/index.ts`); **fora do escopo** (`ESCOPO_FORA.md`) |
 | RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia); **sem** assistente/tela; uso só em `tests/services/estoque.test.ts` |
