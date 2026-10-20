@@ -17,6 +17,8 @@ Já entregue nessa branch:
 3. **Aba Saída** — nota `SAIDA` sem itens, agregando remessas planejadas, com reserva pela
    `quantidade_solicitada`.
 4. **Cancelamento de remessa** — `StatusRemessa.CANCELADA`, libera a reserva, idempotente.
+5. **Interface de movimentação** — "Mov. Estoque" virou grupo no menu (Entrada e Saída em
+   rotas próprias) e o seletor de entidades virou lista paginada com colunas.
 
 **Entregue antes:** release `1.17.10.2026`; documentação revisada e reorganizada; requisitos
 reclassificados.
@@ -58,6 +60,8 @@ reclassificados.
 | RUN-20261019-14 | Aba Entrada da movimentação | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261019-15 | Aba Saída com remessas planejadas | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261019-16 | `StatusRemessa.CANCELADA` e cancelamento | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-17 | "Mov. Estoque" vira grupo no menu; rotas de Entrada e Saída | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-18 | Seletor de entidades vira lista paginada com colunas | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -109,9 +113,9 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 
 ## Git (verificado no checkpoint)
 
-- Branch atual: **`KAN-140-mov-estoque`** — 4 commits sobre a `main`:
+- Branch atual: **`KAN-140-mov-estoque`** — 7 commits sobre a `main`:
   `628d55e` (reserva na remessa), `0818cef` (entrada), `81fef26` (saída), `24c11fb`
-  (cancelamento).
+  (cancelamento), `1e011d3` (estado), `56bc3aa` (menu), `42af591` (seletor paginado).
 - `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **11 commits à frente** de
   `origin/main` — nada publicado desde a release.
 - Tag `v1.17.10.2026` é a única do projeto. Árvore limpa.
