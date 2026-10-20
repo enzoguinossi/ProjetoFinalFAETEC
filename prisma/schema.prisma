@@ -365,7 +365,7 @@ model MovimentacaoEstoque {
 model ReservaEstoque {
   id_reserva_estoque Int       @id @default(autoincrement()) @map("ID_reserva_estoque")
   id_estoque         Int       @map("ID_estoque")
-  id_nota_saida      Int       @map("ID_nota_saida")
+  id_remessa         Int       @map("ID_remessa")
   id_usuario         Int       @map("ID_usuario")
   quantidade         Float     @map("quantidade")
   saldo_anterior     Float?    @map("saldo_anterior")
@@ -373,11 +373,11 @@ model ReservaEstoque {
   data_hora          DateTime  @map("data_hora") @db.Timestamp(0)
   observacao         String?   @map("observacao") @db.Text
   estoque            Estoque   @relation(fields: [id_estoque], references: [id_estoque])
-  notaSaida          NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  remessa            Remessa   @relation(fields: [id_remessa], references: [id_remessa])
   usuario            Usuario   @relation(fields: [id_usuario], references: [id_usuario])
 
   @@index([id_estoque], map: "reserva_estoque_ID_estoque_fkey")
-  @@index([id_nota_saida], map: "reserva_estoque_ID_nota_saida_fkey")
+  @@index([id_remessa], map: "reserva_estoque_ID_remessa_fkey")
   @@index([id_usuario], map: "reserva_estoque_ID_usuario_fkey")
   @@map("reserva_estoque")
 }
@@ -493,7 +493,6 @@ model NotaSaida {
   movimentacoes    MovimentacaoEstoque[]
   pedidos          PedidoEscola[]
   remessas         Remessa[]
-  reservas         ReservaEstoque[]
 
   @@map("nota_saida")
 }
@@ -526,6 +525,7 @@ model Remessa {
   anexos                 Anexo[]
   itens                  ItemRemessa[]
   movimentacoes          MovimentacaoEstoque[]
+  reservas               ReservaEstoque[]
   condutor               Funcionario?          @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
   destinatario           Destinatario          @relation(fields: [id_destinatario], references: [id_destinatario])
   notaSaida              NotaSaida             @relation(fields: [id_nota_saida], references: [id_nota_saida])

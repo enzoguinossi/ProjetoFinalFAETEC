@@ -285,14 +285,14 @@ export async function criarMovimentacao(
 
 export async function criarReserva(
   idEstoque: number,
-  idNotaSaida: number,
+  idRemessa: number,
   idUsuario: number,
   quantidade = 1,
 ) {
   return prismaTeste.reservaEstoque.create({
     data: {
       id_estoque: idEstoque,
-      id_nota_saida: idNotaSaida,
+      id_remessa: idRemessa,
       id_usuario: idUsuario,
       quantidade,
       data_hora: new Date(),

@@ -306,7 +306,7 @@ entity "reserva_estoque" as reserva {
   * ID_reserva_estoque : INT <<PK>>
   --
   * ID_estoque : INT <<FK>>
-  * ID_nota_saida : INT <<FK>>
+  * ID_remessa : INT <<FK>>
   * ID_usuario : INT <<FK>>
   * quantidade : FLOAT
   saldo_anterior : FLOAT
@@ -684,10 +684,10 @@ nota ||--o{ pedido
 nota ||--|{ item_nota
 nota ||--o{ remessa
 nota ||--o{ coleta
-nota ||--o{ reserva
 destinatario ||--o{ remessa
 destinatario ||--o{ coleta
 remessa ||--|{ item_rem
+remessa ||--o{ reserva
 coleta ||--|{ item_coleta
 funcionario ||--o{ remessa
 veiculo ||--o{ remessa

@@ -15,6 +15,15 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Reserva de estoque passa a pertencer à remessa `(KAN-140)`:** `reserva_estoque` trocou a
+  FK `ID_nota_saida` por `ID_remessa` (`ReservaEstoque.id_remessa`); `Remessa` ganhou
+  `reservas` e `NotaSaida` perdeu a relação. A nota de saída **deixa de reservar**: a reserva
+  nasce quando a remessa planejada é criada com seus itens (`saldo_reservado += quantidade`),
+  é liberada no cancelamento e baixada na finalização. Para `tipo = SAIDA` a nota não tem
+  itens (os itens e o destinatário estão na remessa); `CONSUMO_INTERNO`, `AVARIA` e
+  `DESMONTAGEM` continuam com itens em `item_nota_saida`, por serem baixas internas sem
+  entrega. `AGENTS.md` §8.2–§8.4, `ENTENDIMENTO.md` (§3.7.1, §3.8.1, §3.8.2, §3.11.1,
+  §3.11.2, §3.11.5) e `DER.puml` foram alinhados.
 - **Documentação reorganizada por assunto:** `docs/` passou a ter três pastas — `dominio/`
   (ENTENDIMENTO, REGRAS_NEGOCIO, REQUISITOS_FUNCIONAIS, REQUISITOS_NAO_FUNCIONAIS e o novo
   IMPLEMENTACAO), `processo/` (VERSIONAMENTO, JIRA e WORKFLOW) e `diagramas/` (classes.puml,

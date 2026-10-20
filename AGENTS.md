@@ -199,19 +199,20 @@ quantidade_atual += quantidade_convertida
 
 e gera registro de movimentação de estoque.
 
-## 8.2 Nota de saída
+## 8.2 Reserva (remessa planejada)
 
-Criar uma Nota de Saída **reserva** estoque:
+Criar uma **remessa planejada com itens** reserva estoque:
 
 ```text
 saldo_reservado += quantidade
 ```
 
-A criação da nota não representa baixa física definitiva.
+A nota de saída, por si, **não** reserva nada — a reserva pertence à remessa. Criar a remessa
+também não representa baixa física definitiva.
 
 ## 8.3 Cancelamento
 
-O cancelamento libera a reserva:
+O cancelamento da **remessa** libera a reserva:
 
 ```text
 saldo_reservado -= quantidade

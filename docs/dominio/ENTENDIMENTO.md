@@ -27,7 +27,7 @@ Um sistema web que centraliza:
 - **Controle de Estoque** — substitui a contagem manual e planilhas Excel
 - **Cadastro de Produtos** — com fotos, lotes, validade, composição
 - **Gestão de Pedidos (Notas de Saída)** — transcrição dos pedidos em papel para o sistema
-- **Reserva de Estoque** — ao criar uma nota, o sistema reserva os produtos no estoque
+- **Reserva de Estoque** — ao criar uma remessa planejada, o sistema reserva os produtos no estoque
 - **Remessas** — tentativas de entrega vinculadas a notas de saída
 - **Rotas** — organização diária das entregas em ordem de visita (com suporte a templates)
 - **Auditoria** — registro de toda ação feita no sistema
@@ -353,7 +353,7 @@ estoque (saldo real — controle de quantidade)
 ├── ID_estoque            INT PK auto_increment
 ├── ID_produto            INT FK NOT NULL
 ├── quantidade_atual      FLOAT NOT NULL          ← saldo físico real no galpão
-├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída
+├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por remessas planejadas
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 
@@ -375,8 +375,8 @@ Regras:
 | Momento | Ação | Impacto |
 |---------|------|---------|
 | Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += X` |
-| Cria Nota Saída | Cria `reserva_estoque` | `saldo_reservado += X` |
-| Cancelamento de Nota | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
+| Cria Remessa planejada com itens | Cria `reserva_estoque` | `saldo_reservado += X` |
+| Cancelamento de Remessa | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
 | Remessa finalizada (total/parcial) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
 | Desmontagem de composto | Baixa pai + entrada filhos | Vide 3.6.2 |
 | Ajuste de inventário | Acerto manual | `quantidade_atual = novo_valor` |
@@ -422,7 +422,7 @@ Registra cada alteração no `saldo_reservado` do estoque — reservas e libera�
 reserva_estoque
 ├── ID_reserva_estoque     INT PK auto_increment
 ├── ID_estoque             INT FK NOT NULL
-├── ID_nota_saida          INT FK NOT NULL
+├── ID_remessa             INT FK NOT NULL
 ├── ID_usuario             INT FK NOT NULL
 ├── quantidade             FLOAT NOT NULL         ← positiva = reservou, negativa = liberou
 ├── saldo_anterior         FLOAT                  ← snapshot do saldo_reservado antes
@@ -432,14 +432,16 @@ reserva_estoque
 ```
 
 Regras:
-- **Reservar:** cria nota saída → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
-- **Liberar:** cancela nota ou remessa finalizada → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`
+- **Reservar:** criar a **remessa planejada** com seus itens (`item_remessa`) → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
+- **Liberar:** cancelar a remessa ou finalizá-la (total/parcial) → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`
+- A **nota de saída, por si, não reserva nada** (decisão do usuário, 2026-10-19): a reserva
+  pertence à remessa planejada, que é quem carrega os itens e o destinatário
 - A consulta de saldo disponível usa `saldo_disponivel = quantidade_atual - saldo_reservado` (`saldo_reservado` está no `estoque`, atualizado em tempo real)
 - A `reserva_estoque` é a trilha de auditoria para conferência posterior
 
 #### 3.8.2 Correção de Notas (Regra de Editabilidade)
 
-Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e uma `movimentacao_estoque` corretiva.
+Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e a trilha correspondente (`movimentacao_estoque` ou `reserva_estoque`, conforme o caso).
 
 ```
 Usuário edita item_nota_entrada.quantidade de 10 para 15
@@ -456,14 +458,14 @@ Usuário edita item_nota_entrada.quantidade de 10 para 15
 3. estoque.quantidade_atual += 5
 ```
 
-**Fluxo de correção de Nota Saída:**
+**Fluxo de correção de Remessa planejada (itens ainda não entregues):**
 ```
-Usuário edita item_nota_saida.qtd_esperada de 20 para 15
+Usuário edita item_remessa.quantidade_solicitada de 20 para 15
   ↓
 1. registro_auditoria captura antes/depois
   ↓
 2. reserva_estoque: {
-     ID_nota_saida, ID_estoque,
+     ID_remessa, ID_estoque,
      quantidade: -5,
      saldo_anterior: 20, saldo_posterior: 15 }
   ↓
@@ -473,8 +475,9 @@ Usuário edita item_nota_saida.qtd_esperada de 20 para 15
 Regras:
 - `registro_auditoria` sempre captura snapshots antes/depois em JSON
 - Correção em nota de entrada: gera `movimentacao_estoque` (altera `quantidade_atual`)
-- Correção em nota de saída: gera `reserva_estoque` (altera `saldo_reservado`)
-- Se o item editado já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
+- Correção em remessa planejada: gera `reserva_estoque` (altera `saldo_reservado`)
+- Correção em `item_nota_saida` de baixa interna (`CONSUMO_INTERNO`, `AVARIA`, `DESMONTAGEM`): gera `movimentacao_estoque` (altera `quantidade_atual`)
+- Se o item já teve parte entregue, a correção só afeta o saldo disponível (`quantidade_solicitada - quantidade_entregue`)
 
 ---
 
@@ -611,9 +614,15 @@ Regras:
 
 #### 3.11.1 Nota Saída (Compromisso Oficial)
 
-Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**. A nota **não tem
-destinatário** — ela é o documento que **agrega remessas**, e são as remessas (e coletas) que
-carregam o destinatário da entrega.
+Representa o compromisso de entrega. A nota **não reserva estoque por si** (decisão do
+usuário, 2026-10-19): quem reserva é a **remessa planejada**, ao ser criada com seus itens. A
+nota **não tem destinatário** — ela é o documento que **agrega remessas**, e são as remessas
+(e coletas) que carregam o destinatário da entrega.
+
+Para `tipo = SAIDA`, a nota também **não tem itens**: os itens e o destinatário estão na
+remessa (`item_remessa` / `remessa.ID_destinatario`). Os tipos `CONSUMO_INTERNO`, `AVARIA` e
+`DESMONTAGEM` **mantêm itens** na própria nota (`item_nota_saida`), porque são **baixas
+internas sem entrega** — não geram remessa e não passam por reserva.
 
 A nota também **consolida pedidos** (decisão do usuário, 2026-10-19): ela **agrega os pedidos**
 que consolida (1:N), e o vínculo fica em `pedido_escola.ID_nota_saida` — a nota **não** tem
@@ -635,7 +644,7 @@ nota_saida
 ├── observacao              TEXT
 └── ativo                   BOOLEAN DEFAULT TRUE
 
-item_nota_saida
+item_nota_saida (apenas tipos de baixa interna: CONSUMO_INTERNO, AVARIA, DESMONTAGEM)
 ├── ID_item_nota_saida      INT PK auto_increment
 ├── ID_nota_saida           INT FK NOT NULL
 ├── ID_estoque              INT FK NOT NULL
@@ -645,9 +654,14 @@ item_nota_saida
 ```
 
 Regras:
-- Ao criar `item_nota_saida`, o **estoque é reservado** (`saldo_reservado += qtd_esperada`)
-- `qtd_entregue` é atualizado automaticamente conforme remessas e coletas são finalizadas
-- Se a nota for cancelada, a **reserva é liberada** (`saldo_reservado -= qtd_esperada`)
+- Nota de `tipo = SAIDA` **não tem itens** e **não reserva estoque**: os itens da entrega estão
+  em `item_remessa`, e a reserva nasce com a **remessa planejada** (§3.8.1 e §3.11.2)
+- `item_nota_saida` existe apenas para as baixas internas (`CONSUMO_INTERNO`, `AVARIA`,
+  `DESMONTAGEM`): ao confirmar, a baixa é física (`quantidade_atual -= qtd_esperada`) e gera
+  `movimentacao_estoque` — não há reserva nem remessa nesses tipos
+- Cancelar uma nota de baixa interna estorna a baixa física (`quantidade_atual +=`) via
+  `movimentacao_estoque`; cancelar uma nota `SAIDA` **não mexe em reserva**, porque a nota não
+  reserva (a liberação é do cancelamento da remessa)
 - A nota **não tem destinatário** (decisão do usuário, 2026-10-19): é tratada como uma
   **coleção de remessas**, e o destinatário da entrega está em `remessa.ID_destinatario` e
   `coleta.ID_destinatario` — nunca na nota
@@ -688,13 +702,17 @@ item_remessa
 ```
 
 Regras:
+- **A remessa é quem reserva o estoque** (decisão do usuário, 2026-10-19): criar a remessa
+  planejada com seus `item_remessa` insere `reserva_estoque` (`saldo_reservado +=
+  quantidade_solicitada`); cancelar a remessa libera a reserva; finalizar (total ou parcial)
+  dá a baixa definitiva do que foi entregue e libera a reserva correspondente
 - Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
 - Remessa PENDENTE pode ser realocada em outra rota
 - **A remessa `PENDENTE` criada no split é o "registro automático de pendência vinculado ao
   destinatário" da RN003** (decisão do usuário, 2026-10-19): não existe tabela de pendência e
   nenhuma é necessária — o vínculo com o destinatário é a própria coluna
   `remessa.ID_destinatario`, e o que falta entregar continua derivado de
-  `item_nota_saida.qtd_esperada − qtd_entregue`
+  `item_remessa.quantidade_solicitada − quantidade_entregue`
 
 #### 3.11.3 Coleta (Retirada Direta na Escola)
 
@@ -717,7 +735,7 @@ item_coleta
 
 Regras:
 - Chegou e pegou — sem agendamento, sem status
-- Ao registrar, `item_nota_saida.qtd_entregue` é atualizado e o estoque dá baixa
+- Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o estoque dá baixa
 
 #### 3.11.4 Rota × Remessa (N:N com ordem)
 
@@ -736,9 +754,11 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  Cria Nota Saída → reserva estoque (saldo_reservado +=)  │
+│  Cria Nota Saída (sem itens; agrega remessas)            │
 │         ↓                                                │
-│  Cria Remessa → EM_PREPARACAO                            │
+│  Cria Remessa planejada + itens → reserva estoque        │
+│         ↓                                                │
+│  EM_PREPARACAO                                           │
 │         ↓                                                │
 │  Adiciona na Rota do dia (rota_remessa + ordem_visita)   │
 │         ↓                                                │
@@ -1061,5 +1081,5 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 > - [`../diagramas/fluxo_atual.puml`](../diagramas/fluxo_atual.puml) e
 >   [`../diagramas/fluxosAtuais/`](../diagramas/fluxosAtuais/) (6 sub-fluxos) — o fluxo
 >   **AS-IS manual** descrito em §1.1 (papel, Trello, Excel, celular). **Não** representam o
->   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → reserva → remessa → rota →
+>   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → remessa (reserva) → rota →
 >   percurso → entrega → baixa)
