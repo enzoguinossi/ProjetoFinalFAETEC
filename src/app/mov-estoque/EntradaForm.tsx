@@ -5,18 +5,16 @@ import Button from "@/components/Button";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
+import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
+import { COLUNAS_FORNECEDOR } from "./colunas-selecao";
 import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
 import {
-  buscarFornecedoresEntrada,
-  buscarProdutosEntrada,
   criarNotaEntrada,
   getProdutoEntrada,
+  listarFornecedoresSelecao,
+  listarProdutosSelecao,
 } from "./actions";
-import type {
-  ConversaoUnidadeItem,
-  FornecedorBuscaItem,
-  ProdutoBuscaItem,
-} from "./tipos";
+import type { ConversaoUnidadeItem, FornecedorSelecaoRow } from "./tipos";
 
 interface Props {
   conversoes: ConversaoUnidadeItem[];
@@ -49,7 +47,7 @@ let proximoUid = 1;
 export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
   const mostrarAviso = useAviso();
 
-  const [fornecedor, setFornecedor] = useState<FornecedorBuscaItem | null>(null);
+  const [fornecedor, setFornecedor] = useState<FornecedorSelecaoRow | null>(null);
   const [dataRecebimento, setDataRecebimento] = useState("");
   const [observacao, setObservacao] = useState("");
   const [chaves, setChaves] = useState<string[]>([""]);
@@ -71,7 +69,7 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
     setChaves((atuais) => atuais.filter((_, i) => i !== indice));
   }
 
-  async function adicionarItem(produto: ProdutoBuscaItem) {
+  async function adicionarItem(produto: ProdutoListRow) {
     const detalhe = await getProdutoEntrada(produto.id_produto);
     const conversaoPadrao = detalhe?.id_conversao_padrao
       ? conversoes.find((c) => c.id_conversao === detalhe.id_conversao_padrao)
@@ -322,25 +320,27 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
         />
       </div>
 
-      <SearchEntityModal<FornecedorBuscaItem>
+      <SearchEntityModal<FornecedorSelecaoRow>
         open={buscandoFornecedor}
         onClose={() => setBuscandoFornecedor(false)}
         onSelect={setFornecedor}
-        placeholder="Buscar fornecedor por razão social..."
-        searchAction={buscarFornecedoresEntrada}
+        title="Selecionar Fornecedor"
+        columns={COLUNAS_FORNECEDOR}
+        loadPage={listarFornecedoresSelecao}
         getItemId={(f) => f.id_fornecedor}
-        getItemLabel={(f) => f.razao_social}
+        placeholder="Filtrar fornecedor por razão social..."
       />
 
-      <SearchEntityModal<ProdutoBuscaItem>
+      <SearchEntityModal<ProdutoListRow>
         open={buscandoProduto}
         onClose={() => setBuscandoProduto(false)}
         onSelect={(produto) => void adicionarItem(produto)}
-        placeholder="Buscar produto por código ou descrição..."
-        searchAction={buscarProdutosEntrada}
+        title="Selecionar Produto"
+        columns={COLUNAS_PRODUTO}
+        loadPage={listarProdutosSelecao}
         excludeIds={itens.map((item) => item.id_produto)}
         getItemId={(p) => p.id_produto}
-        getItemLabel={(p) => p.descricao}
+        placeholder="Filtrar produto por código ou descrição..."
       />
     </div>
   );

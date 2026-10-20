@@ -10,27 +10,47 @@ import { produtoDAO } from "@/dao/produto";
 import { veiculoDAO } from "@/dao/veiculo";
 import { mensagemDeErro } from "@/dao/_errors";
 import { requireUser } from "@/lib/auth";
-import { comPermissao, usuarioPodeAlguma } from "@/lib/permissoes";
+import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
+import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { notaEntradaService } from "@/services/nota-entrada";
 import { notaSaidaService } from "@/services/nota-saida";
-import { resultadoVazio, type PaginationParams, type PaginatedResult } from "@/types";
+import {
+  buildPagination,
+  resultadoVazio,
+  type PaginationParams,
+  type PaginatedResult,
+} from "@/types";
 import type {
   CondutorItem,
   ConversaoUnidadeItem,
-  DestinatarioBuscaItem,
-  FornecedorBuscaItem,
+  DestinatarioSelecaoRow,
+  FornecedorSelecaoRow,
   NotaEntradaListRow,
   NotaSaidaListRow,
   NovaEntradaPayload,
   NovaSaidaPayload,
-  ProdutoBuscaItem,
   ProdutoEntradaDetalhe,
-  ProdutoSaidaBuscaItem,
+  SelecaoParams,
   VeiculoItem,
 } from "./tipos";
 
 const PERMISSOES_VER = ["estoque.ver_saldo", "estoque.entrada"];
 const PERMISSOES_VER_SAIDA = ["estoque.ver_saldo", "estoque.saida"];
+const PERMISSOES_SELECAO_PRODUTO = ["estoque.entrada", "estoque.saida"];
+
+/** Normaliza os parâmetros de uma listagem de seletor (página, limite e filtro). */
+function parametrosSelecao(params: SelecaoParams): {
+  page: number;
+  limit: number;
+  search?: string;
+} {
+  const { take } = buildPagination(params);
+  return {
+    page: Math.max(1, params.page ?? 1),
+    limit: take,
+    search: params.search?.trim() || undefined,
+  };
+}
 
 /** `data_recebimento` é `DATE` (sem hora): formata em UTC; `data_criacao` é timestamp local. */
 function formatarData(data: Date | null, utc = false): string {
@@ -74,11 +94,40 @@ export async function listarUnidadesEntrada(): Promise<ConversaoUnidadeItem[]> {
   return conversaoUnidadeDAO.list();
 }
 
-export async function buscarProdutosEntrada(query: string): Promise<ProdutoBuscaItem[]> {
-  if (query.length < 2) return [];
+/**
+ * Produtos para os seletores da movimentação (entrada/saída), paginados e com os
+ * mesmos valores da listagem de produtos (Código, Descrição, Quantidade, Qtd. Livre).
+ * Permissão: `estoque.entrada` ou `estoque.saida` (permissão da tela, não da entidade).
+ */
+export async function listarProdutosSelecao(
+  params: SelecaoParams = {},
+): Promise<PaginatedResult<ProdutoListRow>> {
   const user = await requireUser();
-  if (!(await usuarioPodeAlguma(user, ["estoque.entrada"]))) return [];
-  return produtoDAO.searchPriorizado(query);
+  if (!(await usuarioPodeAlguma(user, PERMISSOES_SELECAO_PRODUTO))) {
+    return resultadoVazio(params);
+  }
+
+  const { page, limit, search } = parametrosSelecao(params);
+  const excluidos = new Set(params.excludeIds ?? []);
+
+  if (search) {
+    // Mesma busca priorizada da listagem de produtos (código → descrição),
+    // paginada aqui porque a busca priorizada devolve um único lote.
+    const linhas = (await produtoDAO.searchPriorizadoComEstoque(search))
+      .map(produtoParaLinha)
+      .filter((linha) => !excluidos.has(linha.id_produto));
+    const { skip, take } = buildPagination({ page, limit });
+    return {
+      data: linhas.slice(skip, skip + take),
+      total: linhas.length,
+      page,
+      limit: take,
+      totalPages: Math.ceil(linhas.length / take),
+    };
+  }
+
+  const resultado = await produtoDAO.list({ page, limit }, [...excluidos]);
+  return { ...resultado, data: resultado.data.map(produtoParaLinha) };
 }
 
 export async function getProdutoEntrada(id: number): Promise<ProdutoEntradaDetalhe | null> {
@@ -95,16 +144,23 @@ export async function getProdutoEntrada(id: number): Promise<ProdutoEntradaDetal
   };
 }
 
-export async function buscarFornecedoresEntrada(query: string): Promise<FornecedorBuscaItem[]> {
-  if (query.length < 2) return [];
+/** Fornecedores para o seletor da entrada. Permissão da tela: `estoque.entrada`. */
+export async function listarFornecedoresSelecao(
+  params: SelecaoParams = {},
+): Promise<PaginatedResult<FornecedorSelecaoRow>> {
   const user = await requireUser();
-  if (!(await usuarioPodeAlguma(user, ["estoque.entrada"]))) return [];
+  if (!(await usuarioPode(user, "estoque.entrada"))) return resultadoVazio(params);
 
-  const resultado = await fornecedorDAO.list({ search: query, limit: 20 });
-  return resultado.data.map((f) => ({
-    id_fornecedor: f.id_fornecedor,
-    razao_social: f.pessoaJuridica.razao_social,
-  }));
+  const { page, limit, search } = parametrosSelecao(params);
+  const resultado = await fornecedorDAO.list({ page, limit, search });
+  return {
+    ...resultado,
+    data: resultado.data.map((f) => ({
+      id_fornecedor: f.id_fornecedor,
+      razao_social: f.pessoaJuridica.razao_social,
+      cnpj: f.pessoaJuridica.cnpj,
+    })),
+  };
 }
 
 export async function criarNotaEntrada(payload: NovaEntradaPayload) {
@@ -178,16 +234,23 @@ export async function listarNotasSaida(
   };
 }
 
-export async function buscarDestinatariosSaida(query: string): Promise<DestinatarioBuscaItem[]> {
-  if (query.length < 2) return [];
+/** Destinatários para o seletor da saída. Permissão da tela: `estoque.saida`. */
+export async function listarDestinatariosSelecao(
+  params: SelecaoParams = {},
+): Promise<PaginatedResult<DestinatarioSelecaoRow>> {
   const user = await requireUser();
-  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
+  if (!(await usuarioPode(user, "estoque.saida"))) return resultadoVazio(params);
 
-  const resultado = await destinatarioDAO.list({ search: query, limit: 20 });
-  return resultado.data.map((d) => ({
-    id_destinatario: d.id_destinatario,
-    razao_social: d.pessoaJuridica.razao_social,
-  }));
+  const { page, limit, search } = parametrosSelecao(params);
+  const resultado = await destinatarioDAO.list({ page, limit, search });
+  return {
+    ...resultado,
+    data: resultado.data.map((d) => ({
+      id_destinatario: d.id_destinatario,
+      razao_social: d.pessoaJuridica.razao_social,
+      tipo: d.tipo_destinatario,
+    })),
+  };
 }
 
 /** Condutores disponíveis: funcionários ativos marcados `condutor = true`. */
@@ -212,27 +275,6 @@ export async function listarVeiculosSaida(): Promise<VeiculoItem[]> {
     placa: v.placa,
     modelo: v.modelo,
   }));
-}
-
-/**
- * Busca priorizada de produtos para a saída, com o saldo disponível de cada
- * um — exibido na UI para avisar (sem bloquear) quando a solicitada excede.
- */
-export async function buscarProdutosSaida(query: string): Promise<ProdutoSaidaBuscaItem[]> {
-  if (query.length < 2) return [];
-  const user = await requireUser();
-  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
-
-  const produtos = await produtoDAO.searchPriorizadoComEstoque(query);
-  return produtos.map((p) => {
-    const quantidade = p.estoques.reduce((acc, e) => acc + Number(e.quantidade_atual), 0);
-    const reservado = p.estoques.reduce((acc, e) => acc + Number(e.saldo_reservado), 0);
-    return {
-      id_produto: p.id_produto,
-      descricao: p.descricao,
-      saldo_disponivel: quantidade - reservado,
-    };
-  });
 }
 
 export async function criarNotaSaida(payload: NovaSaidaPayload) {

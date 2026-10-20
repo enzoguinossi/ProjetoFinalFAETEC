@@ -39,6 +39,17 @@ describe("produtoDAO", () => {
       expect(resultado.data[0]?.estoques[0]?.quantidade_atual).toBe(10);
       expect(resultado.data[0]).toHaveProperty("conversaoPadrao");
     });
+
+    it("exclui os ids informados e mantém o total coerente", async () => {
+      const manter = await criarProduto({ descricao: "Manter" });
+      const excluir = await criarProduto({ descricao: "Excluir" });
+
+      const resultado = await produtoDAO.list({ page: 1, limit: 10 }, [excluir.id_produto]);
+
+      expect(resultado.total).toBe(1);
+      expect(resultado.totalPages).toBe(1);
+      expect(resultado.data.map((p) => p.id_produto)).toEqual([manter.id_produto]);
+    });
   });
 
   describe("searchPriorizado", () => {

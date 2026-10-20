@@ -7,9 +7,19 @@ export type ConversaoUnidadeItem = {
   descricao: string | null;
 };
 
-export type ProdutoBuscaItem = {
-  id_produto: number;
-  descricao: string;
+/** Parâmetros das listagens paginadas usadas pelos seletores (modais). */
+export type SelecaoParams = {
+  page?: number;
+  search?: string;
+  limit?: number;
+  /** Ids que não devem aparecer (já adicionados na nota/remessa). */
+  excludeIds?: number[];
+};
+
+export type FornecedorSelecaoRow = {
+  id_fornecedor: number;
+  razao_social: string;
+  cnpj: string | null;
 };
 
 export type ProdutoEntradaDetalhe = {
@@ -17,11 +27,6 @@ export type ProdutoEntradaDetalhe = {
   descricao: string;
   id_conversao_padrao: number | null;
   fator_padrao: number | null;
-};
-
-export type FornecedorBuscaItem = {
-  id_fornecedor: number;
-  razao_social: string;
 };
 
 export type NotaEntradaListRow = {
@@ -67,9 +72,10 @@ export type NotaSaidaListRow = {
   listaRemessas: RemessaNotaRow[];
 };
 
-export type DestinatarioBuscaItem = {
+export type DestinatarioSelecaoRow = {
   id_destinatario: number;
   razao_social: string;
+  tipo: string;
 };
 
 export type CondutorItem = {
@@ -81,12 +87,6 @@ export type VeiculoItem = {
   id_veiculo: number;
   placa: string;
   modelo: string | null;
-};
-
-export type ProdutoSaidaBuscaItem = {
-  id_produto: number;
-  descricao: string;
-  saldo_disponivel: number;
 };
 
 export type ItemSaidaPayload = {

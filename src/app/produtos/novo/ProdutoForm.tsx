@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createProduto, updateProduto, getProduto, searchProdutos } from "../actions";
+import { createProduto, updateProduto, getProduto, listarProdutos } from "../actions";
 import type { ProdutoFormData } from "../actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
+import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
@@ -287,14 +288,16 @@ export default function ProdutoForm({
         </div>
       </form>
 
-      <SearchEntityModal
+      <SearchEntityModal<ProdutoListRow>
         open={buscandoIdx !== null}
         onClose={() => { setBuscandoIdx(null); setEditandoIns(null); }}
         onSelect={onSelectInsumo}
-        searchAction={searchProdutos}
+        title="Selecionar Produto"
+        columns={COLUNAS_PRODUTO}
+        loadPage={listarProdutos}
         getItemId={(item) => item.id_produto}
-        getItemLabel={(item) => item.descricao}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
+        placeholder="Filtrar produto por código ou descrição..."
       />
 
       <UnidadesModal

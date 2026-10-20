@@ -7,10 +7,11 @@ import { buildPagination, type ListParams } from "@/types";
 type Db = Prisma.TransactionClient;
 
 export class ProdutoDAO {
-  async list(params: ListParams = {}) {
+  async list(params: ListParams = {}, exceptoIds: number[] = []) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.ProdutoWhereInput = { ativo: true };
     if (params.search) where.descricao = { contains: params.search };
+    if (exceptoIds.length > 0) where.id_produto = { notIn: exceptoIds };
     const [data, total] = await Promise.all([
       prisma.produto.findMany({
         skip, take, where,

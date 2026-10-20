@@ -5,14 +5,11 @@ import Button from "@/components/Button";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
-import { criarNotaSaida, buscarDestinatariosSaida, buscarProdutosSaida } from "./actions";
+import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
+import { COLUNAS_DESTINATARIO } from "./colunas-selecao";
+import { criarNotaSaida, listarDestinatariosSelecao, listarProdutosSelecao } from "./actions";
 import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
-import type {
-  CondutorItem,
-  DestinatarioBuscaItem,
-  ProdutoSaidaBuscaItem,
-  VeiculoItem,
-} from "./tipos";
+import type { CondutorItem, DestinatarioSelecaoRow, VeiculoItem } from "./tipos";
 
 interface Props {
   condutores: CondutorItem[];
@@ -31,7 +28,7 @@ type ItemForm = {
 
 type RemessaForm = {
   uid: number;
-  destinatario: DestinatarioBuscaItem | null;
+  destinatario: DestinatarioSelecaoRow | null;
   id_funcionario_condutor: string;
   id_veiculo: string;
   urgente: boolean;
@@ -87,7 +84,7 @@ export default function SaidaForm({ condutores, veiculos, onSaved, onCancel }: P
     setRemessas((atuais) => atuais.filter((remessa) => remessa.uid !== uid));
   }
 
-  function adicionarItem(uidRemessa: number, produto: ProdutoSaidaBuscaItem) {
+  function adicionarItem(uidRemessa: number, produto: ProdutoListRow) {
     setRemessas((atuais) =>
       atuais.map((remessa) =>
         remessa.uid === uidRemessa
@@ -99,7 +96,7 @@ export default function SaidaForm({ condutores, veiculos, onSaved, onCancel }: P
                   uid: proximoUid++,
                   id_produto: produto.id_produto,
                   descricao: produto.descricao,
-                  saldo_disponivel: produto.saldo_disponivel,
+                  saldo_disponivel: Number(produto.livre),
                   quantidade: "1",
                 },
               ],
@@ -375,7 +372,7 @@ export default function SaidaForm({ condutores, veiculos, onSaved, onCancel }: P
         />
       </div>
 
-      <SearchEntityModal<DestinatarioBuscaItem>
+      <SearchEntityModal<DestinatarioSelecaoRow>
         open={buscandoDestinatarioUid !== null}
         onClose={() => setBuscandoDestinatarioUid(null)}
         onSelect={(destinatario) => {
@@ -383,26 +380,28 @@ export default function SaidaForm({ condutores, veiculos, onSaved, onCancel }: P
             alterarRemessa(buscandoDestinatarioUid, { destinatario });
           }
         }}
-        placeholder="Buscar destinatário por razão social..."
-        searchAction={buscarDestinatariosSaida}
+        title="Selecionar Destinatário"
+        columns={COLUNAS_DESTINATARIO}
+        loadPage={listarDestinatariosSelecao}
         getItemId={(d) => d.id_destinatario}
-        getItemLabel={(d) => d.razao_social}
+        placeholder="Filtrar destinatário por razão social..."
       />
 
       {buscandoProdutoUid !== null && (
-        <SearchEntityModal<ProdutoSaidaBuscaItem>
+        <SearchEntityModal<ProdutoListRow>
           open
           onClose={() => setBuscandoProdutoUid(null)}
           onSelect={(produto) => adicionarItem(buscandoProdutoUid, produto)}
-          placeholder="Buscar produto por código ou descrição..."
-          searchAction={buscarProdutosSaida}
+          title="Selecionar Produto"
+          columns={COLUNAS_PRODUTO}
+          loadPage={listarProdutosSelecao}
           excludeIds={
             remessas.find((remessa) => remessa.uid === buscandoProdutoUid)?.itens.map(
               (item) => item.id_produto,
             ) ?? []
           }
           getItemId={(p) => p.id_produto}
-          getItemLabel={(p) => p.descricao}
+          placeholder="Filtrar produto por código ou descrição..."
         />
       )}
     </div>
