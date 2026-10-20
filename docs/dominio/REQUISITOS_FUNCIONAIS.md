@@ -47,7 +47,7 @@
 | RF019 | Assistente de Remessa | O sistema deve **avisar** o usuário quando o saldo disponível (quantidade_atual - saldo_reservado) for insuficiente, mas **permitir que a remessa prossiga**. | Essencial |
 | RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à remessa. | Essencial |
 | RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que remessas não entregues (PENDENTE) sejam adicionadas em uma nova rota. Retiradas diretas de urgência no galpão devem ser registradas como remessa com flag de urgente. Dando uma baixa parcial na remessa. | Essencial |
-| RF022 | Percurso e Rota | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e rotas como instâncias do dia. A rota pode ser baseada em um percurso ou criada do zero, e deve ser editável. A rota agrupa remessas com ordem de visita. | Importante |
+| RF022 | Percurso e Rota | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e rotas como instâncias do dia. A rota pode ser baseada em um percurso ou criada do zero, e deve ser editável. A rota agrupa remessas com ordem de visita. | Essencial |
 
 ## Módulo 5: Relatórios, Consultas e Integrações
 
