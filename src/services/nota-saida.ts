@@ -117,6 +117,18 @@ export class NotaSaidaService {
       remessas: resultado.remessas.map((r) => ({ id_remessa: r.id_remessa })),
     };
   }
+
+  /**
+   * Cancela a remessa e libera a reserva dos itens. A validação de estado
+   * (só `EM_PREPARACAO`/`PRONTO_PARA_ENTREGA`) e a idempotência ficam na
+   * transação do DAO — cancelar de novo é recusado sem debitar outra vez.
+   */
+  async cancelarRemessa(id_remessa: number, id_usuario: number) {
+    const id = idPositivo(id_remessa);
+    if (!id) return { error: "Remessa inválida." };
+
+    return notaSaidaDAO.cancelarRemessa(id, id_usuario);
+  }
 }
 
 export const notaSaidaService = new NotaSaidaService();

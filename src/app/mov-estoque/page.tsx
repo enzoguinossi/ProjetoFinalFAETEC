@@ -27,6 +27,7 @@ export default async function MovEstoquePage() {
   const podeCriar = await usuarioPode(user, "estoque.entrada");
   const podeVerSaida = await usuarioPodeAlguma(user, ["estoque.ver_saldo", "estoque.saida"]);
   const podeCriarSaida = await usuarioPode(user, "estoque.saida");
+  const podeCancelarRemessa = await usuarioPode(user, "remessa.alterar_status");
 
   const [inicial, conversoes, inicialSaida, condutores, veiculos] = await Promise.all([
     listarNotasEntrada({ page: 1, limit: 20 }),
@@ -47,6 +48,7 @@ export default async function MovEstoquePage() {
         inicialSaida={inicialSaida}
         podeVerSaida={podeVerSaida}
         podeCriarSaida={podeCriarSaida}
+        podeCancelarRemessa={podeCancelarRemessa}
         condutores={condutores}
         veiculos={veiculos}
       />

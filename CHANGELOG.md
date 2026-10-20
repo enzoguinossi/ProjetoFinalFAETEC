@@ -15,6 +15,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Cancelamento de remessa com liberação da reserva `(KAN-140)`:** `StatusRemessa` ganhou
+  `CANCELADA` (ao final do enum) e a aba Saída permite cancelar uma remessa pelo detalhe da
+  nota. Só remessas em `EM_PREPARACAO` ou `PRONTO_PARA_ENTREGA` podem ser canceladas; em
+  percurso ou finalizadas a ação é recusada com mensagem clara. Em transação única, cada item
+  devolve `saldo_reservado -= quantidade_solicitada`, registra uma `reserva_estoque` com
+  quantidade negativa (saldos anterior/posterior e data/hora), muda a remessa para `CANCELADA`
+  e grava auditoria (`Remessa`/`ALTERAR`). Cancelar de novo é recusado e nada é excluído
+  (RN004). Ação exige `remessa.alterar_status` no servidor.
 - **Aba Saída da movimentação de estoque `(KAN-140)`:** nova aba em `/mov-estoque` que cria a
   nota de saída (`tipo = SAIDA`, `status = ABERTA`) agregando uma ou mais **remessas
   planejadas**. A nota **não tem itens**: destinatário, condutor (só `funcionario.condutor`),

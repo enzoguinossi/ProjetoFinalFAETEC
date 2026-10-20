@@ -8,7 +8,7 @@ export type StatusNotaSaida = (typeof STATUS_NOTA_SAIDA)[number];
 
 export const STATUS_REMESSA = [
   "EM_PREPARACAO", "PRONTO_PARA_ENTREGA", "EM_PERCURSO",
-  "PENDENTE", "FINALIZADO_TOTAL", "FINALIZADO_PARCIAL",
+  "PENDENTE", "FINALIZADO_TOTAL", "FINALIZADO_PARCIAL", "CANCELADA",
 ] as const;
 export type StatusRemessa = (typeof STATUS_REMESSA)[number];
 

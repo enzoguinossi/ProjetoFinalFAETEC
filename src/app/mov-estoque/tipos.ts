@@ -50,12 +50,21 @@ export type NovaEntradaPayload = {
 
 // ── Saída ───────────────────────────────────────────────────────────
 
+export type RemessaNotaRow = {
+  id_remessa: number;
+  destinatario: string;
+  status: string;
+  statusLabel: string;
+  podeCancelar: boolean;
+};
+
 export type NotaSaidaListRow = {
   id_nota_saida: number;
   data: string;
   remessas: number;
   destinatarios: string;
   status: string;
+  listaRemessas: RemessaNotaRow[];
 };
 
 export type DestinatarioBuscaItem = {

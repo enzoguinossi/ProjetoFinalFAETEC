@@ -130,6 +130,18 @@ const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
   CANCELADA: "Cancelada",
 };
 
+const ROTULOS_STATUS_REMESSA: Record<string, string> = {
+  EM_PREPARACAO: "Em preparação",
+  PRONTO_PARA_ENTREGA: "Pronta para entrega",
+  EM_PERCURSO: "Em percurso",
+  PENDENTE: "Pendente",
+  FINALIZADO_TOTAL: "Finalizada",
+  FINALIZADO_PARCIAL: "Finalizada parcialmente",
+  CANCELADA: "Cancelada",
+};
+
+const STATUS_REMESSA_CANCELAVEL = ["EM_PREPARACAO", "PRONTO_PARA_ENTREGA"];
+
 export async function listarNotasSaida(
   params: PaginationParams = {},
 ): Promise<PaginatedResult<NotaSaidaListRow>> {
@@ -151,6 +163,16 @@ export async function listarNotasSaida(
         remessas: nota.remessas.length,
         destinatarios: destinatarios.length > 0 ? destinatarios.join(", ") : "—",
         status: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
+        listaRemessas: nota.remessas
+          .slice()
+          .sort((a, b) => a.id_remessa - b.id_remessa)
+          .map((remessa) => ({
+            id_remessa: remessa.id_remessa,
+            destinatario: remessa.destinatario.pessoaJuridica.razao_social,
+            status: remessa.status,
+            statusLabel: ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status,
+            podeCancelar: STATUS_REMESSA_CANCELAVEL.includes(remessa.status),
+          })),
       };
     }),
   };
@@ -223,6 +245,22 @@ export async function criarNotaSaida(payload: NovaSaidaPayload) {
         id_nota_saida: resultado.nota.id_nota_saida,
         remessas: resultado.remessas.length,
       };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
+/**
+ * Cancela uma remessa da nota (só em preparação ou pronta para entrega) e
+ * libera a reserva dos itens. Exige `remessa.alterar_status` no servidor.
+ */
+export async function cancelarRemessa(id_remessa: number) {
+  return comPermissao("remessa.alterar_status", async (user) => {
+    try {
+      const resultado = await notaSaidaService.cancelarRemessa(id_remessa, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return { success: true, id_remessa: resultado.id_remessa };
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }

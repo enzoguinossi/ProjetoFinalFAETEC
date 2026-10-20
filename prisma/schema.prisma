@@ -807,6 +807,7 @@ enum StatusRemessa {
   PENDENTE
   FINALIZADO_TOTAL
   FINALIZADO_PARCIAL
+  CANCELADA
 }
 
 enum StatusVeiculo {

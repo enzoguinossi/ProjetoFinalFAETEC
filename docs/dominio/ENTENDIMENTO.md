@@ -685,7 +685,8 @@ remessa
                               'EM_PERCURSO',
                               'PENDENTE',
                               'FINALIZADO_TOTAL',
-                              'FINALIZADO_PARCIAL'
+                              'FINALIZADO_PARCIAL',
+                              'CANCELADA'
                             )
 ├── ID_funcionario_condutor INT FK → funcionario NULL   ← quem dirigiu (não há tabela condutor)
 ├── ID_veiculo             INT FK → veiculo NULL
@@ -706,6 +707,11 @@ Regras:
   planejada com seus `item_remessa` insere `reserva_estoque` (`saldo_reservado +=
   quantidade_solicitada`); cancelar a remessa libera a reserva; finalizar (total ou parcial)
   dá a baixa definitiva do que foi entregue e libera a reserva correspondente
+- **Cancelar a remessa** (status `CANCELADA`, decisão do usuário, 2026-10-19) só é permitido
+  em `EM_PREPARACAO` ou `PRONTO_PARA_ENTREGA`: devolve `saldo_reservado -= quantidade_solicitada`
+  em cada item e registra uma `reserva_estoque` com quantidade negativa, preservando o
+  histórico. Remessa em percurso ou finalizada **não** pode ser cancelada; o segundo
+  cancelamento é recusado e não debita a reserva outra vez
 - Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
 - Remessa PENDENTE pode ser realocada em outra rota
 - **A remessa `PENDENTE` criada no split é o "registro automático de pendência vinculado ao

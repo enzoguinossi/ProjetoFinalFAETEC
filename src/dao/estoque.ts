@@ -167,6 +167,49 @@ export class EstoqueDAO {
     return { estoque, reserva, saldo_anterior, saldo_posterior };
   }
 
+  /**
+   * Libera uma reserva já feita na linha de estoque da remessa: subtrai
+   * `quantidade` de `saldo_reservado` e registra a `reserva_estoque` com
+   * quantidade **negativa**, preservando o histórico (RN004). Roda no cliente
+   * de transação informado.
+   */
+  async liberarReserva(
+    dados: {
+      id_estoque: number;
+      id_remessa: number;
+      id_usuario: number;
+      quantidade: number;
+      observacao?: string | null;
+    },
+    client: Prisma.TransactionClient = prisma,
+  ) {
+    const existente = await client.estoque.findUniqueOrThrow({
+      where: { id_estoque: dados.id_estoque },
+    });
+
+    const saldo_anterior = Number(existente.saldo_reservado);
+    const estoque = await client.estoque.update({
+      where: { id_estoque: dados.id_estoque },
+      data: { saldo_reservado: { decrement: dados.quantidade } },
+    });
+    const saldo_posterior = Number(estoque.saldo_reservado);
+
+    const reserva = await client.reservaEstoque.create({
+      data: {
+        id_estoque: estoque.id_estoque,
+        id_remessa: dados.id_remessa,
+        id_usuario: dados.id_usuario,
+        quantidade: -dados.quantidade,
+        saldo_anterior,
+        saldo_posterior,
+        data_hora: new Date(),
+        observacao: dados.observacao ?? null,
+      },
+    });
+
+    return { estoque, reserva, saldo_anterior, saldo_posterior };
+  }
+
   async movimentar(
     id_estoque: number,
     id_usuario: number,

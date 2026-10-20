@@ -218,6 +218,9 @@ O cancelamento da **remessa** libera a reserva:
 saldo_reservado -= quantidade
 ```
 
+A remessa vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
+sem debitar a reserva outra vez.
+
 ## 8.4 Remessa finalizada
 
 A baixa definitiva ocorre quando a remessa é finalizada:

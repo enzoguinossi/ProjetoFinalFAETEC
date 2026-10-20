@@ -24,6 +24,20 @@ export type NotaSaidaCriacao = {
 
 const AUDIT_ENTIDADE = "NotaSaida";
 
+const ROTULOS_STATUS_REMESSA: Record<string, string> = {
+  EM_PREPARACAO: "em preparação",
+  PRONTO_PARA_ENTREGA: "pronta para entrega",
+  EM_PERCURSO: "em percurso",
+  PENDENTE: "pendente",
+  FINALIZADO_TOTAL: "finalizada",
+  FINALIZADO_PARCIAL: "finalizada parcialmente",
+  CANCELADA: "cancelada",
+};
+
+export type ResultadoCancelamentoRemessa =
+  | { success: true; id_remessa: number; status: "CANCELADA" }
+  | { error: string };
+
 export class NotaSaidaDAO {
   /** Notas de saída (tipo SAIDA), da mais recente para a mais antiga. */
   async list(params: PaginationParams = {}) {
@@ -187,6 +201,110 @@ export class NotaSaidaDAO {
       );
 
       return { nota, remessas: remessasGravadas };
+    });
+  }
+
+  /**
+   * Cancela uma remessa ainda não iniciada (`EM_PREPARACAO` ou
+   * `PRONTO_PARA_ENTREGA`) em uma única transação: devolve
+   * `saldo_reservado -= quantidade_solicitada` na linha de estoque de cada
+   * item, registra a `reserva_estoque` negativa, muda o status para
+   * `CANCELADA` e grava a auditoria. Nada é excluído (RN004). O status
+   * `CANCELADA` faz a segunda tentativa ser recusada sem debitar de novo.
+   */
+  async cancelarRemessa(
+    id_remessa: number,
+    id_usuario: number,
+  ): Promise<ResultadoCancelamentoRemessa> {
+    return prisma.$transaction(async (tx) => {
+      const remessa = await tx.remessa.findUnique({
+        where: { id_remessa },
+        include: { itens: { orderBy: { id_item_remessa: "asc" } } },
+      });
+
+      if (!remessa) return { error: "Remessa não encontrada." };
+
+      if (remessa.status === "CANCELADA") {
+        return { error: "Remessa já está cancelada." };
+      }
+
+      if (
+        remessa.status !== "EM_PREPARACAO" &&
+        remessa.status !== "PRONTO_PARA_ENTREGA"
+      ) {
+        const rotulo = ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status;
+        return {
+          error: `Remessa ${rotulo} não pode ser cancelada. Só remessas em preparação ou prontas para entrega podem ser canceladas.`,
+        };
+      }
+
+      // Garante a transição uma única vez mesmo com cancelamentos concorrentes:
+      // a segunda atualização não encontra mais o status de origem.
+      const atualizacao = await tx.remessa.updateMany({
+        where: {
+          id_remessa,
+          status: { in: ["EM_PREPARACAO", "PRONTO_PARA_ENTREGA"] },
+        },
+        data: { status: "CANCELADA" },
+      });
+      if (atualizacao.count !== 1) {
+        return { error: "Remessa já está cancelada." };
+      }
+
+      const reservasLiberadas: {
+        id_reserva_estoque: number;
+        id_item_remessa: number;
+        id_estoque: number;
+        quantidade: number;
+        saldo_anterior: number;
+        saldo_posterior: number;
+      }[] = [];
+
+      for (const item of remessa.itens) {
+        const liberacao = await estoqueDAO.liberarReserva(
+          {
+            id_estoque: item.id_estoque,
+            id_remessa,
+            id_usuario,
+            quantidade: Number(item.quantidade_solicitada),
+            observacao: "Cancelamento da remessa",
+          },
+          tx,
+        );
+
+        reservasLiberadas.push({
+          id_reserva_estoque: liberacao.reserva.id_reserva_estoque,
+          id_item_remessa: item.id_item_remessa,
+          id_estoque: item.id_estoque,
+          quantidade: Number(liberacao.reserva.quantidade),
+          saldo_anterior: liberacao.saldo_anterior,
+          saldo_posterior: liberacao.saldo_posterior,
+        });
+      }
+
+      await registrarAuditoria(
+        id_usuario,
+        "ALTERAR",
+        "Remessa",
+        id_remessa,
+        {
+          id_remessa,
+          status: remessa.status,
+          itens: remessa.itens.map((item) => ({
+            id_item_remessa: item.id_item_remessa,
+            id_estoque: item.id_estoque,
+            quantidade_solicitada: Number(item.quantidade_solicitada),
+          })),
+        },
+        {
+          id_remessa,
+          status: "CANCELADA",
+          reservas_liberadas: reservasLiberadas,
+        },
+        tx,
+      );
+
+      return { success: true, id_remessa, status: "CANCELADA" };
     });
   }
 }

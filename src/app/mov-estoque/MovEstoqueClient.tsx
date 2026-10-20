@@ -5,10 +5,11 @@ import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import type { Column } from "@/components/DataTable";
+import { useAviso } from "@/components/AvisoProvider";
 import type { PaginatedResult } from "@/types";
 import EntradaForm from "./EntradaForm";
 import SaidaForm from "./SaidaForm";
-import { listarNotasEntrada, listarNotasSaida } from "./actions";
+import { cancelarRemessa, listarNotasEntrada, listarNotasSaida } from "./actions";
 import type {
   CondutorItem,
   ConversaoUnidadeItem,
@@ -24,6 +25,7 @@ interface Props {
   inicialSaida: PaginatedResult<NotaSaidaListRow>;
   podeVerSaida: boolean;
   podeCriarSaida: boolean;
+  podeCancelarRemessa: boolean;
   condutores: CondutorItem[];
   veiculos: VeiculoItem[];
 }
@@ -61,9 +63,12 @@ export default function MovEstoqueClient({
   inicialSaida,
   podeVerSaida,
   podeCriarSaida,
+  podeCancelarRemessa,
   condutores,
   veiculos,
 }: Props) {
+  const mostrarAviso = useAviso();
+
   const [aba, setAba] = useState<Aba>("entrada");
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
@@ -72,6 +77,8 @@ export default function MovEstoqueClient({
   const [resultadoSaida, setResultadoSaida] = useState(inicialSaida);
   const [carregandoSaida, setCarregandoSaida] = useState(false);
   const [modalSaidaAberto, setModalSaidaAberto] = useState(false);
+  const [notaDetalhe, setNotaDetalhe] = useState<NotaSaidaListRow | null>(null);
+  const [cancelandoId, setCancelandoId] = useState<number | null>(null);
 
   async function carregar(page = 1, limit = resultado.limit) {
     setCarregando(true);
@@ -90,6 +97,32 @@ export default function MovEstoqueClient({
       setResultadoSaida(atualizado);
     } finally {
       setCarregandoSaida(false);
+    }
+  }
+
+  async function cancelar(idRemessa: number) {
+    setCancelandoId(idRemessa);
+    try {
+      const resultadoCancelamento = await cancelarRemessa(idRemessa);
+      if ("error" in resultadoCancelamento) {
+        mostrarAviso(resultadoCancelamento.error, "erro");
+        return;
+      }
+      mostrarAviso("Remessa cancelada e reserva liberada.", "sucesso");
+
+      const atualizado = await listarNotasSaida({
+        page: resultadoSaida.page,
+        limit: resultadoSaida.limit,
+      });
+      setResultadoSaida(atualizado);
+      const notaAtualizada = atualizado.data.find(
+        (nota) => nota.id_nota_saida === notaDetalhe?.id_nota_saida,
+      );
+      setNotaDetalhe(notaAtualizada ?? null);
+    } catch {
+      mostrarAviso("Erro ao cancelar a remessa. Tente novamente.", "erro");
+    } finally {
+      setCancelandoId(null);
     }
   }
 
@@ -187,6 +220,13 @@ export default function MovEstoqueClient({
             columns={columnsSaida}
             data={resultadoSaida.data}
             idField="id_nota_saida"
+            actions={[
+              {
+                icon: "/icons/actions/Olho.svg",
+                label: "Ver remessas e cancelar",
+                onClick: (row) => setNotaDetalhe(row),
+              },
+            ]}
             paginacaoServidor={{
               total: resultadoSaida.total,
               page: resultadoSaida.page,
@@ -220,6 +260,49 @@ export default function MovEstoqueClient({
             await carregarSaida(1);
           }}
         />
+      </Modal>
+
+      <Modal
+        open={notaDetalhe !== null}
+        onClose={() => setNotaDetalhe(null)}
+        title={`Remessas da nota #${notaDetalhe?.id_nota_saida ?? ""}`}
+        width="720px"
+      >
+        <div className="flex flex-col gap-3">
+          {notaDetalhe?.listaRemessas.length === 0 && (
+            <p className="m-0 font-sans text-sm text-[#697077]">Esta nota não possui remessas.</p>
+          )}
+
+          {notaDetalhe?.listaRemessas.map((remessa) => (
+            <div
+              key={remessa.id_remessa}
+              className="grid items-center gap-3 rounded-[20px] border border-border p-4 sm:grid-cols-[0.7fr_2fr_1.2fr_auto]"
+            >
+              <span className="font-sans text-sm text-[#697077]">#{remessa.id_remessa}</span>
+              <span className="font-sans text-base text-ink-strong">{remessa.destinatario}</span>
+              <span className="font-sans text-sm text-ink">{remessa.statusLabel}</span>
+
+              <div className="flex justify-end">
+                {podeCancelarRemessa && remessa.podeCancelar ? (
+                  <Button
+                    label={cancelandoId === remessa.id_remessa ? "Cancelando..." : "Cancelar remessa"}
+                    variant="cancel"
+                    onClick={() => void cancelar(remessa.id_remessa)}
+                    disabled={cancelandoId !== null}
+                  />
+                ) : remessa.podeCancelar ? (
+                  <span className="font-sans text-xs text-[#697077]">
+                    Sem permissão para cancelar.
+                  </span>
+                ) : (
+                  <span className="font-sans text-xs text-[#697077]">
+                    Não pode ser cancelada neste status.
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </Modal>
     </div>
   );
