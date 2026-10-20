@@ -15,9 +15,13 @@ export const cadastroItems = [
   { label: "Veículos", path: "/veiculos", icon: "/icons/cadastros/carro.svg", permissao: "veiculo.listar" },
 ];
 
+export const movEstoqueItems = [
+  { label: "Entrada", path: "/mov-estoque/entrada", icon: "/icons/nav/estoque.svg", permissao: "estoque.entrada" },
+  { label: "Saída", path: "/mov-estoque/saida", icon: "/icons/nav/estoque.svg", permissao: "estoque.saida" },
+];
+
 export const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: "/icons/nav/dashboard.svg" },
-  { label: "Mov. Estoque", path: "/mov-estoque", icon: "/icons/nav/estoque.svg" },
   { label: "Pedidos", path: "/pedidos", icon: "/icons/nav/dados.svg" },
   { label: "Relatórios", path: "/relatorios", icon: "/icons/nav/estoque.svg" },
 ];
