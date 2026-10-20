@@ -15,8 +15,19 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Aba Saída da movimentação de estoque `(KAN-140)`:** nova aba em `/mov-estoque` que cria a
+  nota de saída (`tipo = SAIDA`, `status = ABERTA`) agregando uma ou mais **remessas
+  planejadas**. A nota **não tem itens**: destinatário, condutor (só `funcionario.condutor`),
+  veículo, urgência e itens ficam na remessa (`status = EM_PREPARACAO`). A gravação é uma
+  transação única: `nota_saida`, `remessa`, `item_remessa`, reserva de estoque
+  (`saldo_reservado += quantidade_solicitada` + `reserva_estoque` apontando para a remessa) e
+  auditoria (`NotaSaida`/`CRIAR`). Saldo insuficiente apenas avisa e **não bloqueia** (RN001),
+  com o disponível exibido por produto. Criar exige `estoque.saida`; ver exige
+  `estoque.ver_saldo` ou `estoque.saida`; a listagem é somente leitura (RN004). Código em
+  `src/app/mov-estoque/**`, `src/services/nota-saida.ts`, `src/dao/nota-saida.ts` e
+  `estoqueDAO.reservar`.
 - **Aba Entrada da movimentação de estoque `(KAN-140)`:** nova página `/mov-estoque` (aba
-  Entrada; Saída desabilitada para o próximo run). O formulário aceita fornecedor e data de
+  Entrada; a aba Saída foi implementada no run seguinte). O formulário aceita fornecedor e data de
   recebimento opcionais, chaves de acesso NF-e opcionais (44 caracteres, únicas), observação e
   itens com conversão de unidade de fator editável. A gravação é uma transação única:
   `nota_entrada`, `nota_entrada_chave_acesso`, `item_nota_entrada`, atualização de

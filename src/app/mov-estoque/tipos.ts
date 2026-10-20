@@ -47,3 +47,54 @@ export type NovaEntradaPayload = {
   chaves_acesso?: string[];
   itens: ItemEntradaPayload[];
 };
+
+// ── Saída ───────────────────────────────────────────────────────────
+
+export type NotaSaidaListRow = {
+  id_nota_saida: number;
+  data: string;
+  remessas: number;
+  destinatarios: string;
+  status: string;
+};
+
+export type DestinatarioBuscaItem = {
+  id_destinatario: number;
+  razao_social: string;
+};
+
+export type CondutorItem = {
+  id_funcionario: number;
+  nome: string;
+};
+
+export type VeiculoItem = {
+  id_veiculo: number;
+  placa: string;
+  modelo: string | null;
+};
+
+export type ProdutoSaidaBuscaItem = {
+  id_produto: number;
+  descricao: string;
+  saldo_disponivel: number;
+};
+
+export type ItemSaidaPayload = {
+  id_produto: number;
+  quantidade_solicitada: number;
+};
+
+export type RemessaSaidaPayload = {
+  id_destinatario: number;
+  id_funcionario_condutor?: number | null;
+  id_veiculo?: number | null;
+  urgente?: boolean;
+  observacao?: string | null;
+  itens: ItemSaidaPayload[];
+};
+
+export type NovaSaidaPayload = {
+  observacao?: string | null;
+  remessas: RemessaSaidaPayload[];
+};

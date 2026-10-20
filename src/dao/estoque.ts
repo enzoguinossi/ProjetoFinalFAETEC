@@ -99,6 +99,74 @@ export class EstoqueDAO {
     return { estoque, movimentacao, saldo_anterior, saldo_posterior };
   }
 
+  /**
+   * Reserva `quantidade` da linha de estoque do produto para uma remessa:
+   * usa a linha ativa (ou reativa a inativa; sem linha, cria com
+   * `quantidade_atual = 0`), soma `saldo_reservado` e registra a
+   * `reserva_estoque` com os saldos anterior/posterior. A reserva pode deixar
+   * o disponível negativo (RN001). Roda no cliente de transação informado.
+   */
+  async reservar(
+    dados: {
+      id_produto: number;
+      id_remessa: number;
+      id_usuario: number;
+      quantidade: number;
+      observacao?: string | null;
+    },
+    client: Prisma.TransactionClient = prisma,
+  ) {
+    const ativa = await client.estoque.findFirst({
+      where: { id_produto: dados.id_produto, ativo: true },
+      orderBy: { id_estoque: "asc" },
+    });
+
+    const existente =
+      ativa ??
+      (await client.estoque.findFirst({
+        where: { id_produto: dados.id_produto, ativo: false },
+        orderBy: { id_estoque: "asc" },
+      }));
+
+    let saldo_anterior: number;
+    let estoque;
+
+    if (existente) {
+      saldo_anterior = Number(existente.saldo_reservado);
+      estoque = await client.estoque.update({
+        where: { id_estoque: existente.id_estoque },
+        data: { saldo_reservado: { increment: dados.quantidade }, ativo: true },
+      });
+    } else {
+      saldo_anterior = 0;
+      estoque = await client.estoque.create({
+        data: {
+          id_produto: dados.id_produto,
+          quantidade_atual: 0,
+          saldo_reservado: dados.quantidade,
+          data_entrada: new Date(),
+        },
+      });
+    }
+
+    const saldo_posterior = Number(estoque.saldo_reservado);
+
+    const reserva = await client.reservaEstoque.create({
+      data: {
+        id_estoque: estoque.id_estoque,
+        id_remessa: dados.id_remessa,
+        id_usuario: dados.id_usuario,
+        quantidade: dados.quantidade,
+        saldo_anterior,
+        saldo_posterior,
+        data_hora: new Date(),
+        observacao: dados.observacao ?? null,
+      },
+    });
+
+    return { estoque, reserva, saldo_anterior, saldo_posterior };
+  }
+
   async movimentar(
     id_estoque: number,
     id_usuario: number,

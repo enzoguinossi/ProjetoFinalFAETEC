@@ -5,6 +5,7 @@ import Button from "@/components/Button";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
+import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
 import {
   buscarFornecedoresEntrada,
   buscarProdutosEntrada,
@@ -31,11 +32,6 @@ type ItemForm = {
   fator: string;
   quantidade: string;
 };
-
-const INPUT_CLASS =
-  "h-10 px-3 border border-border-input rounded-lg font-sans text-base outline-none w-full box-border bg-white focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]";
-
-const LABEL_CLASS = "font-sans text-sm text-ink-strong";
 
 function quantidadeConvertida(item: ItemForm): number {
   const quantidade = Number(item.quantidade);

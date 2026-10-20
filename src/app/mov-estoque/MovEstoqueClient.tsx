@@ -7,18 +7,30 @@ import Modal from "@/components/Modal";
 import type { Column } from "@/components/DataTable";
 import type { PaginatedResult } from "@/types";
 import EntradaForm from "./EntradaForm";
-import { listarNotasEntrada } from "./actions";
-import type { ConversaoUnidadeItem, NotaEntradaListRow } from "./tipos";
+import SaidaForm from "./SaidaForm";
+import { listarNotasEntrada, listarNotasSaida } from "./actions";
+import type {
+  CondutorItem,
+  ConversaoUnidadeItem,
+  NotaEntradaListRow,
+  NotaSaidaListRow,
+  VeiculoItem,
+} from "./tipos";
 
 interface Props {
   inicial: PaginatedResult<NotaEntradaListRow>;
   conversoes: ConversaoUnidadeItem[];
   podeCriar: boolean;
+  inicialSaida: PaginatedResult<NotaSaidaListRow>;
+  podeVerSaida: boolean;
+  podeCriarSaida: boolean;
+  condutores: CondutorItem[];
+  veiculos: VeiculoItem[];
 }
 
 type Aba = "entrada" | "saida";
 
-const columns: Column<NotaEntradaListRow>[] = [
+const columnsEntrada: Column<NotaEntradaListRow>[] = [
   { key: "data", label: "Data", width: "1fr" },
   { key: "fornecedor", label: "Fornecedor", width: "2fr" },
   { key: "itens", label: "Itens", width: "0.7fr" },
@@ -32,14 +44,34 @@ const columns: Column<NotaEntradaListRow>[] = [
   },
 ];
 
+const columnsSaida: Column<NotaSaidaListRow>[] = [
+  { key: "data", label: "Data", width: "1fr" },
+  { key: "remessas", label: "Remessas", width: "0.7fr" },
+  { key: "destinatarios", label: "Destinatários", width: "3fr" },
+  { key: "status", label: "Status", width: "1fr" },
+];
+
 const tabBase =
   "h-10 px-4 border-none rounded-t-lg bg-transparent font-sans text-base cursor-pointer transition-[background-color,color] duration-[120ms]";
 
-export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Props) {
+export default function MovEstoqueClient({
+  inicial,
+  conversoes,
+  podeCriar,
+  inicialSaida,
+  podeVerSaida,
+  podeCriarSaida,
+  condutores,
+  veiculos,
+}: Props) {
   const [aba, setAba] = useState<Aba>("entrada");
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
+
+  const [resultadoSaida, setResultadoSaida] = useState(inicialSaida);
+  const [carregandoSaida, setCarregandoSaida] = useState(false);
+  const [modalSaidaAberto, setModalSaidaAberto] = useState(false);
 
   async function carregar(page = 1, limit = resultado.limit) {
     setCarregando(true);
@@ -48,6 +80,16 @@ export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Pro
       setResultado(atualizado);
     } finally {
       setCarregando(false);
+    }
+  }
+
+  async function carregarSaida(page = 1, limit = resultadoSaida.limit) {
+    setCarregandoSaida(true);
+    try {
+      const atualizado = await listarNotasSaida({ page, limit });
+      setResultadoSaida(atualizado);
+    } finally {
+      setCarregandoSaida(false);
     }
   }
 
@@ -66,16 +108,21 @@ export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Pro
           </button>
           <button
             type="button"
-            className={`${tabBase} text-[#697077] opacity-60 cursor-not-allowed`}
-            disabled
-            title="A aba Saída será implementada em seguida."
+            className={`${tabBase} ${
+              !podeVerSaida
+                ? "text-[#697077] opacity-60 cursor-not-allowed"
+                : aba === "saida"
+                  ? "bg-brand text-white"
+                  : "text-ink hover:bg-hover"
+            }`}
+            onClick={() => podeVerSaida && setAba("saida")}
+            aria-pressed={aba === "saida"}
+            disabled={!podeVerSaida}
+            title={podeVerSaida ? undefined : "Seu usuário não tem permissão para ver saídas."}
           >
             Saída
           </button>
         </div>
-        <p className="m-0 px-1 font-sans text-sm text-[#697077]">
-          A aba <strong>Saída</strong> será implementada em seguida.
-        </p>
       </div>
 
       {aba === "entrada" && (
@@ -100,7 +147,7 @@ export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Pro
           </div>
 
           <DataTable
-            columns={columns}
+            columns={columnsEntrada}
             data={resultado.data}
             idField="id_nota_entrada"
             paginacaoServidor={{
@@ -115,6 +162,43 @@ export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Pro
         </div>
       )}
 
+      {aba === "saida" && podeVerSaida && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="m-0 font-display text-xl font-[590] text-ink-strong">Notas de saída</h2>
+            {podeCriarSaida ? (
+              <Button
+                label="Nova saída"
+                iconLeft={
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                }
+                onClick={() => setModalSaidaAberto(true)}
+              />
+            ) : (
+              <span className="font-sans text-sm text-[#697077]">
+                Seu usuário não tem permissão para registrar saídas.
+              </span>
+            )}
+          </div>
+
+          <DataTable
+            columns={columnsSaida}
+            data={resultadoSaida.data}
+            idField="id_nota_saida"
+            paginacaoServidor={{
+              total: resultadoSaida.total,
+              page: resultadoSaida.page,
+              pageSize: resultadoSaida.limit,
+              onPageChange: (page) => void carregarSaida(page, resultadoSaida.limit),
+              onPageSizeChange: (limit) => void carregarSaida(1, limit),
+            }}
+            carregando={carregandoSaida}
+          />
+        </div>
+      )}
+
       <Modal open={modalAberto} onClose={() => setModalAberto(false)} title="Nova entrada" width="960px">
         <EntradaForm
           conversoes={conversoes}
@@ -122,6 +206,18 @@ export default function MovEstoqueClient({ inicial, conversoes, podeCriar }: Pro
           onSaved={async () => {
             setModalAberto(false);
             await carregar(1);
+          }}
+        />
+      </Modal>
+
+      <Modal open={modalSaidaAberto} onClose={() => setModalSaidaAberto(false)} title="Nova saída" width="960px">
+        <SaidaForm
+          condutores={condutores}
+          veiculos={veiculos}
+          onCancel={() => setModalSaidaAberto(false)}
+          onSaved={async () => {
+            setModalSaidaAberto(false);
+            await carregarSaida(1);
           }}
         />
       </Modal>

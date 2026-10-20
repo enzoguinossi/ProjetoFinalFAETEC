@@ -1,24 +1,36 @@
 "use server";
 
 import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
+import { destinatarioDAO } from "@/dao/destinatario";
 import { fornecedorDAO } from "@/dao/fornecedor";
+import { funcionarioDAO } from "@/dao/funcionario";
 import { notaEntradaDAO } from "@/dao/nota-entrada";
+import { notaSaidaDAO } from "@/dao/nota-saida";
 import { produtoDAO } from "@/dao/produto";
+import { veiculoDAO } from "@/dao/veiculo";
 import { mensagemDeErro } from "@/dao/_errors";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPodeAlguma } from "@/lib/permissoes";
 import { notaEntradaService } from "@/services/nota-entrada";
+import { notaSaidaService } from "@/services/nota-saida";
 import { resultadoVazio, type PaginationParams, type PaginatedResult } from "@/types";
 import type {
+  CondutorItem,
   ConversaoUnidadeItem,
+  DestinatarioBuscaItem,
   FornecedorBuscaItem,
   NotaEntradaListRow,
+  NotaSaidaListRow,
   NovaEntradaPayload,
+  NovaSaidaPayload,
   ProdutoBuscaItem,
   ProdutoEntradaDetalhe,
+  ProdutoSaidaBuscaItem,
+  VeiculoItem,
 } from "./tipos";
 
 const PERMISSOES_VER = ["estoque.ver_saldo", "estoque.entrada"];
+const PERMISSOES_VER_SAIDA = ["estoque.ver_saldo", "estoque.saida"];
 
 /** `data_recebimento` é `DATE` (sem hora): formata em UTC; `data_criacao` é timestamp local. */
 function formatarData(data: Date | null, utc = false): string {
@@ -101,6 +113,116 @@ export async function criarNotaEntrada(payload: NovaEntradaPayload) {
       const resultado = await notaEntradaService.registrar(payload, user.id_usuario);
       if ("error" in resultado) return resultado;
       return { success: true, id_nota_entrada: resultado.nota.id_nota_entrada };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
+// ── Saída ───────────────────────────────────────────────────────────
+
+const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
+  ABERTA: "Aberta",
+  EM_ANDAMENTO: "Em andamento",
+  BAIXA_TOTAL: "Baixa total",
+  BAIXA_PARCIAL: "Baixa parcial",
+  BAIXA_COM_CORTE: "Baixa com corte",
+  CANCELADA: "Cancelada",
+};
+
+export async function listarNotasSaida(
+  params: PaginationParams = {},
+): Promise<PaginatedResult<NotaSaidaListRow>> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, PERMISSOES_VER_SAIDA))) return resultadoVazio(params);
+
+  const resultado = await notaSaidaDAO.list(params);
+  return {
+    ...resultado,
+    data: resultado.data.map((nota) => {
+      const destinatarios = [
+        ...new Set(
+          nota.remessas.map((r) => r.destinatario.pessoaJuridica.razao_social),
+        ),
+      ];
+      return {
+        id_nota_saida: nota.id_nota_saida,
+        data: formatarData(nota.data_criacao),
+        remessas: nota.remessas.length,
+        destinatarios: destinatarios.length > 0 ? destinatarios.join(", ") : "—",
+        status: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
+      };
+    }),
+  };
+}
+
+export async function buscarDestinatariosSaida(query: string): Promise<DestinatarioBuscaItem[]> {
+  if (query.length < 2) return [];
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
+
+  const resultado = await destinatarioDAO.list({ search: query, limit: 20 });
+  return resultado.data.map((d) => ({
+    id_destinatario: d.id_destinatario,
+    razao_social: d.pessoaJuridica.razao_social,
+  }));
+}
+
+/** Condutores disponíveis: funcionários ativos marcados `condutor = true`. */
+export async function listarCondutoresSaida(): Promise<CondutorItem[]> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
+
+  const resultado = await funcionarioDAO.list({ limit: 100 });
+  return resultado.data
+    .filter((f) => f.condutor)
+    .map((f) => ({ id_funcionario: f.id_funcionario, nome: f.pessoaFisica.nome }));
+}
+
+/** Veículos ativos para a remessa. */
+export async function listarVeiculosSaida(): Promise<VeiculoItem[]> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
+
+  const resultado = await veiculoDAO.list({ limit: 100 });
+  return resultado.data.map((v) => ({
+    id_veiculo: v.id_veiculo,
+    placa: v.placa,
+    modelo: v.modelo,
+  }));
+}
+
+/**
+ * Busca priorizada de produtos para a saída, com o saldo disponível de cada
+ * um — exibido na UI para avisar (sem bloquear) quando a solicitada excede.
+ */
+export async function buscarProdutosSaida(query: string): Promise<ProdutoSaidaBuscaItem[]> {
+  if (query.length < 2) return [];
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, ["estoque.saida"]))) return [];
+
+  const produtos = await produtoDAO.searchPriorizadoComEstoque(query);
+  return produtos.map((p) => {
+    const quantidade = p.estoques.reduce((acc, e) => acc + Number(e.quantidade_atual), 0);
+    const reservado = p.estoques.reduce((acc, e) => acc + Number(e.saldo_reservado), 0);
+    return {
+      id_produto: p.id_produto,
+      descricao: p.descricao,
+      saldo_disponivel: quantidade - reservado,
+    };
+  });
+}
+
+export async function criarNotaSaida(payload: NovaSaidaPayload) {
+  return comPermissao("estoque.saida", async (user) => {
+    try {
+      const resultado = await notaSaidaService.registrar(payload, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return {
+        success: true,
+        id_nota_saida: resultado.nota.id_nota_saida,
+        remessas: resultado.remessas.length,
+      };
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }

@@ -26,15 +26,15 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF009 — Mural de mensagens | não implementado | Só um cartão **estático** no dashboard (`src/app/dashboard/page.tsx`); sem tela, serviço ou DAO de mural |
 | RF010 — Catálogo de produtos | implementado | `src/app/produtos/**`, `src/dao/produto.ts`, `src/components/UnidadesModal.tsx` |
 | RF011 — Leitura por código de barras | parcial | Busca priorizada por código em `src/dao/produto.ts` e tipos EAN em `src/dao/tipo-codigo.ts`; **sem** tela/leitor dedicado |
-| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar` e `registrarEntrada`); entrada pela tela `/mov-estoque` (RF017a) atualiza `quantidade_atual` e grava `movimentacao_estoque`; **sem** nota de saída/transferência |
+| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar`, `registrarEntrada` e `reservar`); entrada pela aba Entrada (RF017a) atualiza `quantidade_atual` e grava `movimentacao_estoque`; saída pela aba Saída (RF017b) reserva `saldo_reservado` na criação da remessa; **sem** baixa física de remessa e **sem** transferência |
 | RF013 — Conversão de unidades | implementado | CRUD em `src/app/unidades/actions.ts`, `src/dao/conversao-unidade.ts` e `src/components/UnidadesModal.tsx`; a entrada calcula `quantidade_convertida = quantidade × fator` com fator editável no formulário (`src/services/nota-entrada.ts`) |
 | RF014 — Alertas de validade | não implementado | Nenhuma rotina gera alerta a partir de `produto.data_validade` |
 | RF015 — Gestão de inventário | não implementado | Sem código de inventário em `src/app`, `src/services` ou `src/dao` (só as tabelas no schema) |
 | RF016 — Baixas por consumo interno e avaria | não implementado | Nenhum fluxo de baixa por consumo/avaria |
 | RF017a — Nota de entrada | implementado | Página `/mov-estoque` (aba Entrada) em `src/app/mov-estoque/**`, `src/services/nota-entrada.ts` e `src/dao/nota-entrada.ts`; grava nota, chaves, itens, estoque, movimentação e auditoria em transação única; entrada confirmada é imutável (sem edição/exclusão) |
-| RF017b — Nota de saída | não implementado | Sem tela/serviço/DAO de nota de saída |
+| RF017b — Nota de saída | implementado | Página `/mov-estoque` (aba Saída) em `src/app/mov-estoque/**`, `src/services/nota-saida.ts` e `src/dao/nota-saida.ts`; a nota `tipo = SAIDA` **não tem itens** e agrega remessas (`EM_PREPARACAO`) com destinatário e itens; grava nota, remessas, itens e reservas (`saldo_reservado += quantidade_solicitada`) em transação única, com auditoria (`NotaSaida`/`CRIAR`); listagem somente leitura (RN004); criar exige `estoque.saida`, ver exige `estoque.ver_saldo` ou `estoque.saida` |
 | RF018 — Quadro Kanban de remessas | não implementado | Apenas as constantes `STATUS_REMESSA` (`src/types/index.ts`); **fora do escopo** (`ESCOPO_FORA.md`) |
-| RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia); **sem** assistente/tela; uso só em `tests/services/estoque.test.ts` |
+| RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia) e exposta na aba Saída (saldo disponível por produto + aviso ao exceder, sem bloquear a gravação); **sem** assistente dedicado |
 | RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); nada vinculado a remessa |
 | RF021 — Pendências e urgências | não implementado | Sem fluxo de pendência/urgência |
 | RF022 — Percurso e rota | não implementado | Sem tela/serviço/DAO (só as tabelas no schema) |
@@ -79,8 +79,8 @@ em "Pontos em aberto", abaixo.)
 - **Como um pedido entra numa nota de saída** — a decisão do usuário de **2026-10-19** definiu
   **que** a nota consolida pedidos (o vínculo é `pedido_escola.ID_nota_saida`, 1:N), mas **não**
   definiu **quando** o pedido é consolidado: **criar uma nota nova a cada pedido confirmado** ou
-  **juntar o pedido a uma nota já aberta** (por exemplo, a do mesmo destinatário). A regra **não
-  foi inventada** e o fluxo de nota de saída continua **não implementado** (RF017b) — o ponto
-  fica registrado para a implementação do módulo de expedições (KAN-142 / RF017b).
-  (`RUN-20261017-11`.)
+  **juntar o pedido a uma nota já aberta** (por exemplo, a do mesmo destinatário). O fluxo manual
+  de nota de saída com remessas planejadas foi implementado (RF017b), mas o **pedido** ainda não
+  entra nele: a consolidação pedido → nota continua em aberto, para o módulo de expedições
+  (KAN-142 / RF017b). (`RUN-20261017-11`; RF017b implementada em `RUN-20261019-15`.)
 
