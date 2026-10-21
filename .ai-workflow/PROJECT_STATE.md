@@ -66,6 +66,13 @@ reclassificados.
 | RUN-20261020-20 | Tabela semântica própria (alinhamento), sem dependência | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-21 | `Modal` sobre Radix Dialog (foco, aria, portal) | developer | concluído (agente caiu; validado pelo Orquestrador) | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-22 | Rodapé do `DataTable` com contagem e paginação | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-23 | Entrada: chave única, botões de lupa e fornecedor inline | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-24 | Linha expansível na listagem de saídas | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-25 | Chave de acesso vira coluna nullable na nota de entrada | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-26 | Botões de campo (lupa e "+") no padrão do sistema | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-27 | Permissões `remessa.consultar` e `remessa.alterar` | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-28 | Nota de entrada: visualizar e editar com correção de estoque | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-29 | Remessa e nota de saída: visualizar e editar com ajuste de reserva | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -128,12 +135,14 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 
 ## Git (verificado no checkpoint)
 
-- Branch atual: **`KAN-140-mov-estoque`** — 11 commits sobre a `main`:
+- Branch atual: **`KAN-140-mov-estoque`** — **19 commits** sobre a `main`. Marcos recentes:
   `628d55e` (reserva na remessa), `0818cef` (entrada), `81fef26` (saída), `24c11fb`
-  (cancelamento), `1e011d3` (estado), `56bc3aa` (menu), `42af591` (seletor paginado),
-  `9f391c5` (estado), `f9c24cf` (tabela semântica), `b8a79c0` (Modal com Radix) e
-  `ff90c6c` (rodapé do DataTable).
-- `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **18 commits à frente** de
+  (cancelamento), `56bc3aa` (menu), `42af591` (seletor paginado), `f9c24cf` (tabela
+  semântica), `b8a79c0` (Modal com Radix), `ff90c6c` (rodapé), `32ab8fa` (chave única),
+  `6637741` (chave nullable), `f1f3f09` (botões), `fca9932` (linha expansível),
+  `5e42d92` (permissões de remessa), `977dcd3` (entrada view/edit) e `26e4c74`
+  (saída e remessa view/edit).
+- `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **26 commits à frente** de
   `origin/main` — nada publicado desde a release.
 - Tag `v1.17.10.2026` é a única do projeto. Árvore limpa.
 
