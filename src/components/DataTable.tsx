@@ -206,6 +206,18 @@ export default function DataTable<T extends Record<string, unknown>>({
   /** Total de colunas (inclui a coluna de ações) — identifica a tabela no Figma. */
   const totalColunas = columns.length + (actions !== undefined ? 1 : 0);
 
+  /**
+   * Números do rodapé. As linhas visíveis são as da página atual; o total vem do
+   * servidor quando a paginação é manual (`paginacaoServidor`) ou do conjunto
+   * inteiro antes da paginação, no modo client-side.
+   *
+   * No TanStack Table v9 o método é `getPrePaginatedRowModel` (o v8 o chamava
+   * `getPrePaginationRowModel`).
+   */
+  const linhasVisiveis = table.getRowModel().rows.length;
+  const totalRegistros =
+    paginacaoServidor?.total ?? table.getPrePaginatedRowModel().rows.length;
+
   // Garante keys únicas mesmo quando idField se repete (ex.: contatos duplicados).
   const rowKeys = useMemo(() => {
     const seen = new Map<string | number, number>();
@@ -315,19 +327,24 @@ export default function DataTable<T extends Record<string, unknown>>({
         </table>
       </div>
 
-      {/* Pagination */}
-      <TablePagination
-        pageIndex={table.state.pagination.pageIndex}
-        pageCount={table.getPageCount()}
-        pageSize={table.state.pagination.pageSize}
-        canPrevious={table.getCanPreviousPage()}
-        canNext={table.getCanNextPage()}
-        onFirst={() => table.firstPage()}
-        onPrevious={() => table.previousPage()}
-        onNext={() => table.nextPage()}
-        onLast={() => table.lastPage()}
-        onPageSizeChange={(size) => table.setPageSize(size)}
-      />
+      {/* Rodapé — contagem de registros + paginação */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-sans text-[0.8125rem] text-[#697077]">
+          Exibindo {linhasVisiveis} de {totalRegistros} registro(s).
+        </span>
+        <TablePagination
+          pageIndex={table.state.pagination.pageIndex}
+          pageCount={table.getPageCount()}
+          pageSize={table.state.pagination.pageSize}
+          canPrevious={table.getCanPreviousPage()}
+          canNext={table.getCanNextPage()}
+          onFirst={() => table.firstPage()}
+          onPrevious={() => table.previousPage()}
+          onNext={() => table.nextPage()}
+          onLast={() => table.lastPage()}
+          onPageSizeChange={(size) => table.setPageSize(size)}
+        />
+      </div>
     </div>
   );
 }
