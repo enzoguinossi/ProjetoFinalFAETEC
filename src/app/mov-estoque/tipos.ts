@@ -56,7 +56,10 @@ export type NovaEntradaPayload = {
 
 export type RemessaNotaRow = {
   id_remessa: number;
+  id_destinatario: number;
   destinatario: string;
+  /** Quantidade de produtos: linhas de item da remessa. */
+  produtos: number;
   status: string;
   statusLabel: string;
   podeCancelar: boolean;

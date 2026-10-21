@@ -236,7 +236,9 @@ export async function listarNotasSaida(
           .sort((a, b) => a.id_remessa - b.id_remessa)
           .map((remessa) => ({
             id_remessa: remessa.id_remessa,
+            id_destinatario: remessa.id_destinatario,
             destinatario: remessa.destinatario.pessoaJuridica.razao_social,
+            produtos: remessa.itens.length,
             status: remessa.status,
             statusLabel: ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status,
             podeCancelar: STATUS_REMESSA_CANCELAVEL.includes(remessa.status),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Fragment, useState, useMemo } from "react";
 import TablePagination from "@/components/TablePagination";
 import {
   useTable,
@@ -56,6 +56,10 @@ interface DataTableProps<T> {
   /** Quando informado, a paginação passa a ser server-side (manual). */
   paginacaoServidor?: PaginacaoServidor;
   carregando?: boolean;
+  /** Quais linhas podem abrir a expansão (acordeão: uma aberta por vez). */
+  rowExpansivel?: (row: T) => boolean;
+  /** Conteúdo da linha de expansão. Só é renderizado nas linhas expansíveis. */
+  renderExpandido?: (row: T) => React.ReactNode;
 }
 
 /* ── Classes ── */
@@ -75,6 +79,12 @@ const actionsCellCls = "px-[0.6875rem] py-2";
 const actionsCls = "flex items-center justify-center gap-[0.625rem]";
 const actionBtnCls =
   "flex items-center justify-center w-7 h-7 border-none rounded-md bg-transparent cursor-pointer transition-[background-color] duration-[120ms] text-ink hover:bg-[rgba(0,0,0,0.06)] [&_svg]:w-5 [&_svg]:h-5";
+const expansivelCls = "cursor-pointer hover:bg-[rgba(0,0,0,0.02)]";
+const caretCls =
+  "inline-flex shrink-0 items-center justify-center w-4 h-4 text-[#697077] transition-transform duration-[120ms]";
+const celulaPrimeiraCls = "flex items-center gap-2 min-w-0";
+const celulaTextoCls = "flex-1 min-w-0 overflow-hidden text-ellipsis";
+const expansaoCellCls = "px-[0.6875rem] pb-3 pt-1";
 const emptyCls =
   "py-8 px-4 text-center font-sans text-sm text-[#697077] bg-white";
 
@@ -137,11 +147,17 @@ export default function DataTable<T extends Record<string, unknown>>({
   pageSize = 10,
   paginacaoServidor,
   carregando = false,
+  rowExpansivel,
+  renderExpandido,
 }: DataTableProps<T>) {
   const [paginationInterna, setPaginationInterna] = useState<PaginationState>({
     pageIndex: 0,
     pageSize,
   });
+  /** Chave da linha aberta — acordeão, uma por vez. */
+  const [linhaExpandida, setLinhaExpandida] = useState<
+    string | number | null
+  >(null);
 
   const pagination: PaginationState = paginacaoServidor
     ? {
@@ -273,43 +289,103 @@ export default function DataTable<T extends Record<string, unknown>>({
               table.getRowModel().rows.map((row) => {
                 const original = row.original as T;
                 const key = rowKeys[row.index] ?? row.index;
+                const podeExpandir = rowExpansivel?.(original) ?? false;
+                const aberta =
+                  podeExpandir && renderExpandido !== undefined && linhaExpandida === key;
+
+                /**
+                 * Clique na linha alterna a expansão, mas cliques em controles
+                 * (botões, links, campos) continuam sendo deles — Ações e o
+                 * cancelamento dentro da expansão não abrem/fecham a linha.
+                 */
+                function aoClicarLinha(event: React.MouseEvent<HTMLTableRowElement>) {
+                  if (!podeExpandir) return;
+                  const alvo = event.target as HTMLElement | null;
+                  if (
+                    alvo?.closest("button, a, input, select, textarea, label")
+                  ) {
+                    return;
+                  }
+                  setLinhaExpandida((atual) => (atual === key ? null : key));
+                }
+
                 return (
-                  <tr
-                    key={key}
-                    className={`${rowCls} ${row.index % 2 === 1 ? rowAltCls : ""}`}
-                    data-figma="TableRow"
-                    data-figma-variant={
-                      row.index % 2 === 1 ? "alternada" : "normal"
-                    }
-                    data-figma-columns={String(totalColunas)}
-                    data-figma-index={String(row.index)}
-                  >
-                    {row.getAllCells().map((cell, index) => (
-                      <td
-                        key={cell.id}
-                        className={`${cellCls} ${ALINHAMENTO_CLS[alinhamentoDe(columns, index)]}`}
+                  <Fragment key={key}>
+                    <tr
+                      className={`${rowCls} ${row.index % 2 === 1 ? rowAltCls : ""} ${podeExpandir ? expansivelCls : ""}`}
+                      data-figma="TableRow"
+                      data-figma-variant={
+                        row.index % 2 === 1 ? "alternada" : "normal"
+                      }
+                      data-figma-columns={String(totalColunas)}
+                      data-figma-index={String(row.index)}
+                      data-figma-part={aberta ? "expandida" : undefined}
+                      onClick={podeExpandir ? aoClicarLinha : undefined}
+                    >
+                      {row.getAllCells().map((cell, index) => (
+                        <td
+                          key={cell.id}
+                          className={`${cellCls} ${ALINHAMENTO_CLS[alinhamentoDe(columns, index)]}`}
+                        >
+                          {index === 0 && podeExpandir ? (
+                            <div className={celulaPrimeiraCls}>
+                              <span
+                                className={`${caretCls} ${aberta ? "rotate-90" : ""}`}
+                                aria-hidden="true"
+                                data-figma-part="caret"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                  <path
+                                    d="M6 4L10 8L6 12"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              </span>
+                              <span className={celulaTextoCls}>
+                                <table.FlexRender cell={cell} />
+                              </span>
+                            </div>
+                          ) : (
+                            <table.FlexRender cell={cell} />
+                          )}
+                        </td>
+                      ))}
+                      {actions !== undefined && (
+                        <td className={`${actionsCellCls} text-center`}>
+                          <div className={actionsCls}>
+                            {actions.map((action, i) => (
+                              <button
+                                key={i}
+                                className={actionBtnCls}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  action.onClick(original);
+                                }}
+                                title={action.label}
+                                type="button"
+                              >
+                                <img src={action.icon} alt={action.label} />
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                    {aberta && (
+                      <tr
+                        className={rowCls}
+                        data-figma-part="expansao"
+                        data-figma-columns={String(totalColunas)}
                       >
-                        <table.FlexRender cell={cell} />
-                      </td>
-                    ))}
-                    {actions !== undefined && (
-                      <td className={`${actionsCellCls} text-center`}>
-                        <div className={actionsCls}>
-                          {actions.map((action, i) => (
-                            <button
-                              key={i}
-                              className={actionBtnCls}
-                              onClick={() => action.onClick(original)}
-                              title={action.label}
-                              type="button"
-                            >
-                              <img src={action.icon} alt={action.label} />
-                            </button>
-                          ))}
-                        </div>
-                      </td>
+                        <td colSpan={totalColunas} className={expansaoCellCls}>
+                          {renderExpandido?.(original)}
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </Fragment>
                 );
               })
             ) : (

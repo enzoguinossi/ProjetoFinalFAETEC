@@ -55,6 +55,9 @@ export class NotaSaidaDAO {
               destinatario: {
                 select: { pessoaJuridica: { select: { razao_social: true } } },
               },
+              // Só o id dos itens: a tela mostra a quantidade de produtos
+              // (linhas de item) de cada remessa.
+              itens: { select: { id_item_remessa: true } },
             },
           },
         },
