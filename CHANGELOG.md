@@ -15,6 +15,20 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Visualização e edição da nota de entrada `(KAN-140)`:** a listagem de
+  `/mov-estoque` (aba Entrada) ganhou a coluna de ações com visualizar
+  (`nota_entrada.consultar`) e editar (`nota_entrada.alterar`, validados no
+  servidor). Os dois modais reutilizam o `EntradaForm` (`mode` create/edit/view),
+  sem duplicar o formulário; no modo `view` tudo é somente leitura. A edição altera
+  fornecedor, data de recebimento, observação e chave, permite corrigir
+  fator/quantidade de um item existente e **acrescentar** itens novos, em uma única
+  transação: cada item alterado gera `movimentacao_estoque` com
+  `quantidade = convertida_nova − convertida_antiga` (positiva ou negativa) e os
+  saldos anterior/posterior, item novo entra pela convertida cheia e a operação
+  grava auditoria (`NotaEntrada`/`ALTERAR`) com antes/depois. Qualquer falha desfaz
+  tudo. **Remover item não é permitido** — não há estado de "item excluído" e
+  apagar a linha perderia a rastreabilidade (RN004); a UI não oferece a ação e o
+  serviço/DAO recusam. Excluir a nota continua fora do escopo.
 - **Permissões de remessa para consulta e edição `(KAN-140)`:** o seed passa a criar
   `remessa.consultar` e `remessa.alterar` ao lado das já existentes `remessa.criar`,
   `remessa.alterar_status` e `remessa.finalizar`, permitindo autorizar a leitura e a edição

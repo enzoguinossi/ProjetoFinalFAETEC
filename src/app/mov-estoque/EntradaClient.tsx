@@ -4,21 +4,32 @@ import { useState } from "react";
 import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
-import type { Column } from "@/components/DataTable";
+import { useAviso } from "@/components/AvisoProvider";
+import type { Action, Column } from "@/components/DataTable";
 import type { PaginatedResult } from "@/types";
 import EntradaForm from "./EntradaForm";
-import { listarNotasEntrada } from "./actions";
-import type { ConversaoUnidadeItem, NotaEntradaListRow } from "./tipos";
+import { listarNotasEntrada, obterNotaEntrada } from "./actions";
+import type {
+  ConversaoUnidadeItem,
+  NotaEntradaFormData,
+  NotaEntradaListRow,
+} from "./tipos";
 
 interface Props {
   inicial: PaginatedResult<NotaEntradaListRow>;
   conversoes: ConversaoUnidadeItem[];
   podeCriar: boolean;
+  /** `nota_entrada.consultar`: habilita a visualização da nota. */
+  podeConsultar: boolean;
+  /** `nota_entrada.alterar`: habilita a edição da nota. */
+  podeAlterar: boolean;
   /** `fornecedor.criar`: habilita o "+" para cadastrar fornecedor na própria nota. */
   podeCriarFornecedor: boolean;
   /** Tipos de código aceitos pelo `FornecedorForm`. */
   tiposCodigoFornecedor: { id_tipo_codigo: number; nome: string }[];
 }
+
+type ModoModal = "create" | "edit" | "view" | null;
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
   { key: "data", label: "Data", width: "1fr", align: "left" },
@@ -35,16 +46,27 @@ const columnsEntrada: Column<NotaEntradaListRow>[] = [
   },
 ];
 
+const TITULOS: Record<Exclude<ModoModal, null>, string> = {
+  create: "Nova entrada",
+  edit: "Editar entrada",
+  view: "Detalhes da entrada",
+};
+
 export default function EntradaClient({
   inicial,
   conversoes,
   podeCriar,
+  podeConsultar,
+  podeAlterar,
   podeCriarFornecedor,
   tiposCodigoFornecedor,
 }: Props) {
+  const mostrarAviso = useAviso();
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
-  const [modalAberto, setModalAberto] = useState(false);
+  const [modalMode, setModalMode] = useState<ModoModal>(null);
+  const [formData, setFormData] = useState<NotaEntradaFormData | null>(null);
+  const [carregandoNota, setCarregandoNota] = useState(false);
 
   async function carregar(page = 1, limit = resultado.limit) {
     setCarregando(true);
@@ -55,6 +77,57 @@ export default function EntradaClient({
       setCarregando(false);
     }
   }
+
+  function fecharModal() {
+    setModalMode(null);
+    setFormData(null);
+  }
+
+  async function abrirNota(row: NotaEntradaListRow, mode: "view" | "edit") {
+    setCarregandoNota(true);
+    try {
+      const dados = await obterNotaEntrada(row.id_nota_entrada, mode);
+      if (!dados) {
+        mostrarAviso("Não foi possível carregar a nota de entrada.", "erro");
+        return;
+      }
+      setFormData(dados);
+      setModalMode(mode);
+    } finally {
+      setCarregandoNota(false);
+    }
+  }
+
+  async function aoSalvar() {
+    const pagina = modalMode === "create" ? 1 : resultado.page;
+    fecharModal();
+    await carregar(pagina);
+  }
+
+  const actions: Action<NotaEntradaListRow>[] = [
+    ...(podeConsultar
+      ? [
+          {
+            icon: "/icons/actions/Olho.svg",
+            label: "Visualizar",
+            onClick: (row: NotaEntradaListRow) => {
+              void abrirNota(row, "view");
+            },
+          },
+        ]
+      : []),
+    ...(podeAlterar
+      ? [
+          {
+            icon: "/icons/actions/Editar.svg",
+            label: "Editar",
+            onClick: (row: NotaEntradaListRow) => {
+              void abrirNota(row, "edit");
+            },
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="flex flex-col gap-3">
@@ -68,7 +141,7 @@ export default function EntradaClient({
                 <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             }
-            onClick={() => setModalAberto(true)}
+            onClick={() => setModalMode("create")}
           />
         ) : (
           <span className="font-sans text-sm text-[#697077]">
@@ -81,6 +154,7 @@ export default function EntradaClient({
         columns={columnsEntrada}
         data={resultado.data}
         idField="id_nota_entrada"
+        actions={actions}
         paginacaoServidor={{
           total: resultado.total,
           page: resultado.page,
@@ -88,20 +162,61 @@ export default function EntradaClient({
           onPageChange: (page) => void carregar(page, resultado.limit),
           onPageSizeChange: (limit) => void carregar(1, limit),
         }}
-        carregando={carregando}
+        carregando={carregando || carregandoNota}
       />
 
-      <Modal open={modalAberto} onClose={() => setModalAberto(false)} title="Nova entrada" width="960px">
+      <Modal
+        open={modalMode === "create"}
+        onClose={fecharModal}
+        title={TITULOS.create}
+        width="960px"
+      >
         <EntradaForm
+          mode="create"
           conversoes={conversoes}
           podeCriarFornecedor={podeCriarFornecedor}
           tiposCodigoFornecedor={tiposCodigoFornecedor}
-          onCancel={() => setModalAberto(false)}
-          onSaved={async () => {
-            setModalAberto(false);
-            await carregar(1);
-          }}
+          onCancel={fecharModal}
+          onSaved={aoSalvar}
         />
+      </Modal>
+
+      <Modal
+        open={modalMode === "edit" && formData !== null}
+        onClose={fecharModal}
+        title={TITULOS.edit}
+        width="960px"
+      >
+        {formData && (
+          <EntradaForm
+            mode="edit"
+            initialData={formData}
+            conversoes={conversoes}
+            podeCriarFornecedor={podeCriarFornecedor}
+            tiposCodigoFornecedor={tiposCodigoFornecedor}
+            onCancel={fecharModal}
+            onSaved={aoSalvar}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={modalMode === "view" && formData !== null}
+        onClose={fecharModal}
+        title={TITULOS.view}
+        width="960px"
+      >
+        {formData && (
+          <EntradaForm
+            mode="view"
+            initialData={formData}
+            conversoes={conversoes}
+            podeCriarFornecedor={false}
+            tiposCodigoFornecedor={[]}
+            onCancel={fecharModal}
+            onSaved={aoSalvar}
+          />
+        )}
       </Modal>
     </div>
   );

@@ -15,11 +15,14 @@ export default async function MovEstoqueEntradaPage() {
   if (!podeVer) redirect("/dashboard");
 
   const podeCriar = await usuarioPode(user, "estoque.entrada");
-  const podeCriarFornecedor = podeCriar && (await usuarioPode(user, "fornecedor.criar"));
+  const podeConsultar = await usuarioPode(user, "nota_entrada.consultar");
+  const podeAlterar = await usuarioPode(user, "nota_entrada.alterar");
+  const podeMontarNota = podeCriar || podeAlterar;
+  const podeCriarFornecedor = podeMontarNota && (await usuarioPode(user, "fornecedor.criar"));
 
   const [inicial, conversoes, tiposCodigo] = await Promise.all([
     listarNotasEntrada({ page: 1, limit: 20 }),
-    podeCriar ? listarUnidadesEntrada() : Promise.resolve<ConversaoUnidadeItem[]>([]),
+    podeMontarNota ? listarUnidadesEntrada() : Promise.resolve<ConversaoUnidadeItem[]>([]),
     podeCriarFornecedor
       ? tipoCodigoDAO.listParaEntidade("FORNECEDOR")
       : Promise.resolve<{ id_tipo_codigo: number; nome: string }[]>([]),
@@ -31,6 +34,8 @@ export default async function MovEstoqueEntradaPage() {
         inicial={inicial}
         conversoes={conversoes}
         podeCriar={podeCriar}
+        podeConsultar={podeConsultar}
+        podeAlterar={podeAlterar}
         podeCriarFornecedor={podeCriarFornecedor}
         tiposCodigoFornecedor={tiposCodigo.map((t) => ({ id_tipo_codigo: t.id_tipo_codigo, nome: t.nome }))}
       />

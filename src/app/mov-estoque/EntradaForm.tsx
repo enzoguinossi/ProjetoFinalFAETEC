@@ -16,10 +16,13 @@ import {
   getProdutoEntrada,
   listarFornecedoresSelecao,
   listarProdutosSelecao,
+  salvarNotaEntrada,
 } from "./actions";
-import type { ConversaoUnidadeItem, FornecedorSelecaoRow } from "./tipos";
+import type { ConversaoUnidadeItem, FornecedorSelecaoRow, NotaEntradaFormData } from "./tipos";
 
 interface Props {
+  mode?: "create" | "edit" | "view";
+  initialData?: NotaEntradaFormData;
   conversoes: ConversaoUnidadeItem[];
   podeCriarFornecedor: boolean;
   tiposCodigoFornecedor: { id_tipo_codigo: number; nome: string }[];
@@ -29,6 +32,8 @@ interface Props {
 
 type ItemForm = {
   uid: number;
+  /** Item já gravado na nota (`null` = item novo, ainda não salvo). */
+  id_item_nota_entrada: number | null;
   id_produto: number;
   descricao: string;
   id_conversao: number | null;
@@ -50,6 +55,8 @@ function formatarNumero(valor: number): string {
 let proximoUid = 1;
 
 export default function EntradaForm({
+  mode = "create",
+  initialData,
   conversoes,
   podeCriarFornecedor,
   tiposCodigoFornecedor,
@@ -57,12 +64,34 @@ export default function EntradaForm({
   onCancel,
 }: Props) {
   const mostrarAviso = useAviso();
+  const isView = mode === "view";
+  const isEdit = mode === "edit";
 
-  const [fornecedor, setFornecedor] = useState<FornecedorSelecaoRow | null>(null);
-  const [dataRecebimento, setDataRecebimento] = useState("");
-  const [observacao, setObservacao] = useState("");
-  const [chaveAcesso, setChaveAcesso] = useState("");
-  const [itens, setItens] = useState<ItemForm[]>([]);
+  const [fornecedor, setFornecedor] = useState<FornecedorSelecaoRow | null>(
+    initialData?.id_fornecedor
+      ? {
+          id_fornecedor: initialData.id_fornecedor,
+          razao_social: initialData.fornecedor ?? "",
+          cnpj: initialData.cnpj,
+        }
+      : null,
+  );
+  const [dataRecebimento, setDataRecebimento] = useState(initialData?.data_recebimento ?? "");
+  const [observacao, setObservacao] = useState(initialData?.observacao ?? "");
+  const [chaveAcesso, setChaveAcesso] = useState(initialData?.chave_acesso ?? "");
+  const [itens, setItens] = useState<ItemForm[]>(() =>
+    (initialData?.itens ?? []).map((item) => ({
+      uid: proximoUid++,
+      id_item_nota_entrada: item.id_item_nota_entrada,
+      id_produto: item.id_produto,
+      descricao: item.descricao,
+      id_conversao:
+        conversoes.find((c) => Number(c.fator) === Number(item.fator_conversao))
+          ?.id_conversao ?? null,
+      fator: String(item.fator_conversao),
+      quantidade: String(item.quantidade),
+    })),
+  );
   const [salvando, setSalvando] = useState(false);
 
   const [buscandoProduto, setBuscandoProduto] = useState(false);
@@ -95,6 +124,7 @@ export default function EntradaForm({
       ...atuais,
       {
         uid: proximoUid++,
+        id_item_nota_entrada: null,
         id_produto: produto.id_produto,
         descricao: detalhe?.descricao ?? produto.descricao,
         id_conversao: conversaoPadrao?.id_conversao ?? null,
@@ -109,7 +139,11 @@ export default function EntradaForm({
   }
 
   function removerItem(uid: number) {
-    setItens((atuais) => atuais.filter((item) => item.uid !== uid));
+    // Só itens novos (ainda não gravados) podem sair: apagar um item já
+    // registrado perderia a rastreabilidade (RN004).
+    setItens((atuais) =>
+      atuais.filter((item) => item.uid !== uid || item.id_item_nota_entrada !== null),
+    );
   }
 
   function escolherConversao(item: ItemForm, valor: string) {
@@ -142,32 +176,57 @@ export default function EntradaForm({
       }
     }
 
+    if (isView) return;
+
     setSalvando(true);
     try {
-      const resultado = await criarNotaEntrada({
-        id_fornecedor: fornecedor?.id_fornecedor ?? null,
-        data_recebimento: dataRecebimento || null,
-        observacao: observacao.trim() || null,
-        chave_acesso: chave || null,
-        itens: itens.map((item) => ({
-          id_produto: item.id_produto,
-          fator_conversao: Number(item.fator),
-          quantidade: Number(item.quantidade),
-        })),
-      });
+      const itensBase = itens.map((item) => ({
+        id_produto: item.id_produto,
+        fator_conversao: Number(item.fator),
+        quantidade: Number(item.quantidade),
+      }));
+
+      const resultado =
+        isEdit && initialData
+          ? await salvarNotaEntrada(initialData.id_nota_entrada, {
+              id_fornecedor: fornecedor?.id_fornecedor ?? null,
+              data_recebimento: dataRecebimento || null,
+              observacao: observacao.trim() || null,
+              chave_acesso: chave || null,
+              itens: itens.map((item, indice) => ({
+                ...itensBase[indice],
+                id_item_nota_entrada: item.id_item_nota_entrada,
+              })),
+            })
+          : await criarNotaEntrada({
+              id_fornecedor: fornecedor?.id_fornecedor ?? null,
+              data_recebimento: dataRecebimento || null,
+              observacao: observacao.trim() || null,
+              chave_acesso: chave || null,
+              itens: itensBase,
+            });
+
       if ("error" in resultado) {
         mostrarAviso(resultado.error, "erro");
         return;
       }
-      mostrarAviso("Entrada registrada com sucesso.", "sucesso");
-      setFornecedor(null);
-      setDataRecebimento("");
-      setObservacao("");
-      setChaveAcesso("");
-      setItens([]);
+      mostrarAviso(
+        isEdit ? "Entrada atualizada com sucesso." : "Entrada registrada com sucesso.",
+        "sucesso",
+      );
+      if (!isEdit) {
+        setFornecedor(null);
+        setDataRecebimento("");
+        setObservacao("");
+        setChaveAcesso("");
+        setItens([]);
+      }
       await onSaved();
     } catch {
-      mostrarAviso("Erro ao gravar a entrada. Tente novamente.", "erro");
+      mostrarAviso(
+        isEdit ? "Erro ao atualizar a entrada. Tente novamente." : "Erro ao gravar a entrada. Tente novamente.",
+        "erro",
+      );
     } finally {
       setSalvando(false);
     }
@@ -186,19 +245,21 @@ export default function EntradaForm({
               placeholder="Sem fornecedor"
               className={INPUT_CLASS}
             />
-            <button
-              type="button"
-              onClick={() => setBuscandoFornecedor(true)}
-              aria-label="Selecionar fornecedor"
-              title="Selecionar fornecedor"
-              className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
-            {podeCriarFornecedor && (
+            {!isView && (
+              <button
+                type="button"
+                onClick={() => setBuscandoFornecedor(true)}
+                aria-label="Selecionar fornecedor"
+                title="Selecionar fornecedor"
+                className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
+            )}
+            {!isView && podeCriarFornecedor && (
               <button
                 type="button"
                 onClick={() => setCriandoFornecedor(true)}
@@ -211,7 +272,7 @@ export default function EntradaForm({
                 </svg>
               </button>
             )}
-            {fornecedor && (
+            {!isView && fornecedor && (
               <Button label="Limpar" variant="cancel" onClick={() => setFornecedor(null)} />
             )}
           </div>
@@ -223,6 +284,7 @@ export default function EntradaForm({
             type="date"
             value={dataRecebimento}
             onChange={(e) => setDataRecebimento(e.target.value)}
+            readOnly={isView}
             className={INPUT_CLASS}
           />
         </div>
@@ -233,6 +295,7 @@ export default function EntradaForm({
             value={observacao}
             onChange={(e) => setObservacao(e.target.value)}
             placeholder="Opcional"
+            readOnly={isView}
             className={INPUT_CLASS}
           />
         </div>
@@ -247,6 +310,7 @@ export default function EntradaForm({
             maxLength={44}
             onChange={(e) => setChaveAcesso(e.target.value)}
             placeholder="44 caracteres"
+            readOnly={isView}
             className={INPUT_CLASS}
           />
           <span className="w-16 shrink-0 font-sans text-xs text-[#697077]">{chaveAcesso.trim().length}/44</span>
@@ -257,16 +321,25 @@ export default function EntradaForm({
       <div className={ui.field}>
         <div className="flex items-center justify-between">
           <label className={LABEL_CLASS}>Itens</label>
-          <Button
-            label="Adicionar item"
-            iconLeft={
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            }
-            onClick={() => setBuscandoProduto(true)}
-          />
+          {!isView && (
+            <Button
+              label="Adicionar item"
+              iconLeft={
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              }
+              onClick={() => setBuscandoProduto(true)}
+            />
+          )}
         </div>
+
+        {isEdit && (
+          <p className="m-0 font-sans text-sm text-[#697077]">
+            Itens já registrados podem ter fator e quantidade corrigidos, mas não podem ser
+            removidos — a nota preserva a rastreabilidade.
+          </p>
+        )}
 
         {itens.length === 0 ? (
           <p className="m-0 font-sans text-sm text-[#697077]">
@@ -291,6 +364,7 @@ export default function EntradaForm({
                     <select
                       value={item.id_conversao ?? ""}
                       onChange={(e) => escolherConversao(item, e.target.value)}
+                      disabled={isView}
                       className={INPUT_CLASS}
                     >
                       <option value="">—</option>
@@ -310,6 +384,7 @@ export default function EntradaForm({
                       step="any"
                       value={item.fator}
                       onChange={(e) => alterarItem(item.uid, { fator: e.target.value })}
+                      readOnly={isView}
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -322,6 +397,7 @@ export default function EntradaForm({
                       step="any"
                       value={item.quantidade}
                       onChange={(e) => alterarItem(item.uid, { quantidade: e.target.value })}
+                      readOnly={isView}
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -330,7 +406,9 @@ export default function EntradaForm({
                     <span className="font-sans text-xs text-[#697077]">Convertida</span>
                     <div className="flex items-center gap-2">
                       <span className="font-sans text-base text-ink-strong">{formatarNumero(convertida)}</span>
-                      <Button label="Remover" variant="cancel" onClick={() => removerItem(item.uid)} />
+                      {!isView && item.id_item_nota_entrada === null && (
+                        <Button label="Remover" variant="cancel" onClick={() => removerItem(item.uid)} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -341,13 +419,27 @@ export default function EntradaForm({
       </div>
 
       <div className={ui.rowActions}>
-        <Button label="Cancelar" variant="cancel" onClick={onCancel} />
-        <Button
-          label={salvando ? "Gravando..." : "Gravar entrada"}
-          variant="primary"
-          onClick={gravar}
-          disabled={salvando || itens.length === 0}
-        />
+        {isView ? (
+          <Button label="Fechar" variant="cancel" onClick={onCancel} />
+        ) : (
+          <>
+            <Button label="Cancelar" variant="cancel" onClick={onCancel} />
+            <Button
+              label={
+                salvando
+                  ? isEdit
+                    ? "Salvando..."
+                    : "Gravando..."
+                  : isEdit
+                    ? "Salvar alterações"
+                    : "Gravar entrada"
+              }
+              variant="primary"
+              onClick={gravar}
+              disabled={salvando || itens.length === 0}
+            />
+          </>
+        )}
       </div>
 
       <SearchEntityModal<FornecedorSelecaoRow>

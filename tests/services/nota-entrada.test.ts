@@ -278,6 +278,295 @@ describe("notaEntradaService.registrar", () => {
   });
 });
 
+describe("notaEntradaService.atualizar", () => {
+  /** Cria uma nota com um item e devolve os ids úteis ao teste. */
+  async function prepararNota(
+    idUsuario: number,
+    idProduto: number,
+    opts: { fator?: number; quantidade?: number } = {},
+  ) {
+    const resultado = await notaEntradaService.registrar(
+      {
+        itens: [
+          {
+            id_produto: idProduto,
+            fator_conversao: opts.fator ?? 1,
+            quantidade: opts.quantidade ?? 5,
+          },
+        ],
+      },
+      idUsuario,
+    );
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) throw new Error(resultado.error);
+
+    const nota = await prismaTeste.notaEntrada.findUniqueOrThrow({
+      where: { id_nota_entrada: resultado.nota.id_nota_entrada },
+      include: { itens: true },
+    });
+    return { nota, item: nota.itens[0]! };
+  }
+
+  it("aumenta a quantidade e movimenta o estoque pelo delta positivo", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const { nota, item } = await prepararNota(usuario.id_usuario, produto.id_produto, {
+      quantidade: 5,
+    });
+
+    const resultado = await notaEntradaService.atualizar(
+      nota.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: item.id_item_nota_entrada,
+            id_produto: produto.id_produto,
+            fator_conversao: 1,
+            quantidade: 8,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+
+    const estoque = await prismaTeste.estoque.findFirstOrThrow({
+      where: { id_produto: produto.id_produto },
+    });
+    expect(estoque.quantidade_atual).toBe(8);
+
+    const itemAtualizado = await prismaTeste.itemNotaEntrada.findUniqueOrThrow({
+      where: { id_item_nota_entrada: item.id_item_nota_entrada },
+    });
+    expect(itemAtualizado).toMatchObject({ quantidade: 8, quantidade_convertida: 8 });
+
+    const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+      where: { id_nota_entrada: nota.id_nota_entrada },
+      orderBy: { id_movimentacao: "desc" },
+    });
+    expect(movimentacao).toMatchObject({
+      id_usuario: usuario.id_usuario,
+      quantidade: 3,
+      saldo_anterior: 5,
+      saldo_posterior: 8,
+    });
+
+    const auditorias = await auditoriasDe("NotaEntrada", nota.id_nota_entrada);
+    expect(auditorias).toHaveLength(2);
+    expect(auditorias[1]?.acao).toBe("ALTERAR");
+    expect(auditorias[1]?.id_usuario).toBe(usuario.id_usuario);
+    expect(auditorias[1]?.dados_anteriores).toMatchObject({
+      itens: [{ quantidade: 5, quantidade_convertida: 5 }],
+    });
+    expect(auditorias[1]?.dados_novos).toMatchObject({
+      itens: [{ quantidade: 8, quantidade_convertida: 8 }],
+    });
+  });
+
+  it("diminui a quantidade e movimenta o estoque pelo delta negativo", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const { nota, item } = await prepararNota(usuario.id_usuario, produto.id_produto, {
+      quantidade: 5,
+    });
+
+    const resultado = await notaEntradaService.atualizar(
+      nota.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: item.id_item_nota_entrada,
+            id_produto: produto.id_produto,
+            fator_conversao: 1,
+            quantidade: 2,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+
+    const estoque = await prismaTeste.estoque.findFirstOrThrow({
+      where: { id_produto: produto.id_produto },
+    });
+    expect(estoque.quantidade_atual).toBe(2);
+
+    const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+      where: { id_nota_entrada: nota.id_nota_entrada },
+      orderBy: { id_movimentacao: "desc" },
+    });
+    expect(movimentacao).toMatchObject({
+      quantidade: -3,
+      saldo_anterior: 5,
+      saldo_posterior: 2,
+    });
+  });
+
+  it("acrescenta item novo e soma a quantidade convertida ao estoque", async () => {
+    const { usuario } = await criarUsuario();
+    const produtoA = await criarProduto();
+    const produtoB = await criarProduto();
+    const { nota, item } = await prepararNota(usuario.id_usuario, produtoA.id_produto, {
+      quantidade: 5,
+    });
+
+    const resultado = await notaEntradaService.atualizar(
+      nota.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: item.id_item_nota_entrada,
+            id_produto: produtoA.id_produto,
+            fator_conversao: 1,
+            quantidade: 5,
+          },
+          { id_produto: produtoB.id_produto, fator_conversao: 4, quantidade: 2 },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+
+    const itens = await prismaTeste.itemNotaEntrada.findMany({
+      where: { id_nota_entrada: nota.id_nota_entrada },
+      orderBy: { id_item_nota_entrada: "asc" },
+    });
+    expect(itens).toHaveLength(2);
+
+    const estoqueB = await prismaTeste.estoque.findFirstOrThrow({
+      where: { id_produto: produtoB.id_produto },
+    });
+    expect(estoqueB.quantidade_atual).toBe(8);
+
+    const movimentacaoB = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+      where: { id_nota_entrada: nota.id_nota_entrada, id_estoque: estoqueB.id_estoque },
+    });
+    expect(movimentacaoB).toMatchObject({
+      quantidade: 8,
+      saldo_anterior: 0,
+      saldo_posterior: 8,
+    });
+  });
+
+  it("recusa remover um item existente da nota", async () => {
+    const { usuario } = await criarUsuario();
+    const produtoA = await criarProduto();
+    const produtoB = await criarProduto();
+
+    const criada = await notaEntradaService.registrar(
+      {
+        itens: [
+          { id_produto: produtoA.id_produto, fator_conversao: 1, quantidade: 1 },
+          { id_produto: produtoB.id_produto, fator_conversao: 1, quantidade: 1 },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in criada).toBe(false);
+    if ("error" in criada) return;
+
+    const nota = await prismaTeste.notaEntrada.findUniqueOrThrow({
+      where: { id_nota_entrada: criada.nota.id_nota_entrada },
+      include: { itens: { orderBy: { id_item_nota_entrada: "asc" } } },
+    });
+    const [primeiro] = nota.itens;
+
+    const resultado = await notaEntradaService.atualizar(
+      nota.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: primeiro!.id_item_nota_entrada,
+            id_produto: primeiro!.id_produto,
+            fator_conversao: 1,
+            quantidade: 1,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect(resultado).toEqual({
+      error: "Não é possível remover itens de uma nota de entrada.",
+    });
+    expect(
+      await prismaTeste.itemNotaEntrada.count({
+        where: { id_nota_entrada: nota.id_nota_entrada },
+      }),
+    ).toBe(2);
+  });
+
+  it("desfaz tudo quando a edição viola a unicidade da chave", async () => {
+    const { usuario } = await criarUsuario();
+    const produtoA = await criarProduto();
+    const produtoB = await criarProduto();
+    const chaveA = `${"3".repeat(44)}`;
+    const chaveB = `${"4".repeat(44)}`;
+
+    const notaA = await notaEntradaService.registrar(
+      {
+        chave_acesso: chaveA,
+        itens: [{ id_produto: produtoA.id_produto, fator_conversao: 1, quantidade: 5 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in notaA).toBe(false);
+    if ("error" in notaA) return;
+
+    const notaB = await notaEntradaService.registrar(
+      {
+        chave_acesso: chaveB,
+        itens: [{ id_produto: produtoB.id_produto, fator_conversao: 1, quantidade: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in notaB).toBe(false);
+
+    const nota = await prismaTeste.notaEntrada.findUniqueOrThrow({
+      where: { id_nota_entrada: notaA.nota.id_nota_entrada },
+      include: { itens: true },
+    });
+    const item = nota.itens[0]!;
+
+    await expect(
+      notaEntradaService.atualizar(
+        nota.id_nota_entrada,
+        {
+          chave_acesso: chaveB,
+          itens: [
+            {
+              id_item_nota_entrada: item.id_item_nota_entrada,
+              id_produto: produtoA.id_produto,
+              fator_conversao: 1,
+              quantidade: 9,
+            },
+          ],
+        },
+        usuario.id_usuario,
+      ),
+    ).rejects.toThrow();
+
+    const estoqueA = await prismaTeste.estoque.findFirstOrThrow({
+      where: { id_produto: produtoA.id_produto },
+    });
+    expect(estoqueA.quantidade_atual).toBe(5);
+
+    const itemDepois = await prismaTeste.itemNotaEntrada.findUniqueOrThrow({
+      where: { id_item_nota_entrada: item.id_item_nota_entrada },
+    });
+    expect(itemDepois.quantidade).toBe(5);
+
+    const notaDepois = await prismaTeste.notaEntrada.findUniqueOrThrow({
+      where: { id_nota_entrada: nota.id_nota_entrada },
+    });
+    expect(notaDepois.chave_acesso).toBe(chaveA);
+
+    // Só as duas entradas originais; nenhuma movimentação/auditoria da edição.
+    expect(await prismaTeste.movimentacaoEstoque.count()).toBe(2);
+    expect(await auditoriasDe("NotaEntrada", nota.id_nota_entrada)).toHaveLength(1);
+  });
+});
+
 describe("notaEntradaDAO.list", () => {
   it("pagina as notas de entrada e traz itens e chave de acesso", async () => {
     const { usuario } = await criarUsuario();

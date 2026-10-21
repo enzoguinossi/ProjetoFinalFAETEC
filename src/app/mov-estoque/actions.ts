@@ -21,10 +21,12 @@ import {
   type PaginatedResult,
 } from "@/types";
 import type {
+  AtualizacaoEntradaPayload,
   CondutorItem,
   ConversaoUnidadeItem,
   DestinatarioSelecaoRow,
   FornecedorSelecaoRow,
+  NotaEntradaFormData,
   NotaEntradaListRow,
   NotaSaidaListRow,
   NovaEntradaPayload,
@@ -179,6 +181,65 @@ export async function criarNotaEntrada(payload: NovaEntradaPayload) {
   return comPermissao("estoque.entrada", async (user) => {
     try {
       const resultado = await notaEntradaService.registrar(payload, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return { success: true, id_nota_entrada: resultado.nota.id_nota_entrada };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
+/** `data_recebimento` é `DATE`: o `<input type="date">` usa `YYYY-MM-DD` em UTC. */
+function dataRecebimentoParaInput(data: Date | null): string | null {
+  if (!data) return null;
+  const dia = String(data.getUTCDate()).padStart(2, "0");
+  const mes = String(data.getUTCMonth() + 1).padStart(2, "0");
+  return `${data.getUTCFullYear()}-${mes}-${dia}`;
+}
+
+/**
+ * Nota de entrada com cabeçalho e itens, para os modais de visualização e
+ * edição. Ver exige `nota_entrada.consultar`; editar exige
+ * `nota_entrada.alterar`.
+ */
+export async function obterNotaEntrada(
+  id: number,
+  modo: "view" | "edit" = "view",
+): Promise<NotaEntradaFormData | null> {
+  const user = await requireUser();
+  const permissao = modo === "edit" ? "nota_entrada.alterar" : "nota_entrada.consultar";
+  if (!(await usuarioPode(user, permissao))) return null;
+
+  const nota = await notaEntradaDAO.getById(id);
+  if (!nota) return null;
+
+  return {
+    id_nota_entrada: nota.id_nota_entrada,
+    id_fornecedor: nota.fornecedor?.id_fornecedor ?? null,
+    fornecedor: nota.fornecedor?.pessoaJuridica.razao_social ?? null,
+    cnpj: nota.fornecedor?.pessoaJuridica.cnpj ?? null,
+    data_recebimento: dataRecebimentoParaInput(nota.data_recebimento),
+    observacao: nota.observacao,
+    chave_acesso: nota.chave_acesso,
+    itens: nota.itens.map((item) => ({
+      id_item_nota_entrada: item.id_item_nota_entrada,
+      id_produto: item.id_produto,
+      descricao: item.produto.descricao,
+      fator_conversao: Number(item.fator_conversao),
+      quantidade: Number(item.quantidade),
+      quantidade_convertida: Number(item.quantidade_convertida),
+    })),
+  };
+}
+
+/**
+ * Grava a edição da nota de entrada (cabeçalho e itens). Exige
+ * `nota_entrada.alterar` no servidor; remover item é recusado.
+ */
+export async function salvarNotaEntrada(id: number, payload: AtualizacaoEntradaPayload) {
+  return comPermissao("nota_entrada.alterar", async (user) => {
+    try {
+      const resultado = await notaEntradaService.atualizar(id, payload, user.id_usuario);
       if ("error" in resultado) return resultado;
       return { success: true, id_nota_entrada: resultado.nota.id_nota_entrada };
     } catch (e) {

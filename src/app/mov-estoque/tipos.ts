@@ -52,6 +52,37 @@ export type NovaEntradaPayload = {
   itens: ItemEntradaPayload[];
 };
 
+/** Item da edição: com `id_item_nota_entrada` = existente; sem = novo. */
+export type ItemEntradaAtualizacaoPayload = ItemEntradaPayload & {
+  id_item_nota_entrada?: number | null;
+};
+
+export type AtualizacaoEntradaPayload = Omit<NovaEntradaPayload, "itens"> & {
+  itens: ItemEntradaAtualizacaoPayload[];
+};
+
+export type NotaEntradaItemDetalhe = {
+  id_item_nota_entrada: number;
+  id_produto: number;
+  descricao: string;
+  fator_conversao: number;
+  quantidade: number;
+  quantidade_convertida: number;
+};
+
+/** Nota de entrada carregada para os modos `view` e `edit`. */
+export type NotaEntradaFormData = {
+  id_nota_entrada: number;
+  id_fornecedor: number | null;
+  fornecedor: string | null;
+  cnpj: string | null;
+  /** `YYYY-MM-DD`, como o `<input type="date">` espera. */
+  data_recebimento: string | null;
+  observacao: string | null;
+  chave_acesso: string | null;
+  itens: NotaEntradaItemDetalhe[];
+};
+
 // ── Saída ───────────────────────────────────────────────────────────
 
 export type RemessaNotaRow = {
