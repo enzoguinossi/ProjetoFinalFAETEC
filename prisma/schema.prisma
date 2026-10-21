@@ -652,23 +652,14 @@ model NotaEntrada {
   tipo             TipoNotaEntrada          @map("tipo")
   data_recebimento DateTime?                @map("data_recebimento") @db.Date
   observacao       String?                  @map("observacao") @db.Text
+  chave_acesso     String?                  @unique @map("chave_acesso") @db.VarChar(44)
   ativo            Boolean                  @default(true) @map("ativo")
   itens            ItemNotaEntrada[]
   movimentacoes    MovimentacaoEstoque[]
   fornecedor       Fornecedor?              @relation(fields: [id_fornecedor], references: [id_fornecedor])
-  chavesAcesso     NotaEntradaChaveAcesso[]
 
   @@index([id_fornecedor], map: "nota_entrada_ID_fornecedor_fkey")
   @@map("nota_entrada")
-}
-
-model NotaEntradaChaveAcesso {
-  id_nota_entrada Int         @map("ID_nota_entrada")
-  chave_acesso    String      @unique @map("chave_acesso")
-  notaEntrada     NotaEntrada @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
-
-  @@id([id_nota_entrada, chave_acesso])
-  @@map("nota_entrada_chave_acesso")
 }
 
 model ItemNotaEntrada {

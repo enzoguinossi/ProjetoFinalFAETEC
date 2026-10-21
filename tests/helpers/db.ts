@@ -16,7 +16,6 @@ export async function resetarBanco() {
     prismaTeste.itemNotaSaida.deleteMany(),
     prismaTeste.itemPedidoEscola.deleteMany(),
     prismaTeste.itemNotaEntrada.deleteMany(),
-    prismaTeste.notaEntradaChaveAcesso.deleteMany(),
     prismaTeste.percursoDestinatario.deleteMany(),
     prismaTeste.rotaRemessa.deleteMany(),
     prismaTeste.anexo.deleteMany(),

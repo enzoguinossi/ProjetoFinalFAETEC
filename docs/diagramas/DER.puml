@@ -522,12 +522,8 @@ entity "nota_entrada" as nota_entrada {
   * tipo : ENUM(ENTRADA, DESMONTAGEM)
   data_recebimento : DATE
   observacao : TEXT
+  chave_acesso : VARCHAR(44) <<UK>>
   * ativo : BOOLEAN
-}
-
-entity "nota_entrada_chave_acesso" as chave_acesso {
-  * ID_nota_entrada : INT <<PK, FK>>
-  * chave_acesso : VARCHAR <<UK>>
 }
 
 entity "item_nota_entrada" as item_nota_entrada {
@@ -703,7 +699,6 @@ remessa ||--o{ rota_rem
 ' Nota de Entrada
 fornecedor ||--o{ nota_entrada
 nota_entrada ||--|{ item_nota_entrada
-nota_entrada ||--o{ chave_acesso
 
 ' Anexos
 remessa ||--o{ anexo

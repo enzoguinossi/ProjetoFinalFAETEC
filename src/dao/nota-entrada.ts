@@ -15,7 +15,7 @@ export type NotaEntradaCriacao = {
   id_fornecedor: number | null;
   data_recebimento: Date | null;
   observacao: string | null;
-  chaves_acesso: string[];
+  chave_acesso: string | null;
   itens: NotaEntradaItemCriacao[];
 };
 
@@ -36,7 +36,6 @@ export class NotaEntradaDAO {
           fornecedor: {
             select: { pessoaJuridica: { select: { razao_social: true } } },
           },
-          chavesAcesso: { select: { chave_acesso: true } },
           itens: { select: { id_item_nota_entrada: true } },
         },
         orderBy: { data_criacao: "desc" },
@@ -54,8 +53,8 @@ export class NotaEntradaDAO {
   }
 
   /**
-   * Cria a nota de entrada com chaves, itens, atualização de estoque e
-   * movimentações em uma única transação. Qualquer falha desfaz tudo.
+   * Cria a nota de entrada com a chave de acesso (opcional), itens, atualização
+   * de estoque e movimentações em uma única transação. Qualquer falha desfaz tudo.
    */
   async create(data: NotaEntradaCriacao, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
@@ -66,17 +65,9 @@ export class NotaEntradaDAO {
           tipo: "ENTRADA",
           data_recebimento: data.data_recebimento,
           observacao: data.observacao,
+          chave_acesso: data.chave_acesso,
         },
       });
-
-      if (data.chaves_acesso.length > 0) {
-        await tx.notaEntradaChaveAcesso.createMany({
-          data: data.chaves_acesso.map((chave_acesso) => ({
-            id_nota_entrada: nota.id_nota_entrada,
-            chave_acesso,
-          })),
-        });
-      }
 
       const itensGravados: {
         id_produto: number;
@@ -127,7 +118,7 @@ export class NotaEntradaDAO {
           id_fornecedor: data.id_fornecedor,
           data_recebimento: data.data_recebimento?.toISOString() ?? null,
           observacao: data.observacao,
-          chaves_acesso: data.chaves_acesso,
+          chave_acesso: data.chave_acesso,
           itens: itensGravados,
         },
         tx,

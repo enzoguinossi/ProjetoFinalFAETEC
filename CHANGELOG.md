@@ -46,6 +46,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Chave de acesso da NF-e vira coluna da nota de entrada `(KAN-140)`:** a tabela
+  `nota_entrada_chave_acesso` deixou de existir; a chave passou a ser a coluna nullable e
+  única `nota_entrada.chave_acesso VARCHAR(44)` — a nota tem no máximo uma chave, e o
+  `@unique` preserva a unicidade que a tabela garantia. As chaves existentes foram
+  transportadas antes da queda da tabela; o DAO não usa mais `createMany`, o serviço valida
+  44 caracteres quando a chave é informada, o formulário tem um único campo opcional e a
+  listagem mostra a chave ou "—". `ENTENDIMENTO.md` §3.12, `IMPLEMENTACAO.md` (RF017a) e
+  `DER.puml` (agora **51** entidades) foram alinhados.
 - **Reserva de estoque passa a pertencer à remessa `(KAN-140)`:** `reserva_estoque` trocou a
   FK `ID_nota_saida` por `ID_remessa` (`ReservaEstoque.id_remessa`); `Remessa` ganhou
   `reservas` e `NotaSaida` perdeu a relação. A nota de saída **deixa de reservar**: a reserva

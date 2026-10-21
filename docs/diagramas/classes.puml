@@ -407,11 +407,8 @@ package "Nota de Entrada" as NotaEntrada {
     + tipo: Enum
     + data_recebimento: Date
     + observacao: Text
-    + ativo: Boolean
-  }
-
-  class NotaEntradaChaveAcesso {
     + chave_acesso: String
+    + ativo: Boolean
   }
 
   class ItemNotaEntrada {
@@ -424,7 +421,6 @@ package "Nota de Entrada" as NotaEntrada {
 
 Fornecedor "1" --> "*" NotaEntrada : emite >
 NotaEntrada "1" --> "*" ItemNotaEntrada : contém >
-NotaEntrada "1" --> "*" NotaEntradaChaveAcesso : referência >
 Produto "1" --> "*" ItemNotaEntrada : listado em >
 
 ' =========================================================

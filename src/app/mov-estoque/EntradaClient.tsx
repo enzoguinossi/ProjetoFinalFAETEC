@@ -25,12 +25,12 @@ const columnsEntrada: Column<NotaEntradaListRow>[] = [
   { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left" },
   { key: "itens", label: "Itens", width: "0.7fr", align: "right" },
   {
-    key: "chavesTexto",
-    label: "Chaves de acesso",
+    key: "chave_acesso",
+    label: "Chave de acesso",
     width: "3fr",
     align: "left",
     render: (_valor, row) => (
-      <span title={row.chaves.join(", ")}>{row.chavesTexto}</span>
+      <span title={row.chave_acesso ?? undefined}>{row.chave_acesso ?? "—"}</span>
     ),
   },
 ];

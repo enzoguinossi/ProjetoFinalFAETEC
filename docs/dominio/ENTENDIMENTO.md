@@ -67,7 +67,7 @@ projetofinalfaetec/
 │   ├── types/             # Interfaces e tipos TypeScript
 │   └── proxy.ts           # Proteção das rotas privadas (sessão)
 ├── prisma/
-│   ├── schema.prisma      # Modelo de dados (52 entidades)
+│   ├── schema.prisma      # Modelo de dados (51 entidades)
 │   └── seed.ts            # Seed de referência
 ├── prisma.config.ts       # Configuração do Prisma 7
 ├── docs/                  # Documentação (ver docs/README.md)
@@ -812,12 +812,8 @@ nota_entrada
 ├── tipo                  ENUM('ENTRADA','DESMONTAGEM')
 ├── data_recebimento      DATE
 ├── observacao            TEXT
+├── chave_acesso          VARCHAR(44) NULL UNIQUE  ← no máximo uma chave NF-e por nota
 └── ativo                 BOOLEAN DEFAULT TRUE
-
-nota_entrada_chave_acesso   ← opcional, 0 ou mais chaves NF-e
-├── ID_nota_entrada       INT FK NOT NULL
-├── chave_acesso          VARCHAR(44) UNIQUE NOT NULL
-└── PRIMARY KEY (ID_nota_entrada, chave_acesso)
 
 item_nota_entrada
 ├── ID_item_nota_entrada  INT PK auto_increment
@@ -832,6 +828,9 @@ item_nota_entrada
 Regras:
 - A entrada pode ser feita **com ou sem** chave de acesso de NF-e
 - A chave de acesso, quando informada, deve ser uma chave válida de NF-e (44 caracteres)
+- A nota tem **no máximo uma** chave de acesso: ela é a coluna `nota_entrada.chave_acesso`
+  (nullable e única) — não existe mais a tabela `nota_entrada_chave_acesso`
+- A unicidade da coluna impede a mesma chave em duas notas
 - A conversão de unidade é aplicada no momento da entrada
 - Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:

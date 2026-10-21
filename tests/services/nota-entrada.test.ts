@@ -18,7 +18,7 @@ describe("notaEntradaService.registrar", () => {
     const resultado = await notaEntradaService.registrar(
       {
         data_recebimento: "2026-10-19",
-        chaves_acesso: [CHAVE],
+        chave_acesso: CHAVE,
         observacao: "NF-e de teste",
         itens: [
           { id_produto: produtoComConversao.id_produto, fator_conversao: 12, quantidade: 2 },
@@ -33,13 +33,13 @@ describe("notaEntradaService.registrar", () => {
 
     const nota = await prismaTeste.notaEntrada.findUniqueOrThrow({
       where: { id_nota_entrada: resultado.nota.id_nota_entrada },
-      include: { itens: true, chavesAcesso: true },
+      include: { itens: true },
     });
     expect(nota.tipo).toBe("ENTRADA");
     expect(nota.id_fornecedor).toBeNull();
     expect(nota.observacao).toBe("NF-e de teste");
     expect(nota.data_recebimento?.toISOString().slice(0, 10)).toBe("2026-10-19");
-    expect(nota.chavesAcesso.map((c) => c.chave_acesso)).toEqual([CHAVE]);
+    expect(nota.chave_acesso).toBe(CHAVE);
     expect(nota.itens).toHaveLength(2);
 
     const itemComConversao = nota.itens.find(
@@ -86,7 +86,7 @@ describe("notaEntradaService.registrar", () => {
     expect(auditorias).toHaveLength(1);
     expect(auditorias[0]?.acao).toBe("CRIAR");
     expect(auditorias[0]?.id_usuario).toBe(usuario.id_usuario);
-    expect(auditorias[0]?.dados_novos).toMatchObject({ chaves_acesso: [CHAVE] });
+    expect(auditorias[0]?.dados_novos).toMatchObject({ chave_acesso: CHAVE });
   });
 
   it("reaproveita a linha de estoque do produto na segunda entrada", async () => {
@@ -162,7 +162,7 @@ describe("notaEntradaService.registrar", () => {
 
     const resultado = await notaEntradaService.registrar(
       {
-        chaves_acesso: ["1".repeat(43)],
+        chave_acesso: "1".repeat(43),
         itens: [{ id_produto: produto.id_produto, fator_conversao: 1, quantidade: 1 }],
       },
       usuario.id_usuario,
@@ -174,24 +174,22 @@ describe("notaEntradaService.registrar", () => {
     expect(await prismaTeste.estoque.count()).toBe(0);
   });
 
-  it("recusa mais de uma chave de acesso na mesma nota sem gravar nada", async () => {
+  it("aceita nota de entrada sem chave de acesso", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
 
     const resultado = await notaEntradaService.registrar(
-      {
-        chaves_acesso: ["1".repeat(44), "2".repeat(44)],
-        itens: [{ id_produto: produto.id_produto, fator_conversao: 1, quantidade: 1 }],
-      },
+      { itens: [{ id_produto: produto.id_produto, fator_conversao: 1, quantidade: 1 }] },
       usuario.id_usuario,
     );
 
-    expect(resultado).toEqual({
-      error: "A nota de entrada aceita apenas uma chave de acesso da NF-e.",
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+
+    const nota = await prismaTeste.notaEntrada.findUniqueOrThrow({
+      where: { id_nota_entrada: resultado.nota.id_nota_entrada },
     });
-    expect(await prismaTeste.notaEntrada.count()).toBe(0);
-    expect(await prismaTeste.itemNotaEntrada.count()).toBe(0);
-    expect(await prismaTeste.estoque.count()).toBe(0);
+    expect(nota.chave_acesso).toBeNull();
   });
 
   it("recusa nota sem itens", async () => {
@@ -228,7 +226,7 @@ describe("notaEntradaService.registrar", () => {
 
     const primeira = await notaEntradaService.registrar(
       {
-        chaves_acesso: [CHAVE],
+        chave_acesso: CHAVE,
         itens: [{ id_produto: produtoA.id_produto, fator_conversao: 1, quantidade: 1 }],
       },
       usuario.id_usuario,
@@ -238,7 +236,7 @@ describe("notaEntradaService.registrar", () => {
     await expect(
       notaEntradaService.registrar(
         {
-          chaves_acesso: [CHAVE],
+          chave_acesso: CHAVE,
           itens: [{ id_produto: produtoB.id_produto, fator_conversao: 1, quantidade: 2 }],
         },
         usuario.id_usuario,
@@ -281,14 +279,14 @@ describe("notaEntradaService.registrar", () => {
 });
 
 describe("notaEntradaDAO.list", () => {
-  it("pagina as notas de entrada e traz itens e chaves", async () => {
+  it("pagina as notas de entrada e traz itens e chave de acesso", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
 
     for (let i = 0; i < 2; i++) {
       const resultado = await notaEntradaService.registrar(
         {
-          chaves_acesso: [`${i}${"2".repeat(43)}`],
+          chave_acesso: `${i}${"2".repeat(43)}`,
           itens: [{ id_produto: produto.id_produto, fator_conversao: 1, quantidade: i + 1 }],
         },
         usuario.id_usuario,
@@ -302,6 +300,6 @@ describe("notaEntradaDAO.list", () => {
     expect(pagina.totalPages).toBe(2);
     expect(pagina.data).toHaveLength(1);
     expect(pagina.data[0]?.itens).toHaveLength(1);
-    expect(pagina.data[0]?.chavesAcesso).toHaveLength(1);
+    expect(pagina.data[0]?.chave_acesso).toHaveLength(44);
   });
 });

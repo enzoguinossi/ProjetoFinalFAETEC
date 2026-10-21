@@ -70,20 +70,16 @@ export async function listarNotasEntrada(
   const resultado = await notaEntradaDAO.list(params);
   return {
     ...resultado,
-    data: resultado.data.map((nota) => {
-      const chaves = nota.chavesAcesso.map((c) => c.chave_acesso);
-      return {
-        id_nota_entrada: nota.id_nota_entrada,
-        data: formatarData(
-          nota.data_recebimento ?? nota.data_criacao,
-          nota.data_recebimento !== null,
-        ),
-        fornecedor: nota.fornecedor?.pessoaJuridica.razao_social ?? "Sem fornecedor",
-        itens: nota.itens.length,
-        chaves,
-        chavesTexto: chaves.length > 0 ? chaves.join(", ") : "—",
-      };
-    }),
+    data: resultado.data.map((nota) => ({
+      id_nota_entrada: nota.id_nota_entrada,
+      data: formatarData(
+        nota.data_recebimento ?? nota.data_criacao,
+        nota.data_recebimento !== null,
+      ),
+      fornecedor: nota.fornecedor?.pessoaJuridica.razao_social ?? "Sem fornecedor",
+      itens: nota.itens.length,
+      chave_acesso: nota.chave_acesso,
+    })),
   };
 }
 

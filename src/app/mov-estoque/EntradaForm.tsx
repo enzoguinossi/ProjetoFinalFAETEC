@@ -152,7 +152,7 @@ export default function EntradaForm({
         id_fornecedor: fornecedor?.id_fornecedor ?? null,
         data_recebimento: dataRecebimento || null,
         observacao: observacao.trim() || null,
-        chaves_acesso: chave ? [chave] : [],
+        chave_acesso: chave || null,
         itens: itens.map((item) => ({
           id_produto: item.id_produto,
           fator_conversao: Number(item.fator),

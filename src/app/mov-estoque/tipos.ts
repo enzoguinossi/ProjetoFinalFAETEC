@@ -34,8 +34,7 @@ export type NotaEntradaListRow = {
   data: string;
   fornecedor: string;
   itens: number;
-  chaves: string[];
-  chavesTexto: string;
+  chave_acesso: string | null;
 };
 
 export type ItemEntradaPayload = {
@@ -49,7 +48,7 @@ export type NovaEntradaPayload = {
   id_fornecedor?: number | null;
   data_recebimento?: string | null;
   observacao?: string | null;
-  chaves_acesso?: string[];
+  chave_acesso?: string | null;
   itens: ItemEntradaPayload[];
 };
 

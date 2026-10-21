@@ -12,7 +12,7 @@ export type EntradaInput = {
   /** Data no formato `YYYY-MM-DD` ou um Date. */
   data_recebimento?: string | Date | null;
   observacao?: string | null;
-  chaves_acesso?: string[];
+  chave_acesso?: string | null;
   itens: EntradaItemInput[];
 };
 
@@ -38,8 +38,8 @@ function lerDataRecebimento(valor: EntradaInput["data_recebimento"]): Date | nul
 
 export class NotaEntradaService {
   /**
-   * Valida a entrada e grava nota, chaves, itens, estoque, movimentações e
-   * auditoria em uma única transação (via `notaEntradaDAO.create`).
+   * Valida a entrada e grava nota, chave de acesso, itens, estoque, movimentações
+   * e auditoria em uma única transação (via `notaEntradaDAO.create`).
    */
   async registrar(input: EntradaInput, id_usuario: number): Promise<ResultadoEntrada> {
     if (!Array.isArray(input.itens) || input.itens.length === 0) {
@@ -75,20 +75,16 @@ export class NotaEntradaService {
       }
     }
 
-    // Uma nota de entrada tem no máximo uma chave de acesso. A tabela
-    // `nota_entrada_chave_acesso` continua existindo (1:N no schema); o limite
-    // de uma chave é regra de aplicação, não do modelo físico.
-    const chaves: string[] = [];
-    for (const bruta of input.chaves_acesso ?? []) {
-      const chave = String(bruta ?? "").trim();
-      if (!chave) continue;
-      if (chave.length !== 44) {
+    // Chave de acesso da NF-e: opcional; quando informada, precisa ter 44
+    // caracteres. A nota tem no máximo uma chave — o schema garante isso
+    // (`nota_entrada.chave_acesso` é coluna única).
+    let chaveAcesso: string | null = null;
+    const chaveBruta = String(input.chave_acesso ?? "").trim();
+    if (chaveBruta) {
+      if (chaveBruta.length !== 44) {
         return { error: "A chave de acesso da NF-e deve ter 44 caracteres." };
       }
-      chaves.push(chave);
-    }
-    if (chaves.length > 1) {
-      return { error: "A nota de entrada aceita apenas uma chave de acesso da NF-e." };
+      chaveAcesso = chaveBruta;
     }
 
     const dataRecebimento = lerDataRecebimento(input.data_recebimento);
@@ -102,7 +98,7 @@ export class NotaEntradaService {
             : Number(input.id_fornecedor),
         data_recebimento: dataRecebimento,
         observacao: input.observacao?.trim() || null,
-        chaves_acesso: chaves,
+        chave_acesso: chaveAcesso,
         itens: input.itens.map((item) => {
           const fator_conversao = Number(item.fator_conversao);
           const quantidade = Number(item.quantidade);
