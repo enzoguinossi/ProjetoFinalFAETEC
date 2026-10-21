@@ -75,19 +75,20 @@ export class NotaEntradaService {
       }
     }
 
+    // Uma nota de entrada tem no máximo uma chave de acesso. A tabela
+    // `nota_entrada_chave_acesso` continua existindo (1:N no schema); o limite
+    // de uma chave é regra de aplicação, não do modelo físico.
     const chaves: string[] = [];
-    const chavesVistas = new Set<string>();
     for (const bruta of input.chaves_acesso ?? []) {
       const chave = String(bruta ?? "").trim();
       if (!chave) continue;
       if (chave.length !== 44) {
         return { error: "A chave de acesso da NF-e deve ter 44 caracteres." };
       }
-      if (chavesVistas.has(chave)) {
-        return { error: "A mesma chave de acesso não pode ser informada duas vezes." };
-      }
-      chavesVistas.add(chave);
       chaves.push(chave);
+    }
+    if (chaves.length > 1) {
+      return { error: "A nota de entrada aceita apenas uma chave de acesso da NF-e." };
     }
 
     const dataRecebimento = lerDataRecebimento(input.data_recebimento);

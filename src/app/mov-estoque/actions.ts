@@ -163,6 +163,22 @@ export async function listarFornecedoresSelecao(
   };
 }
 
+/** Dados de um fornecedor recém-criado, para selecioná-lo na nota. */
+export async function getFornecedorSelecao(
+  id: number,
+): Promise<FornecedorSelecaoRow | null> {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "estoque.entrada"))) return null;
+
+  const fornecedor = await fornecedorDAO.getById(id);
+  if (!fornecedor) return null;
+  return {
+    id_fornecedor: fornecedor.id_fornecedor,
+    razao_social: fornecedor.pessoaJuridica.razao_social,
+    cnpj: fornecedor.pessoaJuridica.cnpj,
+  };
+}
+
 export async function criarNotaEntrada(payload: NovaEntradaPayload) {
   return comPermissao("estoque.entrada", async (user) => {
     try {

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Button from "@/components/Button";
+import Modal from "@/components/Modal";
 import SearchEntityModal from "@/components/SearchEntityModal";
+import FornecedorForm from "@/app/fornecedores/novo/FornecedorForm";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
 import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
@@ -10,6 +12,7 @@ import { COLUNAS_FORNECEDOR } from "./colunas-selecao";
 import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
 import {
   criarNotaEntrada,
+  getFornecedorSelecao,
   getProdutoEntrada,
   listarFornecedoresSelecao,
   listarProdutosSelecao,
@@ -18,9 +21,15 @@ import type { ConversaoUnidadeItem, FornecedorSelecaoRow } from "./tipos";
 
 interface Props {
   conversoes: ConversaoUnidadeItem[];
+  podeCriarFornecedor: boolean;
+  tiposCodigoFornecedor: { id_tipo_codigo: number; nome: string }[];
   onSaved: () => Promise<void> | void;
   onCancel: () => void;
 }
+
+/** Botão de ação só com ícone — mesmo visual dos botões de ação das tabelas. */
+const ICON_BUTTON_CLASS =
+  "flex items-center justify-center w-7 h-7 border-none rounded-md bg-transparent cursor-pointer transition-[background-color] duration-[120ms] text-ink hover:bg-[rgba(0,0,0,0.06)] [&_svg]:w-5 [&_svg]:h-5 [&_img]:w-5 [&_img]:h-5 shrink-0";
 
 type ItemForm = {
   uid: number;
@@ -44,29 +53,40 @@ function formatarNumero(valor: number): string {
 
 let proximoUid = 1;
 
-export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
+export default function EntradaForm({
+  conversoes,
+  podeCriarFornecedor,
+  tiposCodigoFornecedor,
+  onSaved,
+  onCancel,
+}: Props) {
   const mostrarAviso = useAviso();
 
   const [fornecedor, setFornecedor] = useState<FornecedorSelecaoRow | null>(null);
   const [dataRecebimento, setDataRecebimento] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [chaves, setChaves] = useState<string[]>([""]);
+  const [chaveAcesso, setChaveAcesso] = useState("");
   const [itens, setItens] = useState<ItemForm[]>([]);
   const [salvando, setSalvando] = useState(false);
 
   const [buscandoProduto, setBuscandoProduto] = useState(false);
   const [buscandoFornecedor, setBuscandoFornecedor] = useState(false);
+  const [criandoFornecedor, setCriandoFornecedor] = useState(false);
 
-  function adicionarChave() {
-    setChaves((atuais) => [...atuais, ""]);
-  }
-
-  function alterarChave(indice: number, valor: string) {
-    setChaves((atuais) => atuais.map((c, i) => (i === indice ? valor : c)));
-  }
-
-  function removerChave(indice: number) {
-    setChaves((atuais) => atuais.filter((_, i) => i !== indice));
+  /** Fornecedor criado no diálogo interno: seleciona na nota e fecha o diálogo. */
+  async function fornecedorCriado(id_fornecedor?: number) {
+    setCriandoFornecedor(false);
+    if (!id_fornecedor) {
+      mostrarAviso("Fornecedor criado, mas não foi possível selecioná-lo na nota.", "erro");
+      return;
+    }
+    const criado = await getFornecedorSelecao(id_fornecedor);
+    if (!criado) {
+      mostrarAviso("Fornecedor criado, mas não foi possível selecioná-lo na nota.", "erro");
+      return;
+    }
+    setFornecedor(criado);
+    mostrarAviso("Fornecedor criado e selecionado na nota.", "sucesso");
   }
 
   async function adicionarItem(produto: ProdutoListRow) {
@@ -106,10 +126,9 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
   }
 
   async function gravar() {
-    const chavesPreenchidas = chaves.map((c) => c.trim()).filter(Boolean);
-    const chaveInvalida = chavesPreenchidas.find((c) => c.length !== 44);
-    if (chaveInvalida) {
-      mostrarAviso("Cada chave de acesso da NF-e deve ter 44 caracteres.", "erro");
+    const chave = chaveAcesso.trim();
+    if (chave && chave.length !== 44) {
+      mostrarAviso("A chave de acesso da NF-e deve ter 44 caracteres.", "erro");
       return;
     }
     if (itens.length === 0) {
@@ -133,7 +152,7 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
         id_fornecedor: fornecedor?.id_fornecedor ?? null,
         data_recebimento: dataRecebimento || null,
         observacao: observacao.trim() || null,
-        chaves_acesso: chavesPreenchidas,
+        chaves_acesso: chave ? [chave] : [],
         itens: itens.map((item) => ({
           id_produto: item.id_produto,
           fator_conversao: Number(item.fator),
@@ -148,7 +167,7 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
       setFornecedor(null);
       setDataRecebimento("");
       setObservacao("");
-      setChaves([""]);
+      setChaveAcesso("");
       setItens([]);
       await onSaved();
     } catch {
@@ -171,7 +190,28 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
               placeholder="Sem fornecedor"
               className={INPUT_CLASS}
             />
-            <Button label={fornecedor ? "Alterar" : "Selecionar"} variant="ghost" onClick={() => setBuscandoFornecedor(true)} />
+            <button
+              type="button"
+              className={ICON_BUTTON_CLASS}
+              aria-label="Selecionar fornecedor"
+              title="Selecionar fornecedor"
+              onClick={() => setBuscandoFornecedor(true)}
+            >
+              <img src="/icons/actions/Lupa.svg" alt="" />
+            </button>
+            {podeCriarFornecedor && (
+              <button
+                type="button"
+                className={ICON_BUTTON_CLASS}
+                aria-label="Cadastrar fornecedor"
+                title="Cadastrar fornecedor"
+                onClick={() => setCriandoFornecedor(true)}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
             {fornecedor && (
               <Button label="Limpar" variant="cancel" onClick={() => setFornecedor(null)} />
             )}
@@ -199,28 +239,19 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
         </div>
       </div>
 
-      {/* Chaves de acesso */}
+      {/* Chave de acesso */}
       <div className={ui.field}>
-        <div className="flex items-center justify-between">
-          <label className={LABEL_CLASS}>Chaves de acesso NF-e (opcionais)</label>
-          <Button label="Adicionar chave" variant="ghost" onClick={adicionarChave} />
+        <label className={LABEL_CLASS}>Chave de acesso NF-e (opcional)</label>
+        <div className="flex items-center gap-2">
+          <input
+            value={chaveAcesso}
+            maxLength={44}
+            onChange={(e) => setChaveAcesso(e.target.value)}
+            placeholder="44 caracteres"
+            className={INPUT_CLASS}
+          />
+          <span className="w-16 shrink-0 font-sans text-xs text-[#697077]">{chaveAcesso.trim().length}/44</span>
         </div>
-        {chaves.length === 0 && (
-          <p className="m-0 font-sans text-sm text-[#697077]">Nenhuma chave informada.</p>
-        )}
-        {chaves.map((chave, indice) => (
-          <div key={indice} className="flex items-center gap-2">
-            <input
-              value={chave}
-              maxLength={44}
-              onChange={(e) => alterarChave(indice, e.target.value)}
-              placeholder="44 caracteres"
-              className={INPUT_CLASS}
-            />
-            <span className="w-16 shrink-0 font-sans text-xs text-[#697077]">{chave.trim().length}/44</span>
-            <Button label="Remover" variant="cancel" onClick={() => removerChave(indice)} />
-          </div>
-        ))}
       </div>
 
       {/* Itens */}
@@ -330,6 +361,22 @@ export default function EntradaForm({ conversoes, onSaved, onCancel }: Props) {
         getItemId={(f) => f.id_fornecedor}
         placeholder="Filtrar fornecedor por razão social..."
       />
+
+      {/* Diálogo aninhado: o Radix empilha os diálogos — foco e Escape no interno
+          não fecham o modal da nota. */}
+      <Modal
+        open={criandoFornecedor}
+        onClose={() => setCriandoFornecedor(false)}
+        title="Novo fornecedor"
+        width="860px"
+      >
+        <FornecedorForm
+          mode="create"
+          tiposCodigo={tiposCodigoFornecedor}
+          onSuccess={(id_fornecedor) => void fornecedorCriado(id_fornecedor)}
+          onCancel={() => setCriandoFornecedor(false)}
+        />
+      </Modal>
 
       <SearchEntityModal<ProdutoListRow>
         open={buscandoProduto}

@@ -16,7 +16,8 @@ interface Props {
   initialData?: FornecedorFormData;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   canDeactivate?: boolean;
-  onSuccess?: () => void;
+  /** Recebe o id do fornecedor quando a criação termina com sucesso. */
+  onSuccess?: (id_fornecedor?: number) => void;
   onCancel?: () => void;
 }
 
@@ -48,7 +49,13 @@ export default function FornecedorForm({
         : await createFornecedor(form);
       if (result.error) { mostrarAviso(result.error, "erro"); return; }
       mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
-      onSuccess?.();
+      onSuccess?.(
+        !initialData &&
+          "id_fornecedor" in result &&
+          typeof result.id_fornecedor === "number"
+          ? result.id_fornecedor
+          : undefined,
+      );
     } catch {
       mostrarAviso("Erro ao salvar.", "erro");
     } finally {

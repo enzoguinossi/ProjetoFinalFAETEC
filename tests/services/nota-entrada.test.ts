@@ -174,6 +174,26 @@ describe("notaEntradaService.registrar", () => {
     expect(await prismaTeste.estoque.count()).toBe(0);
   });
 
+  it("recusa mais de uma chave de acesso na mesma nota sem gravar nada", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+
+    const resultado = await notaEntradaService.registrar(
+      {
+        chaves_acesso: ["1".repeat(44), "2".repeat(44)],
+        itens: [{ id_produto: produto.id_produto, fator_conversao: 1, quantidade: 1 }],
+      },
+      usuario.id_usuario,
+    );
+
+    expect(resultado).toEqual({
+      error: "A nota de entrada aceita apenas uma chave de acesso da NF-e.",
+    });
+    expect(await prismaTeste.notaEntrada.count()).toBe(0);
+    expect(await prismaTeste.itemNotaEntrada.count()).toBe(0);
+    expect(await prismaTeste.estoque.count()).toBe(0);
+  });
+
   it("recusa nota sem itens", async () => {
     const { usuario } = await criarUsuario();
 

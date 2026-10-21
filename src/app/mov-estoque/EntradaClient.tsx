@@ -14,6 +14,10 @@ interface Props {
   inicial: PaginatedResult<NotaEntradaListRow>;
   conversoes: ConversaoUnidadeItem[];
   podeCriar: boolean;
+  /** `fornecedor.criar`: habilita o "+" para cadastrar fornecedor na própria nota. */
+  podeCriarFornecedor: boolean;
+  /** Tipos de código aceitos pelo `FornecedorForm`. */
+  tiposCodigoFornecedor: { id_tipo_codigo: number; nome: string }[];
 }
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
@@ -31,7 +35,13 @@ const columnsEntrada: Column<NotaEntradaListRow>[] = [
   },
 ];
 
-export default function EntradaClient({ inicial, conversoes, podeCriar }: Props) {
+export default function EntradaClient({
+  inicial,
+  conversoes,
+  podeCriar,
+  podeCriarFornecedor,
+  tiposCodigoFornecedor,
+}: Props) {
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
@@ -84,6 +94,8 @@ export default function EntradaClient({ inicial, conversoes, podeCriar }: Props)
       <Modal open={modalAberto} onClose={() => setModalAberto(false)} title="Nova entrada" width="960px">
         <EntradaForm
           conversoes={conversoes}
+          podeCriarFornecedor={podeCriarFornecedor}
+          tiposCodigoFornecedor={tiposCodigoFornecedor}
           onCancel={() => setModalAberto(false)}
           onSaved={async () => {
             setModalAberto(false);
