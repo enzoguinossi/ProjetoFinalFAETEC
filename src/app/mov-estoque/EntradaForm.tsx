@@ -27,10 +27,6 @@ interface Props {
   onCancel: () => void;
 }
 
-/** Botão de ação só com ícone — mesmo visual dos botões de ação das tabelas. */
-const ICON_BUTTON_CLASS =
-  "flex items-center justify-center w-7 h-7 border-none rounded-md bg-transparent cursor-pointer transition-[background-color] duration-[120ms] text-ink hover:bg-[rgba(0,0,0,0.06)] [&_svg]:w-5 [&_svg]:h-5 [&_img]:w-5 [&_img]:h-5 shrink-0";
-
 type ItemForm = {
   uid: number;
   id_produto: number;
@@ -192,20 +188,23 @@ export default function EntradaForm({
             />
             <button
               type="button"
-              className={ICON_BUTTON_CLASS}
+              onClick={() => setBuscandoFornecedor(true)}
               aria-label="Selecionar fornecedor"
               title="Selecionar fornecedor"
-              onClick={() => setBuscandoFornecedor(true)}
+              className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
             >
-              <img src="/icons/actions/Lupa.svg" alt="" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
             </button>
             {podeCriarFornecedor && (
               <button
                 type="button"
-                className={ICON_BUTTON_CLASS}
+                onClick={() => setCriandoFornecedor(true)}
                 aria-label="Cadastrar fornecedor"
                 title="Cadastrar fornecedor"
-                onClick={() => setCriandoFornecedor(true)}
+                className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

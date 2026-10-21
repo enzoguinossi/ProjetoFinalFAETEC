@@ -241,11 +241,18 @@ export default function SaidaForm({ condutores, veiculos, onSaved, onCancel }: P
                       placeholder="Obrigatório"
                       className={INPUT_CLASS}
                     />
-                    <Button
-                      label={remessa.destinatario ? "Alterar" : "Selecionar"}
-                      variant="ghost"
+                    <button
+                      type="button"
                       onClick={() => setBuscandoDestinatarioUid(remessa.uid)}
-                    />
+                      aria-label="Selecionar destinatário"
+                      title="Selecionar destinatário"
+                      className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
