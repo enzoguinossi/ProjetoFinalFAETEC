@@ -17,13 +17,14 @@ interface Props {
 }
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
-  { key: "data", label: "Data", width: "1fr" },
-  { key: "fornecedor", label: "Fornecedor", width: "2fr" },
-  { key: "itens", label: "Itens", width: "0.7fr" },
+  { key: "data", label: "Data", width: "1fr", align: "left" },
+  { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left" },
+  { key: "itens", label: "Itens", width: "0.7fr", align: "right" },
   {
     key: "chavesTexto",
     label: "Chaves de acesso",
     width: "3fr",
+    align: "left",
     render: (_valor, row) => (
       <span title={row.chaves.join(", ")}>{row.chavesTexto}</span>
     ),

@@ -25,10 +25,10 @@ interface Props {
 }
 
 const columns: Column<ProdutoListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "descricao", label: "Descrição", width: "2fr" },
-  { key: "qtd", label: "Quantidade", width: "1fr" },
-  { key: "livre", label: "Qtd. Livre", width: "1fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
+  { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
+  { key: "livre", label: "Qtd. Livre", width: "1fr", align: "right" },
 ];
 
 export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms }: Props) {

@@ -20,10 +20,10 @@ interface Props {
 }
 
 const columnsSaida: Column<NotaSaidaListRow>[] = [
-  { key: "data", label: "Data", width: "1fr" },
-  { key: "remessas", label: "Remessas", width: "0.7fr" },
-  { key: "destinatarios", label: "Destinatários", width: "3fr" },
-  { key: "status", label: "Status", width: "1fr" },
+  { key: "data", label: "Data", width: "1fr", align: "left" },
+  { key: "remessas", label: "Remessas", width: "0.7fr", align: "center" },
+  { key: "destinatarios", label: "Destinatários", width: "3fr", align: "left" },
+  { key: "status", label: "Status", width: "1fr", align: "center" },
 ];
 
 export default function SaidaClient({
