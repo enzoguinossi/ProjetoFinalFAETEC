@@ -5,7 +5,7 @@ import { destinatarioDAO } from "@/dao/destinatario";
 import { fornecedorDAO } from "@/dao/fornecedor";
 import { funcionarioDAO } from "@/dao/funcionario";
 import { notaEntradaDAO } from "@/dao/nota-entrada";
-import { notaSaidaDAO } from "@/dao/nota-saida";
+import { notaSaidaDAO, STATUS_REMESSA_EDITAVEL } from "@/dao/nota-saida";
 import { produtoDAO } from "@/dao/produto";
 import { veiculoDAO } from "@/dao/veiculo";
 import { mensagemDeErro } from "@/dao/_errors";
@@ -22,16 +22,20 @@ import {
 } from "@/types";
 import type {
   AtualizacaoEntradaPayload,
+  AtualizacaoNotaSaidaPayload,
+  AtualizacaoRemessaPayload,
   CondutorItem,
   ConversaoUnidadeItem,
   DestinatarioSelecaoRow,
   FornecedorSelecaoRow,
   NotaEntradaFormData,
   NotaEntradaListRow,
+  NotaSaidaFormData,
   NotaSaidaListRow,
   NovaEntradaPayload,
   NovaSaidaPayload,
   ProdutoEntradaDetalhe,
+  RemessaFormData,
   SelecaoParams,
   VeiculoItem,
 } from "./tipos";
@@ -303,6 +307,7 @@ export async function listarNotasSaida(
             status: remessa.status,
             statusLabel: ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status,
             podeCancelar: STATUS_REMESSA_CANCELAVEL.includes(remessa.status),
+            podeEditar: STATUS_REMESSA_EDITAVEL.includes(remessa.status),
           })),
       };
     }),
@@ -350,6 +355,128 @@ export async function listarVeiculosSaida(): Promise<VeiculoItem[]> {
     placa: v.placa,
     modelo: v.modelo,
   }));
+}
+
+/** Rótulo do veículo na remessa: placa e modelo, quando houver. */
+function rotuloVeiculo(veiculo: { placa: string; modelo: string | null } | null): string | null {
+  if (!veiculo) return null;
+  return veiculo.modelo ? `${veiculo.placa} — ${veiculo.modelo}` : veiculo.placa;
+}
+
+/**
+ * Remessa com cabeçalho, itens e produto de cada item, para os modais de
+ * visualização e edição. Ver exige `remessa.consultar`; editar exige
+ * `remessa.alterar`.
+ */
+export async function obterRemessa(
+  id: number,
+  modo: "view" | "edit" = "view",
+): Promise<RemessaFormData | null> {
+  const user = await requireUser();
+  const permissao = modo === "edit" ? "remessa.alterar" : "remessa.consultar";
+  if (!(await usuarioPode(user, permissao))) return null;
+
+  const remessa = await notaSaidaDAO.getRemessa(id);
+  if (!remessa) return null;
+
+  return {
+    id_remessa: remessa.id_remessa,
+    id_nota_saida: remessa.id_nota_saida,
+    status: remessa.status,
+    statusLabel: ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status,
+    podeEditar: STATUS_REMESSA_EDITAVEL.includes(remessa.status),
+    id_destinatario: remessa.id_destinatario,
+    destinatario: remessa.destinatario.pessoaJuridica.razao_social,
+    id_funcionario_condutor: remessa.id_funcionario_condutor,
+    condutor: remessa.condutor?.pessoaFisica.nome ?? null,
+    id_veiculo: remessa.id_veiculo,
+    veiculo: rotuloVeiculo(remessa.veiculo),
+    urgente: remessa.urgente,
+    observacao: remessa.observacao,
+    itens: remessa.itens.map((item) => ({
+      id_item_remessa: item.id_item_remessa,
+      id_produto: item.estoque.produto.id_produto,
+      descricao: item.estoque.produto.descricao,
+      quantidade_solicitada: Number(item.quantidade_solicitada),
+      quantidade_separada:
+        item.quantidade_separada === null ? null : Number(item.quantidade_separada),
+      quantidade_entregue:
+        item.quantidade_entregue === null ? null : Number(item.quantidade_entregue),
+    })),
+  };
+}
+
+/**
+ * Grava a edição da remessa (cabeçalho, quantidades e item novo). Exige
+ * `remessa.alterar` no servidor; remover item é recusado e remessa
+ * finalizada/cancelada não é editável (RN004).
+ */
+export async function salvarRemessa(id: number, payload: AtualizacaoRemessaPayload) {
+  return comPermissao("remessa.alterar", async (user) => {
+    try {
+      const resultado = await notaSaidaService.atualizarRemessa(id, payload, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return { success: true, id_remessa: resultado.remessa.id_remessa };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
+/**
+ * Nota de saída com status, observação e as remessas (destinatário e itens),
+ * para os modais de visualização e edição. Ver exige `nota_saida.consultar`;
+ * editar exige `nota_saida.alterar`.
+ */
+export async function obterNotaSaida(
+  id: number,
+  modo: "view" | "edit" = "view",
+): Promise<NotaSaidaFormData | null> {
+  const user = await requireUser();
+  const permissao = modo === "edit" ? "nota_saida.alterar" : "nota_saida.consultar";
+  if (!(await usuarioPode(user, permissao))) return null;
+
+  const nota = await notaSaidaDAO.getNotaSaida(id);
+  if (!nota) return null;
+
+  return {
+    id_nota_saida: nota.id_nota_saida,
+    data: formatarData(nota.data_criacao),
+    status: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
+    observacao: nota.observacao,
+    remessas: nota.remessas.map((remessa) => ({
+      id_remessa: remessa.id_remessa,
+      destinatario: remessa.destinatario.pessoaJuridica.razao_social,
+      status: remessa.status,
+      statusLabel: ROTULOS_STATUS_REMESSA[remessa.status] ?? remessa.status,
+      itens: remessa.itens.map((item) => ({
+        id_item_remessa: item.id_item_remessa,
+        id_produto: item.estoque.produto.id_produto,
+        descricao: item.estoque.produto.descricao,
+        quantidade_solicitada: Number(item.quantidade_solicitada),
+        quantidade_separada:
+          item.quantidade_separada === null ? null : Number(item.quantidade_separada),
+        quantidade_entregue:
+          item.quantidade_entregue === null ? null : Number(item.quantidade_entregue),
+      })),
+    })),
+  };
+}
+
+/**
+ * Grava a edição da nota de saída (apenas a observação; as remessas são
+ * editadas individualmente). Exige `nota_saida.alterar` no servidor.
+ */
+export async function salvarNotaSaida(id: number, payload: AtualizacaoNotaSaidaPayload) {
+  return comPermissao("nota_saida.alterar", async (user) => {
+    try {
+      const resultado = await notaSaidaService.atualizarNotaSaida(id, payload, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return { success: true, id_nota_saida: resultado.nota.id_nota_saida };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
 }
 
 export async function criarNotaSaida(payload: NovaSaidaPayload) {

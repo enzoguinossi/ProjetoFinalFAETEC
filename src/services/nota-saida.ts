@@ -1,5 +1,9 @@
-import { notaSaidaDAO } from "@/dao/nota-saida";
-import type { NotaSaidaRemessaCriacao } from "@/dao/nota-saida";
+import { notaSaidaDAO, STATUS_REMESSA_EDITAVEL } from "@/dao/nota-saida";
+import type {
+  NotaSaidaAtualizacao,
+  NotaSaidaRemessaCriacao,
+  RemessaItemAtualizacao,
+} from "@/dao/nota-saida";
 
 export type SaidaItemInput = {
   id_produto: number;
@@ -20,13 +24,118 @@ export type SaidaInput = {
   remessas: SaidaRemessaInput[];
 };
 
+/** Item da edição: com `id_item_remessa` = existente; sem = novo. */
+export type SaidaItemAtualizacaoInput = SaidaItemInput & {
+  id_item_remessa?: number | null;
+};
+
+export type AtualizacaoRemessaInput = Omit<SaidaRemessaInput, "itens"> & {
+  itens: SaidaItemAtualizacaoInput[];
+};
+
+export type AtualizacaoNotaSaidaInput = {
+  observacao?: string | null;
+};
+
 export type ResultadoSaida =
   | { nota: { id_nota_saida: number }; remessas: { id_remessa: number }[] }
   | { error: string };
 
+export type ResultadoRemessa = { remessa: { id_remessa: number } } | { error: string };
+
+export type ResultadoNotaSaida = { nota: { id_nota_saida: number } } | { error: string };
+
+const ROTULOS_STATUS_REMESSA: Record<string, string> = {
+  EM_PREPARACAO: "em preparação",
+  PRONTO_PARA_ENTREGA: "pronta para entrega",
+  EM_PERCURSO: "em percurso",
+  PENDENTE: "pendente",
+  FINALIZADO_TOTAL: "finalizada",
+  FINALIZADO_PARCIAL: "finalizada parcialmente",
+  CANCELADA: "cancelada",
+};
+
 function idPositivo(valor: unknown): number | null {
   const id = Number(valor);
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function validarCabecalhoRemessa(
+  input: Omit<SaidaRemessaInput, "itens">,
+):
+  | {
+      id_destinatario: number;
+      id_funcionario_condutor: number | null;
+      id_veiculo: number | null;
+      urgente: boolean;
+      observacao: string | null;
+    }
+  | { error: string } {
+  const idDestinatario = idPositivo(input.id_destinatario);
+  if (!idDestinatario) {
+    return { error: "Selecione o destinatário da remessa." };
+  }
+
+  const idCondutor =
+    input.id_funcionario_condutor === null || input.id_funcionario_condutor === undefined
+      ? null
+      : idPositivo(input.id_funcionario_condutor);
+  if (
+    input.id_funcionario_condutor !== null &&
+    input.id_funcionario_condutor !== undefined &&
+    !idCondutor
+  ) {
+    return { error: "Condutor inválido na remessa." };
+  }
+
+  const idVeiculo =
+    input.id_veiculo === null || input.id_veiculo === undefined
+      ? null
+      : idPositivo(input.id_veiculo);
+  if (input.id_veiculo !== null && input.id_veiculo !== undefined && !idVeiculo) {
+    return { error: "Veículo inválido na remessa." };
+  }
+
+  return {
+    id_destinatario: idDestinatario,
+    id_funcionario_condutor: idCondutor,
+    id_veiculo: idVeiculo,
+    urgente: input.urgente ?? false,
+    observacao: input.observacao?.trim() || null,
+  };
+}
+
+function validarItensRemessa(
+  itens: SaidaItemAtualizacaoInput[],
+): { itens: RemessaItemAtualizacao[] } | { error: string } {
+  if (!Array.isArray(itens) || itens.length === 0) {
+    return { error: "Informe ao menos um item na remessa." };
+  }
+
+  const validados: RemessaItemAtualizacao[] = [];
+  for (const item of itens) {
+    const idProduto = idPositivo(item.id_produto);
+    if (!idProduto) {
+      return { error: "Produto inválido em uma remessa." };
+    }
+
+    const idItem =
+      item.id_item_remessa === null || item.id_item_remessa === undefined
+        ? null
+        : Number(item.id_item_remessa);
+    if (idItem !== null && (!Number.isInteger(idItem) || idItem <= 0)) {
+      return { error: "Item inválido na remessa." };
+    }
+
+    const quantidade = Number(item.quantidade_solicitada);
+    if (!Number.isFinite(quantidade) || quantidade <= 0) {
+      return { error: "A quantidade solicitada deve ser maior que zero." };
+    }
+
+    validados.push({ id_item_remessa: idItem, id_produto: idProduto, quantidade_solicitada: quantidade });
+  }
+
+  return { itens: validados };
 }
 
 export class NotaSaidaService {
@@ -116,6 +225,100 @@ export class NotaSaidaService {
       nota: { id_nota_saida: resultado.nota.id_nota_saida },
       remessas: resultado.remessas.map((r) => ({ id_remessa: r.id_remessa })),
     };
+  }
+
+  /**
+   * Valida e aplica a edição de uma remessa: destinatário, condutor, veículo,
+   * urgência, observação e `quantidade_solicitada` dos itens; acrescentar item
+   * é permitido, remover é recusado (RN004). Só remessas em preparação ou
+   * prontas para entrega são editáveis — finalizada/cancelada é histórico. A
+   * correção da reserva (pelo delta) e a auditoria ficam no DAO, na mesma
+   * transação.
+   */
+  async atualizarRemessa(
+    id: number,
+    input: AtualizacaoRemessaInput,
+    id_usuario: number,
+  ): Promise<ResultadoRemessa> {
+    const idRemessa = idPositivo(id);
+    if (!idRemessa) return { error: "Remessa inválida." };
+
+    const cabecalho = validarCabecalhoRemessa(input);
+    if ("error" in cabecalho) return cabecalho;
+
+    const itens = validarItensRemessa(input.itens);
+    if ("error" in itens) return itens;
+
+    const existente = await notaSaidaDAO.getRemessa(idRemessa);
+    if (!existente) return { error: "Remessa não encontrada." };
+
+    if (!STATUS_REMESSA_EDITAVEL.includes(existente.status)) {
+      const rotulo = ROTULOS_STATUS_REMESSA[existente.status] ?? existente.status;
+      return {
+        error: `Remessa ${rotulo} não pode ser editada. Só remessas em preparação ou prontas para entrega podem ser editadas; finalizadas e canceladas são histórico.`,
+      };
+    }
+
+    const itensExistentes = new Map(
+      existente.itens.map((item) => [item.id_item_remessa, item]),
+    );
+    const idsInformados = new Set<number>();
+    for (const item of itens.itens) {
+      if (item.id_item_remessa === null) continue;
+      if (!itensExistentes.has(item.id_item_remessa)) {
+        return { error: "Item inválido para esta remessa." };
+      }
+      idsInformados.add(item.id_item_remessa);
+    }
+    for (const idAtual of itensExistentes.keys()) {
+      if (!idsInformados.has(idAtual)) {
+        return { error: "Não é possível remover itens de uma remessa." };
+      }
+    }
+
+    // O produto de um item existente é o gravado na remessa: a edição altera
+    // apenas a quantidade solicitada, nunca o produto.
+    const normalizados = itens.itens.map((item) => {
+      if (item.id_item_remessa === null) return item;
+      const atual = itensExistentes.get(item.id_item_remessa)!;
+      return { ...item, id_produto: atual.estoque.produto.id_produto };
+    });
+
+    const produtos = new Set<number>();
+    for (const item of normalizados) {
+      if (produtos.has(item.id_produto)) {
+        return { error: "O mesmo produto não pode aparecer mais de uma vez na mesma remessa." };
+      }
+      produtos.add(item.id_produto);
+    }
+
+    const remessa = await notaSaidaDAO.updateRemessa(
+      idRemessa,
+      { ...cabecalho, itens: normalizados },
+      id_usuario,
+    );
+
+    return { remessa };
+  }
+
+  /**
+   * Edita apenas a observação da nota de saída; as remessas são editadas
+   * individualmente, cada uma com a sua própria reserva.
+   */
+  async atualizarNotaSaida(
+    id: number,
+    input: AtualizacaoNotaSaidaInput,
+    id_usuario: number,
+  ): Promise<ResultadoNotaSaida> {
+    const idNota = idPositivo(id);
+    if (!idNota) return { error: "Nota de saída inválida." };
+
+    const data: NotaSaidaAtualizacao = {
+      observacao: input.observacao?.trim() || null,
+    };
+
+    const nota = await notaSaidaDAO.updateNotaSaida(idNota, data, id_usuario);
+    return { nota };
   }
 
   /**

@@ -4,20 +4,38 @@ import { useState } from "react";
 import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
-import type { Column } from "@/components/DataTable";
+import type { Action, Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
 import type { PaginatedResult } from "@/types";
 import SaidaForm from "./SaidaForm";
-import { cancelarRemessa, listarNotasSaida } from "./actions";
-import type { CondutorItem, NotaSaidaListRow, VeiculoItem } from "./tipos";
+import NotaSaidaForm from "./NotaSaidaForm";
+import RemessaForm from "./RemessaForm";
+import { cancelarRemessa, listarNotasSaida, obterNotaSaida, obterRemessa } from "./actions";
+import type {
+  CondutorItem,
+  NotaSaidaFormData,
+  NotaSaidaListRow,
+  RemessaFormData,
+  VeiculoItem,
+} from "./tipos";
 
 interface Props {
   inicialSaida: PaginatedResult<NotaSaidaListRow>;
   podeCriarSaida: boolean;
   podeCancelarRemessa: boolean;
+  /** `nota_saida.consultar`: habilita a visualização da nota. */
+  podeConsultarNota: boolean;
+  /** `nota_saida.alterar`: habilita a edição da observação da nota. */
+  podeAlterarNota: boolean;
+  /** `remessa.consultar`: habilita a visualização da remessa. */
+  podeConsultarRemessa: boolean;
+  /** `remessa.alterar`: habilita a edição da remessa. */
+  podeAlterarRemessa: boolean;
   condutores: CondutorItem[];
   veiculos: VeiculoItem[];
 }
+
+type ModoModal = "view" | "edit";
 
 const columnsSaida: Column<NotaSaidaListRow>[] = [
   { key: "data", label: "Data", width: "1fr", align: "left" },
@@ -26,10 +44,17 @@ const columnsSaida: Column<NotaSaidaListRow>[] = [
   { key: "status", label: "Status", width: "1fr", align: "center" },
 ];
 
+const ICONE_ACTION_CLS =
+  "flex items-center justify-center w-7 h-7 border-none rounded-md bg-transparent cursor-pointer transition-[background-color] duration-[120ms] text-ink hover:bg-[rgba(0,0,0,0.06)] disabled:cursor-wait disabled:opacity-60";
+
 export default function SaidaClient({
   inicialSaida,
   podeCriarSaida,
   podeCancelarRemessa,
+  podeConsultarNota,
+  podeAlterarNota,
+  podeConsultarRemessa,
+  podeAlterarRemessa,
   condutores,
   veiculos,
 }: Props) {
@@ -40,6 +65,16 @@ export default function SaidaClient({
   const [modalSaidaAberto, setModalSaidaAberto] = useState(false);
   const [cancelandoId, setCancelandoId] = useState<number | null>(null);
 
+  const [notaModal, setNotaModal] = useState<{
+    mode: ModoModal;
+    data: NotaSaidaFormData;
+  } | null>(null);
+  const [remessaModal, setRemessaModal] = useState<{
+    mode: ModoModal;
+    data: RemessaFormData;
+  } | null>(null);
+  const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
+
   async function carregarSaida(page = 1, limit = resultadoSaida.limit) {
     setCarregandoSaida(true);
     try {
@@ -48,6 +83,11 @@ export default function SaidaClient({
     } finally {
       setCarregandoSaida(false);
     }
+  }
+
+  /** Recarrega a página atual (depois de editar/cancelar, sem pular de página). */
+  async function recarregarPaginaAtual() {
+    await carregarSaida(resultadoSaida.page, resultadoSaida.limit);
   }
 
   async function cancelar(idRemessa: number) {
@@ -71,6 +111,59 @@ export default function SaidaClient({
       setCancelandoId(null);
     }
   }
+
+  async function abrirNota(row: NotaSaidaListRow, mode: ModoModal) {
+    setCarregandoDetalhe(true);
+    try {
+      const dados = await obterNotaSaida(row.id_nota_saida, mode);
+      if (!dados) {
+        mostrarAviso("Não foi possível carregar a nota de saída.", "erro");
+        return;
+      }
+      setNotaModal({ mode, data: dados });
+    } finally {
+      setCarregandoDetalhe(false);
+    }
+  }
+
+  async function abrirRemessa(idRemessa: number, mode: ModoModal) {
+    setCarregandoDetalhe(true);
+    try {
+      const dados = await obterRemessa(idRemessa, mode);
+      if (!dados) {
+        mostrarAviso("Não foi possível carregar a remessa.", "erro");
+        return;
+      }
+      setRemessaModal({ mode, data: dados });
+    } finally {
+      setCarregandoDetalhe(false);
+    }
+  }
+
+  const acoesNota: Action<NotaSaidaListRow>[] = [
+    ...(podeConsultarNota
+      ? [
+          {
+            icon: "/icons/actions/Olho.svg",
+            label: "Visualizar",
+            onClick: (row: NotaSaidaListRow) => {
+              void abrirNota(row, "view");
+            },
+          },
+        ]
+      : []),
+    ...(podeAlterarNota
+      ? [
+          {
+            icon: "/icons/actions/Editar.svg",
+            label: "Editar",
+            onClick: (row: NotaSaidaListRow) => {
+              void abrirNota(row, "edit");
+            },
+          },
+        ]
+      : []),
+  ];
 
   /** Conteúdo da linha expandida: as remessas da nota de saída. */
   function renderRemessas(nota: NotaSaidaListRow) {
@@ -104,7 +197,41 @@ export default function SaidaClient({
             <span className="text-sm text-ink">{remessa.produtos}</span>
             <span className="text-sm text-ink">{remessa.statusLabel}</span>
 
-            <div className="flex justify-start sm:justify-end">
+            <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+              {podeConsultarRemessa && (
+                <button
+                  type="button"
+                  title="Visualizar remessa"
+                  aria-label="Visualizar remessa"
+                  onClick={() => void abrirRemessa(remessa.id_remessa, "view")}
+                  className={ICONE_ACTION_CLS}
+                  disabled={carregandoDetalhe}
+                >
+                  <img
+                    src="/icons/actions/Olho.svg"
+                    alt="Visualizar remessa"
+                    className="h-5 w-5"
+                  />
+                </button>
+              )}
+
+              {podeAlterarRemessa && remessa.podeEditar && (
+                <button
+                  type="button"
+                  title="Editar remessa"
+                  aria-label="Editar remessa"
+                  onClick={() => void abrirRemessa(remessa.id_remessa, "edit")}
+                  className={ICONE_ACTION_CLS}
+                  disabled={carregandoDetalhe}
+                >
+                  <img
+                    src="/icons/actions/Editar.svg"
+                    alt="Editar remessa"
+                    className="h-5 w-5"
+                  />
+                </button>
+              )}
+
               {podeCancelarRemessa && remessa.podeCancelar ? (
                 <Button
                   label={cancelandoId === remessa.id_remessa ? "Cancelando..." : "Cancelar remessa"}
@@ -153,6 +280,7 @@ export default function SaidaClient({
         columns={columnsSaida}
         data={resultadoSaida.data}
         idField="id_nota_saida"
+        actions={acoesNota}
         rowExpansivel={() => true}
         renderExpandido={renderRemessas}
         paginacaoServidor={{
@@ -162,7 +290,7 @@ export default function SaidaClient({
           onPageChange: (page) => void carregarSaida(page, resultadoSaida.limit),
           onPageSizeChange: (limit) => void carregarSaida(1, limit),
         }}
-        carregando={carregandoSaida}
+        carregando={carregandoSaida || carregandoDetalhe}
       />
 
       <Modal open={modalSaidaAberto} onClose={() => setModalSaidaAberto(false)} title="Nova saída" width="960px">
@@ -175,6 +303,46 @@ export default function SaidaClient({
             await carregarSaida(1);
           }}
         />
+      </Modal>
+
+      <Modal
+        open={notaModal !== null}
+        onClose={() => setNotaModal(null)}
+        title={notaModal?.mode === "edit" ? "Editar saída" : "Detalhes da saída"}
+        width="960px"
+      >
+        {notaModal && (
+          <NotaSaidaForm
+            mode={notaModal.mode}
+            initialData={notaModal.data}
+            onCancel={() => setNotaModal(null)}
+            onSaved={async () => {
+              setNotaModal(null);
+              await recarregarPaginaAtual();
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={remessaModal !== null}
+        onClose={() => setRemessaModal(null)}
+        title={remessaModal?.mode === "edit" ? "Editar remessa" : "Detalhes da remessa"}
+        width="960px"
+      >
+        {remessaModal && (
+          <RemessaForm
+            mode={remessaModal.mode}
+            initialData={remessaModal.data}
+            condutores={condutores}
+            veiculos={veiculos}
+            onCancel={() => setRemessaModal(null)}
+            onSaved={async () => {
+              setRemessaModal(null);
+              await recarregarPaginaAtual();
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

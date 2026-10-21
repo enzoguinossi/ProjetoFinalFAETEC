@@ -15,6 +15,22 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Visualização e edição da nota de saída e da remessa `(KAN-140):** a listagem de
+  `/mov-estoque` (aba Saída) ganhou a coluna de ações com visualizar
+  (`nota_saida.consultar`) e editar (`nota_saida.alterar`) da nota, e cada remessa da
+  expansão ganhou visualizar (`remessa.consultar`) e editar (`remessa.alterar`) ao lado do
+  cancelamento — todas validadas no servidor. O `RemessaForm` (`mode` view/edit) mostra
+  destinatário, condutor, veículo, urgência, observação, status e os itens com
+  solicitada/separada/entregue; a criação continua no `SaidaForm`. A remessa só é editável
+  em `EM_PREPARACAO` ou `PRONTO_PARA_ENTREGA` — finalizada ou cancelada é histórico
+  (RN004) e a edição é recusada. Em transação única, cada item alterado corrige a reserva
+  **pelo delta** (`nova_solicitada − antiga`): `estoque.saldo_reservado += delta` e uma
+  `reserva_estoque` com `quantidade = delta` (positiva ou negativa) e os saldos
+  anterior/posterior; item novo reserva o valor cheio, e a operação grava auditoria
+  (`Remessa`/`ALTERAR`). A nota de saída é editada apenas na observação
+  (`NotaSaida`/`ALTERAR`) — as remessas são editadas individualmente, cada uma com a sua
+  reserva. **Remover item não é permitido** (não há estado de item excluído — RN004); a UI
+  não oferece a ação e o serviço/DAO recusam. Qualquer falha desfaz tudo.
 - **Visualização e edição da nota de entrada `(KAN-140)`:** a listagem de
   `/mov-estoque` (aba Entrada) ganhou a coluna de ações com visualizar
   (`nota_entrada.consultar`) e editar (`nota_entrada.alterar`, validados no

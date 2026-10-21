@@ -94,6 +94,8 @@ export type RemessaNotaRow = {
   status: string;
   statusLabel: string;
   podeCancelar: boolean;
+  /** Só remessas em preparação ou prontas para entrega podem ser editadas. */
+  podeEditar: boolean;
 };
 
 export type NotaSaidaListRow = {
@@ -139,4 +141,63 @@ export type RemessaSaidaPayload = {
 export type NovaSaidaPayload = {
   observacao?: string | null;
   remessas: RemessaSaidaPayload[];
+};
+
+/** Item da edição: com `id_item_remessa` = existente; sem = novo. */
+export type ItemRemessaAtualizacaoPayload = ItemSaidaPayload & {
+  id_item_remessa?: number | null;
+};
+
+export type AtualizacaoRemessaPayload = Omit<RemessaSaidaPayload, "itens"> & {
+  itens: ItemRemessaAtualizacaoPayload[];
+};
+
+export type AtualizacaoNotaSaidaPayload = {
+  observacao?: string | null;
+};
+
+export type RemessaItemDetalhe = {
+  id_item_remessa: number;
+  id_produto: number;
+  descricao: string;
+  quantidade_solicitada: number;
+  quantidade_separada: number | null;
+  quantidade_entregue: number | null;
+};
+
+/** Remessa carregada para os modais de visualização e edição. */
+export type RemessaFormData = {
+  id_remessa: number;
+  id_nota_saida: number;
+  status: string;
+  statusLabel: string;
+  /** Só remessas em preparação ou prontas para entrega são editáveis. */
+  podeEditar: boolean;
+  id_destinatario: number;
+  destinatario: string;
+  id_funcionario_condutor: number | null;
+  condutor: string | null;
+  id_veiculo: number | null;
+  /** Placa e modelo do veículo, quando houver. */
+  veiculo: string | null;
+  urgente: boolean;
+  observacao: string | null;
+  itens: RemessaItemDetalhe[];
+};
+
+export type NotaSaidaRemessaDetalhe = {
+  id_remessa: number;
+  destinatario: string;
+  status: string;
+  statusLabel: string;
+  itens: RemessaItemDetalhe[];
+};
+
+/** Nota de saída carregada para os modais de visualização e edição. */
+export type NotaSaidaFormData = {
+  id_nota_saida: number;
+  data: string;
+  status: string;
+  observacao: string | null;
+  remessas: NotaSaidaRemessaDetalhe[];
 };
