@@ -62,6 +62,10 @@ reclassificados.
 | RUN-20261019-16 | `StatusRemessa.CANCELADA` e cancelamento | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-17 | "Mov. Estoque" vira grupo no menu; rotas de Entrada e Saída | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-18 | Seletor de entidades vira lista paginada com colunas | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-19 | Experimento de migração para shadcn/ui | developer | concluído (experimento) | `experimento-shadcn` (worktree) | KAN-140 |
+| RUN-20261020-20 | Tabela semântica própria (alinhamento), sem dependência | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-21 | `Modal` sobre Radix Dialog (foco, aria, portal) | developer | concluído (agente caiu; validado pelo Orquestrador) | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261020-22 | Rodapé do `DataTable` com contagem e paginação | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -75,6 +79,17 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
   2. **`KAN-140` no Jira** descreve escopo maior (inclui inventário e alertas de validade) e
      ainda marca o RF016 como "Importante" (hoje Essencial). Reescrita e divisão em
      subtasks precisam de aprovação do texto exato.
+  3. **Spike do portal do Radix** — o `Modal` usa portal desde `b8a79c0`, mas o
+     `figma:harvest` das 47 telas **não rodou**. O `figma:check` valida invariantes contra
+     cenas já colhidas; só a colheita nova prova que o portal não altera a estrutura
+     capturada. Até lá, o Radix está apoiado em verificação parcial.
+  4. **Branch `experimento-shadcn`** — 5 commits, sem push, parada como referência. Nada
+     dela foi integrado. Apagar a worktree exige autorização do usuário.
+
+- **Risco conhecido do ambiente de testes:** a suíte usa **um banco único** (`nexus_test`)
+  sem trava. Duas execuções simultâneas de `npm test` corrompem uma à outra e o sintoma é
+  violação de chave estrangeira — que parece defeito de código e não é (aconteceu em
+  2026-10-20 e foi diagnosticado rodando um arquivo isolado).
 
 ## Trabalho existente a preservar
 
@@ -113,10 +128,12 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 
 ## Git (verificado no checkpoint)
 
-- Branch atual: **`KAN-140-mov-estoque`** — 7 commits sobre a `main`:
+- Branch atual: **`KAN-140-mov-estoque`** — 11 commits sobre a `main`:
   `628d55e` (reserva na remessa), `0818cef` (entrada), `81fef26` (saída), `24c11fb`
-  (cancelamento), `1e011d3` (estado), `56bc3aa` (menu), `42af591` (seletor paginado).
-- `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **11 commits à frente** de
+  (cancelamento), `1e011d3` (estado), `56bc3aa` (menu), `42af591` (seletor paginado),
+  `9f391c5` (estado), `f9c24cf` (tabela semântica), `b8a79c0` (Modal com Radix) e
+  `ff90c6c` (rodapé do DataTable).
+- `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **18 commits à frente** de
   `origin/main` — nada publicado desde a release.
 - Tag `v1.17.10.2026` é a única do projeto. Árvore limpa.
 
