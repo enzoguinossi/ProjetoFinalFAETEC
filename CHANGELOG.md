@@ -15,6 +15,12 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Permissões de remessa para consulta e edição `(KAN-140)`:** o seed passa a criar
+  `remessa.consultar` e `remessa.alterar` ao lado das já existentes `remessa.criar`,
+  `remessa.alterar_status` e `remessa.finalizar`, permitindo autorizar a leitura e a edição
+  de uma remessa (`entidade.acao`). Total de permissões do seed: **68 → 70**, sem duplicatas.
+  Aplicado no banco com `npm run db:seed` (upsert idempotente); documentação de permissões
+  atualizada em `docs/dominio/ENTENDIMENTO.md` §3.15.1.
 - **Cancelamento de remessa com liberação da reserva `(KAN-140)`:** `StatusRemessa` ganhou
   `CANCELADA` (ao final do enum) e a aba Saída permite cancelar uma remessa pelo detalhe da
   nota. Só remessas em `EM_PREPARACAO` ou `PRONTO_PARA_ENTREGA` podem ser canceladas; em
