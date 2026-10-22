@@ -1,12 +1,12 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-10-19 (movimentação de estoque — KAN-140, branch de trabalho).
+> Última consolidação: 2026-10-22 (sincronização de estado e Jira — KAN-140, branch de trabalho).
 
 ## Objetivo atual
 
 **Em andamento: movimentação de estoque (KAN-140)**, na branch
-**`KAN-140-mov-estoque`** — 4 commits sobre a `main`, ainda **não integrados**.
+**`KAN-140-mov-estoque`** — **21 commits** sobre a `main`, ainda **não integrados**.
 
 Já entregue nessa branch:
 
@@ -73,6 +73,8 @@ reclassificados.
 | RUN-20261020-27 | Permissões `remessa.consultar` e `remessa.alterar` | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-28 | Nota de entrada: visualizar e editar com correção de estoque | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-29 | Remessa e nota de saída: visualizar e editar com ajuste de reserva | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261021-30 | Coluna "Código" na expansão da nota de saída | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261022-31 | Sincronização de estado + status no Jira | orchestrator | concluído (worklog pendente) | `KAN-140-mov-estoque` | KAN-137, KAN-140, KAN-146, KAN-147, KAN-164 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -85,12 +87,15 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
      quando todas estiverem. Não decidir sem o usuário.
   2. **`KAN-140` no Jira** descreve escopo maior (inclui inventário e alertas de validade) e
      ainda marca o RF016 como "Importante" (hoje Essencial). Reescrita e divisão em
-     subtasks precisam de aprovação do texto exato.
-  3. **Spike do portal do Radix** — o `Modal` usa portal desde `b8a79c0`, mas o
+     subtasks precisam de aprovação do texto exato. O status foi corrigido para
+     **Em andamento** em 2026-10-22; a issue **não tem worklog**.
+  3. **Worklog de KAN-140** — o usuário definiu **8h** em 2026-10-22; o registro está
+     **pendente** porque o MCP do Atlassian caiu (HTTP 503) antes da chamada de worklog.
+  4. **Spike do portal do Radix** — o `Modal` usa portal desde `b8a79c0`, mas o
      `figma:harvest` das 47 telas **não rodou**. O `figma:check` valida invariantes contra
      cenas já colhidas; só a colheita nova prova que o portal não altera a estrutura
      capturada. Até lá, o Radix está apoiado em verificação parcial.
-  4. **Branch `experimento-shadcn`** — 5 commits, sem push, parada como referência. Nada
+  5. **Branch `experimento-shadcn`** — 5 commits, sem push, parada como referência. Nada
      dela foi integrado. Apagar a worktree exige autorização do usuário.
 
 - **Risco conhecido do ambiente de testes:** a suíte usa **um banco único** (`nexus_test`)
@@ -135,19 +140,26 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 
 ## Git (verificado no checkpoint)
 
-- Branch atual: **`KAN-140-mov-estoque`** — **19 commits** sobre a `main`. Marcos recentes:
-  `628d55e` (reserva na remessa), `0818cef` (entrada), `81fef26` (saída), `24c11fb`
-  (cancelamento), `56bc3aa` (menu), `42af591` (seletor paginado), `f9c24cf` (tabela
-  semântica), `b8a79c0` (Modal com Radix), `ff90c6c` (rodapé), `32ab8fa` (chave única),
+- Branch atual: **`KAN-140-mov-estoque`** — **21 commits** sobre a `main` (`main` = `1097e0f`).
+  Marcos recentes: `628d55e` (reserva na remessa), `0818cef` (entrada), `81fef26` (saída),
+  `24c11fb` (cancelamento), `56bc3aa` (menu), `42af591` (seletor paginado), `f9c24cf`
+  (tabela semântica), `b8a79c0` (Modal com Radix), `ff90c6c` (rodapé), `32ab8fa` (chave única),
   `6637741` (chave nullable), `f1f3f09` (botões), `fca9932` (linha expansível),
-  `5e42d92` (permissões de remessa), `977dcd3` (entrada view/edit) e `26e4c74`
-  (saída e remessa view/edit).
-- `main` = `1097e0f`; `origin/main` = `6922050`. A branch está **26 commits à frente** de
-  `origin/main` — nada publicado desde a release.
-- Tag `v1.17.10.2026` é a única do projeto. Árvore limpa.
+  `5e42d92` (permissões de remessa), `977dcd3` (entrada view/edit), `26e4c74`
+  (saída e remessa view/edit) e `61ccc48` (coluna Código na expansão).
+- `origin/main` = `6922050`. A branch está **28 commits à frente** de `origin/main`; a `main`
+  local está **7 commits à frente** de `origin/main` (docs + `e407b96`) — nada publicado desde
+  a release.
+- Tag `v1.17.10.2026` é a única do projeto. Árvore limpa (nenhum arquivo modificado ou não
+  rastreado neste checkout).
 
 ## Último checkpoint válido
 
+- 2026-10-22 — estado reconferido no Git e no Jira: branch com 21 commits, árvore limpa,
+  `npm run test:coverage` verde (222 testes; cobertura global 90,22% de statements, services
+  90,4%). Status do Jira sincronizado (ver "Jira em 2026-10-22"). Worklog de KAN-140 ainda
+  pendente de informação do usuário.
+- 2026-10-21 — coluna "Código" na expansão da nota de saída (`61ccc48`).
 - 2026-10-19 — movimentação de estoque: entrada, saída e cancelamento implementados na
   branch `KAN-140-mov-estoque`, com banco aplicado e sincronizado.
 - Documentação anterior consolidada: `docs/` em `dominio/` · `processo/` · `diagramas/`;
@@ -155,21 +167,43 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
   reclassificados e escopo fora documentado.
 - Entradas **publicadas** do `CHANGELOG` permanecem intactas (não se reescreve histórico).
 
+## Jira em 2026-10-22
+
+| Issue | Antes | Depois | Base da decisão |
+| --- | --- | --- | --- |
+| KAN-137 — Autenticação e Usuários | Em andamento | **Concluído** | RF001/RF002/RNF004 no código (`src/app/usuarios`, `src/app/perfis`, `src/services/permissao.ts`, `src/proxy.ts`); inativação e `ultimo_acesso` presentes |
+| KAN-146 — Testes unitários | A fazer | **Concluído** | `npm run test:coverage`: 222 testes em 25 arquivos; services 90,4% de statements (meta ≥70%); CI em `.github/workflows/tests.yml` |
+| KAN-147 — Testes de integração | A fazer | **Em andamento** | testes de serviço com banco real (`tests/services/nota-entrada`, `nota-saida`, `remessa-*`); fluxos de entrega/baixa ainda não existem |
+| KAN-164 — Refatoração e otimização | A fazer | **Em andamento** | paginação server-side nos 6 módulos + rodapé do `DataTable` entregues; debounce, N+1 e consolidação pendentes |
+| KAN-140 — Módulo de Estoque | A fazer | **Em andamento** (confirmar — a transição falhou com 503 na primeira tentativa) | RF012/**RF017a**/**RF017b** entregues na branch; RF014 (validade), RF015 (inventário) e RF016 (baixas) sem código |
+
+Comentários nas issues: **nenhum publicado** — `docs/processo/JIRA.md` exige aprovação prévia
+do texto. **Worklog:** o usuário definiu **8h** para a KAN-140 em 2026-10-22; a gravação
+falhou porque o MCP do Atlassian devolveu 503 e saiu do ar — **repetir** com
+`addOrEditJiraIssueWorklog` (`issueIdOrKey: KAN-140`, `timeSpent: 8h`).
+
 ## Testes executados
 
-- `npm test` → **191/191 (21 arquivos)** · `npm run build` → *Compiled successfully* —
-  reexecutados pelo Orquestrador no `24c11fb`.
+- `npm run test:coverage` (2026-10-22, Orquestrador) → **222/222 (25 arquivos)**; cobertura
+  global 90,22% statements · 84,55% branches · 90,94% funções · 92,28% linhas; `services`
+  90,4% statements · `dao` 94,33%.
+- Última execução de `npm test` + `npm run build` + `npm run figma:check` antes do commit
+  `61ccc48`: 222/222, build *Compiled successfully*, plugin verificado sem problemas
+  (`RUN-20261021-30`).
 - `npx prisma validate` + `prisma generate` + `prisma db push` → OK; `migrate diff` →
   *No difference detected*.
 - `node scripts/ai-workflow-check.mjs` → 13/13 automáticos, 0 falhas (última execução).
-- `npm run figma:check` — da release anterior.
 
 ## Próximas ações
 
-1. **Decidir quando a nota vira `CANCELADA`** (uma remessa ou todas) — pendência registrada.
-2. **Continuar a KAN-140:** entrega/baixa da remessa (finalização), que consome a reserva e
-   dá a baixa física; depois rotas e percursos (RF022, agora Essencial).
-3. **Integrar a branch na `main`** e publicar — requer aprovação do usuário.
-4. **Reescrever a `KAN-140` no Jira** (escopo e divisão em subtasks), com o texto exato
+1. **Registrar o worklog da KAN-140** — 8h definidas pelo usuário; repetir a chamada
+   `addOrEditJiraIssueWorklog` quando o MCP do Atlassian voltar.
+2. **Confirmar a transição da KAN-140** para *Em andamento* (a chamada inicial devolveu 503).
+3. **Continuar a KAN-140:** entrega/baixa da remessa (finalização), que consome a reserva e
+   dá a baixa física; depois baixas (RF016), inventário (RF015), validade (RF014) e rotas
+   e percursos (RF022, agora Essencial).
+4. **Integrar a branch na `main`** e publicar — requer aprovação do usuário.
+5. **Reescrever a `KAN-140` no Jira** (escopo e divisão em subtasks), com o texto exato
    aprovado antes de qualquer alteração.
-5. Definir o destino de `gravacao` (worktree com `prisma/seed-demo.ts` não rastreado).
+6. Definir o destino de `gravacao` (worktree com `prisma/seed-demo.ts` não rastreado) e da
+   `experimento-shadcn`.
