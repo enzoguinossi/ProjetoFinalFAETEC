@@ -6,6 +6,7 @@ import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import type { Action, Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
+import { formatarCodigo } from "@/lib/formatar";
 import type { PaginatedResult } from "@/types";
 import SaidaForm from "./SaidaForm";
 import NotaSaidaForm from "./NotaSaidaForm";
@@ -178,7 +179,7 @@ export default function SaidaClient({
     return (
       <div className="flex flex-col gap-2">
         <div className="grid items-center gap-3 px-4 font-sans text-xs uppercase tracking-[0.02em] text-[#697077] sm:grid-cols-[1fr_2.5fr_0.9fr_1.4fr_auto]">
-          <span>Destinatário</span>
+          <span>Código</span>
           <span>Nome</span>
           <span>Produtos</span>
           <span>Status</span>
@@ -191,7 +192,7 @@ export default function SaidaClient({
             className="grid items-center gap-3 rounded-[1rem] bg-[rgba(0,0,0,0.03)] px-4 py-3 font-sans sm:grid-cols-[1fr_2.5fr_0.9fr_1.4fr_auto]"
           >
             <span className="text-sm text-[#697077]">
-              #{remessa.id_destinatario}
+              {formatarCodigo(remessa.id_destinatario)}
             </span>
             <span className="text-base text-ink-strong">{remessa.destinatario}</span>
             <span className="text-sm text-ink">{remessa.produtos}</span>
