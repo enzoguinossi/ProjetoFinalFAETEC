@@ -12,8 +12,6 @@ export type PercursoListRow = {
   id_percurso: number;
   nome: string;
   total_destinatarios: number;
-  situacao: "Ativo" | "Desativado";
-  ativo: boolean;
 };
 
 export type PercursoDestinatarioForm = {
@@ -27,7 +25,6 @@ export type PercursoFormData = {
   id_percurso: number;
   nome: string;
   descricao: string | null;
-  ativo: boolean;
   destinatarios: PercursoDestinatarioForm[];
 };
 
@@ -57,8 +54,6 @@ export async function listarPercursos(
       id_percurso: p.id_percurso,
       nome: p.nome,
       total_destinatarios: p._count.destinatarios,
-      situacao: p.ativo ? "Ativo" : "Desativado",
-      ativo: p.ativo,
     })),
   };
 }
@@ -76,7 +71,6 @@ export async function getPercurso(id: number): Promise<PercursoFormData | null> 
     id_percurso: percurso.id_percurso,
     nome: percurso.nome,
     descricao: percurso.descricao,
-    ativo: percurso.ativo,
     destinatarios: percurso.destinatarios.map((d) => ({
       id_destinatario: d.id_destinatario,
       razao_social: d.destinatario.pessoaJuridica.razao_social,
@@ -174,10 +168,10 @@ export async function salvarPercurso(
   }
 }
 
-export async function desativarPercurso(id: number) {
-  return comPermissao("percurso.desativar", async (user) => {
+export async function excluirPercurso(id: number) {
+  return comPermissao("percurso.excluir", async (user) => {
     try {
-      const resultado = await percursoService.desativar(id, user.id_usuario);
+      const resultado = await percursoService.excluir(id, user.id_usuario);
       if ("error" in resultado) return { error: resultado.error };
       return { success: true };
     } catch (e) {

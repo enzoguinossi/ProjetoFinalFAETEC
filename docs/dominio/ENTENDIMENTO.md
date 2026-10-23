@@ -550,8 +550,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 percurso
 ├── ID_percurso           INT PK auto_increment
 ├── nome                  VARCHAR NOT NULL     ← "Escolas da roça", "Longe→perto"
-├── descricao             TEXT
-└── ativo                 BOOLEAN DEFAULT TRUE
+└── descricao             TEXT
 
 percurso_destinatario
 ├── ID_percurso           INT FK → percurso
@@ -560,6 +559,12 @@ percurso_destinatario
 ├── PRIMARY KEY (ID_percurso, ID_destinatario)
 ```
 
+Regras:
+- O percurso é um atalho de ordenação: guarda apenas o nome, a descrição e a ordem das
+  visitas. Não possui `ativo` e **não é desativado** — excluir é **físico** e permanente
+  (o registro e as visitas são apagados; a auditoria guarda o snapshot anterior).
+- O nome é único entre **todos** os percursos existentes.
+
 #### 3.10.2 Rota (Instância do Dia)
 
 ```
@@ -567,15 +572,14 @@ rota
 ├── ID_rota               INT PK auto_increment
 ├── data_criacao          TIMESTAMP NOT NULL
 ├── data_prevista         DATE                  ← qual dia vai rodar
-├── ID_percurso           INT FK → percurso NULL  ← template usado como base (opcional)
 ├── observacao            TEXT
 ├── status                ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA) DEFAULT PLANEJADA
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
 Regras:
-- Ao criar uma rota, o Jonathan pode selecionar um percurso pré-cadastrado
-- A ordem pode ser editada livremente **sem alterar o template original**
+- **A rota não armazena o percurso.** O percurso só serve para ordenar os destinatários no
+  momento de montar a rota; a ordem gravada na rota é a sua própria (`rota_remessa`).
 - A rota não precisa de nome — é filtrável por data, destinatários, remessas
 - A rota **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a
   `CONCLUIDA` quando é encerrado. O status é próprio da rota, independente do status das
@@ -905,7 +909,7 @@ Permissões criadas por `prisma/seed.ts` (**80** no total):
 | `nota_entrada` | criar, alterar, consultar, cancelar |
 | `nota_saida` | criar, alterar, consultar, cancelar |
 | `remessa` | criar, alterar, alterar_status, consultar, finalizar |
-| `percurso` | listar, criar, alterar, consultar, desativar |
+| `percurso` | listar, criar, alterar, consultar, excluir |
 | `rota` | listar, criar, alterar, consultar, desativar |
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
@@ -914,6 +918,8 @@ Permissões criadas por `prisma/seed.ts` (**80** no total):
 
 > Perfil **não é desativado**: `perfil.excluir` é exclusão física (`src/services/permissao.ts`).
 > O seed remove a permissão obsoleta `perfil.desativar` caso ela exista no banco.
+> Percurso **não é desativado**: `percurso.excluir` é exclusão física. O seed remove a
+> permissão obsoleta `percurso.desativar` caso ela exista no banco.
 
 #### 3.15.2 Perfil (Template)
 

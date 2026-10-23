@@ -71,8 +71,8 @@ export class PercursoService {
     const validado = this.validar(input);
     if ("error" in validado) return validado;
 
-    if (await percursoDAO.nomeAtivoEmUso(validado.dados.nome)) {
-      return { error: "Já existe um percurso ativo com este nome." };
+    if (await percursoDAO.nomeEmUso(validado.dados.nome)) {
+      return { error: "Já existe um percurso com este nome." };
     }
 
     return { percurso: await percursoDAO.create(validado.dados, id_usuario) };
@@ -85,8 +85,8 @@ export class PercursoService {
     const validado = this.validar(input);
     if ("error" in validado) return validado;
 
-    if (await percursoDAO.nomeAtivoEmUso(validado.dados.nome, idPercurso)) {
-      return { error: "Já existe um percurso ativo com este nome." };
+    if (await percursoDAO.nomeEmUso(validado.dados.nome, idPercurso)) {
+      return { error: "Já existe um percurso com este nome." };
     }
 
     const existente = await percursoDAO.getById(idPercurso);
@@ -97,14 +97,14 @@ export class PercursoService {
     };
   }
 
-  async desativar(id: number, id_usuario: number) {
+  async excluir(id: number, id_usuario: number) {
     const idPercurso = idPositivo(id);
     if (!idPercurso) return { error: "Percurso inválido." };
 
     const existente = await percursoDAO.getById(idPercurso);
     if (!existente) return { error: "Percurso não encontrado." };
 
-    return { percurso: await percursoDAO.desativar(idPercurso, id_usuario) };
+    return { percurso: await percursoDAO.excluir(idPercurso, id_usuario) };
   }
 }
 

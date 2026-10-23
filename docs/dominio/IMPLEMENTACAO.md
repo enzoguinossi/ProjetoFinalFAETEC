@@ -37,7 +37,7 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia) e exposta na aba Saída (saldo disponível por produto + aviso ao exceder, sem bloquear a gravação); **sem** assistente dedicado |
 | RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); nada vinculado a remessa |
 | RF021 — Pendências e urgências | não implementado | Sem fluxo de pendência/urgência |
-| RF022 — Percurso e rota | parcial | **Percurso** implementado em `src/app/expedicoes/percursos/**`, `src/services/percurso.ts` e `src/dao/percurso.ts`: CRUD com destinatários ordenados, desativação (soft delete) e auditoria; **rota ainda não implementada** |
+| RF022 — Percurso e rota | parcial | **Percurso** implementado em `src/app/expedicoes/percursos/**`, `src/services/percurso.ts` e `src/dao/percurso.ts`: CRUD com destinatários ordenados, exclusão física (auditoria `EXCLUIR` com o snapshot anterior) e nome único entre todos; **rota ainda não implementada** |
 | RF023 — Relatórios | não implementado | Item de menu `/relatorios` **sem página** (`src/components/sidebar-config.ts`) |
 | RF024 — Exportação de dados | não implementado | Sem geração de PDF/CSV/XLSX |
 | RF025 — Importação de NF-e (XML) | não implementado | Sem leitura de XML NF-e — **fora do escopo** (`ESCOPO_FORA.md`) |

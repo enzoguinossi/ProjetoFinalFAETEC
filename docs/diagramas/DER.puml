@@ -468,7 +468,6 @@ entity "percurso" as percurso {
   --
   * nome : VARCHAR
   descricao : TEXT
-  * ativo : BOOLEAN
 }
 
 entity "percurso_destinatario" as perc_dest {
@@ -483,7 +482,6 @@ entity "rota" as rota {
   --
   * data_criacao : TIMESTAMP
   data_prevista : DATE
-  ID_percurso : INT <<FK>>
   observacao : TEXT
   * status : ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA)
   * ativo : BOOLEAN
@@ -693,7 +691,6 @@ veiculo ||--o{ remessa
 ' Percurso / Rota
 percurso ||--|{ perc_dest
 destinatario ||--o{ perc_dest
-percurso ||--o{ rota
 rota ||--o{ rota_rem
 remessa ||--o{ rota_rem
 

@@ -46,24 +46,18 @@ async function garantirNomeUnico(
   const existente = await client.percurso.findFirst({
     where: {
       nome,
-      ativo: true,
       ...(ignorarId ? { NOT: { id_percurso: ignorarId } } : {}),
     },
     select: { id_percurso: true },
   });
-  if (existente) throw new Error("Já existe um percurso ativo com este nome.");
+  if (existente) throw new Error("Já existe um percurso com este nome.");
 }
 
 export class PercursoDAO {
-  /**
-   * Lista paginada de percursos com a contagem de destinatários.
-   * Sem `ativo` informado, devolve ativos e desativados (a tela de cadastro
-   * mostra a situação); os seletores de rota pedem `ativo: true`.
-   */
-  async list(params: ListParams & { ativo?: boolean } = {}) {
+  /** Lista paginada de percursos com a contagem de destinatários. */
+  async list(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.PercursoWhereInput = {};
-    if (params.ativo !== undefined) where.ativo = params.ativo;
     if (params.search) where.nome = { contains: params.search };
 
     const [data, total] = await Promise.all([
@@ -93,12 +87,11 @@ export class PercursoDAO {
     });
   }
 
-  /** Nome já usado por um percurso ativo (fora do próprio, ao alterar). */
-  async nomeAtivoEmUso(nome: string, ignorarId?: number): Promise<boolean> {
+  /** Nome já usado por outro percurso (fora do próprio, ao alterar). */
+  async nomeEmUso(nome: string, ignorarId?: number): Promise<boolean> {
     const existente = await prisma.percurso.findFirst({
       where: {
         nome,
-        ativo: true,
         ...(ignorarId ? { NOT: { id_percurso: ignorarId } } : {}),
       },
       select: { id_percurso: true },
@@ -182,35 +175,32 @@ export class PercursoDAO {
     });
   }
 
-  /** Desativação (soft delete): o registro e a ordem das visitas permanecem. */
-  async desativar(id: number, id_usuario: number) {
+  /**
+   * Exclusão física: o registro e as visitas são apagados. O percurso não tem
+   * histórico próprio — a auditoria guarda o snapshot anterior.
+   */
+  async excluir(id: number, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.percurso.findUniqueOrThrow({
         where: { id_percurso: id },
         include: includeDestinatarios,
       });
+      const dados = snapshot(antes);
 
-      if (!antes.ativo) return antes;
-
-      await tx.percurso.update({
-        where: { id_percurso: id },
-        data: { ativo: false },
-      });
+      await tx.percursoDestinatario.deleteMany({ where: { id_percurso: id } });
+      await tx.percurso.delete({ where: { id_percurso: id } });
 
       await registrarAuditoria(
         id_usuario,
-        "DESATIVAR",
+        "EXCLUIR",
         "Percurso",
         id,
-        snapshot(antes),
-        { ...snapshot(antes), ativo: false },
+        dados,
+        null,
         tx,
       );
 
-      return tx.percurso.findUniqueOrThrow({
-        where: { id_percurso: id },
-        include: includeDestinatarios,
-      });
+      return dados;
     });
   }
 

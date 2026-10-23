@@ -17,24 +17,24 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 - **CRUD de percursos de expedição `(KAN-140)`:** nova tela `/expedicoes/percursos`
   (grupo **Expedições** na sidebar, padrão do grupo Cadastros) para cadastrar os templates
-  ordenados de visitas que as rotas usarão como base. A listagem mostra nome, quantidade de
-  destinatários e situação, com ações de visualizar, editar e desativar. O formulário exige
-  nome (único entre os ativos) e ao menos um destinatário, sem repetição; a ordem das visitas
-  é editável por setas e gravada em `ordem_visita` contínua a partir de 1. A desativação é
-  **soft delete** (`ativo = false`) — o registro e as visitas permanecem e o percurso deixa
-  de aparecer para novas rotas. DAO, serviço e actions ficam em `src/dao/percurso.ts`,
+  ordenados de visitas que as rotas usarão como base. A listagem mostra nome e quantidade de
+  destinatários, com ações de visualizar, editar e excluir. O formulário exige
+  nome (único entre todos os percursos) e ao menos um destinatário, sem repetição; a ordem
+  das visitas é editável por setas e gravada em `ordem_visita` contínua a partir de 1. A
+  exclusão é **física** — o registro e as visitas são apagados e a auditoria guarda o
+  snapshot anterior. DAO, serviço e actions ficam em `src/dao/percurso.ts`,
   `src/services/percurso.ts` e `src/app/expedicoes/percursos/actions.ts`; criar, alterar e
-  desativar gravam auditoria (`Percurso`) e as permissões `percurso.*` são validadas no
+  excluir gravam auditoria (`Percurso`) e as permissões `percurso.*` são validadas no
   servidor. O seletor de destinatários tem listagem própria (não depende de
   `estoque.saida`). Testes em `tests/services/percurso.test.ts`.
 - **Base do módulo de expedições `(KAN-140)`:** a `rota` ganhou **status próprio** —
   `enum StatusRota { PLANEJADA, EM_PERCURSO, CONCLUIDA }` no schema, com
   `status StatusRota @default(PLANEJADA)` em `Rota` (a rota nasce planejada) e a constante
   `STATUS_ROTA`/tipo `StatusRota` em `src/types/index.ts`. O seed passou a criar as
-  permissões de `percurso` e `rota` (`listar`, `criar`, `alterar`, `consultar`,
-  `desativar`), levando o catálogo de **70 para 80**. DER, `classes.puml` e
-  `ENTENDIMENTO.md` (§3.10 e §3.15.1) refletem o status e as novas permissões. Telas,
-  DAOs, serviços e actions vêm nos runs seguintes.
+  permissões de `percurso` (`listar`, `criar`, `alterar`, `consultar`, `excluir`) e de `rota`
+  (`listar`, `criar`, `alterar`, `consultar`, `desativar`), levando o catálogo de **70 para
+  80**. DER, `classes.puml` e `ENTENDIMENTO.md` (§3.10 e §3.15.1) refletem o status e as
+  novas permissões. Telas, DAOs, serviços e actions vêm nos runs seguintes.
 - **Visualização e edição da nota de saída e da remessa `(KAN-140):** a listagem de
   `/mov-estoque` (aba Saída) ganhou a coluna de ações com visualizar
   (`nota_saida.consultar`) e editar (`nota_saida.alterar`) da nota, e cada remessa da
@@ -102,6 +102,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Percurso é excluído fisicamente e a rota não guarda o percurso `(KAN-140)`:** por
+  decisão do usuário, `percurso` deixou de ter `ativo` e passou a ser **excluído
+  fisicamente** (como `unidade_conversao`); `rota` perdeu `ID_percurso` — o percurso é
+  apenas um atalho de ordenação no momento de montar a rota. Antes do `db push` foi excluído
+  o único percurso inativo existente (1 registro, 3 visitas) e confirmado que nenhuma rota o
+  referenciava. A permissão `percurso.desativar` virou `percurso.excluir` (catálogo segue com
+  **80**) e a órfã `percurso.desativar` foi removida do banco. A tela perdeu a coluna
+  Situação e a ação Desativar: excluir usa `ConfirmDialog`, exige `percurso.excluir` e avisa
+  que a ação é permanente; a auditoria grava `Percurso`/`EXCLUIR` com o snapshot anterior. O
+  nome passou a ser único entre todos os percursos. `AGENTS.md` §7/§13, `ENTENDIMENTO.md`
+  §3.10.1/§3.10.2/§3.15.1, `IMPLEMENTACAO.md` e os diagramas foram alinhados.
 - **Chave de acesso da NF-e vira coluna da nota de entrada `(KAN-140)`:** a tabela
   `nota_entrada_chave_acesso` deixou de existir; a chave passou a ser a coluna nullable e
   única `nota_entrada.chave_acesso VARCHAR(44)` — a nota tem no máximo uma chave, e o

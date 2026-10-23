@@ -586,9 +586,7 @@ model Percurso {
   id_percurso   Int                    @id @default(autoincrement()) @map("ID_percurso")
   nome          String                 @map("nome")
   descricao     String?                @map("descricao") @db.Text
-  ativo         Boolean                @default(true) @map("ativo")
   destinatarios PercursoDestinatario[]
-  rotas         Rota[]
 
   @@map("percurso")
 }
@@ -609,14 +607,11 @@ model Rota {
   id_rota       Int           @id @default(autoincrement()) @map("ID_rota")
   data_criacao  DateTime      @map("data_criacao") @db.Timestamp(0)
   data_prevista DateTime?     @map("data_prevista") @db.Date
-  id_percurso   Int?          @map("ID_percurso")
   observacao    String?       @map("observacao") @db.Text
   status        StatusRota    @default(PLANEJADA) @map("status")
   ativo         Boolean       @default(true) @map("ativo")
-  percurso      Percurso?     @relation(fields: [id_percurso], references: [id_percurso])
   remessas      RotaRemessa[]
 
-  @@index([id_percurso], map: "rota_ID_percurso_fkey")
   @@map("rota")
 }
 

@@ -22,7 +22,7 @@ vi.mock("@/services/permissao", () => ({
 }));
 
 import {
-  desativarPercurso,
+  excluirPercurso,
   salvarPercurso,
 } from "@/app/expedicoes/percursos/actions";
 
@@ -60,7 +60,6 @@ describe("percursoService", () => {
       include: { destinatarios: { orderBy: { ordem_visita: "asc" } } },
     });
 
-    expect(percurso.ativo).toBe(true);
     expect(percurso.nome).toBe("Escolas da roça");
     expect(
       percurso.destinatarios.map((d) => ({
@@ -86,7 +85,7 @@ describe("percursoService", () => {
     });
   });
 
-  it("recusa nome já usado por outro percurso ativo", async () => {
+  it("recusa nome já usado por outro percurso", async () => {
     const { usuario } = await criarUsuario();
     const [destinatario] = await criarDestinatarios(1);
     if (!destinatario) throw new Error("destinatário não criado");
@@ -114,9 +113,53 @@ describe("percursoService", () => {
 
     expect("error" in segundo).toBe(true);
     if ("error" in segundo) {
-      expect(segundo.error).toContain("Já existe um percurso ativo");
+      expect(segundo.error).toContain("Já existe um percurso com este nome");
     }
     expect(await prismaTeste.percurso.count()).toBe(1);
+  });
+
+  it("mantém o nome único entre todos os percursos, inclusive ao alterar", async () => {
+    const { usuario } = await criarUsuario();
+    const [destinatario] = await criarDestinatarios(1);
+    if (!destinatario) throw new Error("destinatário não criado");
+
+    const destinatarios = [
+      { id_destinatario: destinatario.id_destinatario, ordem_visita: 1 },
+    ];
+
+    const primeiro = await percursoService.criar(
+      { nome: "Percurso A", destinatarios },
+      usuario.id_usuario,
+    );
+    if ("error" in primeiro) throw new Error(primeiro.error);
+
+    const segundo = await percursoService.criar(
+      { nome: "Percurso B", destinatarios },
+      usuario.id_usuario,
+    );
+    if ("error" in segundo) throw new Error(segundo.error);
+
+    const alterado = await percursoService.alterar(
+      segundo.percurso.id_percurso,
+      { nome: "Percurso A", destinatarios },
+      usuario.id_usuario,
+    );
+    expect("error" in alterado).toBe(true);
+    if ("error" in alterado) {
+      expect(alterado.error).toContain("Já existe um percurso com este nome");
+    }
+
+    const excluido = await percursoService.excluir(
+      primeiro.percurso.id_percurso,
+      usuario.id_usuario,
+    );
+    expect("error" in excluido).toBe(false);
+
+    const terceiro = await percursoService.criar(
+      { nome: "Percurso A", destinatarios },
+      usuario.id_usuario,
+    );
+    expect("error" in terceiro).toBe(false);
   });
 
   it("recusa percurso sem destinatário", async () => {
@@ -250,13 +293,13 @@ describe("percursoService", () => {
     });
   });
 
-  it("desativa sem apagar o registro nem as visitas e registra auditoria", async () => {
+  it("exclui fisicamente o percurso e as visitas, com auditoria do snapshot anterior", async () => {
     const { usuario } = await criarUsuario();
     const destinatarios = await criarDestinatarios(2);
 
     const criado = await percursoService.criar(
       {
-        nome: "Percurso a desativar",
+        nome: "Percurso a excluir",
         destinatarios: destinatarios.map((d, indice) => ({
           id_destinatario: d.id_destinatario,
           ordem_visita: indice + 1,
@@ -266,30 +309,32 @@ describe("percursoService", () => {
     );
     if ("error" in criado) throw new Error(criado.error);
 
-    const desativado = await percursoService.desativar(
+    const excluido = await percursoService.excluir(
       criado.percurso.id_percurso,
       usuario.id_usuario,
     );
-    expect("error" in desativado).toBe(false);
+    expect("error" in excluido).toBe(false);
 
-    const percurso = await prismaTeste.percurso.findUniqueOrThrow({
-      where: { id_percurso: criado.percurso.id_percurso },
-    });
-    expect(percurso.ativo).toBe(false);
-    expect(await prismaTeste.percurso.count()).toBe(1);
     expect(
-      await prismaTeste.percursoDestinatario.count({
-        where: { id_percurso: percurso.id_percurso },
+      await prismaTeste.percurso.findUnique({
+        where: { id_percurso: criado.percurso.id_percurso },
       }),
-    ).toBe(2);
+    ).toBeNull();
+    expect(await prismaTeste.percurso.count()).toBe(0);
+    expect(await prismaTeste.percursoDestinatario.count()).toBe(0);
 
-    const auditorias = await auditoriasDe("Percurso", percurso.id_percurso);
-    expect(auditorias.map((a) => a.acao)).toEqual(["CRIAR", "DESATIVAR"]);
-    expect(auditorias[1]?.dados_anteriores).toMatchObject({ nome: "Percurso a desativar" });
+    const auditorias = await auditoriasDe("Percurso", criado.percurso.id_percurso);
+    expect(auditorias.map((a) => a.acao)).toEqual(["CRIAR", "EXCLUIR"]);
+    expect(auditorias[1]?.dados_anteriores).toMatchObject({
+      nome: "Percurso a excluir",
+      destinatarios: destinatarios.map((d, indice) => ({
+        id_destinatario: d.id_destinatario,
+        ordem_visita: indice + 1,
+      })),
+    });
+    expect(auditorias[1]?.dados_novos).toBeNull();
 
-    // Não aparece mais para novas rotas (listagem de ativos).
-    const ativos = await percursoDAO.list({ ativo: true });
-    expect(ativos.total).toBe(0);
+    expect((await percursoDAO.list()).total).toBe(0);
   });
 });
 
@@ -320,7 +365,7 @@ describe("actions de percurso", () => {
     expect(await prismaTeste.percurso.count()).toBe(1);
   });
 
-  it("recusa desativar sem percurso.desativar", async () => {
+  it("recusa excluir sem percurso.excluir e exclui com a permissão", async () => {
     const { usuario } = await criarUsuario();
     sessao.id_usuario = usuario.id_usuario;
     permissoes.nomes = ["percurso.criar"];
@@ -330,7 +375,7 @@ describe("actions de percurso", () => {
 
     const criado = await percursoService.criar(
       {
-        nome: "Percurso sem permissão de desativar",
+        nome: "Percurso sem permissão de excluir",
         destinatarios: [
           { id_destinatario: destinatario.id_destinatario, ordem_visita: 1 },
         ],
@@ -340,12 +385,19 @@ describe("actions de percurso", () => {
     if ("error" in criado) throw new Error(criado.error);
 
     permissoes.nomes = ["percurso.alterar"];
-    const resultado = await desativarPercurso(criado.percurso.id_percurso);
+    const resultado = await excluirPercurso(criado.percurso.id_percurso);
 
     expect(resultado).toEqual({ error: "Sem permissão." });
-    const percurso = await prismaTeste.percurso.findUniqueOrThrow({
-      where: { id_percurso: criado.percurso.id_percurso },
-    });
-    expect(percurso.ativo).toBe(true);
+    expect(
+      await prismaTeste.percurso.findUnique({
+        where: { id_percurso: criado.percurso.id_percurso },
+      }),
+    ).not.toBeNull();
+
+    permissoes.nomes = ["percurso.excluir"];
+    const comPermissao = await excluirPercurso(criado.percurso.id_percurso);
+
+    expect(comPermissao).toEqual({ success: true });
+    expect(await prismaTeste.percurso.count()).toBe(0);
   });
 });

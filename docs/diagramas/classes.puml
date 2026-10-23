@@ -339,7 +339,6 @@ package "Logística" as Logistica {
     + ID_percurso: Integer
     + nome: String
     + descricao: Text
-    + ativo: Boolean
   }
 
   class PercursoDestinatario {
@@ -395,7 +394,6 @@ Rota "1" --> "*" RotaRemessa : agrupa >
 Remessa "1" --> "*" RotaRemessa : alocada em >
 Percurso "1" --> "*" PercursoDestinatario : define >
 Destinatario "1" --> "*" PercursoDestinatario : incluso em >
-Rota "0..1" --> "1" Percurso : baseado em (opcional) >
 Remessa "*" --> "1" Destinatario : destinada a >
 
 ' =========================================================

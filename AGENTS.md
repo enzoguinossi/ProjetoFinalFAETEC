@@ -164,6 +164,9 @@ As convenções documentadas são:
 * entidades de cadastro possuem `ativo`;
 * **hard delete é proibido** para entidades de cadastro;
 * desativação deve ser utilizada no lugar de exclusão física.
+* **Exceções (sem `ativo`, exclusão física):** `conversao_unidade` e `percurso` são
+  excluídos fisicamente e não possuem `ativo`; as demais entidades de cadastro continuam
+  com desativação (`ativo = false`).
 
 Preserve as convenções existentes do projeto.
 
@@ -392,6 +395,10 @@ DELETE FROM ...
 para excluir fisicamente entidades de cadastro.
 
 Quando a entidade possuir `ativo`, utilize a desativação prevista pelo domínio.
+
+**Exceções:** `conversao_unidade` e `percurso` são excluídos fisicamente e **não possuem
+`ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. As demais
+entidades de cadastro continuam com desativação.
 
 Históricos operacionais e registros de auditoria devem permanecer preservados.
 

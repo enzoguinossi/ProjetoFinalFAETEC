@@ -55,7 +55,7 @@ async function main() {
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
     "remessa.criar", "remessa.alterar", "remessa.alterar_status", "remessa.consultar",
     "remessa.finalizar",
-    "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.desativar",
+    "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
     "rota.listar", "rota.criar", "rota.alterar", "rota.consultar", "rota.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
     "relatorio.gerar",
@@ -71,13 +71,15 @@ async function main() {
   }
   console.log(`  ✅ ${permissoes.length} permissões`);
 
-  // ── Limpeza: perfis não são mais desativados ────────────────────
-  const obsoleta = await prisma.permissao.findUnique({ where: { nome: "perfil.desativar" } });
-  if (obsoleta) {
+  // ── Limpeza: permissões obsoletas ───────────────────────────────
+  const obsoletas = ["perfil.desativar", "percurso.desativar"];
+  for (const nome of obsoletas) {
+    const obsoleta = await prisma.permissao.findUnique({ where: { nome } });
+    if (!obsoleta) continue;
     await prisma.perfilPermissao.deleteMany({ where: { id_permissao: obsoleta.id_permissao } });
     await prisma.usuarioPermissao.deleteMany({ where: { id_permissao: obsoleta.id_permissao } });
     await prisma.permissao.delete({ where: { id_permissao: obsoleta.id_permissao } });
-    console.log("  ✅ Permissão obsoleta perfil.desativar removida");
+    console.log(`  ✅ Permissão obsoleta ${nome} removida`);
   }
 
   // ── Perfis-template ─────────────────────────────────────────────
