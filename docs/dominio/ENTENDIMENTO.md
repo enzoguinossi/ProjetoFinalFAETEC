@@ -569,6 +569,7 @@ rota
 ├── data_prevista         DATE                  ← qual dia vai rodar
 ├── ID_percurso           INT FK → percurso NULL  ← template usado como base (opcional)
 ├── observacao            TEXT
+├── status                ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA) DEFAULT PLANEJADA
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
@@ -576,6 +577,9 @@ Regras:
 - Ao criar uma rota, o Jonathan pode selecionar um percurso pré-cadastrado
 - A ordem pode ser editada livremente **sem alterar o template original**
 - A rota não precisa de nome — é filtrável por data, destinatários, remessas
+- A rota **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a
+  `CONCLUIDA` quando é encerrado. O status é próprio da rota, independente do status das
+  remessas que ela transporta.
 
 ---
 
@@ -886,7 +890,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**70** no total):
+Permissões criadas por `prisma/seed.ts` (**80** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -901,6 +905,8 @@ Permissões criadas por `prisma/seed.ts` (**70** no total):
 | `nota_entrada` | criar, alterar, consultar, cancelar |
 | `nota_saida` | criar, alterar, consultar, cancelar |
 | `remessa` | criar, alterar, alterar_status, consultar, finalizar |
+| `percurso` | listar, criar, alterar, consultar, desativar |
+| `rota` | listar, criar, alterar, consultar, desativar |
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
 | `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
@@ -993,7 +999,6 @@ As seguintes entidades **não exigem permissão** para acesso, pois são dados o
   páginas por `listParaEntidade()` e o tipo é revalidado no servidor por `tipoPermitido()`
   (`src/services/codigo.ts` → `src/lib/codigo.ts`). A ausência de `tipo_codigo.*` no seed é
   consequência desse desenho, não esquecimento.
-- `rota`, `percurso` — livre (não há telas ainda)
 - `endereco` — vinculado à entidade que o possui
 - `telefone`, `email` — vinculado à entidade que os possui
 

@@ -15,6 +15,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Base do módulo de expedições `(KAN-140)`:** a `rota` ganhou **status próprio** —
+  `enum StatusRota { PLANEJADA, EM_PERCURSO, CONCLUIDA }` no schema, com
+  `status StatusRota @default(PLANEJADA)` em `Rota` (a rota nasce planejada) e a constante
+  `STATUS_ROTA`/tipo `StatusRota` em `src/types/index.ts`. O seed passou a criar as
+  permissões de `percurso` e `rota` (`listar`, `criar`, `alterar`, `consultar`,
+  `desativar`), levando o catálogo de **70 para 80**. DER, `classes.puml` e
+  `ENTENDIMENTO.md` (§3.10 e §3.15.1) refletem o status e as novas permissões. Telas,
+  DAOs, serviços e actions vêm nos runs seguintes.
 - **Visualização e edição da nota de saída e da remessa `(KAN-140):** a listagem de
   `/mov-estoque` (aba Saída) ganhou a coluna de ações com visualizar
   (`nota_saida.consultar`) e editar (`nota_saida.alterar`) da nota, e cada remessa da

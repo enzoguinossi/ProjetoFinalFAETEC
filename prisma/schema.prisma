@@ -611,6 +611,7 @@ model Rota {
   data_prevista DateTime?     @map("data_prevista") @db.Date
   id_percurso   Int?          @map("ID_percurso")
   observacao    String?       @map("observacao") @db.Text
+  status        StatusRota    @default(PLANEJADA) @map("status")
   ativo         Boolean       @default(true) @map("ativo")
   percurso      Percurso?     @relation(fields: [id_percurso], references: [id_percurso])
   remessas      RotaRemessa[]
@@ -799,6 +800,12 @@ enum StatusRemessa {
   FINALIZADO_TOTAL
   FINALIZADO_PARCIAL
   CANCELADA
+}
+
+enum StatusRota {
+  PLANEJADA
+  EM_PERCURSO
+  CONCLUIDA
 }
 
 enum StatusVeiculo {

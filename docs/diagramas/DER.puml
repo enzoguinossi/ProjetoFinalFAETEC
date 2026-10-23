@@ -485,6 +485,7 @@ entity "rota" as rota {
   data_prevista : DATE
   ID_percurso : INT <<FK>>
   observacao : TEXT
+  * status : ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA)
   * ativo : BOOLEAN
 }
 

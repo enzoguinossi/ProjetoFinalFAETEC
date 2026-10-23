@@ -351,6 +351,7 @@ package "Logística" as Logistica {
     + data_criacao: Timestamp
     + data_prevista: Date
     + observacao: Text
+    + status: Enum
     + ativo: Boolean
   }
 

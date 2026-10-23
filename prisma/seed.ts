@@ -55,6 +55,8 @@ async function main() {
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
     "remessa.criar", "remessa.alterar", "remessa.alterar_status", "remessa.consultar",
     "remessa.finalizar",
+    "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.desativar",
+    "rota.listar", "rota.criar", "rota.alterar", "rota.consultar", "rota.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",

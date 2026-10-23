@@ -12,6 +12,9 @@ export const STATUS_REMESSA = [
 ] as const;
 export type StatusRemessa = (typeof STATUS_REMESSA)[number];
 
+export const STATUS_ROTA = ["PLANEJADA", "EM_PERCURSO", "CONCLUIDA"] as const;
+export type StatusRota = (typeof STATUS_ROTA)[number];
+
 export const STATUS_PEDIDO = ["PENDENTE", "CONFIRMADO", "RECUSADO"] as const;
 export type StatusPedido = (typeof STATUS_PEDIDO)[number];
 
