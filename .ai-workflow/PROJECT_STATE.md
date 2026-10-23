@@ -74,7 +74,9 @@ reclassificados.
 | RUN-20261020-28 | Nota de entrada: visualizar e editar com correção de estoque | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261020-29 | Remessa e nota de saída: visualizar e editar com ajuste de reserva | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261021-30 | Coluna "Código" na expansão da nota de saída | developer | concluído | `KAN-140-mov-estoque` | KAN-140 |
-| RUN-20261022-31 | Sincronização de estado + status no Jira | orchestrator | concluído (worklog pendente) | `KAN-140-mov-estoque` | KAN-137, KAN-140, KAN-146, KAN-147, KAN-164 |
+| RUN-20261022-31 | Sincronização de estado + status no Jira | orchestrator | concluído | `KAN-140-mov-estoque` | KAN-137, KAN-140, KAN-146, KAN-147, KAN-164 |
+| RUN-20261023-31 | Expedições: status da rota e permissões de rota/percurso | developer | concluído (sem commit) | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261023-32 | Expedições: CRUD de percursos | developer | **em andamento** | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -87,10 +89,12 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
      quando todas estiverem. Não decidir sem o usuário.
   2. **`KAN-140` no Jira** descreve escopo maior (inclui inventário e alertas de validade) e
      ainda marca o RF016 como "Importante" (hoje Essencial). Reescrita e divisão em
-     subtasks precisam de aprovação do texto exato. O status foi corrigido para
-     **Em andamento** em 2026-10-22; a issue **não tem worklog**.
-  3. **Worklog de KAN-140** — o usuário definiu **8h** em 2026-10-22; o registro está
-     **pendente** porque o MCP do Atlassian caiu (HTTP 503) antes da chamada de worklog.
+     subtasks precisam de aprovação do texto exato. O status está **Em andamento** desde
+     2026-10-22 (confirmado em 2026-10-23).
+  3. **Worklog de KAN-140** — lançado **8h** em 2026-10-22 (`#10124`, iniciado em 19/10
+     22:15). Mas já existia um worklog de **4h** (`#10123`, iniciado em 22/10 08:57, sem
+     comentário), que não aparecia na primeira leitura da issue. Total atual: **12h**.
+     Falta o usuário decidir se o total deve ser 8h (editar o `#10124` para 4h) ou 12h.
   4. **Spike do portal do Radix** — o `Modal` usa portal desde `b8a79c0`, mas o
      `figma:harvest` das 47 telas **não rodou**. O `figma:check` valida invariantes contra
      cenas já colhidas; só a colheita nova prova que o portal não altera a estrutura
@@ -155,10 +159,13 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 
 ## Último checkpoint válido
 
+- 2026-10-23 — status do Jira reconferido (KAN-137 e KAN-146 **Concluído**; KAN-140, KAN-147 e
+  KAN-164 **Em andamento**) e worklog de **8h** lançado na KAN-140 (`#10124`). No checkout há
+  trabalho novo de expedições ainda **não commitado**: `RUN-20261023-31` concluído (status da
+  rota + permissões) e `RUN-20261023-32` em andamento (CRUD de percursos).
 - 2026-10-22 — estado reconferido no Git e no Jira: branch com 21 commits, árvore limpa,
   `npm run test:coverage` verde (222 testes; cobertura global 90,22% de statements, services
-  90,4%). Status do Jira sincronizado (ver "Jira em 2026-10-22"). Worklog de KAN-140 ainda
-  pendente de informação do usuário.
+  90,4%).
 - 2026-10-21 — coluna "Código" na expansão da nota de saída (`61ccc48`).
 - 2026-10-19 — movimentação de estoque: entrada, saída e cancelamento implementados na
   branch `KAN-140-mov-estoque`, com banco aplicado e sincronizado.
@@ -175,12 +182,12 @@ Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar
 | KAN-146 — Testes unitários | A fazer | **Concluído** | `npm run test:coverage`: 222 testes em 25 arquivos; services 90,4% de statements (meta ≥70%); CI em `.github/workflows/tests.yml` |
 | KAN-147 — Testes de integração | A fazer | **Em andamento** | testes de serviço com banco real (`tests/services/nota-entrada`, `nota-saida`, `remessa-*`); fluxos de entrega/baixa ainda não existem |
 | KAN-164 — Refatoração e otimização | A fazer | **Em andamento** | paginação server-side nos 6 módulos + rodapé do `DataTable` entregues; debounce, N+1 e consolidação pendentes |
-| KAN-140 — Módulo de Estoque | A fazer | **Em andamento** (confirmar — a transição falhou com 503 na primeira tentativa) | RF012/**RF017a**/**RF017b** entregues na branch; RF014 (validade), RF015 (inventário) e RF016 (baixas) sem código |
+| KAN-140 — Módulo de Estoque | A fazer | **Em andamento** (confirmado em 23/10) | RF012/**RF017a**/**RF017b** entregues na branch; RF014 (validade), RF015 (inventário) e RF016 (baixas) sem código |
 
 Comentários nas issues: **nenhum publicado** — `docs/processo/JIRA.md` exige aprovação prévia
-do texto. **Worklog:** o usuário definiu **8h** para a KAN-140 em 2026-10-22; a gravação
-falhou porque o MCP do Atlassian devolveu 503 e saiu do ar — **repetir** com
-`addOrEditJiraIssueWorklog` (`issueIdOrKey: KAN-140`, `timeSpent: 8h`).
+do texto. **Worklog:** 8h lançadas na KAN-140 em 2026-10-22 (`#10124`); existe também um
+lançamento anterior de **4h** (`#10123`), então o total está em **12h** até o usuário decidir
+entre 8h (editar `#10124` para 4h) e 12h.
 
 ## Testes executados
 
@@ -196,9 +203,9 @@ falhou porque o MCP do Atlassian devolveu 503 e saiu do ar — **repetir** com
 
 ## Próximas ações
 
-1. **Registrar o worklog da KAN-140** — 8h definidas pelo usuário; repetir a chamada
-   `addOrEditJiraIssueWorklog` quando o MCP do Atlassian voltar.
-2. **Confirmar a transição da KAN-140** para *Em andamento* (a chamada inicial devolveu 503).
+1. **Fechar o worklog da KAN-140** — decidir entre 8h e 12h de total (ver pendência 3).
+2. **Concluir o `RUN-20261023-32`** (CRUD de percursos) e commitar o `RUN-20261023-31`, que
+   está pronto mas sem commit no checkout.
 3. **Continuar a KAN-140:** entrega/baixa da remessa (finalização), que consome a reserva e
    dá a baixa física; depois baixas (RF016), inventário (RF015), validade (RF014) e rotas
    e percursos (RF022, agora Essencial).
