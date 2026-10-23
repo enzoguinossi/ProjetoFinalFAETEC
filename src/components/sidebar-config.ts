@@ -20,6 +20,10 @@ export const movEstoqueItems = [
   { label: "Saída", path: "/mov-estoque/saida", icon: "/icons/nav/estoque.svg", permissao: "estoque.saida" },
 ];
 
+export const expedicaoItems = [
+  { label: "Percursos", path: "/expedicoes/percursos", icon: "/icons/nav/dados.svg", permissao: "percurso.listar" },
+];
+
 export const navItems = [
   { label: "Dashboard", path: "/dashboard", icon: "/icons/nav/dashboard.svg" },
   { label: "Pedidos", path: "/pedidos", icon: "/icons/nav/dados.svg" },

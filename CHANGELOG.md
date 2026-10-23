@@ -15,6 +15,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **CRUD de percursos de expedição `(KAN-140)`:** nova tela `/expedicoes/percursos`
+  (grupo **Expedições** na sidebar, padrão do grupo Cadastros) para cadastrar os templates
+  ordenados de visitas que as rotas usarão como base. A listagem mostra nome, quantidade de
+  destinatários e situação, com ações de visualizar, editar e desativar. O formulário exige
+  nome (único entre os ativos) e ao menos um destinatário, sem repetição; a ordem das visitas
+  é editável por setas e gravada em `ordem_visita` contínua a partir de 1. A desativação é
+  **soft delete** (`ativo = false`) — o registro e as visitas permanecem e o percurso deixa
+  de aparecer para novas rotas. DAO, serviço e actions ficam em `src/dao/percurso.ts`,
+  `src/services/percurso.ts` e `src/app/expedicoes/percursos/actions.ts`; criar, alterar e
+  desativar gravam auditoria (`Percurso`) e as permissões `percurso.*` são validadas no
+  servidor. O seletor de destinatários tem listagem própria (não depende de
+  `estoque.saida`). Testes em `tests/services/percurso.test.ts`.
 - **Base do módulo de expedições `(KAN-140)`:** a `rota` ganhou **status próprio** —
   `enum StatusRota { PLANEJADA, EM_PERCURSO, CONCLUIDA }` no schema, com
   `status StatusRota @default(PLANEJADA)` em `Rota` (a rota nasce planejada) e a constante
