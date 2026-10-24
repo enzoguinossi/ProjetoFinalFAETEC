@@ -14,11 +14,11 @@ export type ProdutoListRow = {
 
 /** Colunas da listagem/seletor de produto (Código · Descrição · Unidade · Quantidade · Qtd. Livre). */
 export const COLUNAS_PRODUTO: Column<ProdutoListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "descricao", label: "Descrição", width: "2fr" },
-  { key: "unidade", label: "Unidade", width: "0.8fr" },
-  { key: "qtd", label: "Quantidade", width: "1fr" },
-  { key: "livre", label: "Qtd. Livre", width: "1fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
+  { key: "unidade", label: "Unidade", width: "0.8fr", align: "center" },
+  { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
+  { key: "livre", label: "Qtd. Livre", width: "1fr", align: "right" },
 ];
 
 type ProdutoComEstoque = {

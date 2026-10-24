@@ -36,12 +36,17 @@ const wrapperCls = "flex flex-col gap-3 w-full";
 const tableCls = "flex flex-col rounded-[1.25rem] overflow-hidden w-full min-w-[560px]";
 const headerCls =
   "grid bg-brand text-white font-display text-base [font-weight:590] tracking-[-0.028125rem] whitespace-nowrap";
-const headerCellCls = "px-[0.6875rem] py-2 text-center";
+const headerCellCls = "px-[0.6875rem] py-2";
 const rowCls =
   "grid bg-white font-sans text-base text-ink cursor-pointer transition-[background-color] duration-100 hover:bg-[#eef6f1]";
 const rowAltCls = "bg-table-alt!";
 const cellCls =
-  "px-[0.6875rem] py-2 whitespace-nowrap overflow-hidden text-ellipsis [&:first-child]:text-center";
+  "px-[0.6875rem] py-2 whitespace-nowrap overflow-hidden text-ellipsis";
+const ALINHAMENTO_CLS = {
+  left: "text-left",
+  center: "text-center",
+  right: "text-right",
+} as const;
 const selectBtnCls =
   "px-2 py-1 border border-border rounded-md bg-white font-sans text-[0.8125rem] text-ink cursor-pointer transition-[background-color,border-color] duration-100 hover:bg-[#f2f4f8] hover:border-[#c1c7cd]";
 const emptyCls =
@@ -183,11 +188,14 @@ export default function SearchEntityModal<T>({
             >
               <div className={headerCls} style={{ gridTemplateColumns: gridCols }}>
                 {columns.map((col) => (
-                  <div key={col.key} className={headerCellCls}>
+                  <div
+                    key={col.key}
+                    className={`${headerCellCls} ${ALINHAMENTO_CLS[col.align ?? "left"]}`}
+                  >
                     {col.label}
                   </div>
                 ))}
-                <div className={headerCellCls}>Ação</div>
+                <div className={`${headerCellCls} text-center`}>Ação</div>
               </div>
 
               {linhas.length === 0 && (
@@ -206,7 +214,10 @@ export default function SearchEntityModal<T>({
                   onClick={() => selecionar(item)}
                 >
                   {columns.map((col) => (
-                    <div key={col.key} className={cellCls}>
+                    <div
+                      key={col.key}
+                      className={`${cellCls} ${ALINHAMENTO_CLS[col.align ?? "left"]}`}
+                    >
                       {col.render
                         ? col.render(item[col.key], item)
                         : String(item[col.key] ?? "")}

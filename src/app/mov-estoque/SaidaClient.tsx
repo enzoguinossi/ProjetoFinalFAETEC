@@ -104,12 +104,12 @@ export default function SaidaClient({
       key: "id_nota_saida",
       label: "Código",
       width: "0.9fr",
-      align: "left",
+      align: "center",
       render: (value) => formatarCodigo(Number(value)),
     },
     { key: "tipoLabel", label: "Tipo", width: "1.2fr", align: "center" },
     { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
-    { key: "itens", label: "Itens", width: "0.9fr", align: "center" },
+    { key: "itens", label: "Itens", width: "0.9fr", align: "right" },
     { key: "statusLabel", label: "Status", width: "1.2fr", align: "center" },
     ...(podeConsultarNota || podeAlterarNota
       ? [

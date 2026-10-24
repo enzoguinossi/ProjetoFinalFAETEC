@@ -54,14 +54,14 @@ const statusCls: Record<string, string> = {
 };
 
 const COLUNAS_NOTA: Column<NotaElegivelRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "destinatario", label: "Destinatário", width: "3fr" },
-  { key: "itens", label: "Itens", width: "0.8fr", align: "center" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
+  { key: "itens", label: "Itens", width: "0.8fr", align: "right" },
   {
     key: "saldo_pendente",
     label: "Saldo pendente",
     width: "1.2fr",
-    align: "center",
+    align: "right",
     render: (value) => formatarNumero(Number(value ?? 0)),
   },
 ];
@@ -588,10 +588,10 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
             style={{ gridTemplateColumns: gridNotas }}
           >
             <div className="px-[0.6875rem] py-2 text-center">Ordem</div>
-            <div className="px-[0.6875rem] py-2">Código</div>
+            <div className="px-[0.6875rem] py-2 text-center">Código</div>
             <div className="px-[0.6875rem] py-2">Destinatário</div>
             <div className="px-[0.6875rem] py-2 text-center">Status</div>
-            <div className="px-[0.6875rem] py-2 text-center">Itens</div>
+            <div className="px-[0.6875rem] py-2 text-right">Itens</div>
             {colunaAcoes && (
               <div className="px-[0.6875rem] py-2 text-center">Ações</div>
             )}
@@ -608,7 +608,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
               <div className="px-[0.6875rem] py-2 text-center font-semibold">
                 {nota.ordem_visita}
               </div>
-              <div className="px-[0.6875rem] py-2 whitespace-nowrap">
+              <div className="px-[0.6875rem] py-2 text-center whitespace-nowrap">
                 {nota.codigo}
               </div>
               <div className="overflow-hidden text-ellipsis whitespace-nowrap px-[0.6875rem] py-2">
@@ -617,7 +617,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
               <div className="px-[0.6875rem] py-2 text-center text-sm">
                 {nota.statusLabel}
               </div>
-              <div className="px-[0.6875rem] py-2 text-center text-sm">
+              <div className="px-[0.6875rem] py-2 text-right text-sm">
                 {nota.itens}
               </div>
               {podeAlterar && (

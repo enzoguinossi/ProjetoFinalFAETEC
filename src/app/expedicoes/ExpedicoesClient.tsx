@@ -48,6 +48,7 @@ const columns: Column<ExpedicaoListRow>[] = [
     key: "data_prevista",
     label: "Data prevista",
     width: "1.1fr",
+    align: "center",
     render: (value) => formatarData(value ? String(value) : null),
   },
   {
@@ -69,14 +70,15 @@ const columns: Column<ExpedicaoListRow>[] = [
     key: "total_notas",
     label: "Notas",
     width: "0.7fr",
-    align: "center",
+    align: "right",
     render: (value) => String(value ?? 0),
   },
-  { key: "destinatarios", label: "Destinatários", width: "3fr" },
+  { key: "destinatarios", label: "Destinatários", width: "3fr", align: "left" },
   {
     key: "veiculo",
     label: "Veículo",
     width: "1fr",
+    align: "center",
     render: (value) => (value ? String(value) : "—"),
   },
 ];

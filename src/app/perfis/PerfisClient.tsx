@@ -20,10 +20,10 @@ interface Props {
 }
 
 const columns: Column<PerfilListRow>[] = [
-  { key: "nome", label: "Nome", width: "2fr" },
-  { key: "descricao", label: "Descrição", width: "3fr" },
+  { key: "nome", label: "Nome", width: "2fr", align: "left" },
+  { key: "descricao", label: "Descrição", width: "3fr", align: "left" },
   {
-    key: "permissoes", label: "Permissões", width: "1fr",
+    key: "permissoes", label: "Permissões", width: "1fr", align: "right",
     render: (v) => String((v as string[])?.length ?? 0),
   },
 ];

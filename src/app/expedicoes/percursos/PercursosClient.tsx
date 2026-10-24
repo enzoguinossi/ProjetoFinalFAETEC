@@ -22,12 +22,12 @@ interface Props {
 }
 
 const columns: Column<PercursoListRow>[] = [
-  { key: "nome", label: "Nome", width: "4fr" },
+  { key: "nome", label: "Nome", width: "4fr", align: "left" },
   {
     key: "total_destinatarios",
     label: "Destinatários",
     width: "1.2fr",
-    align: "center",
+    align: "right",
     render: (value) => String(value ?? 0),
   },
 ];

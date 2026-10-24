@@ -24,11 +24,12 @@ type ItemSelecionado = {
 };
 
 const COLUNAS_DESTINATARIO: Column<DestinatarioPercursoRow>[] = [
-  { key: "razao_social", label: "Razão social", width: "3fr" },
+  { key: "razao_social", label: "Razão social", width: "3fr", align: "left" },
   {
     key: "tipo",
     label: "Tipo",
     width: "1fr",
+    align: "center",
     render: (value) => (value === "CRECHE" ? "Creche" : "Escola"),
   },
 ];

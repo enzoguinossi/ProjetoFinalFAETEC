@@ -28,9 +28,9 @@ interface Props {
 }
 
 const columns: Column<UsuarioListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "nome", label: "Nome", width: "3fr" },
-  { key: "login", label: "Login", width: "2fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "nome", label: "Nome", width: "3fr", align: "left" },
+  { key: "login", label: "Login", width: "2fr", align: "left" },
 ];
 
 export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {

@@ -78,9 +78,9 @@ export default function ProdutoForm({
   const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
 
   const insumoColumns: import("@/components/DataTable").Column<InsumoEntry>[] = [
-    { key: "descricao", label: "Produto", width: "3fr" },
+    { key: "descricao", label: "Produto", width: "3fr", align: "left" },
     {
-      key: "qtd", label: "Quantidade", width: "1fr",
+      key: "qtd", label: "Quantidade", width: "1fr", align: "right",
       render: (value: string | number, row: InsumoEntry) => (
         <input
           type="number"

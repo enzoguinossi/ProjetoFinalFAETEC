@@ -46,8 +46,8 @@ export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: 
   }));
 
   const insumoColumns: Column<InsumoEntry>[] = [
-    { key: "descricao", label: "Produto", width: "3fr" },
-    { key: "qtd", label: "Quantidade", width: "1fr" },
+    { key: "descricao", label: "Produto", width: "3fr", align: "left" },
+    { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
   ];
 
   const insumoActions: Action<InsumoEntry>[] = [

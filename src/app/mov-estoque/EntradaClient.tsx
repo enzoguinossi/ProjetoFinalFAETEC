@@ -32,7 +32,7 @@ interface Props {
 type ModoModal = "create" | "edit" | "view" | null;
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
-  { key: "data", label: "Data", width: "1fr", align: "left" },
+  { key: "data", label: "Data", width: "1fr", align: "center" },
   { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left" },
   { key: "itens", label: "Itens", width: "0.7fr", align: "right" },
   {

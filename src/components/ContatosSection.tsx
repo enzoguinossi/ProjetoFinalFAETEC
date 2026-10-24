@@ -24,12 +24,12 @@ interface Props {
 const tituloSecao = "m-0 font-display text-lg font-[590] tracking-[-0.028125rem] text-ink-strong";
 
 const emailColumns: Column<EmailEntry>[] = [
-  { key: "endereco", label: "E-mail", width: "3fr" },
+  { key: "endereco", label: "E-mail", width: "3fr", align: "left" },
 ];
 
 const telefoneColumns: Column<TelefoneEntry>[] = [
-  { key: "numero", label: "Número", width: "2fr", render: (v) => formatarTelefone(String(v)) },
-  { key: "tipo", label: "Tipo", width: "1.5fr", render: (v) => TIPO_TELEFONE_LABEL[v as TipoTelefone] ?? String(v) },
+  { key: "numero", label: "Número", width: "2fr", align: "center", render: (v) => formatarTelefone(String(v)) },
+  { key: "tipo", label: "Tipo", width: "1.5fr", align: "center", render: (v) => TIPO_TELEFONE_LABEL[v as TipoTelefone] ?? String(v) },
 ];
 
 function ordenar<T extends { principal: boolean }>(list: T[]): T[] {

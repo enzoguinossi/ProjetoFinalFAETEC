@@ -23,10 +23,10 @@ interface Props {
 }
 
 const columns: Column<VeiculoListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "descricao", label: "Descrição", width: "2fr" },
-  { key: "placa", label: "Placa", width: "1.5fr" },
-  { key: "status", label: "Status", width: "1fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
+  { key: "placa", label: "Placa", width: "1.5fr", align: "center" },
+  { key: "status", label: "Status", width: "1fr", align: "center" },
 ];
 
 export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {

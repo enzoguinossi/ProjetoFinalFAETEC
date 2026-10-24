@@ -153,7 +153,7 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
 
   const columns: Column<UnidadeItem>[] = [
     {
-      key: "nome", label: "Nome", width: "1.4fr",
+      key: "nome", label: "Nome", width: "1.4fr", align: "left",
       render: (value: UnidadeItem[keyof UnidadeItem], row: UnidadeItem) => (
         <span className="flex items-center gap-2">
           <span className="font-semibold">{String(value ?? "")}</span>
@@ -161,8 +161,8 @@ export default function UnidadesModal({ open, onClose, onChanged, initial = [] }
         </span>
       ),
     },
-    { key: "fator", label: "Fator", width: "0.7fr" },
-    { key: "descricao", label: "Descrição", width: "2.5fr" },
+    { key: "fator", label: "Fator", width: "0.7fr", align: "right" },
+    { key: "descricao", label: "Descrição", width: "2.5fr", align: "left" },
     {
       key: "acoes", label: "Ações", width: "0.9fr", align: "center",
       render: (_value: UnidadeItem[keyof UnidadeItem], row: UnidadeItem) => (
