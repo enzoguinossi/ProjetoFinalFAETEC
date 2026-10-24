@@ -13,6 +13,10 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+Nada ainda.
+
+## [1.24.10.2026] - 2026-10-24
+
 Esta seção consolida a entrega da movimentação de estoque (KAN-140), o relatório de
 Lista de Produtos (KAN-159) e as decisões de modelagem e documentação que as sustentam.
 
