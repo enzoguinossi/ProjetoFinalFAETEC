@@ -91,6 +91,120 @@ export type FornecedorFiltroRelatorio = {
   nome: string;
 };
 
+export const STATUS_EXPEDICAO_RELATORIO = [
+  "todas",
+  "PLANEJADA",
+  "EM_PERCURSO",
+  "CONCLUIDA",
+] as const;
+export type StatusExpedicaoRelatorio = (typeof STATUS_EXPEDICAO_RELATORIO)[number];
+
+export const STATUS_NOTA_RELATORIO = [
+  "todos",
+  "PENDENTE",
+  "BAIXA_TOTAL",
+  "BAIXA_PARCIAL",
+  "BAIXA_COM_CORTE",
+  "EM_PERCURSO",
+  "ABERTA",
+  "CANCELADA",
+] as const;
+export type StatusNotaRelatorio = (typeof STATUS_NOTA_RELATORIO)[number];
+
+/** Rótulos de status usados na tela e no CSV (mesmos da listagem de expedições). */
+export const ROTULOS_STATUS_EXPEDICAO = {
+  PLANEJADA: "Planejada",
+  EM_PERCURSO: "Em percurso",
+  CONCLUIDA: "Concluída",
+} as const;
+
+/** Rótulos de status da nota de saída (mesmos da listagem de expedições). */
+export const ROTULOS_STATUS_NOTA = {
+  ABERTA: "Aberta",
+  EM_PERCURSO: "Em percurso",
+  PENDENTE: "Pendente",
+  BAIXA_TOTAL: "Baixa total",
+  BAIXA_PARCIAL: "Baixa parcial",
+  BAIXA_COM_CORTE: "Baixa com corte",
+  CANCELADA: "Cancelada",
+} as const;
+
+export type ExpedicaoRelatorioRow = {
+  id_expedicao: number;
+  /** `YYYY-MM-DD`: `data_prevista` é DATE, sem hora. */
+  data_prevista: string;
+  status: (typeof ROTULOS_STATUS_EXPEDICAO)[keyof typeof ROTULOS_STATUS_EXPEDICAO];
+  veiculo: string;
+  condutor: string;
+  /** Quantidade de notas vinculadas à expedição. */
+  notas: number;
+  /** Razões sociais distintas das notas, separadas por vírgula; `—` sem notas. */
+  destinatarios: string;
+  itens_esperados: number;
+  itens_entregues: number;
+};
+
+export type ExpedicoesRelatorioResult = {
+  data: ExpedicaoRelatorioRow[];
+  totais: { notas: number; esperados: number; entregues: number };
+};
+
+export type ExpedicoesRelatorioFiltros = {
+  /** Limite inferior do dia de `data_prevista` (meia-noite UTC). */
+  de?: Date | null;
+  /** Limite superior do dia de `data_prevista` (meia-noite UTC), inclusivo. */
+  ate?: Date | null;
+  id_expedicao?: number | null;
+  /** Restringe às expedições com alguma nota do destinatário. */
+  id_destinatario?: number | null;
+  id_condutor?: number | null;
+  status?: StatusExpedicaoRelatorio;
+};
+
+export type EntregaRelatorioRow = {
+  id_nota_saida: number;
+  /** Código exibido no relatório (`formatarCodigo(ID_nota_saida)`). */
+  codigo: string;
+  data: Date;
+  destinatario: string;
+  status: (typeof ROTULOS_STATUS_NOTA)[keyof typeof ROTULOS_STATUS_NOTA];
+  /** Quantidade de itens da nota. */
+  itens: number;
+  esperado: number;
+  entregue: number;
+  /** `Σ(qtd_esperada − qtd_entregue)`. */
+  pendente: number;
+  /** `EXP #id` do vínculo mais recente, ou `—`. */
+  expedicao: string;
+};
+
+export type EntregasRelatorioResult = {
+  data: EntregaRelatorioRow[];
+  totais: { esperado: number; entregue: number; pendente: number };
+};
+
+export type EntregasRelatorioFiltros = {
+  /** Limite inferior (inclusivo) já convertido para o instante UTC. */
+  de?: Date | null;
+  /** Limite superior (inclusivo). */
+  ate?: Date | null;
+  id_destinatario?: number | null;
+  status?: StatusNotaRelatorio;
+};
+
+export type ExpedicaoFiltroRelatorio = {
+  id_expedicao: number;
+  codigo: string;
+  /** `YYYY-MM-DD`. */
+  data_prevista: string;
+  veiculo: string;
+};
+
+export type CondutorFiltroRelatorio = {
+  id_funcionario: number;
+  nome: string;
+};
+
 /** Evita resíduo de ponto flutuante nas somas de quantidades (Float no banco). */
 function arredondar(valor: number): number {
   return Math.round(valor * 1000) / 1000;
@@ -349,6 +463,235 @@ export class RelatorioDAO {
       codigo: formatarCodigo(produto.id_produto),
       descricao: produto.descricao,
     };
+  }
+
+  /**
+   * Expedições por período (RF023): data prevista no intervalo, com veículo,
+   * condutor e as notas (destinatário e quantidades). A linha soma os itens de
+   * todas as notas; a data prevista desce (mais recente primeiro).
+   */
+  async listarExpedicoesRelatorio(
+    filtros: ExpedicoesRelatorioFiltros = {},
+  ): Promise<ExpedicoesRelatorioResult> {
+    const where: Prisma.ExpedicaoWhereInput = { ativo: true };
+
+    if (filtros.de || filtros.ate) {
+      where.data_prevista = {};
+      if (filtros.de) where.data_prevista.gte = filtros.de;
+      if (filtros.ate) where.data_prevista.lte = filtros.ate;
+    }
+    if (filtros.id_expedicao) where.id_expedicao = filtros.id_expedicao;
+    if (filtros.id_condutor) where.id_funcionario_condutor = filtros.id_condutor;
+    if (filtros.id_destinatario) {
+      where.notas = { some: { notaSaida: { id_destinatario: filtros.id_destinatario } } };
+    }
+    if (filtros.status && filtros.status !== "todas") where.status = filtros.status;
+
+    const expedicoes = await prisma.expedicao.findMany({
+      where,
+      select: {
+        id_expedicao: true,
+        data_prevista: true,
+        status: true,
+        veiculo: { select: { placa: true } },
+        condutor: { select: { pessoaFisica: { select: { nome: true } } } },
+        notas: {
+          select: {
+            notaSaida: {
+              select: {
+                destinatario: {
+                  select: { pessoaJuridica: { select: { razao_social: true } } },
+                },
+                itens: { select: { qtd_esperada: true, qtd_entregue: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ data_prevista: "desc" }, { id_expedicao: "desc" }],
+    });
+
+    const data: ExpedicaoRelatorioRow[] = expedicoes.map((expedicao) => {
+      const itens = expedicao.notas.flatMap((nota) => nota.notaSaida.itens);
+      const destinatarios = [
+        ...new Set(
+          expedicao.notas
+            .map((nota) => nota.notaSaida.destinatario?.pessoaJuridica.razao_social)
+            .filter((nome): nome is string => Boolean(nome)),
+        ),
+      ].join(", ");
+
+      return {
+        id_expedicao: expedicao.id_expedicao,
+        data_prevista: expedicao.data_prevista.toISOString().slice(0, 10),
+        status: ROTULOS_STATUS_EXPEDICAO[expedicao.status],
+        veiculo: expedicao.veiculo.placa,
+        condutor: expedicao.condutor.pessoaFisica.nome,
+        notas: expedicao.notas.length,
+        destinatarios: destinatarios || "—",
+        itens_esperados: arredondar(
+          itens.reduce((soma, item) => soma + Number(item.qtd_esperada), 0),
+        ),
+        itens_entregues: arredondar(
+          itens.reduce((soma, item) => soma + Number(item.qtd_entregue), 0),
+        ),
+      };
+    });
+
+    const totais = data.reduce(
+      (acc, row) => ({
+        notas: acc.notas + row.notas,
+        esperados: acc.esperados + row.itens_esperados,
+        entregues: acc.entregues + row.itens_entregues,
+      }),
+      { notas: 0, esperados: 0, entregues: 0 },
+    );
+
+    return {
+      data,
+      totais: {
+        notas: totais.notas,
+        esperados: arredondar(totais.esperados),
+        entregues: arredondar(totais.entregues),
+      },
+    };
+  }
+
+  /**
+   * Entregas por instituição (RF023): notas de saída criadas no período, com
+   * destinatário, itens, quantidades e a expedição mais recente. A pendência é
+   * a diferença entre o esperado e o entregue, item a item. Data decrescente.
+   */
+  async listarEntregasRelatorio(
+    filtros: EntregasRelatorioFiltros = {},
+  ): Promise<EntregasRelatorioResult> {
+    const where: Prisma.NotaSaidaWhereInput = { ativo: true };
+
+    if (filtros.de || filtros.ate) {
+      where.data_criacao = {};
+      if (filtros.de) where.data_criacao.gte = filtros.de;
+      if (filtros.ate) where.data_criacao.lte = filtros.ate;
+    }
+    if (filtros.id_destinatario) where.id_destinatario = filtros.id_destinatario;
+    if (filtros.status && filtros.status !== "todos") where.status = filtros.status;
+
+    const notas = await prisma.notaSaida.findMany({
+      where,
+      select: {
+        id_nota_saida: true,
+        data_criacao: true,
+        status: true,
+        destinatario: {
+          select: { pessoaJuridica: { select: { razao_social: true } } },
+        },
+        itens: { select: { qtd_esperada: true, qtd_entregue: true } },
+        expedicoes: {
+          select: { id_expedicao: true },
+          orderBy: { data_adicao: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: [{ data_criacao: "desc" }, { id_nota_saida: "desc" }],
+    });
+
+    const data: EntregaRelatorioRow[] = notas.map((nota) => {
+      const ultimaExpedicao = nota.expedicoes[0];
+      const esperado = arredondar(
+        nota.itens.reduce((soma, item) => soma + Number(item.qtd_esperada), 0),
+      );
+      const entregue = arredondar(
+        nota.itens.reduce((soma, item) => soma + Number(item.qtd_entregue), 0),
+      );
+
+      return {
+        id_nota_saida: nota.id_nota_saida,
+        codigo: formatarCodigo(nota.id_nota_saida),
+        data: nota.data_criacao,
+        destinatario: nota.destinatario?.pessoaJuridica.razao_social ?? "—",
+        status: ROTULOS_STATUS_NOTA[nota.status],
+        itens: nota.itens.length,
+        esperado,
+        entregue,
+        pendente: arredondar(esperado - entregue),
+        expedicao: ultimaExpedicao ? `EXP #${ultimaExpedicao.id_expedicao}` : "—",
+      };
+    });
+
+    const totais = data.reduce(
+      (acc, row) => ({
+        esperado: acc.esperado + row.esperado,
+        entregue: acc.entregue + row.entregue,
+        pendente: acc.pendente + row.pendente,
+      }),
+      { esperado: 0, entregue: 0, pendente: 0 },
+    );
+
+    return {
+      data,
+      totais: {
+        esperado: arredondar(totais.esperado),
+        entregue: arredondar(totais.entregue),
+        pendente: arredondar(totais.pendente),
+      },
+    };
+  }
+
+  /**
+   * Expedições do período para o select de filtro, por data prevista
+   * decrescente. Sem período, todas as ativas. A expedição selecionada entra
+   * mesmo fora do período ou inativa, para o select não perder a seleção.
+   */
+  async listarExpedicoesParaFiltro(opts: {
+    de?: Date | null;
+    ate?: Date | null;
+    incluirId?: number | null;
+  } = {}): Promise<ExpedicaoFiltroRelatorio[]> {
+    const periodo: Prisma.ExpedicaoWhereInput = { ativo: true };
+    if (opts.de || opts.ate) {
+      periodo.data_prevista = {};
+      if (opts.de) periodo.data_prevista.gte = opts.de;
+      if (opts.ate) periodo.data_prevista.lte = opts.ate;
+    }
+
+    const expedicoes = await prisma.expedicao.findMany({
+      where: opts.incluirId
+        ? { OR: [periodo, { id_expedicao: opts.incluirId }] }
+        : periodo,
+      select: {
+        id_expedicao: true,
+        data_prevista: true,
+        veiculo: { select: { placa: true } },
+      },
+      orderBy: [{ data_prevista: "desc" }, { id_expedicao: "desc" }],
+    });
+
+    return expedicoes.map((expedicao) => ({
+      id_expedicao: expedicao.id_expedicao,
+      codigo: formatarCodigo(expedicao.id_expedicao),
+      data_prevista: expedicao.data_prevista.toISOString().slice(0, 10),
+      veiculo: expedicao.veiculo.placa,
+    }));
+  }
+
+  /** Condutores ativos (funcionário com `condutor = true`), por nome. */
+  async listarCondutoresParaFiltro(
+    incluirId?: number | null,
+  ): Promise<CondutorFiltroRelatorio[]> {
+    const condutores = await prisma.funcionario.findMany({
+      where: incluirId
+        ? { OR: [{ ativo: true, condutor: true }, { id_funcionario: incluirId }] }
+        : { ativo: true, condutor: true },
+      select: {
+        id_funcionario: true,
+        pessoaFisica: { select: { nome: true } },
+      },
+      orderBy: { pessoaFisica: { nome: "asc" } },
+    });
+
+    return condutores.map((condutor) => ({
+      id_funcionario: condutor.id_funcionario,
+      nome: condutor.pessoaFisica.nome,
+    }));
   }
 }
 

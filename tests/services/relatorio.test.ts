@@ -2,16 +2,29 @@ import { describe, expect, it } from "vitest";
 import {
   formatarDataHoraRelatorio,
   formatarDataISO,
+  formatarDataRelatorio,
   formatarQuantidadeCsv,
+  gerarCsvEntregas,
+  gerarCsvExpedicoes,
   gerarCsvMovimentacoes,
   gerarCsvProdutos,
   limitesDoPeriodo,
+  limitesDoPeriodoData,
   metadadosEmissao,
+  normalizarFiltrosEntregas,
+  normalizarFiltrosExpedicoes,
   normalizarFiltrosMovimentacao,
   normalizarFiltrosProdutos,
   periodoSemestreAtual,
+  rotuloStatusExpedicao,
+  rotuloStatusNota,
 } from "@/services/relatorio";
-import type { MovimentacaoRelatorioRow, ProdutoRelatorioRow } from "@/dao/relatorio";
+import type {
+  EntregaRelatorioRow,
+  ExpedicaoRelatorioRow,
+  MovimentacaoRelatorioRow,
+  ProdutoRelatorioRow,
+} from "@/dao/relatorio";
 
 const linha: ProdutoRelatorioRow = {
   id_produto: 1,
@@ -214,6 +227,195 @@ describe("serviço de relatórios", () => {
 
       expect(csv).toContain("000002 - Feijão;Ajuste;—;—;-1;—;—;João;");
       expect(csv).toContain('"Ajuste ""manual""; conferido"');
+    });
+  });
+
+  describe("normalizarFiltrosExpedicoes", () => {
+    it("usa o mês corrente e todas como padrão", () => {
+      expect(
+        normalizarFiltrosExpedicoes({}, new Date("2026-10-24T15:30:00.000Z")),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_expedicao: null,
+        id_destinatario: null,
+        id_condutor: null,
+        status: "todas",
+      });
+    });
+
+    it("aceita período, expedição, destinatário, condutor e status, inclusive em array", () => {
+      expect(
+        normalizarFiltrosExpedicoes({
+          de: "2026-09-01",
+          ate: "2026-09-30",
+          expedicao: "4",
+          destinatario: ["3", "5"],
+          condutor: "7",
+          status: ["EM_PERCURSO", "CONCLUIDA"],
+        }),
+      ).toEqual({
+        de: "2026-09-01",
+        ate: "2026-09-30",
+        id_expedicao: 4,
+        id_destinatario: 3,
+        id_condutor: 7,
+        status: "EM_PERCURSO",
+      });
+    });
+
+    it("ignora data, ids e status inválidos", () => {
+      expect(
+        normalizarFiltrosExpedicoes(
+          {
+            de: "2026-02-30",
+            ate: "ontem",
+            expedicao: "abc",
+            destinatario: "0",
+            condutor: "-2",
+            status: "qualquer",
+          },
+          new Date("2026-10-24T15:30:00.000Z"),
+        ),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_expedicao: null,
+        id_destinatario: null,
+        id_condutor: null,
+        status: "todas",
+      });
+    });
+  });
+
+  describe("normalizarFiltrosEntregas", () => {
+    it("usa o mês corrente e todos como padrão", () => {
+      expect(
+        normalizarFiltrosEntregas({}, new Date("2026-10-24T15:30:00.000Z")),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_destinatario: null,
+        status: "todos",
+      });
+    });
+
+    it("aceita período, destinatário e status, inclusive em array", () => {
+      expect(
+        normalizarFiltrosEntregas({
+          de: "2026-09-01",
+          ate: "2026-09-30",
+          destinatario: ["8", "9"],
+          status: ["BAIXA_PARCIAL", "PENDENTE"],
+        }),
+      ).toEqual({
+        de: "2026-09-01",
+        ate: "2026-09-30",
+        id_destinatario: 8,
+        status: "BAIXA_PARCIAL",
+      });
+    });
+
+    it("ignora data, destinatário e status inválidos", () => {
+      expect(
+        normalizarFiltrosEntregas(
+          {
+            de: "2026-13-01",
+            ate: "amanhã",
+            destinatario: "abc",
+            status: "qualquer",
+          },
+          new Date("2026-10-24T15:30:00.000Z"),
+        ),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_destinatario: null,
+        status: "todos",
+      });
+    });
+  });
+
+  describe("Expedições e Entregas — formatação e CSV", () => {
+    it("converte o período de uma coluna DATE para meia-noite UTC", () => {
+      const limites = limitesDoPeriodoData({ de: "2026-10-01", ate: "2026-10-31" });
+
+      expect(limites.de.toISOString()).toBe("2026-10-01T00:00:00.000Z");
+      expect(limites.ate.toISOString()).toBe("2026-10-31T00:00:00.000Z");
+    });
+
+    it("formata data no fuso de São Paulo e rótulos de status", () => {
+      expect(formatarDataRelatorio(new Date("2026-10-24T15:30:00.000Z"))).toBe(
+        "24/10/2026",
+      );
+      expect(rotuloStatusExpedicao("todas")).toBe("Todas");
+      expect(rotuloStatusExpedicao("EM_PERCURSO")).toBe("Em percurso");
+      expect(rotuloStatusNota("todos")).toBe("Todos");
+      expect(rotuloStatusNota("BAIXA_COM_CORTE")).toBe("Baixa com corte");
+    });
+
+    it("gera o CSV de Expedições com BOM, ponto e vírgula e decimal com vírgula", () => {
+      const expedicao: ExpedicaoRelatorioRow = {
+        id_expedicao: 7,
+        data_prevista: "2026-10-05",
+        status: "Concluída",
+        veiculo: "AAA1111",
+        condutor: "Ana Condutora",
+        notas: 2,
+        destinatarios: "Escola A, Escola B",
+        itens_esperados: 15,
+        itens_entregues: 10.5,
+      };
+
+      const csv = gerarCsvExpedicoes([expedicao]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFData prevista;Status;Veículo;Condutor;Notas;Destinatários;Itens esperados;Itens entregues\r\n" +
+          "05/10/2026;Concluída;AAA1111;Ana Condutora;2;Escola A, Escola B;15;10,5\r\n",
+      );
+    });
+
+    it("gera o CSV de Entregas com BOM, ponto e vírgula e decimal com vírgula", () => {
+      const entrega: EntregaRelatorioRow = {
+        id_nota_saida: 12,
+        codigo: "000012",
+        data: new Date("2026-10-10T12:00:00.000Z"),
+        destinatario: "Escola Municipal",
+        status: "Baixa parcial",
+        itens: 2,
+        esperado: 15,
+        entregue: 6,
+        pendente: 9,
+        expedicao: "EXP #3",
+      };
+
+      const csv = gerarCsvEntregas([entrega]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFNota;Data;Destinatário;Status;Itens;Esperado;Entregue;Pendente;Expedição\r\n" +
+          "000012;10/10/2026;Escola Municipal;Baixa parcial;2;15;6;9;EXP #3\r\n",
+      );
+    });
+
+    it("protege campos especiais no CSV de Entregas", () => {
+      const csv = gerarCsvEntregas([
+        {
+          id_nota_saida: 13,
+          codigo: "000013",
+          data: new Date("2026-10-11T12:00:00.000Z"),
+          destinatario: 'Escola "Central"; anexo',
+          status: "Aberta",
+          itens: 0,
+          esperado: 0,
+          entregue: 0,
+          pendente: 0,
+          expedicao: "—",
+        },
+      ]);
+
+      expect(csv).toContain('"Escola ""Central""; anexo"');
     });
   });
 });

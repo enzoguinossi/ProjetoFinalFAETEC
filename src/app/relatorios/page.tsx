@@ -32,6 +32,18 @@ const relatorios: CartaoRelatorio[] = [
     href: "/relatorios/movimentacao",
   },
   {
+    titulo: "Expedições por Período",
+    descricao:
+      "Expedições com data prevista no período, com veículo, condutor, notas, destinatários e itens.",
+    href: "/relatorios/expedicoes",
+  },
+  {
+    titulo: "Entregas por Instituição",
+    descricao:
+      "Notas de saída por destinatário no período, com itens esperados, entregues e pendentes.",
+    href: "/relatorios/entregas",
+  },
+  {
     titulo: "Funcionários",
     descricao: "Listagem de funcionários com cargo e situação.",
   },

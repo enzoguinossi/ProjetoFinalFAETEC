@@ -1,8 +1,18 @@
 import {
   relatorioDAO,
+  ROTULOS_STATUS_EXPEDICAO,
+  ROTULOS_STATUS_NOTA,
   SITUACOES_PRODUTO_RELATORIO,
+  STATUS_EXPEDICAO_RELATORIO,
+  STATUS_NOTA_RELATORIO,
   TIPOS_MOVIMENTACAO_RELATORIO,
+  type CondutorFiltroRelatorio,
   type DestinatarioFiltroRelatorio,
+  type EntregaRelatorioRow,
+  type EntregasRelatorioResult,
+  type ExpedicaoFiltroRelatorio,
+  type ExpedicaoRelatorioRow,
+  type ExpedicoesRelatorioResult,
   type FornecedorFiltroRelatorio,
   type MovimentacaoRelatorioRow,
   type MovimentacoesRelatorioResult,
@@ -11,6 +21,8 @@ import {
   type ProdutosRelatorioFiltros,
   type ProdutosRelatorioResult,
   type SituacaoProdutoRelatorio,
+  type StatusExpedicaoRelatorio,
+  type StatusNotaRelatorio,
   type TipoMovimentacaoRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
@@ -38,6 +50,26 @@ export type FiltrosMovimentacao = {
   id_destinatario: number | null;
   id_fornecedor: number | null;
   tipo: TipoMovimentacaoRelatorio;
+};
+
+export type FiltrosExpedicoes = {
+  /** Data inicial de `data_prevista` (`YYYY-MM-DD`). */
+  de: string;
+  /** Data final de `data_prevista` (`YYYY-MM-DD`), inclusiva. */
+  ate: string;
+  id_expedicao: number | null;
+  id_destinatario: number | null;
+  id_condutor: number | null;
+  status: StatusExpedicaoRelatorio;
+};
+
+export type FiltrosEntregas = {
+  /** Data inicial de `nota_saida.data_criacao` (`YYYY-MM-DD`). */
+  de: string;
+  /** Data final de `nota_saida.data_criacao` (`YYYY-MM-DD`), inclusiva. */
+  ate: string;
+  id_destinatario: number | null;
+  status: StatusNotaRelatorio;
 };
 
 /** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
@@ -149,6 +181,76 @@ export function normalizarFiltrosMovimentacao(
 }
 
 /**
+ * Normaliza os filtros de Expedições por Período. Data vazia ou inválida cai no
+ * mês corrente (fuso de São Paulo). Expedição, destinatário e condutor
+ * vazios/inválidos não filtram; status inválido cai em `todas`.
+ */
+export function normalizarFiltrosExpedicoes(
+  params: {
+    de?: string | string[] | null;
+    ate?: string | string[] | null;
+    expedicao?: string | string[] | null;
+    destinatario?: string | string[] | null;
+    condutor?: string | string[] | null;
+    status?: string | string[] | null;
+  } = {},
+  agora: Date = new Date(),
+): FiltrosExpedicoes {
+  const { de: dePadrao, ate: atePadrao } = periodoMesAtual(agora);
+
+  const deBruto = primeiro(params.de).trim();
+  const ateBruto = primeiro(params.ate).trim();
+  const de = dataValida(deBruto) ? deBruto : dePadrao;
+  const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
+
+  const statusBruto = primeiro(params.status).trim() as StatusExpedicaoRelatorio;
+  const status = STATUS_EXPEDICAO_RELATORIO.includes(statusBruto)
+    ? statusBruto
+    : "todas";
+
+  return {
+    de,
+    ate,
+    id_expedicao: idPositivo(primeiro(params.expedicao).trim()),
+    id_destinatario: idPositivo(primeiro(params.destinatario).trim()),
+    id_condutor: idPositivo(primeiro(params.condutor).trim()),
+    status,
+  };
+}
+
+/**
+ * Normaliza os filtros de Entregas por Instituição. Período pelo mês corrente
+ * quando vazio/inválido; destinatário vazio/inválido não filtra; status
+ * inválido cai em `todos`.
+ */
+export function normalizarFiltrosEntregas(
+  params: {
+    de?: string | string[] | null;
+    ate?: string | string[] | null;
+    destinatario?: string | string[] | null;
+    status?: string | string[] | null;
+  } = {},
+  agora: Date = new Date(),
+): FiltrosEntregas {
+  const { de: dePadrao, ate: atePadrao } = periodoMesAtual(agora);
+
+  const deBruto = primeiro(params.de).trim();
+  const ateBruto = primeiro(params.ate).trim();
+  const de = dataValida(deBruto) ? deBruto : dePadrao;
+  const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
+
+  const statusBruto = primeiro(params.status).trim() as StatusNotaRelatorio;
+  const status = STATUS_NOTA_RELATORIO.includes(statusBruto) ? statusBruto : "todos";
+
+  return {
+    de,
+    ate,
+    id_destinatario: idPositivo(primeiro(params.destinatario).trim()),
+    status,
+  };
+}
+
+/**
  * Converte o período `YYYY-MM-DD` para os instantes UTC do dia local em São
  * Paulo: o `de` começa às 00:00 e o `ate` termina às 23:59:59.999 (inclusivo).
  */
@@ -159,6 +261,20 @@ export function limitesDoPeriodo(filtros: Pick<FiltrosMovimentacao, "de" | "ate"
   return {
     de: new Date(`${filtros.de}T00:00:00.000${OFFSET_SAO_PAULO}`),
     ate: new Date(`${filtros.ate}T23:59:59.999${OFFSET_SAO_PAULO}`),
+  };
+}
+
+/**
+ * Limites de uma coluna `DATE` (sem hora, gravada à meia-noite UTC): o `de` e
+ * o `ate` são o próprio dia, não o instante de São Paulo usado nos timestamps.
+ */
+export function limitesDoPeriodoData(filtros: { de: string; ate: string }): {
+  de: Date;
+  ate: Date;
+} {
+  return {
+    de: new Date(`${filtros.de}T00:00:00.000Z`),
+    ate: new Date(`${filtros.ate}T00:00:00.000Z`),
   };
 }
 
@@ -182,6 +298,26 @@ export function formatarDataHoraRelatorio(valor: Date): string {
 export function formatarDataISO(iso: string): string {
   const [ano, mes, dia] = iso.split("-");
   return `${dia}/${mes}/${ano}`;
+}
+
+/** Data para exibição e CSV: `DD/MM/AAAA` no fuso de São Paulo. */
+export function formatarDataRelatorio(valor: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: FUSO,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(valor);
+}
+
+/** Rótulo do status de expedição, incluindo `todas` como "Todas". */
+export function rotuloStatusExpedicao(status: StatusExpedicaoRelatorio): string {
+  return status === "todas" ? "Todas" : ROTULOS_STATUS_EXPEDICAO[status];
+}
+
+/** Rótulo do status da nota, incluindo `todos` como "Todos". */
+export function rotuloStatusNota(status: StatusNotaRelatorio): string {
+  return status === "todos" ? "Todos" : ROTULOS_STATUS_NOTA[status];
 }
 
 /** Metadados exibidos no cabeçalho do relatório impresso. */
@@ -276,6 +412,70 @@ export function gerarCsvMovimentacoes(linhas: MovimentacaoRelatorioRow[]): strin
   return `\uFEFF${corpo}\r\n`;
 }
 
+/**
+ * CSV de Expedições por Período (RF023/RF024), com a mesma formatação pt-BR:
+ * BOM UTF-8, separador `;` e decimal com vírgula.
+ */
+export function gerarCsvExpedicoes(linhas: ExpedicaoRelatorioRow[]): string {
+  const cabecalho = [
+    "Data prevista",
+    "Status",
+    "Veículo",
+    "Condutor",
+    "Notas",
+    "Destinatários",
+    "Itens esperados",
+    "Itens entregues",
+  ];
+  const registros = linhas.map((linha) => [
+    formatarDataISO(linha.data_prevista),
+    linha.status,
+    linha.veiculo,
+    linha.condutor,
+    String(linha.notas),
+    linha.destinatarios,
+    formatarQuantidadeCsv(linha.itens_esperados),
+    formatarQuantidadeCsv(linha.itens_entregues),
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
+/**
+ * CSV de Entregas por Instituição (RF023/RF024), com a mesma formatação pt-BR
+ * dos demais relatórios.
+ */
+export function gerarCsvEntregas(linhas: EntregaRelatorioRow[]): string {
+  const cabecalho = [
+    "Nota",
+    "Data",
+    "Destinatário",
+    "Status",
+    "Itens",
+    "Esperado",
+    "Entregue",
+    "Pendente",
+    "Expedição",
+  ];
+  const registros = linhas.map((linha) => [
+    linha.codigo,
+    formatarDataRelatorio(linha.data),
+    linha.destinatario,
+    linha.status,
+    String(linha.itens),
+    formatarQuantidadeCsv(linha.esperado),
+    formatarQuantidadeCsv(linha.entregue),
+    formatarQuantidadeCsv(linha.pendente),
+    linha.expedicao,
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
 export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
@@ -312,6 +512,66 @@ export class RelatorioService {
       tipo: filtros.tipo,
     });
     return { ...resultado, filtros };
+  }
+
+  /** Expedições por período, com os filtros normalizados. */
+  async listarExpedicoes(
+    params: {
+      de?: string | string[] | null;
+      ate?: string | string[] | null;
+      expedicao?: string | string[] | null;
+      destinatario?: string | string[] | null;
+      condutor?: string | string[] | null;
+      status?: string | string[] | null;
+    } = {},
+  ): Promise<ExpedicoesRelatorioResult & { filtros: FiltrosExpedicoes }> {
+    const filtros = normalizarFiltrosExpedicoes(params);
+    const { de, ate } = limitesDoPeriodoData(filtros);
+    const resultado = await relatorioDAO.listarExpedicoesRelatorio({
+      de,
+      ate,
+      id_expedicao: filtros.id_expedicao,
+      id_destinatario: filtros.id_destinatario,
+      id_condutor: filtros.id_condutor,
+      status: filtros.status,
+    });
+    return { ...resultado, filtros };
+  }
+
+  /** Entregas por instituição, com os filtros normalizados. */
+  async listarEntregas(
+    params: {
+      de?: string | string[] | null;
+      ate?: string | string[] | null;
+      destinatario?: string | string[] | null;
+      status?: string | string[] | null;
+    } = {},
+  ): Promise<EntregasRelatorioResult & { filtros: FiltrosEntregas }> {
+    const filtros = normalizarFiltrosEntregas(params);
+    const { de, ate } = limitesDoPeriodo(filtros);
+    const resultado = await relatorioDAO.listarEntregasRelatorio({
+      de,
+      ate,
+      id_destinatario: filtros.id_destinatario,
+      status: filtros.status,
+    });
+    return { ...resultado, filtros };
+  }
+
+  /** Expedições do período para o select de filtro (mantém a selecionada). */
+  async expedicoesParaFiltro(
+    periodo: { de: string; ate: string },
+    incluirId?: number | null,
+  ): Promise<ExpedicaoFiltroRelatorio[]> {
+    const { de, ate } = limitesDoPeriodoData(periodo);
+    return relatorioDAO.listarExpedicoesParaFiltro({ de, ate, incluirId });
+  }
+
+  /** Condutores ativos para o select de filtro (mantém o selecionado). */
+  async condutoresParaFiltro(
+    incluirId?: number | null,
+  ): Promise<CondutorFiltroRelatorio[]> {
+    return relatorioDAO.listarCondutoresParaFiltro(incluirId);
   }
 
   /** Produtos ativos para o select de filtro. */
