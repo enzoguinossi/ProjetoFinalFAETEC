@@ -6,7 +6,7 @@
 ## Objetivo atual
 
 **Em andamento: movimentação de estoque (KAN-140)**, na branch
-**`KAN-140-mov-estoque`** — **30 commits** sobre a `main` local (`1097e0f`) e **37** sobre
+**`KAN-140-mov-estoque`** — **32 commits** sobre a `main` local (`1097e0f`) e **39** sobre
 `origin/main` (`6922050`); **nada integrado nem publicado**.
 
 Entregue nesta branch:
@@ -24,6 +24,9 @@ Entregue nesta branch:
    gravado), ordem por setas, adicionar/remover notas e despacho (`e119c4d`).
 6. **Execução da entrega** — entregue (baixa), parcial (restante reservado), corte
    (libera restante), não entregue e conclusão da expedição (`89c2f52`).
+7. **Tipo de Saída** — Remessa (reserva), Avaria e Consumo Interno (baixa real na
+   criação, sem destinatário e sem reserva), com itens inline sem campos de valor
+   (`9f12115`).
 
 **Entregue antes:** release `1.17.10.2026`; documentação revisada e reorganizada;
 requisitos reclassificados.
@@ -87,6 +90,7 @@ requisitos reclassificados.
 | RUN-20261023-35 | Fusão nota = entrega; remessa deixa de existir | developer | concluído (`85fceac`) | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261023-36 | Módulo de expedições | developer | concluído (`e119c4d`) | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261023-37 | Execução da entrega, baixa e conclusão | developer | concluído (`89c2f52`) | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261024-38 | Tipo de saída (Remessa/Avaria/Consumo) e itens sem valores | developer | concluído (`9f12115`) | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -158,6 +162,9 @@ os pedidos vinculados precisam ser do destinatário da nota.
 
 ## Último checkpoint válido
 
+- **2026-10-24** — **Tipo de Saída** (`9f12115`): Remessa reserva; Avaria e Consumo Interno
+  não têm destinatário, não reservam e baixam o estoque na criação; itens inline sem
+  valores. **254 testes**, lint, build e `figma:check` verdes.
 - **2026-10-23** — fusão **nota = entrega** (`85fceac`), módulo de **expedições**
   (`e119c4d`) e **execução da entrega com baixa** (`89c2f52`); estado consolidado em
   `c860277`. Árvore limpa, **246 testes**, lint, build e `figma:check` verdes. Banco de
@@ -169,9 +176,9 @@ os pedidos vinculados precisam ser do destinatário da nota.
 - **2026-10-21** — coluna "Código" na expansão da nota de saída (`61ccc48`).
 - **2026-10-19** — movimentação de estoque: entrada, saída e cancelamento implementados.
 
-## Testes executados (2026-10-23, Orquestrador)
+## Testes executados (2026-10-24, Orquestrador)
 
-- `npm test` → **246/246 (25 arquivos)**.
+- `npm test` → **254/254 (25 arquivos)**.
 - `npm run lint` → exit 0 · `npm run build` → *Compiled successfully* (18 rotas, incluindo
   `/expedicoes`, `/expedicoes/[id]` e `/expedicoes/percursos`).
 - `npm run figma:check` → *plugin verificado sem problemas* (47 cenários).
