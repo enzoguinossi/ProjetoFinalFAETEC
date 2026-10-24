@@ -45,7 +45,7 @@ body:
     id: tela
     attributes:
       label: Tela / URL
-      placeholder: https://localhost:3000/mov-estoque/saida
+      placeholder: http://localhost:3000/mov-estoque/saida
     validations:
       required: true
 

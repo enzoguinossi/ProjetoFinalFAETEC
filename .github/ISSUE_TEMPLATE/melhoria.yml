@@ -43,7 +43,7 @@ body:
     id: tela
     attributes:
       label: Tela / URL
-      placeholder: https://localhost:3000/expedicoes/4
+      placeholder: http://localhost:3000/expedicoes/4
     validations:
       required: true
 

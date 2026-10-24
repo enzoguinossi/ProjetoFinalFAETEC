@@ -1,5 +1,1 @@
 blank_issues_enabled: false
-contact_links:
-  - name: Ambiente de testes
-    url: https://localhost:3000
-    about: Sistema Nexus — ambiente de testes da equipe.
