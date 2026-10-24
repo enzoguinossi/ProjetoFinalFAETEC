@@ -100,8 +100,8 @@ export class EstoqueDAO {
   }
 
   /**
-   * Reserva `quantidade` da linha de estoque do produto para uma remessa:
-   * usa a linha ativa (ou reativa a inativa; sem linha, cria com
+   * Reserva `quantidade` da linha de estoque do produto para uma nota de
+   * saída: usa a linha ativa (ou reativa a inativa; sem linha, cria com
    * `quantidade_atual = 0`), soma `saldo_reservado` e registra a
    * `reserva_estoque` com os saldos anterior/posterior. A reserva pode deixar
    * o disponível negativo (RN001). Roda no cliente de transação informado.
@@ -109,7 +109,7 @@ export class EstoqueDAO {
   async reservar(
     dados: {
       id_produto: number;
-      id_remessa: number;
+      id_nota_saida: number;
       id_usuario: number;
       quantidade: number;
       observacao?: string | null;
@@ -154,7 +154,7 @@ export class EstoqueDAO {
     const reserva = await client.reservaEstoque.create({
       data: {
         id_estoque: estoque.id_estoque,
-        id_remessa: dados.id_remessa,
+        id_nota_saida: dados.id_nota_saida,
         id_usuario: dados.id_usuario,
         quantidade: dados.quantidade,
         saldo_anterior,
@@ -168,7 +168,7 @@ export class EstoqueDAO {
   }
 
   /**
-   * Libera uma reserva já feita na linha de estoque da remessa: subtrai
+   * Libera uma reserva já feita na linha de estoque da nota de saída: subtrai
    * `quantidade` de `saldo_reservado` e registra a `reserva_estoque` com
    * quantidade **negativa**, preservando o histórico (RN004). Roda no cliente
    * de transação informado.
@@ -176,7 +176,7 @@ export class EstoqueDAO {
   async liberarReserva(
     dados: {
       id_estoque: number;
-      id_remessa: number;
+      id_nota_saida: number;
       id_usuario: number;
       quantidade: number;
       observacao?: string | null;
@@ -197,7 +197,7 @@ export class EstoqueDAO {
     const reserva = await client.reservaEstoque.create({
       data: {
         id_estoque: estoque.id_estoque,
-        id_remessa: dados.id_remessa,
+        id_nota_saida: dados.id_nota_saida,
         id_usuario: dados.id_usuario,
         quantidade: -dados.quantidade,
         saldo_anterior,
@@ -211,7 +211,7 @@ export class EstoqueDAO {
   }
 
   /**
-   * Corrige a reserva de uma remessa pelo **delta** informado: soma
+   * Corrige a reserva de uma nota de saída pelo **delta** informado: soma
    * `saldo_reservado += delta` (delta pode ser negativo) e registra a
    * `reserva_estoque` com `quantidade = delta` e os saldos anterior/posterior.
    * Delta zero não gera registro. Roda no cliente de transação informado.
@@ -219,7 +219,7 @@ export class EstoqueDAO {
   async ajustarReserva(
     dados: {
       id_estoque: number;
-      id_remessa: number;
+      id_nota_saida: number;
       id_usuario: number;
       quantidade: number;
       observacao?: string | null;
@@ -240,7 +240,7 @@ export class EstoqueDAO {
     const reserva = await client.reservaEstoque.create({
       data: {
         id_estoque: estoque.id_estoque,
-        id_remessa: dados.id_remessa,
+        id_nota_saida: dados.id_nota_saida,
         id_usuario: dados.id_usuario,
         quantidade: dados.quantidade,
         saldo_anterior,

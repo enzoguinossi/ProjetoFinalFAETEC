@@ -3,11 +3,9 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { EntidadeComVinculosError } from "@/dao/_errors";
 import {
   criarContagem,
-  criarDestinatario,
+  criarExpedicao,
   criarFuncionario,
   criarInventarioComItem,
-  criarNotaSaida,
-  criarRemessa,
   criarTipoCodigo,
   criarUsuario,
 } from "../helpers/factories";
@@ -155,16 +153,10 @@ describe("funcionarioDAO", () => {
       expect(auditorias.map((a) => a.acao)).toEqual(["DESATIVAR"]);
     });
 
-    it("bloqueia remover a marcação de condutor usado em remessa", async () => {
+    it("bloqueia remover a marcação de condutor usado em expedição", async () => {
       const { usuario } = await criarUsuario();
       const { funcionario } = await criarFuncionario({ condutor: true });
-      const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida();
-      await criarRemessa({
-        idNotaSaida: nota.id_nota_saida,
-        idDestinatario: destinatario.id_destinatario,
-        idCondutor: funcionario.id_funcionario,
-      });
+      await criarExpedicao({ idCondutor: funcionario.id_funcionario });
 
       await expect(
         funcionarioDAO.update(funcionario.id_funcionario, { condutor: false }, usuario.id_usuario),
@@ -186,7 +178,7 @@ describe("funcionarioDAO", () => {
       expect(resultado.podeExcluir).toBe(true);
     });
 
-    it("bloqueia quando há usuário, contagem ou remessa como condutor", async () => {
+    it("bloqueia quando há usuário, contagem ou expedição como condutor", async () => {
       const { usuario, funcionario } = await criarUsuario();
       const produto = await prismaTeste.produto.create({ data: { descricao: "P" } });
       const estoque = await prismaTeste.estoque.create({
@@ -194,13 +186,7 @@ describe("funcionarioDAO", () => {
       });
       const { item } = await criarInventarioComItem(estoque.id_estoque, usuario.id_usuario);
       await criarContagem(item.id_item_inventario, funcionario.id_funcionario, 0);
-      const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida();
-      await criarRemessa({
-        idNotaSaida: nota.id_nota_saida,
-        idDestinatario: destinatario.id_destinatario,
-        idCondutor: funcionario.id_funcionario,
-      });
+      await criarExpedicao({ idCondutor: funcionario.id_funcionario });
 
       const resultado = await funcionarioDAO.verificarRelacionamentos(funcionario.id_funcionario);
 
@@ -208,7 +194,7 @@ describe("funcionarioDAO", () => {
       const texto = resultado.vinculos.join(" | ");
       expect(texto).toContain("usuário(s) vinculado(s)");
       expect(texto).toContain("contagem(ns) de inventário");
-      expect(texto).toContain("remessa(s) como condutor");
+      expect(texto).toContain("expedição(ões) como condutor");
     });
   });
 

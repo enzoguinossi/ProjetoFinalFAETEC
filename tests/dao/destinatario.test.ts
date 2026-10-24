@@ -7,7 +7,6 @@ import {
   criarNotaSaida,
   criarPedidoEscola,
   criarPercursoComDestinatario,
-  criarRemessa,
   criarTipoCodigo,
   criarUsuario,
 } from "../helpers/factories";
@@ -146,14 +145,10 @@ describe("destinatarioDAO", () => {
       expect(resultado.vinculos).toEqual([]);
     });
 
-    it("bloqueia quando há pedidos, remessas, coletas ou percursos", async () => {
+    it("bloqueia quando há pedidos, notas de saída, coletas ou percursos", async () => {
       const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida();
+      const nota = await criarNotaSaida({ idDestinatario: destinatario.id_destinatario });
       await criarPedidoEscola(destinatario.id_destinatario);
-      await criarRemessa({
-        idNotaSaida: nota.id_nota_saida,
-        idDestinatario: destinatario.id_destinatario,
-      });
       await criarColeta(nota.id_nota_saida, destinatario.id_destinatario);
       await criarPercursoComDestinatario(destinatario.id_destinatario);
 
@@ -162,7 +157,7 @@ describe("destinatarioDAO", () => {
       expect(resultado.podeExcluir).toBe(false);
       const texto = resultado.vinculos.join(" | ");
       expect(texto).toContain("pedido(s)");
-      expect(texto).toContain("remessa(s)");
+      expect(texto).toContain("nota(s) de saída");
       expect(texto).toContain("coleta(s)");
       expect(texto).toContain("percurso(s)");
     });

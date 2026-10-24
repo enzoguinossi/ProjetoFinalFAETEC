@@ -102,6 +102,25 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Nota de saída e remessa fundidas em um só nível `(KAN-140)`:** por decisão do usuário de
+  2026-10-23, a **nota de saída** passou a ser a própria entrega — carrega destinatário, itens,
+  reserva e status — e a **expedição** virou o manifesto (veículo, condutor e ordem das notas).
+  Saíram do schema `Remessa`, `ItemRemessa` e o enum `StatusRemessa`; `StatusNotaSaida` agora é
+  `ABERTA`, `EM_PERCURSO`, `PENDENTE`, `BAIXA_TOTAL`, `BAIXA_PARCIAL`, `BAIXA_COM_CORTE` e
+  `CANCELADA`. `NotaSaida` ganhou `ID_destinatario` (obrigatório para `SAIDA` na camada de
+  serviço), `urgente` e as relações `reservas`/`expedicoes`/`anexos`; `ReservaEstoque` e `Anexo`
+  apontam para `ID_nota_saida`; `MovimentacaoEstoque` perdeu `ID_remessa`; `Expedicao` ganhou
+  `ID_veiculo` e `ID_funcionario_condutor`; e `ExpedicaoRemessa` virou `ExpedicaoNota`
+  (`expedicao_nota`, `ID_nota_saida`). A aba Saída (`/mov-estoque`) passou a ter um formulário
+  único (destinatário, urgência, observação e itens) e a lista com ver/editar/cancelar; criar
+  reserva o estoque na transação, editar corrige a reserva pelo delta e cancelar libera a
+  reserva (idempotente), sempre com auditoria antes/depois. As cinco permissões `remessa.*`
+  saíram do catálogo (foram para a limpeza de obsoletas) e `nota_saida` ficou com seis
+  (`criar`, `alterar`, `consultar`, `cancelar`, `alterar_status`, `finalizar`), levando o seed de
+  **80 para 77** permissões. A RN003 passou a apontar a própria nota em `BAIXA_PARCIAL` como
+  pendência (sem *split*), e DER/`classes.puml` seguem com **49** entidades/classes.
+  `ENTENDIMENTO.md` (§3.8, §3.10.2, §3.11, §3.15.1), `REGRAS_NEGOCIO.md`,
+  `REQUISITOS_FUNCIONAIS.md`, `IMPLEMENTACAO.md` e `AGENTS.md` §8/§14 foram alinhados.
 - **Conceito de organização das entregas renomeado para expedição `(KAN-140)`:** por decisão do
   usuário, o antigo nome do conceito deu lugar a **expedição** — inclusive no modelo físico. No
   schema, os modelos são agora `Expedicao` (`@@map("expedicao")`) e `ExpedicaoRemessa`
@@ -274,7 +293,9 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   entrada correspondente em *Changed*) e a coluna saiu de `prisma/schema.prisma`. A remoção foi
   precedida da conferência no banco, que deu **1** linha com valor não nulo
   (`SELECT COUNT(*) FROM nota_saida WHERE ID_destinatario IS NOT NULL`, sobre 4 notas). (Decisão
-  do usuário, 2026-10-19 — sem chave de issue.)
+  do usuário, 2026-10-19 — sem chave de issue.) **Reavaliado em 2026-10-23:** com a fusão de nota
+  e remessa, `ID_destinatario` voltou à nota de saída como FK opcional (obrigatória para
+  `SAIDA`), já que a nota passou a ser a entrega.
 
 ## [1.17.10.2026] - 2026-10-17
 

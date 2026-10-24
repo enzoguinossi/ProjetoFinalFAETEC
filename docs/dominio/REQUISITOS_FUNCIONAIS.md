@@ -31,23 +31,23 @@
 |----|--------|-----------|------------|
 | RF010 | Gerenciar Catálogo de Produtos | O sistema deve permitir o cadastro de produtos com descrição, foto, flags Perecível e Composto. Códigos GTIN/EAN via código personalizado (tipos EAN12 e EAN13). Conversão de unidade padrão opcional vinculada à tabela conversao_unidade. | Essencial |
 | RF011 | Leitura por Código de Barras | O sistema deve permitir a identificação de produtos por leitor de código de barras, consultando os códigos EAN12 e EAN13 cadastrados como código personalizado do produto. | Essencial |
-| RF012 | Movimentação de Estoque | O sistema deve registrar entradas (via nota de entrada com conversão de unidades), saídas (via nota de saída e remessa), transferências e ajustes de inventário. Cada movimentação gera registro auditável. | Essencial |
+| RF012 | Movimentação de Estoque | O sistema deve registrar entradas (via nota de entrada com conversão de unidades), saídas (via nota de saída com destinatário e itens), transferências e ajustes de inventário. Cada movimentação gera registro auditável. | Essencial |
 | RF013 | Conversão de Unidades | Tabela standalone de conversão (não vinculada a produto). O usuário cria nomes como CX20, PCT10 ou UN. Ao dar entrada, seleciona a conversão e o sistema multiplica a quantidade. O fator pode ser editado no momento da entrada sem alterar o template. | Essencial |
 | RF014 | Alertas de Validade | O sistema deve notificar automaticamente no mural de mensagens quando produtos perecíveis estiverem a 90, 60, 45 e 30 dias do vencimento, com base na data_validade do cadastro do produto. | Essencial |
 | RF015 | Gestão de Inventário | O sistema deve permitir abertura de inventário com bloqueio de movimentação dos produtos sendo contados. Contagem cega opcional (controlada pela permissão `inventario.ver_contagem_cega`). Múltiplas contagens por item de diferentes funcionários. Aprovador vê planilha comparativa com média e contagens individuais e escolhe qual valor aplicar. Toda diferença precisa de aprovação manual. | Essencial |
 | RF016 | Baixas por Consumo Interno e Avarias | O sistema deve permitir o registro de baixa de itens destinados ao uso do próprio galpão ou danificados, gerando notas de saida. | Essencial |
 
-## Módulo 4: Gestão de Notas e Logística de Remessas
+## Módulo 4: Gestão de Notas e Logística de Entregas
 
 | ID | Título | Descrição | Prioridade |
 |----|--------|-----------|------------|
 | RF017a | Nota de Entrada | O sistema deve permitir o registro de entrada de mercadorias com ou sem chave de acesso NF-e vinculada. Fornecedor opcional. Itens com conversão de unidade. Ao confirmar, aumenta o campo quantidade_atual do estoque. Não cria lote automaticamente. | Essencial |
-| RF017b | Nota de Saída | O sistema deve permitir que o operador transcreva pedidos recebidos em papel para o sistema, gerando uma nota de saída que reserva o estoque. Ao criar, saldo_reservado é incrementado. | Essencial |
-| RF018 | Quadro Kanban de Remessas | O sistema deve gerenciar visualmente o fluxo das entregas pelos status: EM_PREPARACAO, PRONTO_PARA_ENTREGA, EM_PERCURSO, PENDENTE, FINALIZADO_TOTAL e FINALIZADO_PARCIAL. | Importante - fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |
-| RF019 | Assistente de Remessa | O sistema deve **avisar** o usuário quando o saldo disponível (quantidade_atual - saldo_reservado) for insuficiente, mas **permitir que a remessa prossiga**. | Essencial |
-| RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à remessa. | Essencial |
-| RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que remessas não entregues (PENDENTE) sejam adicionadas em uma nova expedição. Retiradas diretas de urgência no galpão devem ser registradas como remessa com flag de urgente. Dando uma baixa parcial na remessa. | Essencial |
-| RF022 | Percurso e Expedição | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e expedições como instâncias do dia. A expedição pode ser baseada em um percurso ou criada do zero, e deve ser editável. A expedição agrupa remessas com ordem de visita. | Essencial |
+| RF017b | Nota de Saída | O sistema deve permitir que o operador registre a entrega (destinatário, urgência e itens) em uma nota de saída que reserva o estoque na criação. A nota é editável enquanto `ABERTA` e pode ser cancelada liberando a reserva. | Essencial |
+| RF018 | Quadro Kanban de Entregas | O sistema deve gerenciar visualmente o fluxo das entregas pelos status: ABERTA, EM_PERCURSO, PENDENTE, BAIXA_TOTAL, BAIXA_PARCIAL, BAIXA_COM_CORTE e CANCELADA. | Importante - fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |
+| RF019 | Assistente de Saída | O sistema deve **avisar** o usuário quando o saldo disponível (quantidade_atual - saldo_reservado) for insuficiente, mas **permitir que a nota prossiga**. | Essencial |
+| RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à nota de saída. | Essencial |
+| RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que notas não entregues (PENDENTE) sejam adicionadas em outra expedição. Retiradas diretas de urgência no galpão devem ser registradas como nota de saída com flag `urgente`, dando baixa parcial na própria nota. | Essencial |
+| RF022 | Percurso e Expedição | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e expedições como manifestos do dia (veículo, condutor e ordem). A expedição pode ser baseada em um percurso ou criada do zero, e deve ser editável. A expedição agrupa notas de saída com ordem de visita. | Essencial |
 
 ## Módulo 5: Relatórios, Consultas e Integrações
 

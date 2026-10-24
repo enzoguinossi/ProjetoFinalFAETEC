@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Nexus — Sistema Logístico",
-  description: "Controle de Estoque e Logística de Remessas",
+  description: "Controle de Estoque e Logística de Entregas",
 };
 
 export default function RootLayout({

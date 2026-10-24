@@ -202,31 +202,31 @@ quantidade_atual += quantidade_convertida
 
 e gera registro de movimentação de estoque.
 
-## 8.2 Reserva (remessa planejada)
+## 8.2 Reserva (nota de saída)
 
-Criar uma **remessa planejada com itens** reserva estoque:
+Criar uma **nota de saída com itens e destinatário** reserva estoque:
 
 ```text
 saldo_reservado += quantidade
 ```
 
-A nota de saída, por si, **não** reserva nada — a reserva pertence à remessa. Criar a remessa
-também não representa baixa física definitiva.
+A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa. Criar a
+nota também não representa baixa física definitiva.
 
 ## 8.3 Cancelamento
 
-O cancelamento da **remessa** libera a reserva:
+O cancelamento da **nota de saída** libera a reserva:
 
 ```text
 saldo_reservado -= quantidade
 ```
 
-A remessa vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
+A nota vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
 sem debitar a reserva outra vez.
 
-## 8.4 Remessa finalizada
+## 8.4 Nota baixada
 
-A baixa definitiva ocorre quando a remessa é finalizada:
+A baixa definitiva ocorre quando a entrega da nota é finalizada:
 
 ```text
 quantidade_atual -= quantidade_entregue
@@ -404,18 +404,14 @@ Históricos operacionais e registros de auditoria devem permanecer preservados.
 
 ---
 
-# 14. Remessas e expedições
+# 14. Entregas e expedições
 
 O ciclo operacional principal é:
 
 ```text
-Nota de Saída
+Nota de Saída (destinatário + itens + reserva)
     ↓
-Reserva de estoque
-    ↓
-Remessa
-    ↓
-Expedição
+Expedição (manifesto: veículo, condutor, ordem)
     ↓
 Preparação
     ↓
@@ -428,18 +424,17 @@ Baixa
 
 Status e transições devem respeitar o modelo documentado.
 
-Uma remessa pendente pode ser adicionada posteriormente a outra expedição.
+Uma nota pendente pode ser adicionada posteriormente a outra expedição.
 
-Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante.
+Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante;
+a pendência é a própria nota em `BAIXA_PARCIAL` (sem split e sem remessa).
 
 Não implemente um novo fluxo de entrega sem verificar:
 
 * `nota_saida`;
 * `item_nota_saida`;
-* `remessa`;
-* `item_remessa`;
 * `expedicao`;
-* `expedicao_remessa`;
+* `expedicao_nota`;
 * `coleta`.
 
 ---

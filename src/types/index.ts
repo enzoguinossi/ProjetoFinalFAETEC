@@ -1,16 +1,10 @@
 // ── Constantes ──────────────────────────────────────────────────────
 
 export const STATUS_NOTA_SAIDA = [
-  "ABERTA", "EM_ANDAMENTO", "BAIXA_TOTAL",
-  "BAIXA_PARCIAL", "BAIXA_COM_CORTE", "CANCELADA",
+  "ABERTA", "EM_PERCURSO", "PENDENTE",
+  "BAIXA_TOTAL", "BAIXA_PARCIAL", "BAIXA_COM_CORTE", "CANCELADA",
 ] as const;
 export type StatusNotaSaida = (typeof STATUS_NOTA_SAIDA)[number];
-
-export const STATUS_REMESSA = [
-  "EM_PREPARACAO", "PRONTO_PARA_ENTREGA", "EM_PERCURSO",
-  "PENDENTE", "FINALIZADO_TOTAL", "FINALIZADO_PARCIAL", "CANCELADA",
-] as const;
-export type StatusRemessa = (typeof STATUS_REMESSA)[number];
 
 export const STATUS_EXPEDICAO = ["PLANEJADA", "EM_PERCURSO", "CONCLUIDA"] as const;
 export type StatusExpedicao = (typeof STATUS_EXPEDICAO)[number];

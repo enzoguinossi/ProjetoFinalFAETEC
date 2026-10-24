@@ -166,12 +166,16 @@ export async function criarVeiculo(
   });
 }
 
-export async function criarNotaSaida() {
+export async function criarNotaSaida(
+  opts: { idDestinatario?: number; urgente?: boolean } = {},
+) {
   return prismaTeste.notaSaida.create({
     data: {
+      id_destinatario: opts.idDestinatario,
       data_criacao: new Date(),
       tipo: "SAIDA",
       status: "ABERTA",
+      urgente: opts.urgente ?? false,
     },
   });
 }
@@ -186,20 +190,17 @@ export async function criarItemNotaSaida(
   });
 }
 
-export async function criarRemessa(opts: {
-  idNotaSaida: number;
-  idDestinatario: number;
+export async function criarExpedicao(opts: {
   idVeiculo?: number;
   idCondutor?: number;
-}) {
-  return prismaTeste.remessa.create({
+  status?: "PLANEJADA" | "EM_PERCURSO" | "CONCLUIDA";
+} = {}) {
+  return prismaTeste.expedicao.create({
     data: {
-      id_nota_saida: opts.idNotaSaida,
-      id_destinatario: opts.idDestinatario,
       data_criacao: new Date(),
-      status: "EM_PREPARACAO",
       id_veiculo: opts.idVeiculo,
       id_funcionario_condutor: opts.idCondutor,
+      status: opts.status ?? "PLANEJADA",
     },
   });
 }
@@ -285,14 +286,14 @@ export async function criarMovimentacao(
 
 export async function criarReserva(
   idEstoque: number,
-  idRemessa: number,
+  idNotaSaida: number,
   idUsuario: number,
   quantidade = 1,
 ) {
   return prismaTeste.reservaEstoque.create({
     data: {
       id_estoque: idEstoque,
-      id_remessa: idRemessa,
+      id_nota_saida: idNotaSaida,
       id_usuario: idUsuario,
       quantidade,
       data_hora: new Date(),

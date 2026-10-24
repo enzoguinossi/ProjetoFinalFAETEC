@@ -237,11 +237,10 @@ export class ProdutoDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [estoque, itensNotaSaida, itensNotaEntrada, itensRemessa, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
+    const [estoque, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
       client.estoque.count({ where: { id_produto: id } }),
       client.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
       client.itemNotaEntrada.count({ where: { id_produto: id } }),
-      client.itemRemessa.count({ where: { estoque: { id_produto: id } } }),
       client.itemPedidoEscola.count({ where: { id_produto: id } }),
       client.itemColeta.count({ where: { estoque: { id_produto: id } } }),
       client.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
@@ -252,7 +251,6 @@ export class ProdutoDAO {
     if (estoque > 0) vinculos.push(`${estoque} registro(s) de estoque`);
     if (itensNotaSaida > 0) vinculos.push(`${itensNotaSaida} item(ns) de nota de saída`);
     if (itensNotaEntrada > 0) vinculos.push(`${itensNotaEntrada} item(ns) de nota de entrada`);
-    if (itensRemessa > 0) vinculos.push(`${itensRemessa} item(ns) de remessa`);
     if (itensPedido > 0) vinculos.push(`${itensPedido} pedido(s) de escola`);
     if (itensColeta > 0) vinculos.push(`${itensColeta} item(ns) de coleta`);
     if (movimentacoes > 0) vinculos.push(`${movimentacoes} movimentação(ões) de estoque`);

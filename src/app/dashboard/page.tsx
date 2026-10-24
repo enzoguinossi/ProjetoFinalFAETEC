@@ -17,7 +17,7 @@ export default async function DashboardPage() {
         <div className="bg-white rounded-xl border border-border p-4 mb-4">
           <div className="text-[0.6875rem] text-[#8a8f9a] mb-1">PEDIDOS PENDENTES</div>
           <div className="text-2xl font-bold">12</div>
-          <div className="text-[0.6875rem] text-[#fbbc04] mt-1">● 3 remessas aguardando</div>
+          <div className="text-[0.6875rem] text-[#fbbc04] mt-1">● 3 saídas aguardando</div>
         </div>
       </div>
 
@@ -32,11 +32,11 @@ export default async function DashboardPage() {
       <div className="bg-white rounded-xl border border-border p-4 mb-4">
         <h3 className="text-[0.8125rem] font-semibold mb-2">⚠️ Pendências</h3>
         <div className="text-xs py-1.5 flex justify-between border-b border-border last:border-b-0">
-          <span>Remessa #1024 — ESCOLA MUNICIPAL CRUZEIRO</span>
+          <span>Saída #1024 — ESCOLA MUNICIPAL CRUZEIRO</span>
           <span className="text-[#fbbc04] text-[0.6875rem]">Pendente</span>
         </div>
         <div className="text-xs py-1.5 flex justify-between border-b border-border last:border-b-0">
-          <span>Remessa #1021 — CRECHE BEM-QUERER</span>
+          <span>Saída #1021 — CRECHE BEM-QUERER</span>
           <span className="text-[#fbbc04] text-[0.6875rem]">Pendente</span>
         </div>
         <div className="text-xs py-1.5 flex justify-between border-b border-border last:border-b-0">

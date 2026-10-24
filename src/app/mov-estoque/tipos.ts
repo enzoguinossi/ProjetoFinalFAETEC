@@ -12,7 +12,7 @@ export type SelecaoParams = {
   page?: number;
   search?: string;
   limit?: number;
-  /** Ids que não devem aparecer (já adicionados na nota/remessa). */
+  /** Ids que não devem aparecer (já adicionados na nota). */
   excludeIds?: number[];
 };
 
@@ -85,43 +85,10 @@ export type NotaEntradaFormData = {
 
 // ── Saída ───────────────────────────────────────────────────────────
 
-export type RemessaNotaRow = {
-  id_remessa: number;
-  id_destinatario: number;
-  destinatario: string;
-  /** Quantidade de produtos: linhas de item da remessa. */
-  produtos: number;
-  status: string;
-  statusLabel: string;
-  podeCancelar: boolean;
-  /** Só remessas em preparação ou prontas para entrega podem ser editadas. */
-  podeEditar: boolean;
-};
-
-export type NotaSaidaListRow = {
-  id_nota_saida: number;
-  data: string;
-  remessas: number;
-  destinatarios: string;
-  status: string;
-  listaRemessas: RemessaNotaRow[];
-};
-
 export type DestinatarioSelecaoRow = {
   id_destinatario: number;
   razao_social: string;
   tipo: string;
-};
-
-export type CondutorItem = {
-  id_funcionario: number;
-  nome: string;
-};
-
-export type VeiculoItem = {
-  id_veiculo: number;
-  placa: string;
-  modelo: string | null;
 };
 
 export type ItemSaidaPayload = {
@@ -129,68 +96,45 @@ export type ItemSaidaPayload = {
   quantidade_solicitada: number;
 };
 
-export type RemessaSaidaPayload = {
+export type NovaSaidaPayload = {
   id_destinatario: number;
-  id_funcionario_condutor?: number | null;
-  id_veiculo?: number | null;
   urgente?: boolean;
   observacao?: string | null;
   itens: ItemSaidaPayload[];
 };
 
-export type NovaSaidaPayload = {
-  observacao?: string | null;
-  remessas: RemessaSaidaPayload[];
-};
-
-/** Item da edição: com `id_item_remessa` = existente; sem = novo. */
-export type ItemRemessaAtualizacaoPayload = ItemSaidaPayload & {
-  id_item_remessa?: number | null;
-};
-
-export type AtualizacaoRemessaPayload = Omit<RemessaSaidaPayload, "itens"> & {
-  itens: ItemRemessaAtualizacaoPayload[];
+/** Item da edição: com `id_item_nota_saida` = existente; sem = novo. */
+export type ItemSaidaAtualizacaoPayload = ItemSaidaPayload & {
+  id_item_nota_saida?: number | null;
 };
 
 export type AtualizacaoNotaSaidaPayload = {
+  id_destinatario: number;
+  urgente?: boolean;
   observacao?: string | null;
+  itens: ItemSaidaAtualizacaoPayload[];
 };
 
-export type RemessaItemDetalhe = {
-  id_item_remessa: number;
+export type NotaSaidaItemDetalhe = {
+  id_item_nota_saida: number;
   id_produto: number;
   descricao: string;
   quantidade_solicitada: number;
-  quantidade_separada: number | null;
-  quantidade_entregue: number | null;
+  quantidade_entregue: number;
 };
 
-/** Remessa carregada para os modais de visualização e edição. */
-export type RemessaFormData = {
-  id_remessa: number;
+export type NotaSaidaListRow = {
   id_nota_saida: number;
+  data: string;
+  destinatario: string;
+  itens: NotaSaidaItemDetalhe[];
+  /** Soma de `qtd_esperada` dos itens. */
+  quantidade: number;
   status: string;
   statusLabel: string;
-  /** Só remessas em preparação ou prontas para entrega são editáveis. */
+  podeCancelar: boolean;
+  /** Só notas `ABERTA` podem ser editadas. */
   podeEditar: boolean;
-  id_destinatario: number;
-  destinatario: string;
-  id_funcionario_condutor: number | null;
-  condutor: string | null;
-  id_veiculo: number | null;
-  /** Placa e modelo do veículo, quando houver. */
-  veiculo: string | null;
-  urgente: boolean;
-  observacao: string | null;
-  itens: RemessaItemDetalhe[];
-};
-
-export type NotaSaidaRemessaDetalhe = {
-  id_remessa: number;
-  destinatario: string;
-  status: string;
-  statusLabel: string;
-  itens: RemessaItemDetalhe[];
 };
 
 /** Nota de saída carregada para os modais de visualização e edição. */
@@ -198,6 +142,12 @@ export type NotaSaidaFormData = {
   id_nota_saida: number;
   data: string;
   status: string;
+  statusLabel: string;
+  /** Só notas abertas são editáveis. */
+  podeEditar: boolean;
+  id_destinatario: number | null;
+  destinatario: string | null;
+  urgente: boolean;
   observacao: string | null;
-  remessas: NotaSaidaRemessaDetalhe[];
+  itens: NotaSaidaItemDetalhe[];
 };

@@ -53,8 +53,7 @@ async function main() {
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
-    "remessa.criar", "remessa.alterar", "remessa.alterar_status", "remessa.consultar",
-    "remessa.finalizar",
+    "nota_saida.alterar_status", "nota_saida.finalizar",
     "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
     "expedicao.listar", "expedicao.criar", "expedicao.alterar", "expedicao.consultar", "expedicao.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
@@ -72,7 +71,24 @@ async function main() {
   console.log(`  ✅ ${permissoes.length} permissões`);
 
   // ── Limpeza: permissões obsoletas ───────────────────────────────
-  const obsoletas = ["perfil.desativar", "percurso.desativar", "rota.listar", "rota.criar", "rota.alterar", "rota.consultar", "rota.desativar"];
+  // `remessa.*` e `rota.*` são nomes de modelos antigos, já fundidos na nota de
+  // saída e na expedição. Eles aparecem aqui de propósito: esta lista não é o
+  // modelo atual, serve para limpar ambientes que ainda tenham as permissões
+  // antigas.
+  const obsoletas = [
+    "perfil.desativar",
+    "percurso.desativar",
+    "rota.listar",
+    "rota.criar",
+    "rota.alterar",
+    "rota.consultar",
+    "rota.desativar",
+    "remessa.criar",
+    "remessa.alterar",
+    "remessa.alterar_status",
+    "remessa.consultar",
+    "remessa.finalizar",
+  ];
   for (const nome of obsoletas) {
     const obsoleta = await prisma.permissao.findUnique({ where: { nome } });
     if (!obsoleta) continue;
@@ -91,7 +107,7 @@ async function main() {
         "produto.consultar", "produto.criar",
         "estoque.entrada", "estoque.ver_saldo",
         "nota_saida.criar", "nota_saida.consultar", "nota_saida.alterar",
-        "remessa.criar", "remessa.alterar_status", "remessa.finalizar",
+        "nota_saida.alterar_status", "nota_saida.finalizar",
         "destinatario.consultar",
         "inventario.contar",
       ],

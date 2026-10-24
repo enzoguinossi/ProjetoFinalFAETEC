@@ -4,43 +4,65 @@ import { notaSaidaService } from "@/services/nota-saida";
 import {
   criarDestinatario,
   criarEstoque,
-  criarFuncionario,
   criarProduto,
   criarUsuario,
-  criarVeiculo,
 } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
 
+/** Nota aberta com um item e a reserva já feita. */
+async function prepararNota(
+  opts: { quantidade?: number; saldoReservado?: number; quantidadeAtual?: number } = {},
+) {
+  const { usuario } = await criarUsuario();
+  const produto = await criarProduto();
+  const estoque = await criarEstoque(produto.id_produto, {
+    quantidadeAtual: opts.quantidadeAtual ?? 10,
+    saldoReservado: opts.saldoReservado ?? 2,
+  });
+  const { destinatario } = await criarDestinatario();
+
+  const resultado = await notaSaidaService.registrar(
+    {
+      id_destinatario: destinatario.id_destinatario,
+      itens: [{ id_produto: produto.id_produto, quantidade_solicitada: opts.quantidade ?? 3 }],
+    },
+    usuario.id_usuario,
+  );
+  if ("error" in resultado) throw new Error(resultado.error);
+
+  const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
+    where: { id_nota_saida: resultado.nota.id_nota_saida },
+    include: { itens: true, reservas: true },
+  });
+
+  return {
+    usuario,
+    produto,
+    estoque,
+    destinatario,
+    notaId: nota.id_nota_saida,
+    item: nota.itens[0]!,
+  };
+}
+
 describe("notaSaidaService.registrar", () => {
-  it("grava uma nota com duas remessas e itens, sem item_nota_saida", async () => {
+  it("grava a nota com destinatário, urgência, itens e reserva", async () => {
     const { usuario } = await criarUsuario();
     const produtoA = await criarProduto();
     const produtoB = await criarProduto();
-    const { destinatario: destinatarioA } = await criarDestinatario();
-    const { destinatario: destinatarioB } = await criarDestinatario();
-    const { funcionario: condutor } = await criarFuncionario({ condutor: true });
-    const veiculo = await criarVeiculo();
+    await criarEstoque(produtoA.id_produto, { quantidadeAtual: 10 });
+    await criarEstoque(produtoB.id_produto, { quantidadeAtual: 10 });
+    const { destinatario } = await criarDestinatario();
 
     const resultado = await notaSaidaService.registrar(
       {
+        id_destinatario: destinatario.id_destinatario,
+        urgente: true,
         observacao: "Saída de teste",
-        remessas: [
-          {
-            id_destinatario: destinatarioA.id_destinatario,
-            id_funcionario_condutor: condutor.id_funcionario,
-            id_veiculo: veiculo.id_veiculo,
-            urgente: true,
-            observacao: "Primeira remessa",
-            itens: [{ id_produto: produtoA.id_produto, quantidade_solicitada: 3 }],
-          },
-          {
-            id_destinatario: destinatarioB.id_destinatario,
-            itens: [
-              { id_produto: produtoA.id_produto, quantidade_solicitada: 2 },
-              { id_produto: produtoB.id_produto, quantidade_solicitada: 7 },
-            ],
-          },
+        itens: [
+          { id_produto: produtoA.id_produto, quantidade_solicitada: 3 },
+          { id_produto: produtoB.id_produto, quantidade_solicitada: 7 },
         ],
       },
       usuario.id_usuario,
@@ -51,36 +73,34 @@ describe("notaSaidaService.registrar", () => {
 
     const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
       where: { id_nota_saida: resultado.nota.id_nota_saida },
-      include: { remessas: { include: { itens: true } } },
+      include: { itens: true, reservas: true, destinatario: true },
     });
     expect(nota.tipo).toBe("SAIDA");
     expect(nota.status).toBe("ABERTA");
+    expect(nota.urgente).toBe(true);
     expect(nota.observacao).toBe("Saída de teste");
-    expect(nota.remessas).toHaveLength(2);
-    expect(nota.remessas.every((r) => r.status === "EM_PREPARACAO")).toBe(true);
-
-    const [primeira, segunda] = nota.remessas.sort((a, b) => a.id_remessa - b.id_remessa);
-    expect(primeira?.id_destinatario).toBe(destinatarioA.id_destinatario);
-    expect(primeira?.id_funcionario_condutor).toBe(condutor.id_funcionario);
-    expect(primeira?.id_veiculo).toBe(veiculo.id_veiculo);
-    expect(primeira?.urgente).toBe(true);
-    expect(primeira?.observacao).toBe("Primeira remessa");
-    expect(primeira?.itens).toHaveLength(1);
-    expect(segunda?.id_destinatario).toBe(destinatarioB.id_destinatario);
-    expect(segunda?.urgente).toBe(false);
-    expect(segunda?.itens).toHaveLength(2);
-
-    expect(await prismaTeste.itemNotaSaida.count()).toBe(0);
-    expect(await prismaTeste.itemRemessa.count()).toBe(3);
-    expect(await prismaTeste.reservaEstoque.count()).toBe(3);
+    expect(nota.id_destinatario).toBe(destinatario.id_destinatario);
+    expect(nota.destinatario?.id_destinatario).toBe(destinatario.id_destinatario);
+    expect(nota.itens).toHaveLength(2);
+    expect(nota.itens.map((item) => Number(item.qtd_esperada))).toEqual([3, 7]);
+    expect(nota.reservas).toHaveLength(2);
+    expect(resultado.aviso).toBeNull();
 
     const auditorias = await auditoriasDe("NotaSaida", nota.id_nota_saida);
     expect(auditorias).toHaveLength(1);
     expect(auditorias[0]?.acao).toBe("CRIAR");
     expect(auditorias[0]?.id_usuario).toBe(usuario.id_usuario);
+    expect(auditorias[0]?.dados_novos).toMatchObject({
+      id_destinatario: destinatario.id_destinatario,
+      status: "ABERTA",
+      itens: expect.arrayContaining([
+        expect.objectContaining({ id_produto: produtoA.id_produto, quantidade_solicitada: 3 }),
+        expect.objectContaining({ id_produto: produtoB.id_produto, quantidade_solicitada: 7 }),
+      ]),
+    });
   });
 
-  it("reserva a quantidade_solicitada na remessa com saldo anterior e posterior", async () => {
+  it("reserva o valor cheio de cada item com saldo anterior e posterior", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const estoque = await criarEstoque(produto.id_produto, {
@@ -91,32 +111,28 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: destinatario.id_destinatario,
-            itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 3 }],
-          },
-        ],
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 3 }],
       },
       usuario.id_usuario,
     );
     expect("error" in resultado).toBe(false);
     if ("error" in resultado) return;
 
-    const remessa = await prismaTeste.remessa.findUniqueOrThrow({
-      where: { id_remessa: resultado.remessas[0]!.id_remessa },
+    const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
+      where: { id_nota_saida: resultado.nota.id_nota_saida },
       include: { itens: true, reservas: true },
     });
-    expect(remessa.itens).toHaveLength(1);
-    expect(remessa.itens[0]).toMatchObject({
+    expect(nota.itens).toHaveLength(1);
+    expect(nota.itens[0]).toMatchObject({
       id_estoque: estoque.id_estoque,
-      quantidade_solicitada: 3,
+      qtd_esperada: 3,
     });
 
-    expect(remessa.reservas).toHaveLength(1);
-    expect(remessa.reservas[0]).toMatchObject({
+    expect(nota.reservas).toHaveLength(1);
+    expect(nota.reservas[0]).toMatchObject({
       id_estoque: estoque.id_estoque,
-      id_remessa: remessa.id_remessa,
+      id_nota_saida: nota.id_nota_saida,
       id_usuario: usuario.id_usuario,
       quantidade: 3,
       saldo_anterior: 2,
@@ -130,7 +146,7 @@ describe("notaSaidaService.registrar", () => {
     expect(estoqueApos.quantidade_atual).toBe(10);
   });
 
-  it("RN001: grava mesmo com a quantidade acima do saldo disponível", async () => {
+  it("RN001: grava mesmo acima do saldo disponível e devolve o aviso", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 2 });
@@ -138,17 +154,15 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: destinatario.id_destinatario,
-            itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 5 }],
-          },
-        ],
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 5 }],
       },
       usuario.id_usuario,
     );
 
     expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+    expect(resultado.aviso).toContain("Saldo insuficiente");
     expect(await prismaTeste.notaSaida.count()).toBe(1);
 
     const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
@@ -165,12 +179,8 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: destinatario.id_destinatario,
-            itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 4 }],
-          },
-        ],
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 4 }],
       },
       usuario.id_usuario,
     );
@@ -194,12 +204,8 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: destinatario.id_destinatario,
-            itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
-          },
-        ],
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
       },
       usuario.id_usuario,
     );
@@ -217,43 +223,27 @@ describe("notaSaidaService.registrar", () => {
     });
   });
 
-  it("recusa nota sem remessa", async () => {
-    const { usuario } = await criarUsuario();
-
-    const resultado = await notaSaidaService.registrar({ remessas: [] }, usuario.id_usuario);
-
-    expect("error" in resultado).toBe(true);
-    expect(await prismaTeste.notaSaida.count()).toBe(0);
-  });
-
-  it("recusa remessa sem item", async () => {
+  it("recusa nota sem item", async () => {
     const { usuario } = await criarUsuario();
     const { destinatario } = await criarDestinatario();
 
     const resultado = await notaSaidaService.registrar(
-      {
-        remessas: [{ id_destinatario: destinatario.id_destinatario, itens: [] }],
-      },
+      { id_destinatario: destinatario.id_destinatario, itens: [] },
       usuario.id_usuario,
     );
 
     expect("error" in resultado).toBe(true);
     expect(await prismaTeste.notaSaida.count()).toBe(0);
-    expect(await prismaTeste.remessa.count()).toBe(0);
   });
 
-  it("recusa remessa sem destinatário", async () => {
+  it("recusa nota sem destinatário", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: 0,
-            itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
-          },
-        ],
+        id_destinatario: 0,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
       },
       usuario.id_usuario,
     );
@@ -262,21 +252,17 @@ describe("notaSaidaService.registrar", () => {
     expect(await prismaTeste.notaSaida.count()).toBe(0);
   });
 
-  it("recusa produto repetido na mesma remessa", async () => {
+  it("recusa produto repetido na mesma nota", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const { destinatario } = await criarDestinatario();
 
     const resultado = await notaSaidaService.registrar(
       {
-        remessas: [
-          {
-            id_destinatario: destinatario.id_destinatario,
-            itens: [
-              { id_produto: produto.id_produto, quantidade_solicitada: 1 },
-              { id_produto: produto.id_produto, quantidade_solicitada: 2 },
-            ],
-          },
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          { id_produto: produto.id_produto, quantidade_solicitada: 1 },
+          { id_produto: produto.id_produto, quantidade_solicitada: 2 },
         ],
       },
       usuario.id_usuario,
@@ -287,7 +273,7 @@ describe("notaSaidaService.registrar", () => {
     expect(await prismaTeste.reservaEstoque.count()).toBe(0);
   });
 
-  it("desfaz tudo quando uma remessa falha no meio da transação", async () => {
+  it("desfaz tudo quando um item falha no meio da transação", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const { destinatario } = await criarDestinatario();
@@ -295,15 +281,10 @@ describe("notaSaidaService.registrar", () => {
     await expect(
       notaSaidaService.registrar(
         {
-          remessas: [
-            {
-              id_destinatario: destinatario.id_destinatario,
-              itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
-            },
-            {
-              id_destinatario: destinatario.id_destinatario,
-              itens: [{ id_produto: 999999, quantidade_solicitada: 1 }],
-            },
+          id_destinatario: destinatario.id_destinatario,
+          itens: [
+            { id_produto: produto.id_produto, quantidade_solicitada: 2 },
+            { id_produto: 999999, quantidade_solicitada: 1 },
           ],
         },
         usuario.id_usuario,
@@ -311,16 +292,444 @@ describe("notaSaidaService.registrar", () => {
     ).rejects.toThrow();
 
     expect(await prismaTeste.notaSaida.count()).toBe(0);
-    expect(await prismaTeste.remessa.count()).toBe(0);
-    expect(await prismaTeste.itemRemessa.count()).toBe(0);
+    expect(await prismaTeste.itemNotaSaida.count()).toBe(0);
     expect(await prismaTeste.reservaEstoque.count()).toBe(0);
     expect(await prismaTeste.estoque.count()).toBe(0);
     expect(await prismaTeste.registroAuditoria.count({ where: { entidade: "NotaSaida" } })).toBe(0);
   });
 });
 
+describe("notaSaidaService.atualizar", () => {
+  it("aumenta a quantidade e ajusta a reserva pelo delta", async () => {
+    const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
+      quantidade: 3,
+    });
+
+    const resultado = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        urgente: true,
+        observacao: "Correção da quantidade",
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 8,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect("error" in resultado).toBe(false);
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.saldo_reservado).toBe(10);
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: item.id_item_nota_saida },
+    });
+    expect(itemDepois.qtd_esperada).toBe(8);
+
+    const reservas = await prismaTeste.reservaEstoque.findMany({
+      where: { id_nota_saida: notaId },
+      orderBy: { id_reserva_estoque: "asc" },
+    });
+    expect(reservas).toHaveLength(2);
+    expect(reservas[1]).toMatchObject({
+      id_estoque: estoque.id_estoque,
+      id_nota_saida: notaId,
+      id_usuario: usuario.id_usuario,
+      quantidade: 5,
+      saldo_anterior: 5,
+      saldo_posterior: 10,
+    });
+
+    const notaDepois = await prismaTeste.notaSaida.findUniqueOrThrow({
+      where: { id_nota_saida: notaId },
+    });
+    expect(notaDepois.observacao).toBe("Correção da quantidade");
+    expect(notaDepois.urgente).toBe(true);
+
+    const auditorias = await auditoriasDe("NotaSaida", notaId);
+    expect(auditorias).toHaveLength(2);
+    expect(auditorias[1]?.acao).toBe("ALTERAR");
+    expect(auditorias[1]?.dados_anteriores).toMatchObject({
+      itens: [{ id_item_nota_saida: item.id_item_nota_saida, quantidade_solicitada: 3 }],
+    });
+    expect(auditorias[1]?.dados_novos).toMatchObject({
+      itens: [{ id_item_nota_saida: item.id_item_nota_saida, quantidade_solicitada: 8 }],
+    });
+  });
+
+  it("diminui a quantidade e devolve a reserva pelo delta negativo", async () => {
+    const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
+      quantidade: 3,
+    });
+
+    const resultado = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 1,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect("error" in resultado).toBe(false);
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.saldo_reservado).toBe(3);
+
+    const reservas = await prismaTeste.reservaEstoque.findMany({
+      where: { id_nota_saida: notaId },
+      orderBy: { id_reserva_estoque: "asc" },
+    });
+    expect(reservas).toHaveLength(2);
+    expect(reservas[1]).toMatchObject({
+      quantidade: -2,
+      saldo_anterior: 5,
+      saldo_posterior: 3,
+    });
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: item.id_item_nota_saida },
+    });
+    expect(itemDepois.qtd_esperada).toBe(1);
+  });
+
+  it("acrescenta item novo e reserva o valor cheio", async () => {
+    const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
+      quantidade: 3,
+    });
+    const produtoB = await criarProduto();
+
+    const resultado = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 3,
+          },
+          { id_produto: produtoB.id_produto, quantidade_solicitada: 4 },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect("error" in resultado).toBe(false);
+
+    const itens = await prismaTeste.itemNotaSaida.findMany({
+      where: { id_nota_saida: notaId },
+      orderBy: { id_item_nota_saida: "asc" },
+    });
+    expect(itens).toHaveLength(2);
+
+    const estoqueB = await prismaTeste.estoque.findFirstOrThrow({
+      where: { id_produto: produtoB.id_produto },
+    });
+    expect(estoqueB.saldo_reservado).toBe(4);
+    expect(itens[1]?.id_estoque).toBe(estoqueB.id_estoque);
+
+    const reservaB = await prismaTeste.reservaEstoque.findFirstOrThrow({
+      where: { id_estoque: estoqueB.id_estoque },
+    });
+    expect(reservaB).toMatchObject({
+      id_nota_saida: notaId,
+      id_usuario: usuario.id_usuario,
+      quantidade: 4,
+      saldo_anterior: 0,
+      saldo_posterior: 4,
+    });
+
+    // O item original não foi tocado: nenhuma reserva de ajuste para ele.
+    const reservasA = await prismaTeste.reservaEstoque.findMany({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(reservasA).toHaveLength(1);
+  });
+
+  it.each(["EM_PERCURSO", "PENDENTE", "BAIXA_TOTAL", "BAIXA_PARCIAL", "CANCELADA"] as const)(
+    "recusa editar nota %s sem alterar reserva nem histórico",
+    async (status) => {
+      const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
+        quantidade: 3,
+      });
+      await prismaTeste.notaSaida.update({
+        where: { id_nota_saida: notaId },
+        data: { status },
+      });
+
+      const resultado = await notaSaidaService.atualizar(
+        notaId,
+        {
+          id_destinatario: destinatario.id_destinatario,
+          itens: [
+            {
+              id_item_nota_saida: item.id_item_nota_saida,
+              id_produto: produto.id_produto,
+              quantidade_solicitada: 9,
+            },
+          ],
+        },
+        usuario.id_usuario,
+      );
+
+      expect("error" in resultado).toBe(true);
+      if ("error" in resultado) expect(resultado.error).toContain("não pode ser editada");
+
+      const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+        where: { id_estoque: estoque.id_estoque },
+      });
+      expect(estoqueDepois.saldo_reservado).toBe(5);
+
+      const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+        where: { id_item_nota_saida: item.id_item_nota_saida },
+      });
+      expect(itemDepois.qtd_esperada).toBe(3);
+
+      expect(await prismaTeste.reservaEstoque.count({ where: { id_nota_saida: notaId } })).toBe(1);
+      expect(await auditoriasDe("NotaSaida", notaId)).toHaveLength(1);
+    },
+  );
+
+  it("recusa remover item de uma nota", async () => {
+    const { usuario, produto, destinatario, notaId, item } = await prepararNota({
+      quantidade: 3,
+    });
+    const produtoB = await criarProduto();
+
+    const comDois = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 3,
+          },
+          { id_produto: produtoB.id_produto, quantidade_solicitada: 2 },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in comDois).toBe(false);
+
+    const resultado = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 3,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect(resultado).toEqual({
+      error: "Não é possível remover itens de uma nota de saída.",
+    });
+    expect(await prismaTeste.itemNotaSaida.count({ where: { id_nota_saida: notaId } })).toBe(2);
+  });
+
+  it("recusa quantidade inválida e nota inexistente", async () => {
+    const { usuario, produto, destinatario, notaId, item } = await prepararNota();
+
+    const quantidadeInvalida = await notaSaidaService.atualizar(
+      notaId,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 0,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in quantidadeInvalida).toBe(true);
+
+    const inexistente = await notaSaidaService.atualizar(
+      999999,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
+      },
+      usuario.id_usuario,
+    );
+    expect(inexistente).toEqual({ error: "Nota de saída não encontrada." });
+  });
+
+  it("desfaz tudo quando um item novo viola a integridade do banco", async () => {
+    const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
+      quantidade: 3,
+    });
+
+    await expect(
+      notaSaidaService.atualizar(
+        notaId,
+        {
+          id_destinatario: destinatario.id_destinatario,
+          itens: [
+            {
+              id_item_nota_saida: item.id_item_nota_saida,
+              id_produto: produto.id_produto,
+              quantidade_solicitada: 9,
+            },
+            { id_produto: 999999, quantidade_solicitada: 4 },
+          ],
+        },
+        usuario.id_usuario,
+      ),
+    ).rejects.toThrow();
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.saldo_reservado).toBe(5);
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: item.id_item_nota_saida },
+    });
+    expect(itemDepois.qtd_esperada).toBe(3);
+
+    // Só a reserva da criação; nenhuma auditoria de edição.
+    expect(await prismaTeste.reservaEstoque.count({ where: { id_nota_saida: notaId } })).toBe(1);
+    expect(await auditoriasDe("NotaSaida", notaId)).toHaveLength(1);
+  });
+});
+
+describe("notaSaidaService.cancelar", () => {
+  it("cancela uma nota aberta e devolve o saldo_reservado ao valor anterior", async () => {
+    const { usuario, estoque, notaId } = await prepararNota({ quantidade: 3 });
+
+    const cancelamento = await notaSaidaService.cancelar(notaId, usuario.id_usuario);
+
+    expect("error" in cancelamento).toBe(false);
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.saldo_reservado).toBe(2);
+    expect(estoqueApos.quantidade_atual).toBe(10);
+
+    const reservas = await prismaTeste.reservaEstoque.findMany({
+      where: { id_nota_saida: notaId },
+      orderBy: { id_reserva_estoque: "asc" },
+    });
+    expect(reservas).toHaveLength(2);
+    expect(reservas[1]).toMatchObject({
+      id_estoque: estoque.id_estoque,
+      id_nota_saida: notaId,
+      id_usuario: usuario.id_usuario,
+      quantidade: -3,
+      saldo_anterior: 5,
+      saldo_posterior: 2,
+    });
+
+    // A nota não é apagada (RN004).
+    const notaApos = await prismaTeste.notaSaida.findUniqueOrThrow({
+      where: { id_nota_saida: notaId },
+    });
+    expect(notaApos.status).toBe("CANCELADA");
+
+    const auditorias = await auditoriasDe("NotaSaida", notaId);
+    expect(auditorias).toHaveLength(2);
+    expect(auditorias[1]?.acao).toBe("ALTERAR");
+    expect(auditorias[1]?.id_usuario).toBe(usuario.id_usuario);
+    expect(auditorias[1]?.dados_anteriores).toMatchObject({
+      id_nota_saida: notaId,
+      status: "ABERTA",
+    });
+    expect(auditorias[1]?.dados_novos).toMatchObject({
+      id_nota_saida: notaId,
+      status: "CANCELADA",
+    });
+  });
+
+  it("recusa o segundo cancelamento e não debita a reserva outra vez", async () => {
+    const { usuario, estoque, notaId } = await prepararNota({ quantidade: 3 });
+
+    const primeiro = await notaSaidaService.cancelar(notaId, usuario.id_usuario);
+    expect("error" in primeiro).toBe(false);
+
+    const segundo = await notaSaidaService.cancelar(notaId, usuario.id_usuario);
+    expect("error" in segundo).toBe(true);
+    if ("error" in segundo) expect(segundo.error).toContain("já está cancelada");
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.saldo_reservado).toBe(2);
+
+    const reservas = await prismaTeste.reservaEstoque.findMany({
+      where: { id_nota_saida: notaId },
+    });
+    expect(reservas).toHaveLength(2);
+  });
+
+  it.each(["EM_PERCURSO", "PENDENTE", "BAIXA_TOTAL", "BAIXA_PARCIAL", "BAIXA_COM_CORTE"] as const)(
+    "recusa cancelar nota %s sem alterar a reserva",
+    async (status) => {
+      const { usuario, estoque, notaId } = await prepararNota({ quantidade: 3 });
+      await prismaTeste.notaSaida.update({
+        where: { id_nota_saida: notaId },
+        data: { status },
+      });
+
+      const cancelamento = await notaSaidaService.cancelar(notaId, usuario.id_usuario);
+
+      expect("error" in cancelamento).toBe(true);
+      if ("error" in cancelamento) expect(cancelamento.error).toContain("não pode ser cancelada");
+
+      const notaApos = await prismaTeste.notaSaida.findUniqueOrThrow({
+        where: { id_nota_saida: notaId },
+      });
+      expect(notaApos.status).toBe(status);
+
+      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+        where: { id_estoque: estoque.id_estoque },
+      });
+      expect(estoqueApos.saldo_reservado).toBe(5);
+
+      expect(await prismaTeste.reservaEstoque.count({ where: { id_nota_saida: notaId } })).toBe(1);
+      expect(await auditoriasDe("NotaSaida", notaId)).toHaveLength(1);
+    },
+  );
+
+  it("recusa nota inexistente", async () => {
+    const { usuario } = await criarUsuario();
+
+    const cancelamento = await notaSaidaService.cancelar(999999, usuario.id_usuario);
+
+    expect("error" in cancelamento).toBe(true);
+    expect(await prismaTeste.notaSaida.count()).toBe(0);
+  });
+});
+
 describe("notaSaidaDAO.list", () => {
-  it("pagina as notas de saída com remessas e destinatários", async () => {
+  it("pagina as notas de saída com destinatário e itens", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const { destinatario } = await criarDestinatario({ razaoSocial: "Escola Municipal" });
@@ -328,12 +737,8 @@ describe("notaSaidaDAO.list", () => {
     for (let i = 0; i < 2; i++) {
       const resultado = await notaSaidaService.registrar(
         {
-          remessas: [
-            {
-              id_destinatario: destinatario.id_destinatario,
-              itens: [{ id_produto: produto.id_produto, quantidade_solicitada: i + 1 }],
-            },
-          ],
+          id_destinatario: destinatario.id_destinatario,
+          itens: [{ id_produto: produto.id_produto, quantidade_solicitada: i + 1 }],
         },
         usuario.id_usuario,
       );
@@ -345,9 +750,7 @@ describe("notaSaidaDAO.list", () => {
     expect(pagina.total).toBe(2);
     expect(pagina.totalPages).toBe(2);
     expect(pagina.data).toHaveLength(1);
-    expect(pagina.data[0]?.remessas).toHaveLength(1);
-    expect(pagina.data[0]?.remessas[0]?.destinatario.pessoaJuridica.razao_social).toBe(
-      "Escola Municipal",
-    );
+    expect(pagina.data[0]?.destinatario?.pessoaJuridica.razao_social).toBe("Escola Municipal");
+    expect(pagina.data[0]?.itens).toHaveLength(1);
   });
 });
