@@ -91,7 +91,7 @@ describe("types/buildPagination", () => {
 });
 
 describe("lib/uf e lib/formatar", () => {
-  it("isUF aceita apenas siglas válidas", () => {
+  it("isUF aceita apenas UFs válidas", () => {
     expect(isUF("RJ")).toBe(true);
     expect(isUF("rj")).toBe(false);
     expect(isUF("XX")).toBe(false);

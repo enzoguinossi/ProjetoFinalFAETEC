@@ -144,19 +144,28 @@ async function main() {
   }
 
   // ── Unidades de Conversão ───────────────────────────────────────
+  // UNIDADE (fator 1) é a unidade padrão do sistema: existe exatamente
+  // uma com `padrao = true` e ela não pode ser excluída nem ter nome
+  // ou fator alterados pela interface.
   const conversoes = [
-    { nome: "UNIDADE", fator: 1, descricao: "Unidade avulsa" },
-    { nome: "PACOTE", fator: 10, descricao: "Pacote com 10 unidades" },
-    { nome: "CAIXA", fator: 50, descricao: "Caixa com 50 unidades" },
+    { nome: "UNIDADE", fator: 1, descricao: "Unidade avulsa", padrao: true },
+    { nome: "PACOTE", fator: 10, descricao: "Pacote com 10 unidades", padrao: false },
+    { nome: "CAIXA", fator: 50, descricao: "Caixa com 50 unidades", padrao: false },
   ];
 
   for (const c of conversoes) {
     await prisma.conversaoUnidade.upsert({
       where: { nome: c.nome },
-      update: { fator: c.fator, descricao: c.descricao },
+      update: { fator: c.fator, descricao: c.descricao, padrao: c.padrao },
       create: c,
     });
   }
+
+  // Invariante: apenas a UNIDADE é padrão.
+  await prisma.conversaoUnidade.updateMany({
+    where: { NOT: { nome: "UNIDADE" } },
+    data: { padrao: false },
+  });
   console.log("  ✅ Conversões de unidade");
 
   console.log("\n✨ Seed concluído!");

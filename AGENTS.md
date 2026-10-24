@@ -166,7 +166,10 @@ As convenções documentadas são:
 * desativação deve ser utilizada no lugar de exclusão física.
 * **Exceções (sem `ativo`, exclusão física):** `conversao_unidade` e `percurso` são
   excluídos fisicamente e não possuem `ativo`; as demais entidades de cadastro continuam
-  com desativação (`ativo = false`).
+  com desativação (`ativo = false`). A unidade **padrão** do sistema (UNIDADE/1) é a
+  exceção dentro da exceção: não pode ser excluída nem ter nome ou fator alterados
+  — só a descrição é editável. Ao excluir uma unidade que não é a padrão, os produtos
+  que a usavam são revinculados à unidade padrão.
 
 Preserve as convenções existentes do projeto.
 
@@ -403,7 +406,10 @@ para excluir fisicamente entidades de cadastro.
 Quando a entidade possuir `ativo`, utilize a desativação prevista pelo domínio.
 
 **Exceções:** `conversao_unidade` e `percurso` são excluídos fisicamente e **não possuem
-`ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. As demais
+`ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. A unidade
+**padrão** (`padrao = true`, UNIDADE/1) **não pode ser excluída** nem ter nome ou
+fator alterados; ao excluir uma unidade que não é a padrão, os produtos que a usavam são
+**revinculados à unidade padrão**. As demais
 entidades de cadastro continuam com desativação.
 
 Históricos operacionais e registros de auditoria devem permanecer preservados.

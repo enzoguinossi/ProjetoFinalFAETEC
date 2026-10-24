@@ -15,6 +15,22 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Unidade padrão do sistema e unidade obrigatória no produto `(KAN-140)`:** a `UNIDADE`
+  (fator 1) passou a ser a unidade **padrão** do sistema. `conversao_unidade` ganhou
+  `padrao` (exatamente uma `TRUE`), e `produto.ID_conversao_padrao` deixou
+  de ser nullable: o cadastro sempre grava uma unidade — a padrão quando o formulário não
+  informa. A unidade padrão não pode ser excluída nem ter nome ou fator alterados
+  (só a descrição), e ao excluir uma unidade que não é a padrão os produtos que a usavam
+  são revinculados à unidade padrão (a exclusão não é recusada por uso). O nome da unidade
+  (`UNIDADE`, `PACOTE`, `CAIXA`) é a forma exibida nas telas compactas —
+  `src/lib/produto-linha.ts`, seletor de produto e itens de entrada/saída — e o select mostra
+  apenas o nome. O seed ficou idempotente e garante a invariante, e a migração dos dados
+  existentes (padrão e backfill do produto) roda sem reset. Código em
+  `prisma/schema.prisma`, `prisma/seed.ts`, `src/dao/conversao-unidade.ts`,
+  `src/dao/produto.ts`, `src/app/unidades/actions.ts`, `src/app/produtos/**`,
+  `src/app/mov-estoque/**` e `src/components/UnidadesModal.tsx`; testes em
+  `tests/dao/conversao-unidade.test.ts`, `tests/dao/produto.test.ts` e
+  `tests/lib/produto-linha.test.ts`.
 - **Tipo de Saída com avaria e consumo interno `(KAN-140)`:** o formulário de saída ganhou **Tipo de
   Saída** (Remessa / Avaria / Consumo Interno) e itens inline no formato do ERP
   (Código/Descrição/Unidade/Quantidade), sem campos de valor. Remessa (`SAIDA`) mantém destinatário

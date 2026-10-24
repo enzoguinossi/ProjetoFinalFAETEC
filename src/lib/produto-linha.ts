@@ -6,7 +6,7 @@ export type ProdutoListRow = {
   id_produto: number;
   codigo: string;
   descricao: string;
-  /** Nome da unidade de conversão padrão do produto (`UN` quando não houver). */
+  /** Nome da unidade de conversão padrão do produto (`—` quando não houver). */
   unidade: string;
   qtd: string;
   livre: string;
@@ -39,7 +39,7 @@ export function produtoParaLinha(p: ProdutoComEstoque): ProdutoListRow {
     id_produto: p.id_produto,
     codigo: formatarCodigo(p.id_produto),
     descricao: p.descricao,
-    unidade: p.conversaoPadrao?.nome ?? "UN",
+    unidade: p.conversaoPadrao?.nome ?? "—",
     qtd: String(qtd),
     livre: String(qtd - reservado),
   };

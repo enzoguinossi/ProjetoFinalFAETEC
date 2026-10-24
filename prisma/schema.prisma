@@ -276,6 +276,7 @@ model ConversaoUnidade {
   nome         String    @unique @map("nome")
   fator        Float     @map("fator")
   descricao    String?   @map("descricao")
+  padrao       Boolean   @default(false) @map("padrao")
   produtos     Produto[]
 
   @@map("conversao_unidade")
@@ -288,12 +289,12 @@ model Produto {
   perecivel           Boolean            @default(false) @map("perecivel")
   composto            Boolean            @default(false) @map("composto")
   data_validade       DateTime?          @map("data_validade") @db.Date
-  id_conversao_padrao Int?               @map("ID_conversao_padrao")
+  id_conversao_padrao Int                @map("ID_conversao_padrao")
   ativo               Boolean            @default(true) @map("ativo")
   estoques            Estoque[]
   itensNotaEntrada    ItemNotaEntrada[]
   itensPedido         ItemPedidoEscola[]
-  conversaoPadrao     ConversaoUnidade?  @relation(fields: [id_conversao_padrao], references: [id_conversao])
+  conversaoPadrao     ConversaoUnidade   @relation(fields: [id_conversao_padrao], references: [id_conversao])
   produtoCodigos      ProdutoCodigo[]
   insumosFilho        ProdutoInsumo[]    @relation("produto_filho")
   insumosPai          ProdutoInsumo[]    @relation("produto_pai")

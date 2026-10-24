@@ -20,7 +20,7 @@ export type ProdutoFormData = {
   perecivel: boolean;
   composto: boolean;
   data_validade: string | null;
-  id_conversao_padrao: number | null;
+  id_conversao_padrao: number;
   foto_url: string | null;
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];

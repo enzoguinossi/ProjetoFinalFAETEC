@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
+import { conversaoUnidadeDAO } from "./conversao-unidade";
 import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
@@ -136,6 +137,14 @@ export class ProdutoDAO {
     },
     id_usuario: number,
   ) {
+    // A unidade padrão do produto é obrigatória: quando o formulário não
+    // informa, vale a unidade padrão do sistema (UNIDADE/1).
+    const idConversaoPadrao =
+      data.id_conversao_padrao ?? (await conversaoUnidadeDAO.getPadrao())?.id_conversao;
+    if (!idConversaoPadrao) {
+      throw new Error("Nenhuma unidade padrão configurada. Execute o seed do sistema.");
+    }
+
     return prisma.$transaction(async (tx) => {
       const p = await tx.produto.create({
         data: {
@@ -144,7 +153,7 @@ export class ProdutoDAO {
           perecivel: data.perecivel ?? false,
           composto: data.composto ?? false,
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
-          id_conversao_padrao: data.id_conversao_padrao,
+          id_conversao_padrao: idConversaoPadrao,
         },
       });
 

@@ -283,7 +283,7 @@ export async function listarNotasSaida(
         id_item_nota_saida: item.id_item_nota_saida,
         id_produto: item.estoque.produto.id_produto,
         descricao: item.estoque.produto.descricao,
-        unidade: item.estoque.produto.conversaoPadrao?.nome ?? "UN",
+        unidade: item.estoque.produto.conversaoPadrao?.nome ?? "—",
         quantidade_solicitada: Number(item.qtd_esperada),
         quantidade_entregue: Number(item.qtd_entregue),
       }));
@@ -355,7 +355,7 @@ export async function obterNotaSaida(
       id_item_nota_saida: item.id_item_nota_saida,
       id_produto: item.estoque.produto.id_produto,
       descricao: item.estoque.produto.descricao,
-      unidade: item.estoque.produto.conversaoPadrao?.nome ?? "UN",
+      unidade: item.estoque.produto.conversaoPadrao?.nome ?? "—",
       quantidade_solicitada: Number(item.qtd_esperada),
       quantidade_entregue: Number(item.qtd_entregue),
     })),

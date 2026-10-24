@@ -10,6 +10,7 @@ export type UnidadeFormData = {
   nome: string;
   fator: number;
   descricao: string | null;
+  padrao: boolean;
 };
 
 export async function listarUnidades() {
@@ -26,7 +27,13 @@ export async function getUnidade(id: number): Promise<UnidadeFormData | null> {
 
   const u = await conversaoUnidadeDAO.getById(id);
   if (!u) return null;
-  return { id_conversao: u.id_conversao, nome: u.nome, fator: u.fator, descricao: u.descricao };
+  return {
+    id_conversao: u.id_conversao,
+    nome: u.nome,
+    fator: u.fator,
+    descricao: u.descricao,
+    padrao: u.padrao,
+  };
 }
 
 export async function createUnidade(formData: FormData) {
@@ -38,10 +45,10 @@ export async function createUnidade(formData: FormData) {
   if (!nome) return { error: "Nome é obrigatório." };
   if (!fator || fator <= 0) return { error: "Fator deve ser maior que zero." };
 
-  const existente = (await conversaoUnidadeDAO.list()).find(
-    (u) => u.nome.toLowerCase() === nome.toLowerCase(),
-  );
-  if (existente) return { error: "Já existe uma unidade com esse nome." };
+  const unidades = await conversaoUnidadeDAO.list();
+  if (unidades.some((u) => u.nome.toLowerCase() === nome.toLowerCase())) {
+    return { error: "Já existe uma unidade com esse nome." };
+  }
 
   try {
     await conversaoUnidadeDAO.create(
@@ -67,10 +74,19 @@ export async function updateUnidade(formData: FormData) {
   if (!nome) return { error: "Nome é obrigatório." };
   if (!fator || fator <= 0) return { error: "Fator deve ser maior que zero." };
 
-  const existente = (await conversaoUnidadeDAO.list()).find(
-    (u) => u.nome.toLowerCase() === nome.toLowerCase() && u.id_conversao !== id,
-  );
-  if (existente) return { error: "Já existe uma unidade com esse nome." };
+  const atual = await conversaoUnidadeDAO.getById(id);
+  if (!atual) return { error: "Registro não encontrado." };
+
+  // A unidade padrão do sistema não pode ter nome ou fator alterados;
+  // somente a descrição é editável.
+  if (atual.padrao && (nome !== atual.nome || fator !== atual.fator)) {
+    return { error: "A unidade padrão não pode ser alterada." };
+  }
+
+  const unidades = await conversaoUnidadeDAO.list();
+  if (unidades.some((u) => u.nome.toLowerCase() === nome.toLowerCase() && u.id_conversao !== id)) {
+    return { error: "Já existe uma unidade com esse nome." };
+  }
 
   try {
     await conversaoUnidadeDAO.update(

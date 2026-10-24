@@ -5,6 +5,7 @@ export type ConversaoUnidadeItem = {
   nome: string;
   fator: number;
   descricao: string | null;
+  padrao: boolean;
 };
 
 /** Parâmetros das listagens paginadas usadas pelos seletores (modais). */
@@ -25,7 +26,7 @@ export type FornecedorSelecaoRow = {
 export type ProdutoEntradaDetalhe = {
   id_produto: number;
   descricao: string;
-  id_conversao_padrao: number | null;
+  id_conversao_padrao: number;
   fator_padrao: number | null;
 };
 
@@ -124,7 +125,7 @@ export type NotaSaidaItemDetalhe = {
   id_item_nota_saida: number;
   id_produto: number;
   descricao: string;
-  /** Unidade de conversão padrão do produto (`UN` quando não houver). */
+  /** Nome da unidade de conversão padrão do produto (`—` quando não houver). */
   unidade: string;
   quantidade_solicitada: number;
   quantidade_entregue: number;

@@ -6,6 +6,7 @@ import {
   criarExpedicao,
   criarFuncionario,
   criarInventarioComItem,
+  criarProduto,
   criarTipoCodigo,
   criarUsuario,
 } from "../helpers/factories";
@@ -180,7 +181,7 @@ describe("funcionarioDAO", () => {
 
     it("bloqueia quando há usuário, contagem ou expedição como condutor", async () => {
       const { usuario, funcionario } = await criarUsuario();
-      const produto = await prismaTeste.produto.create({ data: { descricao: "P" } });
+      const produto = await criarProduto({ descricao: "P" });
       const estoque = await prismaTeste.estoque.create({
         data: { id_produto: produto.id_produto, quantidade_atual: 0, data_entrada: new Date() },
       });

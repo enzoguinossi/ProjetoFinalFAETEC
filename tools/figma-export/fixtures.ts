@@ -333,6 +333,8 @@ async function main() {
   const conversoes = await prisma.conversaoUnidade.findMany();
   const porNomeConversao: Record<string, number> = {};
   for (const c of conversoes) porNomeConversao[c.nome] = c.id_conversao;
+  const conversaoPadrao = porNomeConversao["UNIDADE"] ?? conversoes[0]?.id_conversao;
+  if (!conversaoPadrao) throw new Error("Seed sem unidades de conversão.");
 
   const produtos = [
     { descricao: "Arroz agulhinha tipo 1", codigo: "7891000315507", conversao: "CAIXA", perecivel: false, quantidade: 1240, reservado: 120, validade: null, foto: null },
@@ -351,7 +353,7 @@ async function main() {
         descricao: p.descricao,
         foto_url: p.foto,
         perecivel: p.perecivel,
-        id_conversao_padrao: porNomeConversao[p.conversao] ?? null,
+        id_conversao_padrao: porNomeConversao[p.conversao] ?? conversaoPadrao,
         data_validade: p.validade ? new Date(p.validade) : null,
       },
     });

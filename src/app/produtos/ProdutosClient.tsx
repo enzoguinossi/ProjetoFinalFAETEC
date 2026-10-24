@@ -19,7 +19,7 @@ import {
 
 interface Props {
   inicial: PaginatedResult<ProdutoListRow>;
-  conversoes: { id_conversao: number; nome: string; fator: number; descricao: string | null }[];
+  conversoes: { id_conversao: number; nome: string; fator: number; descricao: string | null; padrao: boolean }[];
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
   perms: PermissoesEntidade;
 }

@@ -9,6 +9,7 @@ import {
   criarProduto,
   criarTipoCodigo,
   criarUsuario,
+  garantirUnidadePadrao,
 } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
@@ -149,7 +150,15 @@ describe("produtoDAO", () => {
       const linhas = new Map(resultado.map((p) => [p.id_produto, produtoParaLinha(p)]));
 
       expect(linhas.get(comConversao.id_produto)?.unidade).toBe("CX");
-      expect(linhas.get(semConversao.id_produto)?.unidade).toBe("UN");
+      expect(linhas.get(semConversao.id_produto)?.unidade).toBe("UNIDADE");
+    });
+    it("produtoParaLinha devolve o nome da unidade padrão do produto", async () => {
+      const caixa = await criarConversao("CX12", 12);
+      const produto = await criarProduto({ idConversaoPadrao: caixa.id_conversao });
+
+      const linha = produtoParaLinha({ ...produto, conversaoPadrao: caixa, estoques: [] });
+
+      expect(linha.unidade).toBe("CX12");
     });
   });
 
@@ -211,6 +220,32 @@ describe("produtoDAO", () => {
         descricao: "Bolo",
         codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "BOLO-1" }],
       });
+    });
+
+    it("usa a unidade padrão quando o formulário não informa a unidade", async () => {
+      const { usuario } = await criarUsuario();
+      const padrao = await garantirUnidadePadrao();
+
+      const criado = await produtoDAO.createCompleto(
+        { descricao: "Sem unidade" },
+        usuario.id_usuario,
+      );
+
+      expect(criado.id_conversao_padrao).toBe(padrao.id_conversao);
+      expect(criado.conversaoPadrao).toMatchObject({ nome: "UNIDADE" });
+    });
+
+    it("respeita a unidade explícita no cadastro do produto", async () => {
+      const { usuario } = await criarUsuario();
+      const caixa = await criarConversao("CX12", 12);
+
+      const criado = await produtoDAO.createCompleto(
+        { descricao: "Com caixa", id_conversao_padrao: caixa.id_conversao },
+        usuario.id_usuario,
+      );
+
+      expect(criado.id_conversao_padrao).toBe(caixa.id_conversao);
+      expect(criado.conversaoPadrao).toMatchObject({ nome: "CX12" });
     });
   });
 

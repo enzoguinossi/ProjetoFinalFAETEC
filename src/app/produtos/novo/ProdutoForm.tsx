@@ -19,6 +19,7 @@ interface Conversao {
   nome: string;
   fator: number;
   descricao: string | null;
+  padrao: boolean;
 }
 
 interface TipoCodigo {
@@ -59,7 +60,11 @@ export default function ProdutoForm({
   const [composto, setComposto] = useState(initialData?.composto ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [descricao, setDescricao] = useState(initialData?.descricao ?? "");
-  const [idConversao, setIdConversao] = useState(initialData?.id_conversao_padrao ?? null);
+  const [idConversao, setIdConversao] = useState<number | null>(
+    initialData?.id_conversao_padrao ??
+      conversoes.find((c) => c.padrao)?.id_conversao ??
+      null,
+  );
   const [conversoesAtuais, setConversoesAtuais] = useState<Conversao[]>(conversoes);
   const [unidadesModalOpen, setUnidadesModalOpen] = useState(false);
 
@@ -191,10 +196,10 @@ export default function ProdutoForm({
             <select
               className={`${INPUT_CLASS} flex-1`}
               name="id_conversao"
+              required
               value={idConversao ?? ""}
               onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
             >
-              <option value="">Selecione...</option>
               {conversoesAtuais.map((c) => (
                 <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
               ))}
@@ -304,7 +309,19 @@ export default function ProdutoForm({
         open={unidadesModalOpen}
         onClose={() => setUnidadesModalOpen(false)}
         initial={conversoesAtuais}
-        onChanged={(lista) => setConversoesAtuais(lista.map((u) => ({ id_conversao: u.id_conversao, nome: u.nome, fator: u.fator, descricao: u.descricao })))}
+        onChanged={(lista) => {
+          const mapeadas = lista.map((u) => ({
+            id_conversao: u.id_conversao,
+            nome: u.nome,
+            fator: u.fator,
+            descricao: u.descricao,
+            padrao: u.padrao,
+          }));
+          setConversoesAtuais(mapeadas);
+          if (idConversao === null) {
+            setIdConversao(mapeadas.find((c) => c.padrao)?.id_conversao ?? null);
+          }
+        }}
       />
 
       <Modal

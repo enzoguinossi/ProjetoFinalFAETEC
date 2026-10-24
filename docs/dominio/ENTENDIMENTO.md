@@ -292,7 +292,7 @@ produto
 ├── perecivel             BOOLEAN DEFAULT FALSE
 ├── composto              BOOLEAN DEFAULT FALSE
 ├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
-├── ID_conversao_padrao   INT FK NULL
+├── ID_conversao_padrao   INT FK NOT NULL           ← unidade padrão do sistema quando não informada
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
@@ -309,17 +309,23 @@ conversao_unidade
 ├── ID_conversao       INT PK auto_increment
 ├── nome               VARCHAR NOT NULL UNIQUE  ← nome livre (o seed cria UNIDADE, PACOTE e CAIXA)
 ├── fator              FLOAT NOT NULL          ← 1, 10, 50 no seed
-└── descricao          VARCHAR
+├── descricao          VARCHAR
+└── padrao             BOOLEAN NOT NULL DEFAULT FALSE  ← exatamente uma TRUE (UNIDADE)
 ```
 
 Regras:
 - O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
 - O fator sempre **multiplica** a quantidade na entrada
 - Ao criar um documento de entrada, o usuário pode selecionar qualquer conversão
-- Se o produto tiver `ID_conversao_padrao`, esse valor é pré-selecionado (economiza cliques)
+- Todo produto tem `ID_conversao_padrao` **obrigatório**: quando o formulário não informa, o
+  cadastro grava a unidade padrão do sistema (economiza cliques)
 - O fator pode ser editado manualmente no momento da entrada **sem alterar o template**
 - Unidades **não são desativadas**: podem ser criadas, editadas e excluídas fisicamente
-- Ao excluir uma unidade, os produtos que a usavam como `ID_conversao_padrao` são **desvinculados** (`NULL`)
+- Existe **exatamente uma** unidade com `padrao = TRUE` — a `UNIDADE` (fator 1). Ela não
+  pode ser excluída nem ter nome ou fator alterados; somente a descrição é editável
+- Ao excluir uma unidade que não é a padrão, os produtos que a usavam (`ID_conversao_padrao`)
+  são **revinculados à unidade padrão** — a FK é obrigatória, então não há desvinculação
+  e a exclusão não é recusada por uso; a auditoria registra os produtos revinculados
 - Na **nota de entrada** não se guarda a unidade, apenas o **fator de conversão** aplicado (`fator_conversao`)
 
 #### 3.6.2 Produto Composto (BOM — Bill of Materials)

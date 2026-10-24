@@ -16,13 +16,13 @@ describe("lib/produto-linha", () => {
       id_produto: 42,
       codigo: "000042",
       descricao: "Arroz",
-      unidade: "UN",
+      unidade: "—",
       qtd: "15",
       livre: "10",
     });
   });
 
-  it("usa a unidade de conversão padrão do produto", () => {
+  it("usa o nome da unidade de conversão padrão do produto", () => {
     const linha = produtoParaLinha({
       id_produto: 9,
       descricao: "Açúcar",

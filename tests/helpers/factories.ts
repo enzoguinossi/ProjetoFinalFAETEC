@@ -8,9 +8,32 @@ export async function criarTipoCodigo(nome: string, descricao?: string) {
 }
 
 export async function criarConversao(nome?: string, fator = 1) {
+  const nomeFinal = nome ?? `UN${proximo()}`;
   return prismaTeste.conversaoUnidade.create({
-    data: { nome: nome ?? `UN${proximo()}`, fator },
+    data: { nome: nomeFinal, fator },
   });
+}
+
+/**
+ * Garante a unidade padrão do sistema (UNIDADE/1) e a devolve.
+ * Todo produto precisa de uma unidade — a padrão é a escolha quando o teste
+ * não informa outra.
+ */
+export async function garantirUnidadePadrao() {
+  return prismaTeste.conversaoUnidade.upsert({
+    where: { nome: "UNIDADE" },
+    update: { padrao: true },
+    create: {
+      nome: "UNIDADE",
+      fator: 1,
+      descricao: "Unidade avulsa",
+      padrao: true,
+    },
+  });
+}
+
+export async function criarUnidadePadrao() {
+  return garantirUnidadePadrao();
 }
 
 export async function criarUsuario(
@@ -69,12 +92,14 @@ export async function criarProduto(
   } = {},
 ) {
   const n = proximo();
+  const idConversaoPadrao =
+    opts.idConversaoPadrao ?? (await garantirUnidadePadrao()).id_conversao;
   return prismaTeste.produto.create({
     data: {
       descricao: opts.descricao ?? `Produto ${n}`,
       perecivel: opts.perecivel ?? false,
       composto: opts.composto ?? false,
-      id_conversao_padrao: opts.idConversaoPadrao,
+      id_conversao_padrao: idConversaoPadrao,
       ativo: opts.ativo ?? true,
     },
   });
