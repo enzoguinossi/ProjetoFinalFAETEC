@@ -3,6 +3,7 @@ import {
   criarDestinatario,
   criarEstoque,
   criarExpedicao,
+  criarFuncionario,
   criarItemNotaSaida,
   criarNotaSaida,
   criarProduto,
@@ -13,6 +14,7 @@ import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
 import { expedicaoDAO } from "@/dao/expedicao";
 import { expedicaoService } from "@/services/expedicao";
+import { hojeISO } from "@/lib/formatar";
 
 type StatusNotaTeste =
   | "ABERTA"
@@ -76,9 +78,7 @@ async function criarPercurso(
 }
 
 async function ocuparNotaEmOutraExpedicao(idNotaSaida: number) {
-  const outra = await prismaTeste.expedicao.create({
-    data: { data_criacao: new Date(), status: "PLANEJADA" },
-  });
+  const outra = await criarExpedicao();
   await prismaTeste.expedicaoNota.create({
     data: {
       id_expedicao: outra.id_expedicao,
@@ -88,6 +88,16 @@ async function ocuparNotaEmOutraExpedicao(idNotaSaida: number) {
     },
   });
   return outra;
+}
+
+/** Veículo ativo + funcionário condutor ativo, exigidos na criação. */
+async function criarVinculosExpedicao() {
+  const veiculo = await criarVeiculo();
+  const { funcionario } = await criarFuncionario({ condutor: true });
+  return {
+    id_veiculo: veiculo.id_veiculo,
+    id_funcionario_condutor: funcionario.id_funcionario,
+  };
 }
 
 /**
@@ -199,7 +209,11 @@ describe("expedicaoService", () => {
     const percurso = await criarPercurso([escolaC, escolaA, escolaB]);
 
     const resultado = await expedicaoService.criar(
-      { data_prevista: "2026-11-05", id_percurso: percurso.id_percurso },
+      {
+        ...(await criarVinculosExpedicao()),
+        data_prevista: "2026-11-05",
+        id_percurso: percurso.id_percurso,
+      },
       usuario.id_usuario,
     );
     if ("error" in resultado) throw new Error(resultado.error);
@@ -210,7 +224,7 @@ describe("expedicaoService", () => {
     });
 
     expect(expedicao.status).toBe("PLANEJADA");
-    expect(expedicao.data_prevista?.toISOString().slice(0, 10)).toBe(
+    expect(expedicao.data_prevista.toISOString().slice(0, 10)).toBe(
       "2026-11-05",
     );
     expect(
@@ -249,12 +263,12 @@ describe("expedicaoService", () => {
     const { destinatario } = await criarDestinatario();
 
     const primeira = await expedicaoService.criar(
-      { observacao: "Primeira" },
+      { ...(await criarVinculosExpedicao()), observacao: "Primeira" },
       usuario.id_usuario,
     );
     if ("error" in primeira) throw new Error(primeira.error);
     const segunda = await expedicaoService.criar(
-      { observacao: "Segunda" },
+      { ...(await criarVinculosExpedicao()), observacao: "Segunda" },
       usuario.id_usuario,
     );
     if ("error" in segunda) throw new Error(segunda.error);
@@ -320,7 +334,10 @@ describe("expedicaoService", () => {
       await criarNota(destinatario.id_destinatario),
     ];
 
-    const criada = await expedicaoService.criar({}, usuario.id_usuario);
+    const criada = await expedicaoService.criar(
+      await criarVinculosExpedicao(),
+      usuario.id_usuario,
+    );
     if ("error" in criada) throw new Error(criada.error);
     const idExpedicao = criada.expedicao.id_expedicao;
 
@@ -394,31 +411,19 @@ describe("expedicaoService", () => {
     ).toBeGreaterThanOrEqual(5);
   });
 
-  it("despacha a expedição, as notas e o veículo; recusa sem nota ou sem veículo", async () => {
+  it("despacha a expedição, as notas e o veículo; recusa sem nota", async () => {
     const { usuario } = await criarUsuario();
     const { destinatario } = await criarDestinatario();
     const veiculo = await criarVeiculo({ status: "DISPONIVEL" });
-
-    const semVeiculo = await expedicaoService.criar({}, usuario.id_usuario);
-    if ("error" in semVeiculo) throw new Error(semVeiculo.error);
-    const notaSemVeiculo = await criarNota(destinatario.id_destinatario);
-    await expedicaoService.adicionarNota(
-      semVeiculo.expedicao.id_expedicao,
-      notaSemVeiculo.id_nota_saida,
-      usuario.id_usuario,
-    );
-
-    const recusaSemVeiculo = await expedicaoService.despachar(
-      semVeiculo.expedicao.id_expedicao,
-      usuario.id_usuario,
-    );
-    expect("error" in recusaSemVeiculo).toBe(true);
-    if ("error" in recusaSemVeiculo) {
-      expect(recusaSemVeiculo.error).toContain("veículo");
-    }
+    const vinculos = {
+      id_veiculo: veiculo.id_veiculo,
+      id_funcionario_condutor: (
+        await criarFuncionario({ condutor: true })
+      ).funcionario.id_funcionario,
+    };
 
     const semNota = await expedicaoService.criar(
-      { id_veiculo: veiculo.id_veiculo },
+      vinculos,
       usuario.id_usuario,
     );
     if ("error" in semNota) throw new Error(semNota.error);
@@ -433,7 +438,7 @@ describe("expedicaoService", () => {
     }
 
     const pronta = await expedicaoService.criar(
-      { id_veiculo: veiculo.id_veiculo },
+      vinculos,
       usuario.id_usuario,
     );
     if ("error" in pronta) throw new Error(pronta.error);
@@ -484,10 +489,16 @@ describe("expedicaoService", () => {
   it("recusa despachar com veículo indisponível ou já em outra expedição em percurso", async () => {
     const { usuario } = await criarUsuario();
     const { destinatario } = await criarDestinatario();
+    const { funcionario: condutor } = await criarFuncionario({
+      condutor: true,
+    });
 
     const indisponivel = await criarVeiculo({ status: "INDISPONIVEL" });
     const expedicaoIndisponivel = await expedicaoService.criar(
-      { id_veiculo: indisponivel.id_veiculo },
+      {
+        id_veiculo: indisponivel.id_veiculo,
+        id_funcionario_condutor: condutor.id_funcionario,
+      },
       usuario.id_usuario,
     );
     if ("error" in expedicaoIndisponivel) {
@@ -514,7 +525,10 @@ describe("expedicaoService", () => {
 
     const veiculo = await criarVeiculo({ status: "DISPONIVEL" });
     const primeira = await expedicaoService.criar(
-      { id_veiculo: veiculo.id_veiculo },
+      {
+        id_veiculo: veiculo.id_veiculo,
+        id_funcionario_condutor: condutor.id_funcionario,
+      },
       usuario.id_usuario,
     );
     if ("error" in primeira) throw new Error(primeira.error);
@@ -532,7 +546,10 @@ describe("expedicaoService", () => {
 
     // O mesmo veículo agora está em uma expedição EM_PERCURSO.
     const segunda = await expedicaoService.criar(
-      { id_veiculo: veiculo.id_veiculo },
+      {
+        id_veiculo: veiculo.id_veiculo,
+        id_funcionario_condutor: condutor.id_funcionario,
+      },
       usuario.id_usuario,
     );
     if ("error" in segunda) throw new Error(segunda.error);
@@ -568,7 +585,10 @@ describe("expedicaoService", () => {
     const { destinatario } = await criarDestinatario();
     const nota = await criarNota(destinatario.id_destinatario);
 
-    const criada = await expedicaoService.criar({}, usuario.id_usuario);
+    const criada = await expedicaoService.criar(
+      await criarVinculosExpedicao(),
+      usuario.id_usuario,
+    );
     if ("error" in criada) throw new Error(criada.error);
     const idExpedicao = criada.expedicao.id_expedicao;
     await expedicaoService.adicionarNota(
@@ -619,7 +639,12 @@ describe("expedicaoService", () => {
     // Depois de despachada, não pode ser desativada.
     const veiculo = await criarVeiculo();
     const despachavel = await expedicaoService.criar(
-      { id_veiculo: veiculo.id_veiculo },
+      {
+        id_veiculo: veiculo.id_veiculo,
+        id_funcionario_condutor: (
+          await criarFuncionario({ condutor: true })
+        ).funcionario.id_funcionario,
+      },
       usuario.id_usuario,
     );
     if ("error" in despachavel) throw new Error(despachavel.error);
@@ -640,6 +665,133 @@ describe("expedicaoService", () => {
       usuario.id_usuario,
     );
     expect("error" in recusa).toBe(true);
+  });
+
+  it("recusa criar sem veículo e sem condutor", async () => {
+    const { usuario } = await criarUsuario();
+    const vinculos = await criarVinculosExpedicao();
+
+    const semVeiculo = await expedicaoService.criar(
+      { id_funcionario_condutor: vinculos.id_funcionario_condutor },
+      usuario.id_usuario,
+    );
+    expect("error" in semVeiculo).toBe(true);
+    if ("error" in semVeiculo) {
+      expect(semVeiculo.error).toBe("Selecione o veículo.");
+    }
+
+    const semCondutor = await expedicaoService.criar(
+      { id_veiculo: vinculos.id_veiculo },
+      usuario.id_usuario,
+    );
+    expect("error" in semCondutor).toBe(true);
+    if ("error" in semCondutor) {
+      expect(semCondutor.error).toBe("Selecione o condutor.");
+    }
+
+    expect(await prismaTeste.expedicao.count()).toBe(0);
+  });
+
+  it("recusa condutor que não está marcado como condutor", async () => {
+    const { usuario } = await criarUsuario();
+    const veiculo = await criarVeiculo();
+    const { funcionario } = await criarFuncionario({ condutor: false });
+
+    const resultado = await expedicaoService.criar(
+      {
+        id_veiculo: veiculo.id_veiculo,
+        id_funcionario_condutor: funcionario.id_funcionario,
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(true);
+    if ("error" in resultado) {
+      expect(resultado.error).toContain(
+        "Condutor não encontrado, inativo ou não habilitado.",
+      );
+    }
+    expect(await prismaTeste.expedicao.count()).toBe(0);
+  });
+
+  it("sem data grava hoje (fuso de São Paulo) e data inválida é recusada", async () => {
+    const { usuario } = await criarUsuario();
+
+    const semData = await expedicaoService.criar(
+      await criarVinculosExpedicao(),
+      usuario.id_usuario,
+    );
+    if ("error" in semData) throw new Error(semData.error);
+
+    const expedicao = await prismaTeste.expedicao.findUniqueOrThrow({
+      where: { id_expedicao: semData.expedicao.id_expedicao },
+    });
+    expect(expedicao.data_prevista.toISOString().slice(0, 10)).toBe(hojeISO());
+
+    const vazia = await expedicaoService.criar(
+      { ...(await criarVinculosExpedicao()), data_prevista: "" },
+      usuario.id_usuario,
+    );
+    if ("error" in vazia) throw new Error(vazia.error);
+    expect(vazia.expedicao.data_prevista.toISOString().slice(0, 10)).toBe(
+      hojeISO(),
+    );
+
+    const invalida = await expedicaoService.criar(
+      { ...(await criarVinculosExpedicao()), data_prevista: "2026-02-31" },
+      usuario.id_usuario,
+    );
+    expect("error" in invalida).toBe(true);
+    if ("error" in invalida) {
+      expect(invalida.error).toBe("Data prevista inválida.");
+    }
+  });
+
+  it("atualização não consegue limpar veículo nem condutor", async () => {
+    const { usuario } = await criarUsuario();
+    const vinculos = await criarVinculosExpedicao();
+
+    const criada = await expedicaoService.criar(
+      { ...vinculos, data_prevista: "2026-11-05" },
+      usuario.id_usuario,
+    );
+    if ("error" in criada) throw new Error(criada.error);
+    const idExpedicao = criada.expedicao.id_expedicao;
+
+    const semVeiculo = await expedicaoService.alterar(
+      idExpedicao,
+      {
+        data_prevista: "2026-11-05",
+        id_veiculo: null,
+        id_funcionario_condutor: vinculos.id_funcionario_condutor,
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in semVeiculo).toBe(true);
+    if ("error" in semVeiculo) {
+      expect(semVeiculo.error).toBe("Selecione o veículo.");
+    }
+
+    const semCondutor = await expedicaoService.alterar(
+      idExpedicao,
+      {
+        data_prevista: "2026-11-05",
+        id_veiculo: vinculos.id_veiculo,
+        id_funcionario_condutor: null,
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in semCondutor).toBe(true);
+    if ("error" in semCondutor) {
+      expect(semCondutor.error).toBe("Selecione o condutor.");
+    }
+
+    const noBanco = await prismaTeste.expedicao.findUniqueOrThrow({
+      where: { id_expedicao: idExpedicao },
+    });
+    expect(noBanco.id_veiculo).toBe(vinculos.id_veiculo);
+    expect(noBanco.id_funcionario_condutor).toBe(
+      vinculos.id_funcionario_condutor,
+    );
   });
 });
 

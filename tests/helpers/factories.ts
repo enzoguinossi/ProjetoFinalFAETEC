@@ -218,13 +218,23 @@ export async function criarItemNotaSaida(
 export async function criarExpedicao(opts: {
   idVeiculo?: number;
   idCondutor?: number;
+  dataPrevista?: Date;
   status?: "PLANEJADA" | "EM_PERCURSO" | "CONCLUIDA";
 } = {}) {
+  // Veículo, condutor e data prevista são obrigatórios na expedição: a fábrica
+  // cria os vínculos quando o teste não os informa.
+  const idVeiculo = opts.idVeiculo ?? (await criarVeiculo()).id_veiculo;
+  const idCondutor =
+    opts.idCondutor ??
+    (await criarFuncionario({ condutor: true })).funcionario.id_funcionario;
   return prismaTeste.expedicao.create({
     data: {
       data_criacao: new Date(),
-      id_veiculo: opts.idVeiculo,
-      id_funcionario_condutor: opts.idCondutor,
+      data_prevista:
+        opts.dataPrevista ??
+        new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`),
+      id_veiculo: idVeiculo,
+      id_funcionario_condutor: idCondutor,
       status: opts.status ?? "PLANEJADA",
     },
   });

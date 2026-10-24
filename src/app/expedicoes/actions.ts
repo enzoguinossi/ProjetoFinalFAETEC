@@ -30,12 +30,12 @@ const ROTULOS_STATUS_NOTA: Record<string, string> = {
 export type ExpedicaoListRow = {
   id_expedicao: number;
   /** `YYYY-MM-DD`, pronto para exibição. */
-  data_prevista: string | null;
+  data_prevista: string;
   status: string;
   statusLabel: string;
   total_notas: number;
   destinatarios: string;
-  veiculo: string | null;
+  veiculo: string;
 };
 
 export type ExpedicaoNotaItemRow = {
@@ -59,12 +59,12 @@ export type ExpedicaoNotaRow = {
 
 export type ExpedicaoFormData = {
   id_expedicao: number;
-  data_prevista: string | null;
+  data_prevista: string;
   observacao: string | null;
-  id_veiculo: number | null;
-  id_funcionario_condutor: number | null;
-  veiculo: string | null;
-  condutor: string | null;
+  id_veiculo: number;
+  id_funcionario_condutor: number;
+  veiculo: string;
+  condutor: string;
   status: string;
   statusLabel: string;
   ativo: boolean;
@@ -107,22 +107,22 @@ type NotaResumo = {
 
 type ExpedicaoResumo = {
   id_expedicao: number;
-  data_prevista: Date | null;
+  data_prevista: Date;
   status: string;
-  veiculo: { placa: string } | null;
+  veiculo: { placa: string };
   notas: NotaResumo[];
 };
 
 type ExpedicaoDetalhe = {
   id_expedicao: number;
-  data_prevista: Date | null;
+  data_prevista: Date;
   observacao: string | null;
-  id_veiculo: number | null;
-  id_funcionario_condutor: number | null;
+  id_veiculo: number;
+  id_funcionario_condutor: number;
   status: string;
   ativo: boolean;
-  veiculo: { placa: string } | null;
-  condutor: { pessoaFisica: { nome: string } } | null;
+  veiculo: { placa: string };
+  condutor: { pessoaFisica: { nome: string } };
   notas: {
     id_nota_saida: number;
     ordem_visita: number;
@@ -139,8 +139,8 @@ type ExpedicaoDetalhe = {
   }[];
 };
 
-function dataISO(data: Date | null): string | null {
-  return data ? data.toISOString().slice(0, 10) : null;
+function dataISO(data: Date): string {
+  return data.toISOString().slice(0, 10);
 }
 
 function destinatariosDe(notas: NotaResumo[]): string {
@@ -162,7 +162,7 @@ function mapaResumo(expedicao: ExpedicaoResumo): ExpedicaoListRow {
       ROTULOS_STATUS_EXPEDICAO[expedicao.status] ?? expedicao.status,
     total_notas: expedicao.notas.length,
     destinatarios: destinatariosDe(expedicao.notas),
-    veiculo: expedicao.veiculo?.placa ?? null,
+    veiculo: expedicao.veiculo.placa,
   };
 }
 
@@ -173,8 +173,8 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
     observacao: expedicao.observacao,
     id_veiculo: expedicao.id_veiculo,
     id_funcionario_condutor: expedicao.id_funcionario_condutor,
-    veiculo: expedicao.veiculo?.placa ?? null,
-    condutor: expedicao.condutor?.pessoaFisica.nome ?? null,
+    veiculo: expedicao.veiculo.placa,
+    condutor: expedicao.condutor.pessoaFisica.nome,
     status: expedicao.status,
     statusLabel:
       ROTULOS_STATUS_EXPEDICAO[expedicao.status] ?? expedicao.status,

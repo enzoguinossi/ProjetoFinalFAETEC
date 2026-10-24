@@ -4,6 +4,7 @@ import {
   type ExpedicaoDados,
 } from "@/dao/expedicao";
 import { mensagemDeErro } from "@/dao/_errors";
+import { hojeISO } from "@/lib/formatar";
 
 export type ExpedicaoInput = {
   data_prevista?: unknown;
@@ -24,8 +25,11 @@ function idOpcional(valor: unknown): number | null | "invalido" {
   return id ?? "invalido";
 }
 
-function dataOpcional(valor: unknown): Date | null | "invalida" {
-  if (valor === null || valor === undefined || valor === "") return null;
+function dataPrevista(valor: unknown): Date | "invalida" {
+  // Vazio/nulo → hoje no fuso de São Paulo.
+  if (valor === null || valor === undefined || valor === "") {
+    return new Date(`${hojeISO()}T00:00:00.000Z`);
+  }
 
   if (valor instanceof Date) {
     return Number.isNaN(valor.getTime()) ? "invalida" : valor;
@@ -35,7 +39,10 @@ function dataOpcional(valor: unknown): Date | null | "invalida" {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return "invalida";
 
   const data = new Date(`${texto}T00:00:00.000Z`);
-  return Number.isNaN(data.getTime()) ? "invalida" : data;
+  if (Number.isNaN(data.getTime())) return "invalida";
+  // Rejeita datas que o JS normaliza (ex.: 2026-02-31 → 03/03).
+  if (data.toISOString().slice(0, 10) !== texto) return "invalida";
+  return data;
 }
 
 function textoOpcional(valor: unknown): string | null {
@@ -84,19 +91,34 @@ function normalizarItensEntrega(
 export class ExpedicaoService {
   /**
    * Valida e normaliza os campos da expedição. A data é aceita como
-   * `YYYY-MM-DD` (valor do `<input type="date">`) e gravada como `Date`.
+   * `YYYY-MM-DD` (valor do `<input type="date">`) e gravada como `Date`;
+   * vazia vira hoje. Veículo e condutor são obrigatórios.
    */
   validar(
     input: ExpedicaoInput,
   ): { dados: ExpedicaoDados } | { error: string } {
-    const data = dataOpcional(input.data_prevista);
+    const data = dataPrevista(input.data_prevista);
     if (data === "invalida") return { error: "Data prevista inválida." };
 
-    const idVeiculo = idOpcional(input.id_veiculo);
-    if (idVeiculo === "invalido") return { error: "Veículo inválido." };
+    if (
+      input.id_veiculo === null ||
+      input.id_veiculo === undefined ||
+      input.id_veiculo === ""
+    ) {
+      return { error: "Selecione o veículo." };
+    }
+    const idVeiculo = idPositivo(input.id_veiculo);
+    if (!idVeiculo) return { error: "Veículo inválido." };
 
-    const idCondutor = idOpcional(input.id_funcionario_condutor);
-    if (idCondutor === "invalido") return { error: "Condutor inválido." };
+    if (
+      input.id_funcionario_condutor === null ||
+      input.id_funcionario_condutor === undefined ||
+      input.id_funcionario_condutor === ""
+    ) {
+      return { error: "Selecione o condutor." };
+    }
+    const idCondutor = idPositivo(input.id_funcionario_condutor);
+    if (!idCondutor) return { error: "Condutor inválido." };
 
     const idPercurso = idOpcional(input.id_percurso);
     if (idPercurso === "invalido") return { error: "Percurso inválido." };

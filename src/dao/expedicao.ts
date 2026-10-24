@@ -38,10 +38,10 @@ const STATUS_EXPEDICAO_ATIVA: StatusExpedicao[] = [
 ];
 
 export type ExpedicaoDados = {
-  data_prevista: Date | null;
+  data_prevista: Date;
   observacao: string | null;
-  id_veiculo: number | null;
-  id_funcionario_condutor: number | null;
+  id_veiculo: number;
+  id_funcionario_condutor: number;
   /** Consumido na criação; não é gravado na expedição. */
   id_percurso: number | null;
 };
@@ -111,9 +111,7 @@ function snapshot(expedicao: ExpedicaoComNotas) {
     id_veiculo: expedicao.id_veiculo,
     id_funcionario_condutor: expedicao.id_funcionario_condutor,
     data_criacao: expedicao.data_criacao.toISOString(),
-    data_prevista: expedicao.data_prevista
-      ? expedicao.data_prevista.toISOString().slice(0, 10)
-      : null,
+    data_prevista: expedicao.data_prevista.toISOString().slice(0, 10),
     observacao: expedicao.observacao,
     status: expedicao.status,
     ativo: expedicao.ativo,
@@ -125,22 +123,24 @@ function snapshot(expedicao: ExpedicaoComNotas) {
   };
 }
 
-/** Confere se o veículo/condutor informado existe e está ativo. */
+/** Confere se o veículo e o condutor informados existem e estão ativos. */
 async function validarVinculos(client: Db, data: ExpedicaoAtualizacao) {
-  if (data.id_veiculo !== null) {
-    const veiculo = await client.veiculo.findFirst({
-      where: { id_veiculo: data.id_veiculo, ativo: true },
-      select: { id_veiculo: true },
-    });
-    if (!veiculo) throw new Error("Veículo não encontrado.");
-  }
+  const veiculo = await client.veiculo.findFirst({
+    where: { id_veiculo: data.id_veiculo, ativo: true },
+    select: { id_veiculo: true },
+  });
+  if (!veiculo) throw new Error("Veículo não encontrado ou inativo.");
 
-  if (data.id_funcionario_condutor !== null) {
-    const condutor = await client.funcionario.findFirst({
-      where: { id_funcionario: data.id_funcionario_condutor, ativo: true },
-      select: { id_funcionario: true },
-    });
-    if (!condutor) throw new Error("Condutor não encontrado.");
+  const condutor = await client.funcionario.findFirst({
+    where: {
+      id_funcionario: data.id_funcionario_condutor,
+      ativo: true,
+      condutor: true,
+    },
+    select: { id_funcionario: true },
+  });
+  if (!condutor) {
+    throw new Error("Condutor não encontrado, inativo ou não habilitado.");
   }
 }
 
@@ -988,9 +988,6 @@ export class ExpedicaoDAO {
       if (antes.notas.length === 0) {
         throw new Error("Adicione ao menos uma nota antes de despachar.");
       }
-      if (antes.id_veiculo === null) {
-        throw new Error("Selecione um veículo antes de despachar.");
-      }
 
       const veiculo = await tx.veiculo.findFirst({
         where: { id_veiculo: antes.id_veiculo, ativo: true },
@@ -1149,23 +1146,21 @@ export class ExpedicaoDAO {
           data: { status: "PENDENTE" },
         });
 
-        if (antes.id_veiculo !== null) {
-          const veiculoEmOutraExpedicao = await tx.expedicao.findFirst({
-            where: {
-              id_expedicao: { not: id },
-              id_veiculo: antes.id_veiculo,
-              ativo: true,
-              status: "EM_PERCURSO",
-            },
-            select: { id_expedicao: true },
-          });
+        const veiculoEmOutraExpedicao = await tx.expedicao.findFirst({
+          where: {
+            id_expedicao: { not: id },
+            id_veiculo: antes.id_veiculo,
+            ativo: true,
+            status: "EM_PERCURSO",
+          },
+          select: { id_expedicao: true },
+        });
 
-          if (!veiculoEmOutraExpedicao) {
-            await tx.veiculo.update({
-              where: { id_veiculo: antes.id_veiculo },
-              data: { status: "DISPONIVEL" },
-            });
-          }
+        if (!veiculoEmOutraExpedicao) {
+          await tx.veiculo.update({
+            where: { id_veiculo: antes.id_veiculo },
+            data: { status: "DISPONIVEL" },
+          });
         }
 
         const depois = await tx.expedicao.findUniqueOrThrow({

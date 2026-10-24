@@ -169,7 +169,7 @@ Regras:
 - FK 1:1 garante que cada PF pode ter no máximo um funcionário
 - **Ser condutor é uma flag do próprio funcionário** (`funcionario.condutor`) — não existe
   tabela `condutor`, nem dados de CNH no modelo. A expedição aponta para o funcionário
-  condutor pela FK `expedicao.ID_funcionario_condutor → funcionario` (opcional)
+  condutor pela FK obrigatória `expedicao.ID_funcionario_condutor → funcionario`
 
 #### 3.3.2 Usuário (1:1 com Funcionário — opcional)
 
@@ -194,16 +194,17 @@ Regras:
 
 Não existe tabela `condutor`. O papel de condutor é a flag booleana
 `funcionario.condutor` (default `FALSE`), marcada no cadastro do funcionário; a expedição
-guarda **quem** dirigiu em `expedicao.ID_funcionario_condutor`, uma FK opcional para
+guarda **quem** dirigiu em `expedicao.ID_funcionario_condutor`, uma FK obrigatória para
 `funcionario`:
 
 ```
 expedicao
-├── ID_funcionario_condutor  INT FK → funcionario NULL   ← quem dirigiu a entrega
+├── ID_funcionario_condutor  INT FK → funcionario NOT NULL   ← quem dirigiu a entrega
 ```
 
 Regras:
-- Só um funcionário cadastrado pode ser condutor de uma expedição
+- Só um funcionário cadastrado, **ativo e marcado como `condutor`** pode ser condutor de uma
+  expedição
 - Um funcionário pode ou não estar marcado como condutor
 - Não há atributos próprios de condutor (CNH, categoria, validade) no modelo
 
@@ -574,10 +575,10 @@ Regras:
 ```
 expedicao
 ├── ID_expedicao          INT PK auto_increment
-├── ID_veiculo            INT FK → veiculo NULL        ← veículo que roda no dia
-├── ID_funcionario_condutor INT FK → funcionario NULL  ← quem dirige (não há tabela condutor)
+├── ID_veiculo            INT FK → veiculo NOT NULL        ← veículo que roda no dia
+├── ID_funcionario_condutor INT FK → funcionario NOT NULL  ← quem dirige (não há tabela condutor)
 ├── data_criacao          TIMESTAMP NOT NULL
-├── data_prevista         DATE                  ← qual dia vai rodar
+├── data_prevista         DATE NOT NULL             ← qual dia vai rodar
 ├── observacao            TEXT
 ├── status                ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA) DEFAULT PLANEJADA
 └── ativo                 BOOLEAN DEFAULT TRUE
@@ -587,6 +588,9 @@ Regras:
 - **A expedição é o manifesto do dia**: guarda o veículo, o condutor e a ordem das notas que
   transporta (`expedicao_nota`). Não armazena o percurso — o percurso só serve para ordenar os
   destinatários no momento de montar a expedição.
+- **Data prevista, veículo e condutor são obrigatórios**: não existe expedição sem os três.
+  A data prevista vazia no formulário assume o dia atual no fuso de São Paulo; o veículo
+  precisa estar ativo e o condutor precisa ser funcionário ativo com `condutor = true`.
 - A ordem gravada na expedição é a sua própria (`expedicao_nota.ordem_visita`).
 - A expedição não precisa de nome — é filtrável por data, destinatários e notas
 - A expedição **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a

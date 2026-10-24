@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
+import { hojeISO } from "@/lib/formatar";
 import type { Column } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
 import {
@@ -206,7 +207,9 @@ function ExpedicaoEdicaoForm({
   onCancel: () => void;
 }) {
   const mostrarAviso = useAviso();
-  const [dataPrevista, setDataPrevista] = useState(inicial.data_prevista ?? "");
+  const [dataPrevista, setDataPrevista] = useState(
+    inicial.data_prevista ?? hojeISO(),
+  );
   const [observacao, setObservacao] = useState(inicial.observacao ?? "");
   const [idVeiculo, setIdVeiculo] = useState(
     inicial.id_veiculo ? String(inicial.id_veiculo) : "",
@@ -240,6 +243,14 @@ function ExpedicaoEdicaoForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!idVeiculo) {
+      mostrarAviso("Selecione o veículo.", "erro");
+      return;
+    }
+    if (!idCondutor) {
+      mostrarAviso("Selecione o condutor.", "erro");
+      return;
+    }
     setSalvando(true);
     try {
       const form = new FormData();
@@ -273,6 +284,7 @@ function ExpedicaoEdicaoForm({
           value={dataPrevista}
           onChange={(e) => setDataPrevista(e.target.value)}
           className={ui.input}
+          required
         />
       </div>
 
@@ -293,8 +305,11 @@ function ExpedicaoEdicaoForm({
             value={idVeiculo}
             onChange={(e) => setIdVeiculo(e.target.value)}
             className={ui.select}
+            required
           >
-            <option value="">Sem veículo</option>
+            <option value="" disabled>
+              Selecione o veículo
+            </option>
             {veiculos.map((veiculo) => (
               <option key={veiculo.id_veiculo} value={veiculo.id_veiculo}>
                 {veiculo.placa}
@@ -310,8 +325,11 @@ function ExpedicaoEdicaoForm({
             value={idCondutor}
             onChange={(e) => setIdCondutor(e.target.value)}
             className={ui.select}
+            required
           >
-            <option value="">Sem condutor</option>
+            <option value="" disabled>
+              Selecione o condutor
+            </option>
             {condutores.map((condutor) => (
               <option key={condutor.id_funcionario} value={condutor.id_funcionario}>
                 {condutor.nome}

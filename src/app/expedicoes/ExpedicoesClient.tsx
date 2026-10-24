@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import SearchBar from "@/components/SearchBar";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
+import { hojeISO } from "@/lib/formatar";
 import { useListaPaginada } from "@/lib/use-lista-paginada";
 import type { Action, Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
@@ -88,7 +89,7 @@ function ExpedicaoForm({
   onCancel: () => void;
 }) {
   const mostrarAviso = useAviso();
-  const [dataPrevista, setDataPrevista] = useState("");
+  const [dataPrevista, setDataPrevista] = useState(hojeISO());
   const [observacao, setObservacao] = useState("");
   const [idVeiculo, setIdVeiculo] = useState("");
   const [idCondutor, setIdCondutor] = useState("");
@@ -121,6 +122,14 @@ function ExpedicaoForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!idVeiculo) {
+      mostrarAviso("Selecione o veículo.", "erro");
+      return;
+    }
+    if (!idCondutor) {
+      mostrarAviso("Selecione o condutor.", "erro");
+      return;
+    }
     setSalvando(true);
     try {
       const form = new FormData();
@@ -154,6 +163,7 @@ function ExpedicaoForm({
           value={dataPrevista}
           onChange={(e) => setDataPrevista(e.target.value)}
           className={ui.input}
+          required
         />
       </div>
 
@@ -174,8 +184,11 @@ function ExpedicaoForm({
             value={idVeiculo}
             onChange={(e) => setIdVeiculo(e.target.value)}
             className={ui.select}
+            required
           >
-            <option value="">Sem veículo</option>
+            <option value="" disabled>
+              Selecione o veículo
+            </option>
             {veiculos.map((veiculo) => (
               <option key={veiculo.id_veiculo} value={veiculo.id_veiculo}>
                 {veiculo.placa}
@@ -191,8 +204,11 @@ function ExpedicaoForm({
             value={idCondutor}
             onChange={(e) => setIdCondutor(e.target.value)}
             className={ui.select}
+            required
           >
-            <option value="">Sem condutor</option>
+            <option value="" disabled>
+              Selecione o condutor
+            </option>
             {condutores.map((condutor) => (
               <option key={condutor.id_funcionario} value={condutor.id_funcionario}>
                 {condutor.nome}

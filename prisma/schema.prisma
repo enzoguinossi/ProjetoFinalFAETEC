@@ -566,16 +566,16 @@ model PercursoDestinatario {
 
 model Expedicao {
   id_expedicao            Int             @id @default(autoincrement()) @map("ID_expedicao")
-  id_veiculo              Int?            @map("ID_veiculo")
-  id_funcionario_condutor Int?            @map("ID_funcionario_condutor")
+  id_veiculo              Int             @map("ID_veiculo")
+  id_funcionario_condutor Int             @map("ID_funcionario_condutor")
   data_criacao            DateTime        @map("data_criacao") @db.Timestamp(0)
-  data_prevista           DateTime?       @map("data_prevista") @db.Date
+  data_prevista           DateTime        @map("data_prevista") @db.Date
   observacao              String?         @map("observacao") @db.Text
   status                  StatusExpedicao @default(PLANEJADA) @map("status")
   ativo                   Boolean         @default(true) @map("ativo")
   notas                   ExpedicaoNota[]
-  condutor                Funcionario?    @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
-  veiculo                 Veiculo?        @relation(fields: [id_veiculo], references: [id_veiculo])
+  condutor                Funcionario     @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
+  veiculo                 Veiculo         @relation(fields: [id_veiculo], references: [id_veiculo])
 
   @@index([id_funcionario_condutor], map: "expedicao_ID_funcionario_condutor_fkey")
   @@index([id_veiculo], map: "expedicao_ID_veiculo_fkey")

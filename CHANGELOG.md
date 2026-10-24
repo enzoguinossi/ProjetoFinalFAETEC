@@ -15,6 +15,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Expedição com data prevista, veículo e condutor obrigatórios `(KAN-140)`:** `expedicao.data_prevista`,
+  `ID_veiculo` e `ID_funcionario_condutor` passaram a **`NOT NULL`**, e as relações `veiculo` e
+  `condutor` deixaram de ser opcionais. O formulário de criação inicia a data com o dia atual
+  (fuso `America/Sao_Paulo`, helper `hojeISO` em `src/lib/formatar.ts`, sem `toISOString` puro)
+  e os dois selects não têm mais "Sem veículo"/"Sem condutor". O serviço recusa sem veículo
+  ("Selecione o veículo.") ou sem condutor ("Selecione o condutor."), e o DAO exige veículo ativo
+  e funcionário ativo com `condutor = true` na criação e na alteração (não é possível limpar os
+  vínculos). A migração sem reset preencheu as linhas existentes (data = data de criação; condutor
+  = único condutor ativo). Código em `prisma/schema.prisma`, `src/services/expedicao.ts`,
+  `src/dao/expedicao.ts`, `src/app/expedicoes/**` e `src/lib/formatar.ts`; testes em
+  `tests/services/expedicao.test.ts` e `tests/helpers/factories.ts`.
 - **Unidade padrão do sistema e unidade obrigatória no produto `(KAN-140)`:** a `UNIDADE`
   (fator 1) passou a ser a unidade **padrão** do sistema. `conversao_unidade` ganhou
   `padrao` (exatamente uma `TRUE`), e `produto.ID_conversao_padrao` deixou
