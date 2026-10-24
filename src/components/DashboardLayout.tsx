@@ -47,7 +47,7 @@ export default function DashboardLayout({
               className="h-10 w-auto"
               style={{
                 filter:
-                  "drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)",
+                  "drop-shadow(0 0 2px rgba(255,255,255,0.65)) drop-shadow(0 0 5px rgba(255,255,255,0.35))",
               }}
             />
           </Link>
