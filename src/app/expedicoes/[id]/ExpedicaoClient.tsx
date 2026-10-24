@@ -11,12 +11,15 @@ import type { Column } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
 import {
   adicionarNotaExpedicao,
+  concluirExpedicao,
   despacharExpedicao,
   listarCondutoresParaExpedicao,
   listarNotasElegiveis,
   listarVeiculosParaExpedicao,
+  marcarNotaNaoEntregue,
   moverNotasExpedicao,
   obterExpedicao,
+  registrarEntregaNota,
   removerNotaExpedicao,
   salvarExpedicao,
   type CondutorExpedicaoRow,
@@ -61,6 +64,137 @@ const COLUNAS_NOTA: Column<NotaElegivelRow>[] = [
     render: (value) => formatarNumero(Number(value ?? 0)),
   },
 ];
+
+function EntregaForm({
+  nota,
+  onConfirm,
+  onCancel,
+  processando,
+}: {
+  nota: ExpedicaoNotaRow;
+  onConfirm: (
+    itens: { id_item_nota_saida: number; qtd_entregue: number }[],
+    cortar: boolean,
+  ) => Promise<void>;
+  onCancel: () => void;
+  processando: boolean;
+}) {
+  const [valores, setValores] = useState<Record<number, string>>(() =>
+    Object.fromEntries(
+      nota.itens_detalhe.map((item) => [
+        item.id_item_nota_saida,
+        String(item.qtd_esperada),
+      ]),
+    ),
+  );
+  const [cortar, setCortar] = useState(false);
+
+  const itens = nota.itens_detalhe.map((item) => ({
+    ...item,
+    valor: Number(valores[item.id_item_nota_saida] ?? ""),
+  }));
+
+  const invalido = itens.some(
+    (item) =>
+      valores[item.id_item_nota_saida] === "" ||
+      !Number.isFinite(item.valor) ||
+      item.valor < item.qtd_entregue ||
+      item.valor > item.qtd_esperada,
+  );
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (invalido) return;
+
+    await onConfirm(
+      itens.map((item) => ({
+        id_item_nota_saida: item.id_item_nota_saida,
+        qtd_entregue: item.valor,
+      })),
+      cortar,
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={ui.form}>
+      <p className="m-0 font-sans text-sm text-[#697077]">
+        Nota {nota.codigo} — informe a quantidade entregue <strong>total</strong> por
+        item. Sem corte, o restante continua reservado para outra expedição.
+      </p>
+
+      {nota.itens_detalhe.length === 0 ? (
+        <p className="m-0 rounded-[1rem] border border-border-input bg-[#f8f9fb] px-4 py-3 font-sans text-sm text-[#697077]">
+          Esta nota não possui itens.
+        </p>
+      ) : (
+        <div className="flex w-full flex-col overflow-x-auto rounded-[1rem] border border-[#e2e8f0]">
+          <div
+            className="grid min-w-[520px] bg-brand px-[0.6875rem] py-2 font-display text-sm text-white [font-weight:590]"
+            style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
+          >
+            <div>Item</div>
+            <div className="text-center">Esperada</div>
+            <div className="text-center">Já entregue</div>
+            <div className="text-center">Entrega (total)</div>
+          </div>
+          {itens.map((item, indice) => (
+            <div
+              key={item.id_item_nota_saida}
+              className={`grid min-w-[520px] items-center px-[0.6875rem] py-2 font-sans text-sm text-ink ${
+                indice % 2 === 1 ? "bg-table-alt!" : "bg-white"
+              }`}
+              style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
+            >
+              <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-2">
+                {item.descricao}
+              </div>
+              <div className="text-center">{formatarNumero(item.qtd_esperada)}</div>
+              <div className="text-center">{formatarNumero(item.qtd_entregue)}</div>
+              <div className="px-1">
+                <input
+                  type="number"
+                  min={item.qtd_entregue}
+                  max={item.qtd_esperada}
+                  step="any"
+                  value={valores[item.id_item_nota_saida] ?? ""}
+                  onChange={(e) =>
+                    setValores((atual) => ({
+                      ...atual,
+                      [item.id_item_nota_saida]: e.target.value,
+                    }))
+                  }
+                  className={`${ui.input} h-9`}
+                  aria-label={`Quantidade entregue de ${item.descricao}`}
+                  disabled={processando}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <label className="flex cursor-pointer items-center gap-2 font-sans text-base text-ink-strong">
+        <input
+          type="checkbox"
+          checked={cortar}
+          onChange={(e) => setCortar(e.target.checked)}
+          className="h-[1.125rem] w-[1.125rem] accent-brand"
+          disabled={processando}
+        />
+        Cortar o restante (não será entregue)
+      </label>
+
+      <div className={ui.rowActions}>
+        <Button label="Cancelar" variant="cancel" onClick={onCancel} />
+        <Button
+          label="Registrar entrega"
+          type="submit"
+          disabled={invalido || processando}
+        />
+      </div>
+    </form>
+  );
+}
 
 function ExpedicaoEdicaoForm({
   inicial,
@@ -208,10 +342,16 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
   const [notaParaRemover, setNotaParaRemover] =
     useState<ExpedicaoNotaRow | null>(null);
   const [despachando, setDespachando] = useState(false);
+  const [notaEntrega, setNotaEntrega] = useState<ExpedicaoNotaRow | null>(null);
+  const [notaNaoEntregue, setNotaNaoEntregue] =
+    useState<ExpedicaoNotaRow | null>(null);
+  const [concluindo, setConcluindo] = useState(false);
   const [processando, setProcessando] = useState(false);
 
   const planejada = detalhe.status === "PLANEJADA";
+  const emPercurso = detalhe.status === "EM_PERCURSO";
   const podeAlterar = perms.canEdit && planejada;
+  const podeExecutar = perms.canEdit && emPercurso;
 
   async function recarregar() {
     const atualizado = await obterExpedicao(detalhe.id_expedicao);
@@ -280,9 +420,51 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
     if (ok) setDespachando(false);
   }
 
-  const gridNotas = podeAlterar
-    ? "4.5rem 6rem 2.4fr 1fr 0.8fr 10.5rem"
-    : "4.5rem 6rem 2.4fr 1fr 0.8fr";
+  async function confirmarEntrega(
+    itens: { id_item_nota_saida: number; qtd_entregue: number }[],
+    cortar: boolean,
+  ) {
+    if (!notaEntrega) return;
+    const ok = await executar(
+      () =>
+        registrarEntregaNota(
+          detalhe.id_expedicao,
+          notaEntrega.id_nota_saida,
+          itens,
+          cortar,
+        ),
+      "Entrega registrada.",
+    );
+    if (ok) setNotaEntrega(null);
+  }
+
+  async function confirmarNaoEntregue() {
+    if (!notaNaoEntregue) return;
+    const ok = await executar(
+      () =>
+        marcarNotaNaoEntregue(
+          detalhe.id_expedicao,
+          notaNaoEntregue.id_nota_saida,
+        ),
+      "Nota marcada como não entregue.",
+    );
+    if (ok) setNotaNaoEntregue(null);
+  }
+
+  async function confirmarConclusao() {
+    const ok = await executar(
+      () => concluirExpedicao(detalhe.id_expedicao),
+      "Expedição concluída.",
+    );
+    if (ok) setConcluindo(false);
+  }
+
+  const colunaAcoes = podeAlterar || podeExecutar;
+  const gridNotas = podeExecutar
+    ? "4.5rem 6rem 2.4fr 1fr 0.8fr 15rem"
+    : podeAlterar
+      ? "4.5rem 6rem 2.4fr 1fr 0.8fr 10.5rem"
+      : "4.5rem 6rem 2.4fr 1fr 0.8fr";
 
   return (
     <div className="flex flex-col gap-4">
@@ -297,6 +479,14 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
               label="Despachar"
               variant="primary"
               onClick={() => setDespachando(true)}
+              disabled={processando}
+            />
+          )}
+          {podeExecutar && (
+            <Button
+              label="Concluir expedição"
+              variant="primary"
+              onClick={() => setConcluindo(true)}
               disabled={processando}
             />
           )}
@@ -384,7 +574,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
             <div className="px-[0.6875rem] py-2">Destinatário</div>
             <div className="px-[0.6875rem] py-2 text-center">Status</div>
             <div className="px-[0.6875rem] py-2 text-center">Itens</div>
-            {podeAlterar && (
+            {colunaAcoes && (
               <div className="px-[0.6875rem] py-2 text-center">Ações</div>
             )}
           </div>
@@ -444,6 +634,34 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                   >
                     Remover
                   </button>
+                </div>
+              )}
+              {podeExecutar && (
+                <div className="flex flex-wrap items-center justify-center gap-1 px-[0.6875rem] py-1">
+                  {nota.status === "EM_PERCURSO" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="rounded-md border border-brand bg-brand px-2 py-1 font-sans text-[0.8125rem] font-semibold text-white cursor-pointer transition-[background-color] duration-100 hover:bg-brand-hover disabled:cursor-default disabled:opacity-50"
+                        onClick={() => setNotaEntrega(nota)}
+                        disabled={processando}
+                      >
+                        Registrar entrega
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md border border-border bg-white px-2 py-1 font-sans text-[0.8125rem] text-ink cursor-pointer transition-[background-color] duration-100 hover:bg-[#f2f4f8] disabled:cursor-default disabled:opacity-50"
+                        onClick={() => setNotaNaoEntregue(nota)}
+                        disabled={processando}
+                      >
+                        Não entregue
+                      </button>
+                    </>
+                  ) : (
+                    <span className="font-sans text-xs text-[#697077]">
+                      Entrega registrada
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -509,6 +727,47 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
         title="Despachar expedição"
         message="Despachar a expedição? Ela passa para Em percurso, as notas também, e o veículo fica Em expedição."
         confirmLabel="Despachar"
+        loading={processando}
+      />
+
+      <Modal
+        open={notaEntrega !== null}
+        onClose={() => setNotaEntrega(null)}
+        title="Registrar entrega"
+        width="760px"
+      >
+        {notaEntrega && (
+          <EntregaForm
+            key={notaEntrega.id_nota_saida}
+            nota={notaEntrega}
+            onConfirm={confirmarEntrega}
+            onCancel={() => setNotaEntrega(null)}
+            processando={processando}
+          />
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={notaNaoEntregue !== null}
+        onClose={() => setNotaNaoEntregue(null)}
+        onConfirm={() => {
+          void confirmarNaoEntregue();
+        }}
+        title="Não entregue"
+        message={`Marcar a nota ${notaNaoEntregue?.codigo ?? ""} como não entregue? Nada é baixado do estoque e a reserva continua para outra expedição.`}
+        confirmLabel="Marcar como não entregue"
+        loading={processando}
+      />
+
+      <ConfirmDialog
+        open={concluindo}
+        onClose={() => setConcluindo(false)}
+        onConfirm={() => {
+          void confirmarConclusao();
+        }}
+        title="Concluir expedição"
+        message="Concluir a expedição? As notas que ainda estiverem em percurso passam a Pendente, a expedição vai para Concluída e o veículo volta a ficar Disponível."
+        confirmLabel="Concluir"
         loading={processando}
       />
     </div>

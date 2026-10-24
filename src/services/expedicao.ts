@@ -1,4 +1,8 @@
-import { expedicaoDAO, type ExpedicaoDados } from "@/dao/expedicao";
+import {
+  expedicaoDAO,
+  type EntregaItem,
+  type ExpedicaoDados,
+} from "@/dao/expedicao";
 import { mensagemDeErro } from "@/dao/_errors";
 
 export type ExpedicaoInput = {
@@ -37,6 +41,44 @@ function dataOpcional(valor: unknown): Date | null | "invalida" {
 function textoOpcional(valor: unknown): string | null {
   const texto = String(valor ?? "").trim();
   return texto || null;
+}
+
+function booleano(valor: unknown): boolean {
+  return valor === true || valor === "true" || valor === "on" || valor === 1;
+}
+
+function normalizarItensEntrega(
+  valor: unknown,
+): { itens: EntregaItem[] } | { error: string } {
+  if (!Array.isArray(valor)) {
+    return { error: "Itens da entrega inválidos." };
+  }
+
+  const vistos = new Set<number>();
+  const itens: EntregaItem[] = [];
+
+  for (const bruto of valor) {
+    if (!bruto || typeof bruto !== "object") {
+      return { error: "Item de entrega inválido." };
+    }
+
+    const registro = bruto as Record<string, unknown>;
+    const idItem = idPositivo(registro.id_item_nota_saida);
+    if (!idItem) return { error: "Item de entrega inválido." };
+    if (vistos.has(idItem)) {
+      return { error: "Cada item da nota deve ser informado uma única vez." };
+    }
+    vistos.add(idItem);
+
+    const quantidade = Number(registro.qtd_entregue ?? 0);
+    if (!Number.isFinite(quantidade) || quantidade < 0) {
+      return { error: "Informe uma quantidade entregue válida." };
+    }
+
+    itens.push({ id_item_nota_saida: idItem, qtd_entregue: quantidade });
+  }
+
+  return { itens };
 }
 
 export class ExpedicaoService {
@@ -190,6 +232,79 @@ export class ExpedicaoService {
     try {
       return {
         expedicao: await expedicaoDAO.despachar(idExpedicao, id_usuario),
+      };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  }
+
+  /**
+   * Registra a entrega de uma nota em `EM_PERCURSO`. `qtd_entregue` é o total
+   * por item (o DAO calcula o delta) e `cortar_restante` libera o que sobrou.
+   */
+  async registrarEntrega(
+    id: number,
+    id_nota_saida: number,
+    input: { itens?: unknown; cortar_restante?: unknown },
+    id_usuario: number,
+  ) {
+    const idExpedicao = idPositivo(id);
+    if (!idExpedicao) return { error: "Expedição inválida." };
+
+    const idNota = idPositivo(id_nota_saida);
+    if (!idNota) return { error: "Nota de saída inválida." };
+
+    const itens = normalizarItensEntrega(input.itens);
+    if ("error" in itens) return itens;
+
+    try {
+      return {
+        entrega: await expedicaoDAO.registrarEntrega(
+          idExpedicao,
+          idNota,
+          itens.itens,
+          booleano(input.cortar_restante),
+          id_usuario,
+        ),
+      };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  }
+
+  /** Atalho de "não entregue": zero entregue, sem corte e sem mexer no estoque. */
+  async marcarNaoEntregue(
+    id: number,
+    id_nota_saida: number,
+    id_usuario: number,
+  ) {
+    const idExpedicao = idPositivo(id);
+    if (!idExpedicao) return { error: "Expedição inválida." };
+
+    const idNota = idPositivo(id_nota_saida);
+    if (!idNota) return { error: "Nota de saída inválida." };
+
+    try {
+      return {
+        entrega: await expedicaoDAO.marcarNaoEntregue(
+          idExpedicao,
+          idNota,
+          id_usuario,
+        ),
+      };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  }
+
+  /** Conclui a expedição em percurso (notas restantes viram pendentes). */
+  async concluir(id: number, id_usuario: number) {
+    const idExpedicao = idPositivo(id);
+    if (!idExpedicao) return { error: "Expedição inválida." };
+
+    try {
+      return {
+        expedicao: await expedicaoDAO.concluir(idExpedicao, id_usuario),
       };
     } catch (e) {
       return { error: mensagemDeErro(e) };

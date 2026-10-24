@@ -5,9 +5,22 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
+import { estoqueDAO } from "./estoque";
 import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
+
+export type EntregaItem = {
+  id_item_nota_saida: number;
+  qtd_entregue: number;
+};
+
+export type ResultadoEntrega = {
+  id_nota_saida: number;
+  id_expedicao: number;
+  status: StatusNotaSaida;
+  itens: { id_item_nota_saida: number; qtd_entregue: number }[];
+};
 
 const AUDIT_ENTIDADE = "Expedicao";
 
@@ -42,7 +55,14 @@ const includeNotas = {
       notaSaida: {
         include: {
           destinatario: { include: { pessoaJuridica: true } },
-          itens: true,
+          itens: {
+            orderBy: { id_item_nota_saida: "asc" as const },
+            include: {
+              estoque: {
+                select: { produto: { select: { descricao: true } } },
+              },
+            },
+          },
         },
       },
     },
@@ -160,6 +180,266 @@ async function buscarNotaElegivel(client: Db, id_nota_saida: number) {
   if (ocupada) return null;
 
   return nota;
+}
+
+/**
+ * Registra a entrega de uma nota em `EM_PERCURSO` na expedição `EM_PERCURSO`.
+ * `itens` traz a quantidade entregue **total** por item; o delta é calculado
+ * sobre `qtd_entregue`. Tudo na transação recebida: baixa de estoque +
+ * reserva + item + status + auditoria. A transição condicional do status
+ * garante que a segunda chamada não debite de novo.
+ */
+async function finalizarNota(
+  tx: Db,
+  id_expedicao: number,
+  id_nota_saida: number,
+  itens: EntregaItem[],
+  cortar_restante: boolean,
+  id_usuario: number,
+): Promise<ResultadoEntrega> {
+  const expedicao = await tx.expedicao.findFirst({
+    where: { id_expedicao, ativo: true },
+    select: { id_expedicao: true, status: true },
+  });
+  if (!expedicao) throw new Error("Expedição não encontrada.");
+  if (expedicao.status !== "EM_PERCURSO") {
+    throw new Error("Só expedições em percurso registram entrega.");
+  }
+
+  const nota = await tx.notaSaida.findFirst({
+    where: { id_nota_saida, tipo: "SAIDA", ativo: true },
+    include: {
+      itens: { orderBy: { id_item_nota_saida: "asc" } },
+      expedicoes: { select: { id_expedicao: true } },
+    },
+  });
+  if (!nota) throw new Error("Nota de saída não encontrada.");
+  if (!nota.expedicoes.some((vinculo) => vinculo.id_expedicao === id_expedicao)) {
+    throw new Error("Esta nota não pertence à expedição.");
+  }
+  if (nota.status !== "EM_PERCURSO") {
+    throw new Error(
+      "Esta nota não está em percurso: a entrega já foi registrada ou a nota não saiu.",
+    );
+  }
+  if (itens.length !== nota.itens.length) {
+    throw new Error("Informe a quantidade entregue de todos os itens da nota.");
+  }
+
+  const informado = new Map<number, number>();
+  for (const item of itens) {
+    if (informado.has(item.id_item_nota_saida)) {
+      throw new Error("Cada item da nota deve ser informado uma única vez.");
+    }
+    informado.set(item.id_item_nota_saida, item.qtd_entregue);
+  }
+
+  const plano = nota.itens.map((item) => {
+    const nova = informado.get(item.id_item_nota_saida);
+    if (nova === undefined) {
+      throw new Error("Informe a quantidade entregue de todos os itens da nota.");
+    }
+
+    const esperada = Number(item.qtd_esperada);
+    const atual = Number(item.qtd_entregue);
+
+    if (!Number.isFinite(nova) || nova < 0 || nova > esperada) {
+      throw new Error(
+        "Quantidade entregue inválida: precisa estar entre zero e a quantidade esperada do item.",
+      );
+    }
+    if (nova < atual) {
+      throw new Error(
+        "A quantidade entregue não pode ser menor que a já registrada no item.",
+      );
+    }
+
+    return {
+      item,
+      esperada,
+      atual,
+      nova,
+      delta: nova - atual,
+      restante: cortar_restante ? esperada - nova : 0,
+    };
+  });
+
+  const totalEsperada = plano.reduce((total, item) => total + item.esperada, 0);
+  const totalEntregue = plano.reduce((total, item) => total + item.nova, 0);
+  const totalDelta = plano.reduce((total, item) => total + item.delta, 0);
+
+  const status: StatusNotaSaida =
+    totalDelta === 0 && !cortar_restante
+      ? "PENDENTE"
+      : totalEntregue >= totalEsperada
+        ? "BAIXA_TOTAL"
+        : cortar_restante
+          ? "BAIXA_COM_CORTE"
+          : "BAIXA_PARCIAL";
+
+  // Aborta antes de mexer em qualquer saldo se a reserva não cobre o que será
+  // entregue/cortado — `saldo_reservado` nunca pode ficar negativo.
+  const saldosAnteriores: {
+    id_estoque: number;
+    quantidade_atual: number;
+    saldo_reservado: number;
+  }[] = [];
+
+  for (const item of plano) {
+    const estoque = await tx.estoque.findUnique({
+      where: { id_estoque: item.item.id_estoque },
+    });
+    if (!estoque) throw new Error("Estoque do item não encontrado.");
+
+    const saldoReservado = Number(estoque.saldo_reservado);
+    if (saldoReservado < item.delta + item.restante) {
+      throw new Error(
+        "Saldo reservado insuficiente para registrar a entrega.",
+      );
+    }
+
+    saldosAnteriores.push({
+      id_estoque: item.item.id_estoque,
+      quantidade_atual: Number(estoque.quantidade_atual),
+      saldo_reservado: saldoReservado,
+    });
+  }
+
+  // Transição condicional: a segunda chamada (mesmo concorrente) não encontra
+  // mais o status de origem e é recusada sem debitar.
+  const transicao = await tx.notaSaida.updateMany({
+    where: { id_nota_saida, status: "EM_PERCURSO" },
+    data: { status },
+  });
+  if (transicao.count !== 1) {
+    throw new Error("A entrega desta nota já foi registrada.");
+  }
+
+  const movimentacoes: {
+    id_movimentacao: number;
+    id_estoque: number;
+    quantidade: number;
+    saldo_anterior: number;
+    saldo_posterior: number;
+  }[] = [];
+  const reservasLiberadas: {
+    id_reserva_estoque: number;
+    id_estoque: number;
+    quantidade: number;
+    saldo_anterior: number;
+    saldo_posterior: number;
+  }[] = [];
+
+  for (const item of plano) {
+    if (item.delta > 0) {
+      const baixa = await estoqueDAO.baixar(
+        {
+          id_estoque: item.item.id_estoque,
+          id_nota_saida,
+          id_usuario,
+          quantidade: item.delta,
+          observacao: "Baixa da entrega da nota de saída",
+        },
+        tx,
+      );
+      movimentacoes.push({
+        id_movimentacao: baixa.movimentacao.id_movimentacao,
+        id_estoque: item.item.id_estoque,
+        quantidade: Number(baixa.movimentacao.quantidade),
+        saldo_anterior: baixa.saldo_anterior,
+        saldo_posterior: baixa.saldo_posterior,
+      });
+    }
+
+    if (item.restante > 0) {
+      const liberacao = await estoqueDAO.liberarReserva(
+        {
+          id_estoque: item.item.id_estoque,
+          id_nota_saida,
+          id_usuario,
+          quantidade: item.restante,
+          observacao: "Corte do restante da entrega",
+        },
+        tx,
+      );
+      reservasLiberadas.push({
+        id_reserva_estoque: liberacao.reserva.id_reserva_estoque,
+        id_estoque: item.item.id_estoque,
+        quantidade: Number(liberacao.reserva.quantidade),
+        saldo_anterior: liberacao.saldo_anterior,
+        saldo_posterior: liberacao.saldo_posterior,
+      });
+    }
+
+    if (item.nova !== item.atual) {
+      await tx.itemNotaSaida.update({
+        where: { id_item_nota_saida: item.item.id_item_nota_saida },
+        data: { qtd_entregue: item.nova },
+      });
+    }
+  }
+
+  const saldosPosteriores: {
+    id_estoque: number;
+    quantidade_atual: number;
+    saldo_reservado: number;
+  }[] = [];
+  for (const item of plano) {
+    const estoque = await tx.estoque.findUniqueOrThrow({
+      where: { id_estoque: item.item.id_estoque },
+    });
+    saldosPosteriores.push({
+      id_estoque: item.item.id_estoque,
+      quantidade_atual: Number(estoque.quantidade_atual),
+      saldo_reservado: Number(estoque.saldo_reservado),
+    });
+  }
+
+  await registrarAuditoria(
+    id_usuario,
+    "ALTERAR",
+    "NotaSaida",
+    id_nota_saida,
+    {
+      id_nota_saida,
+      id_expedicao,
+      status: nota.status,
+      cortar_restante,
+      itens: plano.map((item) => ({
+        id_item_nota_saida: item.item.id_item_nota_saida,
+        id_estoque: item.item.id_estoque,
+        qtd_esperada: item.esperada,
+        qtd_entregue: item.atual,
+      })),
+      saldos: saldosAnteriores,
+    },
+    {
+      id_nota_saida,
+      id_expedicao,
+      status,
+      cortar_restante,
+      itens: plano.map((item) => ({
+        id_item_nota_saida: item.item.id_item_nota_saida,
+        id_estoque: item.item.id_estoque,
+        qtd_esperada: item.esperada,
+        qtd_entregue: item.nova,
+      })),
+      saldos: saldosPosteriores,
+      movimentacoes,
+      reservas_liberadas: reservasLiberadas,
+    },
+    tx,
+  );
+
+  return {
+    id_nota_saida,
+    id_expedicao,
+    status,
+    itens: plano.map((item) => ({
+      id_item_nota_saida: item.item.id_item_nota_saida,
+      qtd_entregue: item.nova,
+    })),
+  };
 }
 
 export class ExpedicaoDAO {
@@ -770,6 +1050,146 @@ export class ExpedicaoDAO {
 
       return depois;
     });
+  }
+
+  /**
+   * Registra a entrega de uma nota em `EM_PERCURSO`: dá baixa do entregue
+   * (`quantidade_atual` e `saldo_reservado` pelo delta), libera a reserva do
+   * restante no corte, atualiza `qtd_entregue` e o status da nota, com
+   * auditoria `NotaSaida`/`ALTERAR`. Tudo em transação única.
+   */
+  async registrarEntrega(
+    id: number,
+    id_nota_saida: number,
+    itens: EntregaItem[],
+    cortar_restante: boolean,
+    id_usuario: number,
+  ): Promise<ResultadoEntrega> {
+    return prisma.$transaction(
+      (tx) =>
+        finalizarNota(
+          tx,
+          id,
+          id_nota_saida,
+          itens,
+          cortar_restante,
+          id_usuario,
+        ),
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  /**
+   * Atalho "não entregue": registra zero entregue (mantendo o já entregue
+   * anteriormente) e sem corte → `PENDENTE`, sem alterar estoque nem reserva.
+   */
+  async marcarNaoEntregue(
+    id: number,
+    id_nota_saida: number,
+    id_usuario: number,
+  ): Promise<ResultadoEntrega> {
+    return prisma.$transaction(
+      async (tx) => {
+        const nota = await tx.notaSaida.findFirst({
+          where: { id_nota_saida, tipo: "SAIDA", ativo: true },
+          include: { itens: { orderBy: { id_item_nota_saida: "asc" } } },
+        });
+        if (!nota) throw new Error("Nota de saída não encontrada.");
+
+        return finalizarNota(
+          tx,
+          id,
+          id_nota_saida,
+          nota.itens.map((item) => ({
+            id_item_nota_saida: item.id_item_nota_saida,
+            qtd_entregue: Number(item.qtd_entregue),
+          })),
+          false,
+          id_usuario,
+        );
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  /**
+   * Conclui a expedição `EM_PERCURSO`: notas ainda em percurso passam a
+   * `PENDENTE`, a expedição vai para `CONCLUIDA` e o veículo volta para
+   * `DISPONIVEL` quando não estiver em outra expedição em percurso. Auditoria
+   * `Expedicao`/`ALTERAR` registra quantas notas ficaram pendentes.
+   */
+  async concluir(id: number, id_usuario: number) {
+    return prisma.$transaction(
+      async (tx) => {
+        const antes = await tx.expedicao.findUniqueOrThrow({
+          where: { id_expedicao: id },
+          include: includeNotas,
+        });
+
+        if (!antes.ativo) throw new Error("Expedição desativada.");
+        if (antes.status !== "EM_PERCURSO") {
+          throw new Error("Só expedições em percurso podem ser concluídas.");
+        }
+
+        const transicao = await tx.expedicao.updateMany({
+          where: { id_expedicao: id, status: "EM_PERCURSO" },
+          data: { status: "CONCLUIDA" },
+        });
+        if (transicao.count !== 1) {
+          throw new Error("A expedição já foi concluída.");
+        }
+
+        const pendentes = await tx.notaSaida.updateMany({
+          where: {
+            id_nota_saida: {
+              in: antes.notas.map((nota) => nota.id_nota_saida),
+            },
+            status: "EM_PERCURSO",
+          },
+          data: { status: "PENDENTE" },
+        });
+
+        if (antes.id_veiculo !== null) {
+          const veiculoEmOutraExpedicao = await tx.expedicao.findFirst({
+            where: {
+              id_expedicao: { not: id },
+              id_veiculo: antes.id_veiculo,
+              ativo: true,
+              status: "EM_PERCURSO",
+            },
+            select: { id_expedicao: true },
+          });
+
+          if (!veiculoEmOutraExpedicao) {
+            await tx.veiculo.update({
+              where: { id_veiculo: antes.id_veiculo },
+              data: { status: "DISPONIVEL" },
+            });
+          }
+        }
+
+        const depois = await tx.expedicao.findUniqueOrThrow({
+          where: { id_expedicao: id },
+          include: includeNotas,
+        });
+
+        await registrarAuditoria(
+          id_usuario,
+          "ALTERAR",
+          AUDIT_ENTIDADE,
+          id,
+          snapshot(antes),
+          {
+            ...snapshot(depois),
+            notas_marcadas_pendentes: pendentes.count,
+          },
+          tx,
+        );
+
+        return depois;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   /** Desativa (`ativo = false`) uma expedição `PLANEJADA`, com auditoria. */

@@ -693,6 +693,15 @@ A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
 - **`PENDENTE`**: a tentativa de entrega não ocorreu (ex.: escola fechada); a reserva permanece e
   a nota pode ser adicionada a outra expedição.
 
+A execução acontece **dentro da expedição em `EM_PERCURSO`**, por nota e por item: a quantidade
+informada é o **total entregue** (o sistema aplica o delta sobre `qtd_entregue`), o **corte** libera
+a reserva do restante e o atalho **não entregue** mantém tudo reservado. A baixa física não é
+bloqueada por `quantidade_atual` insuficiente — divergência de inventário não impede registrar uma
+entrega que aconteceu (RN001) —, mas nunca deixa `saldo_reservado` negativo. A segunda tentativa
+numa nota já finalizada é recusada sem debitar de novo. Ao **concluir** a expedição, as notas ainda
+em percurso passam a `PENDENTE`, a expedição vai para `CONCLUIDA` e o veículo volta a `DISPONIVEL`
+quando não está em outra expedição em percurso.
+
 #### 3.11.3 Coleta (Retirada Direta na Escola)
 
 Representa retirada presencial por urgência — sem expedição, sem condutor, sem veículo.

@@ -15,6 +15,20 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Execução da entrega e baixa da nota `(KAN-140)`:** dentro da expedição em percurso, cada nota
+  ganhou **Registrar entrega** (modal por item com esperada, já entregue, entrega total e o
+  interruptor **cortar o restante**) e o atalho **Não entregue**; o cabeçalho ganhou **Concluir
+  expedição**. A baixa roda em transação única: `quantidade_atual` e `saldo_reservado` caem pelo
+  delta entregue, `item_nota_saida.qtd_entregue` é atualizado e `movimentacao_estoque` é gravada
+  com quantidade negativa e `ID_nota_saida`; o corte libera o restante via reserva negativa, sem
+  movimentação. Status: tudo entregue `BAIXA_TOTAL`; parcial com restante `BAIXA_PARCIAL` (reserva
+  mantida, nota elegível a outra expedição); parcial com corte `BAIXA_COM_CORTE`; tentativa sem
+  entrega `PENDENTE`. A segunda baixa é recusada pela transição condicional de status, e a
+  conclusão marca as notas ainda em percurso como `PENDENTE`, conclui a expedição e devolve o
+  veículo para `DISPONIVEL`. `saldo_reservado` nunca fica negativo (RN001 não bloqueia pela
+  `quantidade_atual`). Código em `src/dao/estoque.ts` (`baixar`), `src/dao/expedicao.ts`,
+  `src/services/expedicao.ts`, `src/app/expedicoes/[id]/**` e `actions.ts`; testes em
+  `tests/services/expedicao.test.ts`.
 - **CRUD de percursos de expedição `(KAN-140)`:** nova tela `/expedicoes/percursos`
   (grupo **Expedições** na sidebar, padrão do grupo Cadastros) para cadastrar os templates
   ordenados de visitas que as expedições usarão como base. A listagem mostra nome e quantidade de

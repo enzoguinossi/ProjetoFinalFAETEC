@@ -253,6 +253,68 @@ export class EstoqueDAO {
     return { estoque, reserva, saldo_anterior, saldo_posterior };
   }
 
+  /**
+   * Dá baixa da entrega de uma nota de saída: subtrai `quantidade` de
+   * `quantidade_atual` **e** de `saldo_reservado` e registra a
+   * `movimentacao_estoque` com quantidade **negativa** e `ID_nota_saida`
+   * (a saída é o sinal — não existe campo `tipo`). Não valida
+   * `quantidade_atual`: a divergência de inventário não pode bloquear uma
+   * entrega que aconteceu (RN001). Aborta se `saldo_reservado` ficar
+   * negativo. Roda no cliente de transação informado.
+   */
+  async baixar(
+    dados: {
+      id_estoque: number;
+      id_nota_saida: number;
+      id_usuario: number;
+      quantidade: number;
+      observacao?: string | null;
+    },
+    client: Prisma.TransactionClient = prisma,
+  ) {
+    const existente = await client.estoque.findUniqueOrThrow({
+      where: { id_estoque: dados.id_estoque },
+    });
+
+    const saldo_reservado_anterior = Number(existente.saldo_reservado);
+    if (saldo_reservado_anterior < dados.quantidade) {
+      throw new Error(
+        "Saldo reservado insuficiente para registrar a baixa da entrega.",
+      );
+    }
+
+    const saldo_anterior = Number(existente.quantidade_atual);
+    const estoque = await client.estoque.update({
+      where: { id_estoque: dados.id_estoque },
+      data: {
+        quantidade_atual: { decrement: dados.quantidade },
+        saldo_reservado: { decrement: dados.quantidade },
+      },
+    });
+
+    const movimentacao = await client.movimentacaoEstoque.create({
+      data: {
+        id_estoque: estoque.id_estoque,
+        id_usuario: dados.id_usuario,
+        id_nota_saida: dados.id_nota_saida,
+        quantidade: -dados.quantidade,
+        saldo_anterior,
+        saldo_posterior: Number(estoque.quantidade_atual),
+        data_hora: new Date(),
+        observacao: dados.observacao ?? null,
+      },
+    });
+
+    return {
+      estoque,
+      movimentacao,
+      saldo_anterior,
+      saldo_posterior: Number(estoque.quantidade_atual),
+      saldo_reservado_anterior,
+      saldo_reservado_posterior: Number(estoque.saldo_reservado),
+    };
+  }
+
   async movimentar(
     id_estoque: number,
     id_usuario: number,

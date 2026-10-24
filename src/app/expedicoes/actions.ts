@@ -38,6 +38,13 @@ export type ExpedicaoListRow = {
   veiculo: string | null;
 };
 
+export type ExpedicaoNotaItemRow = {
+  id_item_nota_saida: number;
+  descricao: string;
+  qtd_esperada: number;
+  qtd_entregue: number;
+};
+
 export type ExpedicaoNotaRow = {
   id_nota_saida: number;
   ordem_visita: number;
@@ -47,6 +54,7 @@ export type ExpedicaoNotaRow = {
   statusLabel: string;
   itens: number;
   saldo_pendente: number;
+  itens_detalhe: ExpedicaoNotaItemRow[];
 };
 
 export type ExpedicaoFormData = {
@@ -121,7 +129,12 @@ type ExpedicaoDetalhe = {
     notaSaida: {
       status: string;
       destinatario: { pessoaJuridica: { razao_social: string } } | null;
-      itens: { qtd_esperada: number; qtd_entregue: number }[];
+      itens: {
+        id_item_nota_saida: number;
+        qtd_esperada: number;
+        qtd_entregue: number;
+        estoque: { produto: { descricao: string } };
+      }[];
     };
   }[];
 };
@@ -177,6 +190,12 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
         ROTULOS_STATUS_NOTA[nota.notaSaida.status] ?? nota.notaSaida.status,
       itens: nota.notaSaida.itens.length,
       saldo_pendente: saldoPendente(nota.notaSaida.itens),
+      itens_detalhe: nota.notaSaida.itens.map((item) => ({
+        id_item_nota_saida: item.id_item_nota_saida,
+        descricao: item.estoque.produto.descricao,
+        qtd_esperada: Number(item.qtd_esperada),
+        qtd_entregue: Number(item.qtd_entregue),
+      })),
     })),
   };
 }
@@ -393,6 +412,50 @@ export async function moverNotasExpedicao(id: number, ordem: number[]) {
 export async function despacharExpedicao(id: number) {
   return comPermissao("expedicao.alterar", async (user) => {
     const resultado = await expedicaoService.despachar(id, user.id_usuario);
+    if ("error" in resultado) return { error: resultado.error };
+    return { success: true };
+  });
+}
+
+export async function registrarEntregaNota(
+  id: number,
+  id_nota_saida: number,
+  itens: { id_item_nota_saida: number; qtd_entregue: number }[],
+  cortar_restante: boolean,
+) {
+  return comPermissao("expedicao.alterar", async (user) => {
+    const resultado = await expedicaoService.registrarEntrega(
+      id,
+      id_nota_saida,
+      {
+        itens: itens.map((item) => ({
+          id_item_nota_saida: item.id_item_nota_saida,
+          qtd_entregue: item.qtd_entregue,
+        })),
+        cortar_restante,
+      },
+      user.id_usuario,
+    );
+    if ("error" in resultado) return { error: resultado.error };
+    return { success: true, status: resultado.entrega.status };
+  });
+}
+
+export async function marcarNotaNaoEntregue(id: number, id_nota_saida: number) {
+  return comPermissao("expedicao.alterar", async (user) => {
+    const resultado = await expedicaoService.marcarNaoEntregue(
+      id,
+      id_nota_saida,
+      user.id_usuario,
+    );
+    if ("error" in resultado) return { error: resultado.error };
+    return { success: true, status: resultado.entrega.status };
+  });
+}
+
+export async function concluirExpedicao(id: number) {
+  return comPermissao("expedicao.alterar", async (user) => {
+    const resultado = await expedicaoService.concluir(id, user.id_usuario);
     if ("error" in resultado) return { error: resultado.error };
     return { success: true };
   });
