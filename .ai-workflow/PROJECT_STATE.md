@@ -6,8 +6,8 @@
 ## Objetivo atual
 
 **Em andamento: movimentação de estoque (KAN-140)**, na branch
-**`KAN-140-mov-estoque`** — **32 commits** sobre a `main` local (`1097e0f`) e **39** sobre
-`origin/main` (`6922050`); **nada integrado nem publicado**.
+**`KAN-140-mov-estoque`** — **34 commits** sobre a `main` local (`1097e0f`) e **41** sobre
+`origin/main` (`6922050`), medidos em `1ca55a6`; **nada integrado nem publicado**.
 
 Entregue nesta branch:
 
