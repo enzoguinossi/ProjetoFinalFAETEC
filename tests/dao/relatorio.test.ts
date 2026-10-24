@@ -211,7 +211,7 @@ describe("relatorioDAO", () => {
       });
 
       const porDestinatario = await relatorioDAO.listarMovimentacoes({
-        id_destinatario: escolaA.destinatario.id_destinatario,
+        id_destinatarios: [escolaA.destinatario.id_destinatario],
       });
       expect(porDestinatario.data).toHaveLength(1);
       expect(porDestinatario.data[0]).toMatchObject({
@@ -222,7 +222,7 @@ describe("relatorioDAO", () => {
       expect(porDestinatario.totais).toEqual({ entradas: 0, saidas: 4 });
 
       const porFornecedor = await relatorioDAO.listarMovimentacoes({
-        id_fornecedor: fornecedorA.fornecedor.id_fornecedor,
+        id_fornecedores: [fornecedorA.fornecedor.id_fornecedor],
       });
       expect(porFornecedor.data).toHaveLength(1);
       expect(porFornecedor.data[0]).toMatchObject({
@@ -233,7 +233,7 @@ describe("relatorioDAO", () => {
       expect(porFornecedor.totais).toEqual({ entradas: 10, saidas: 0 });
 
       const semMovimentacao = await relatorioDAO.listarMovimentacoes({
-        id_fornecedor: fornecedorB.fornecedor.id_fornecedor,
+        id_fornecedores: [fornecedorB.fornecedor.id_fornecedor],
       });
       expect(semMovimentacao.data).toEqual([]);
       expect(semMovimentacao.totais).toEqual({ entradas: 0, saidas: 0 });
@@ -253,9 +253,9 @@ describe("relatorioDAO", () => {
       expect(destinatarios.map((d) => d.nome)).toEqual(["Escola A", "Escola B"]);
       expect(destinatarios[1]?.id_destinatario).toBe(escolaB.destinatario.id_destinatario);
 
-      const comInativa = await relatorioDAO.listarDestinatariosParaFiltro(
+      const comInativa = await relatorioDAO.listarDestinatariosParaFiltro([
         escolaInativa.destinatario.id_destinatario,
-      );
+      ]);
       expect(comInativa.map((d) => d.nome)).toEqual([
         "Escola A",
         "Escola B",
@@ -281,7 +281,7 @@ describe("relatorioDAO", () => {
       });
 
       const resultado = await relatorioDAO.listarMovimentacoes({
-        id_produto: feijao.id_produto,
+        id_produtos: [feijao.id_produto],
       });
 
       expect(resultado.data).toHaveLength(1);
@@ -293,7 +293,57 @@ describe("relatorioDAO", () => {
       expect(resultado.totais).toEqual({ entradas: 7, saidas: 0 });
     });
 
-    it("filtra por tipo entrada e saída, deixando o ajuste só em todos", async () => {
+    it("filtra por vários produtos e combina com destinatários", async () => {
+      const { usuario } = await criarUsuario();
+      const arroz = await criarProduto({ descricao: "Arroz" });
+      const feijao = await criarProduto({ descricao: "Feijão" });
+      const acucar = await criarProduto({ descricao: "Açúcar" });
+      const estoqueArroz = await criarEstoque(arroz.id_produto);
+      const estoqueFeijao = await criarEstoque(feijao.id_produto);
+      const estoqueAcucar = await criarEstoque(acucar.id_produto);
+      const escolaA = await criarDestinatario({ razaoSocial: "Escola A" });
+      const escolaB = await criarDestinatario({ razaoSocial: "Escola B" });
+      const saidaA = await criarNotaSaida({
+        idDestinatario: escolaA.destinatario.id_destinatario,
+      });
+      const saidaB = await criarNotaSaida({
+        idDestinatario: escolaB.destinatario.id_destinatario,
+      });
+
+      await criarMovimentacao(estoqueArroz.id_estoque, usuario.id_usuario, -2, {
+        dataHora: new Date("2026-10-02T12:00:00.000Z"),
+        idNotaSaida: saidaA.id_nota_saida,
+      });
+      await criarMovimentacao(estoqueFeijao.id_estoque, usuario.id_usuario, -3, {
+        dataHora: new Date("2026-10-03T12:00:00.000Z"),
+        idNotaSaida: saidaB.id_nota_saida,
+      });
+      await criarMovimentacao(estoqueAcucar.id_estoque, usuario.id_usuario, -5, {
+        dataHora: new Date("2026-10-04T12:00:00.000Z"),
+        idNotaSaida: saidaA.id_nota_saida,
+      });
+
+      const doisProdutos = await relatorioDAO.listarMovimentacoes({
+        id_produtos: [arroz.id_produto, feijao.id_produto],
+      });
+      expect(doisProdutos.data.map((m) => m.produto)).toEqual(["Arroz", "Feijão"]);
+
+      const combinado = await relatorioDAO.listarMovimentacoes({
+        id_produtos: [arroz.id_produto, acucar.id_produto],
+        id_destinatarios: [escolaA.destinatario.id_destinatario],
+      });
+      expect(combinado.data.map((m) => m.produto)).toEqual(["Arroz", "Açúcar"]);
+
+      const doisDestinatarios = await relatorioDAO.listarMovimentacoes({
+        id_destinatarios: [
+          escolaA.destinatario.id_destinatario,
+          escolaB.destinatario.id_destinatario,
+        ],
+      });
+      expect(doisDestinatarios.data).toHaveLength(3);
+    });
+
+    it("filtra por tipo entrada e saída, deixando o ajuste só sem filtro", async () => {
       const { usuario } = await criarUsuario();
       const produto = await criarProduto({ descricao: "Arroz" });
       const estoque = await criarEstoque(produto.id_produto);
@@ -312,17 +362,23 @@ describe("relatorioDAO", () => {
         dataHora: new Date("2026-10-03T12:00:00.000Z"),
       });
 
-      const entradas = await relatorioDAO.listarMovimentacoes({ tipo: "entrada" });
+      const entradas = await relatorioDAO.listarMovimentacoes({ tipos: ["entrada"] });
       expect(entradas.data.map((m) => m.tipo)).toEqual(["Entrada"]);
       expect(entradas.totais).toEqual({ entradas: 10, saidas: 0 });
 
-      const saidas = await relatorioDAO.listarMovimentacoes({ tipo: "saida" });
+      const saidas = await relatorioDAO.listarMovimentacoes({ tipos: ["saida"] });
       expect(saidas.data.map((m) => m.tipo)).toEqual(["Saída"]);
       expect(saidas.totais).toEqual({ entradas: 0, saidas: 3 });
 
-      const todos = await relatorioDAO.listarMovimentacoes({ tipo: "todos" });
+      const todos = await relatorioDAO.listarMovimentacoes({ tipos: [] });
       expect(todos.data.map((m) => m.tipo)).toEqual(["Entrada", "Saída", "Ajuste"]);
       expect(todos.totais).toEqual({ entradas: 11, saidas: 3 });
+
+      // Entrada + saída: união das duas; o ajuste (sem nota) fica fora.
+      const entradasESaidas = await relatorioDAO.listarMovimentacoes({
+        tipos: ["entrada", "saida"],
+      });
+      expect(entradasESaidas.data.map((m) => m.tipo)).toEqual(["Entrada", "Saída"]);
     });
 
     it("devolve lista vazia e totais zerados sem movimentações", async () => {
@@ -459,37 +515,102 @@ describe("relatorioDAO", () => {
       await vincularNota(inativa.id_expedicao, notaA.id_nota_saida);
 
       const porDestinatario = await relatorioDAO.listarExpedicoesRelatorio({
-        id_destinatario: escolaB.destinatario.id_destinatario,
+        id_destinatarios: [escolaB.destinatario.id_destinatario],
       });
       expect(porDestinatario.data.map((e) => e.id_expedicao)).toEqual([
         comBruno.id_expedicao,
       ]);
 
       const porCondutor = await relatorioDAO.listarExpedicoesRelatorio({
-        id_condutor: ana.id_funcionario,
+        id_condutores: [ana.id_funcionario],
       });
       expect(porCondutor.data.map((e) => e.id_expedicao)).toEqual([
         comAna.id_expedicao,
       ]);
 
       const porStatus = await relatorioDAO.listarExpedicoesRelatorio({
-        status: "PLANEJADA",
+        status: ["PLANEJADA"],
       });
       expect(porStatus.data.map((e) => e.id_expedicao)).toEqual([
         comBruno.id_expedicao,
       ]);
 
       const porExpedicao = await relatorioDAO.listarExpedicoesRelatorio({
-        id_expedicao: comAna.id_expedicao,
+        id_expedicoes: [comAna.id_expedicao],
       });
       expect(porExpedicao.data.map((e) => e.id_expedicao)).toEqual([
         comAna.id_expedicao,
       ]);
 
-      const todas = await relatorioDAO.listarExpedicoesRelatorio({ status: "todas" });
+      const todas = await relatorioDAO.listarExpedicoesRelatorio({ status: [] });
       expect(todas.data.map((e) => e.id_expedicao)).toEqual([
         comBruno.id_expedicao,
         comAna.id_expedicao,
+      ]);
+    });
+
+    it("combina múltiplos destinatários, condutores e status", async () => {
+      const escolaA = await criarDestinatario({ razaoSocial: "Escola A" });
+      const escolaB = await criarDestinatario({ razaoSocial: "Escola B" });
+      const escolaC = await criarDestinatario({ razaoSocial: "Escola C" });
+      const { funcionario: ana } = await criarFuncionario({ nome: "Ana", condutor: true });
+      const { funcionario: bruno } = await criarFuncionario({
+        nome: "Bruno",
+        condutor: true,
+      });
+      const notaA = await criarNotaSaida({
+        idDestinatario: escolaA.destinatario.id_destinatario,
+      });
+      const notaB = await criarNotaSaida({
+        idDestinatario: escolaB.destinatario.id_destinatario,
+      });
+      const notaC = await criarNotaSaida({
+        idDestinatario: escolaC.destinatario.id_destinatario,
+      });
+      const comAna = await criarExpedicao({
+        idCondutor: ana.id_funcionario,
+        dataPrevista: new Date("2026-10-10T00:00:00.000Z"),
+        status: "EM_PERCURSO",
+      });
+      const comBruno = await criarExpedicao({
+        idCondutor: bruno.id_funcionario,
+        dataPrevista: new Date("2026-10-12T00:00:00.000Z"),
+        status: "PLANEJADA",
+      });
+      const terceira = await criarExpedicao({
+        idCondutor: bruno.id_funcionario,
+        dataPrevista: new Date("2026-10-14T00:00:00.000Z"),
+        status: "CONCLUIDA",
+      });
+      await vincularNota(comAna.id_expedicao, notaA.id_nota_saida);
+      await vincularNota(comBruno.id_expedicao, notaB.id_nota_saida);
+      await vincularNota(terceira.id_expedicao, notaC.id_nota_saida);
+
+      const doisDestinatarios = await relatorioDAO.listarExpedicoesRelatorio({
+        id_destinatarios: [
+          escolaA.destinatario.id_destinatario,
+          escolaC.destinatario.id_destinatario,
+        ],
+      });
+      expect(doisDestinatarios.data.map((e) => e.id_expedicao)).toEqual([
+        terceira.id_expedicao,
+        comAna.id_expedicao,
+      ]);
+
+      const doisStatus = await relatorioDAO.listarExpedicoesRelatorio({
+        status: ["PLANEJADA", "CONCLUIDA"],
+      });
+      expect(doisStatus.data.map((e) => e.id_expedicao)).toEqual([
+        terceira.id_expedicao,
+        comBruno.id_expedicao,
+      ]);
+
+      const combinado = await relatorioDAO.listarExpedicoesRelatorio({
+        id_condutores: [bruno.id_funcionario],
+        status: ["CONCLUIDA"],
+      });
+      expect(combinado.data.map((e) => e.id_expedicao)).toEqual([
+        terceira.id_expedicao,
       ]);
     });
 
@@ -625,7 +746,7 @@ describe("relatorioDAO", () => {
       });
 
       const porDestinatario = await relatorioDAO.listarEntregasRelatorio({
-        id_destinatario: escolaA.destinatario.id_destinatario,
+        id_destinatarios: [escolaA.destinatario.id_destinatario],
       });
       expect(porDestinatario.data.map((n) => n.id_nota_saida)).toEqual([
         cancelada.id_nota_saida,
@@ -633,14 +754,71 @@ describe("relatorioDAO", () => {
       ]);
 
       const porStatus = await relatorioDAO.listarEntregasRelatorio({
-        status: "CANCELADA",
+        status: ["CANCELADA"],
       });
       expect(porStatus.data.map((n) => n.id_nota_saida)).toEqual([
         cancelada.id_nota_saida,
       ]);
 
-      const todos = await relatorioDAO.listarEntregasRelatorio({ status: "todos" });
+      const todos = await relatorioDAO.listarEntregasRelatorio({ status: [] });
       expect(todos.data).toHaveLength(3);
+    });
+
+    it("combina múltiplos destinatários e status", async () => {
+      const escolaA = await criarDestinatario({ razaoSocial: "Escola A" });
+      const escolaB = await criarDestinatario({ razaoSocial: "Escola B" });
+      const escolaC = await criarDestinatario({ razaoSocial: "Escola C" });
+      const notaA = await prismaTeste.notaSaida.create({
+        data: {
+          id_destinatario: escolaA.destinatario.id_destinatario,
+          data_criacao: new Date("2026-10-10T12:00:00.000Z"),
+          tipo: "SAIDA",
+          status: "ABERTA",
+        },
+      });
+      const notaB = await prismaTeste.notaSaida.create({
+        data: {
+          id_destinatario: escolaB.destinatario.id_destinatario,
+          data_criacao: new Date("2026-10-11T12:00:00.000Z"),
+          tipo: "SAIDA",
+          status: "BAIXA_PARCIAL",
+        },
+      });
+      const notaC = await prismaTeste.notaSaida.create({
+        data: {
+          id_destinatario: escolaC.destinatario.id_destinatario,
+          data_criacao: new Date("2026-10-12T12:00:00.000Z"),
+          tipo: "SAIDA",
+          status: "BAIXA_TOTAL",
+        },
+      });
+
+      const doisDestinatarios = await relatorioDAO.listarEntregasRelatorio({
+        id_destinatarios: [
+          escolaA.destinatario.id_destinatario,
+          escolaC.destinatario.id_destinatario,
+        ],
+      });
+      expect(doisDestinatarios.data.map((n) => n.id_nota_saida)).toEqual([
+        notaC.id_nota_saida,
+        notaA.id_nota_saida,
+      ]);
+
+      const doisStatus = await relatorioDAO.listarEntregasRelatorio({
+        status: ["ABERTA", "BAIXA_PARCIAL"],
+      });
+      expect(doisStatus.data.map((n) => n.id_nota_saida)).toEqual([
+        notaB.id_nota_saida,
+        notaA.id_nota_saida,
+      ]);
+
+      const combinado = await relatorioDAO.listarEntregasRelatorio({
+        id_destinatarios: [escolaB.destinatario.id_destinatario],
+        status: ["BAIXA_PARCIAL"],
+      });
+      expect(combinado.data.map((n) => n.id_nota_saida)).toEqual([
+        notaB.id_nota_saida,
+      ]);
     });
 
     it("devolve lista vazia e totais zerados sem notas", async () => {
@@ -666,9 +844,9 @@ describe("relatorioDAO", () => {
       expect(condutores[0]?.id_funcionario).toBe(ana.funcionario.id_funcionario);
       expect(condutores[1]?.id_funcionario).toBe(bruno.funcionario.id_funcionario);
 
-      const comInativo = await relatorioDAO.listarCondutoresParaFiltro(
+      const comInativo = await relatorioDAO.listarCondutoresParaFiltro([
         inativo.funcionario.id_funcionario,
-      );
+      ]);
       expect(comInativo.map((c) => c.nome)).toEqual(["Ana", "Bruno", "Diego"]);
     });
 
@@ -693,7 +871,7 @@ describe("relatorioDAO", () => {
       const comSelecionada = await relatorioDAO.listarExpedicoesParaFiltro({
         de: new Date("2026-10-01T00:00:00.000Z"),
         ate: new Date("2026-10-31T00:00:00.000Z"),
-        incluirId: fora.id_expedicao,
+        incluirIds: [fora.id_expedicao],
       });
       expect(comSelecionada.map((e) => e.id_expedicao)).toEqual([
         fora.id_expedicao,

@@ -20,10 +20,10 @@ export async function GET(request: Request) {
   const { data } = await relatorioService.listarExpedicoes({
     de: url.searchParams.get("de"),
     ate: url.searchParams.get("ate"),
-    expedicao: url.searchParams.get("expedicao"),
-    destinatario: url.searchParams.get("destinatario"),
-    condutor: url.searchParams.get("condutor"),
-    status: url.searchParams.get("status"),
+    expedicao: url.searchParams.getAll("expedicao"),
+    destinatario: url.searchParams.getAll("destinatario"),
+    condutor: url.searchParams.getAll("condutor"),
+    status: url.searchParams.getAll("status"),
   });
 
   return new Response(gerarCsvExpedicoes(data), {

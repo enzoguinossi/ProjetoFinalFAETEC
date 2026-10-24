@@ -1,15 +1,13 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import Button from "@/components/Button";
+import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import {
   formatarDataHoraRelatorio,
   formatarDataISO,
   metadadosEmissao,
-  periodoSemestreAtual,
-  periodoMesAtual,
   relatorioService,
 } from "@/services/relatorio";
 import ImprimirButton from "../produtos/ImprimirButton";
@@ -47,46 +45,86 @@ export default async function RelatorioMovimentacaoPage({
     await searchParams,
   );
   const [produtos, destinatarios, fornecedores] = await Promise.all([
-    relatorioService.produtosParaFiltro(),
-    relatorioService.destinatariosParaFiltro(filtros.id_destinatario),
-    relatorioService.fornecedoresParaFiltro(filtros.id_fornecedor),
+    relatorioService.produtosParaFiltro(filtros.id_produtos),
+    relatorioService.destinatariosParaFiltro(filtros.id_destinatarios),
+    relatorioService.fornecedoresParaFiltro(filtros.id_fornecedores),
   ]);
-  const produto =
-    filtros.id_produto === null
-      ? null
-      : await relatorioService.produtoParaFiltro(filtros.id_produto);
-  const destinatario =
-    destinatarios.find((d) => d.id_destinatario === filtros.id_destinatario) ?? null;
-  const fornecedor =
-    fornecedores.find((f) => f.id_fornecedor === filtros.id_fornecedor) ?? null;
+  const produtosSelecionados = produtos.filter((p) =>
+    filtros.id_produtos.includes(p.id_produto),
+  );
+  const destinatariosSelecionados = destinatarios.filter((d) =>
+    filtros.id_destinatarios.includes(d.id_destinatario),
+  );
+  const fornecedoresSelecionados = fornecedores.filter((f) =>
+    filtros.id_fornecedores.includes(f.id_fornecedor),
+  );
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
-  const extrato = filtros.id_produto !== null;
+  // Extrato: exatamente um produto selecionado (compatível com `?produto=<id>`).
+  const produto = produtosSelecionados.length === 1 ? produtosSelecionados[0] : null;
+  const extrato = produto !== null;
   const titulo = extrato ? "Extrato de Produto" : "Movimentação de Estoque";
-  // O produto filtrado pode estar inativo: continua no select para não perder o filtro.
-  const produtoForaDaLista =
-    produto && !produtos.some((p) => p.id_produto === produto.id_produto) ? produto : null;
 
-  const query = new URLSearchParams({ de: filtros.de, ate: filtros.ate, tipo: filtros.tipo });
-  if (filtros.id_produto !== null) query.set("produto", String(filtros.id_produto));
-  if (filtros.id_destinatario !== null) {
-    query.set("destinatario", String(filtros.id_destinatario));
-  }
-  if (filtros.id_fornecedor !== null) query.set("fornecedor", String(filtros.id_fornecedor));
+  const campos: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    {
+      id: "produto",
+      rotulo: "Produto",
+      tipo: "multi",
+      opcoes: produtos.map((p) => ({
+        valor: String(p.id_produto),
+        rotulo: `${p.codigo} - ${p.descricao}`,
+      })),
+    },
+    {
+      id: "destinatario",
+      rotulo: "Destinatário",
+      tipo: "multi",
+      opcoes: destinatarios.map((d) => ({
+        valor: String(d.id_destinatario),
+        rotulo: d.nome,
+      })),
+    },
+    {
+      id: "fornecedor",
+      rotulo: "Fornecedor",
+      tipo: "multi",
+      opcoes: fornecedores.map((f) => ({
+        valor: String(f.id_fornecedor),
+        rotulo: f.nome,
+      })),
+    },
+    {
+      id: "tipo",
+      rotulo: "Tipo",
+      tipo: "multi",
+      opcoes: [
+        { valor: "entrada", rotulo: "Entradas" },
+        { valor: "saida", rotulo: "Saídas" },
+      ],
+    },
+  ];
 
-  // Atalhos de período: trocam apenas de/até, preservando os demais filtros.
-  function linkDoPeriodo(periodo: { de: string; ate: string }): string {
-    const parametros = new URLSearchParams(query);
-    parametros.set("de", periodo.de);
-    parametros.set("ate", periodo.ate);
-    return `/relatorios/movimentacao?${parametros.toString()}`;
+  const valores = {
+    periodo: { de: filtros.de, ate: filtros.ate },
+    produto: filtros.id_produtos.map(String),
+    destinatario: filtros.id_destinatarios.map(String),
+    fornecedor: filtros.id_fornecedores.map(String),
+    tipo: [...filtros.tipos],
+  };
+
+  const query = new URLSearchParams({ de: filtros.de, ate: filtros.ate });
+  if (filtros.id_produtos.length > 0) {
+    query.set("produto", filtros.id_produtos.join(","));
   }
-  const periodoMes = periodoMesAtual();
-  const periodoSemestre = periodoSemestreAtual();
-  const mesAtivo = filtros.de === periodoMes.de && filtros.ate === periodoMes.ate;
-  const semestreAtivo =
-    filtros.de === periodoSemestre.de && filtros.ate === periodoSemestre.ate;
+  if (filtros.id_destinatarios.length > 0) {
+    query.set("destinatario", filtros.id_destinatarios.join(","));
+  }
+  if (filtros.id_fornecedores.length > 0) {
+    query.set("fornecedor", filtros.id_fornecedores.join(","));
+  }
+  if (filtros.tipos.length > 0) query.set("tipo", filtros.tipos.join(","));
 
   return (
     <DashboardLayout title="Relatórios">
@@ -110,111 +148,17 @@ export default async function RelatorioMovimentacaoPage({
         </div>
       </div>
 
-      <form
-        method="get"
-        action="/relatorios/movimentacao"
-        className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-border p-4"
+      <div
+        className="rounded-xl border border-border bg-white p-4"
         data-print-hide
       >
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          De
-          <input
-            type="date"
-            name="de"
-            defaultValue={filtros.de}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Até
-          <input
-            type="date"
-            name="ate"
-            defaultValue={filtros.ate}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Destinatário
-          <select
-            name="destinatario"
-            defaultValue={filtros.id_destinatario ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os destinatários</option>
-            {destinatarios.map((d) => (
-              <option key={d.id_destinatario} value={d.id_destinatario}>
-                {d.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Fornecedor
-          <select
-            name="fornecedor"
-            defaultValue={filtros.id_fornecedor ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os fornecedores</option>
-            {fornecedores.map((f) => (
-              <option key={f.id_fornecedor} value={f.id_fornecedor}>
-                {f.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Produto
-          <select
-            name="produto"
-            defaultValue={filtros.id_produto ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os produtos</option>
-            {produtoForaDaLista && (
-              <option value={produtoForaDaLista.id_produto}>
-                {produtoForaDaLista.codigo} - {produtoForaDaLista.descricao}
-              </option>
-            )}
-            {produtos.map((p) => (
-              <option key={p.id_produto} value={p.id_produto}>
-                {p.codigo} - {p.descricao}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Tipo
-          <select
-            name="tipo"
-            defaultValue={filtros.tipo}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="todos">Todas</option>
-            <option value="entrada">Entradas</option>
-            <option value="saida">Saídas</option>
-          </select>
-        </label>
-        <Button label="Filtrar" type="submit" />
-        <div className="flex items-center gap-3 text-sm mb-2.5">
-          <span className="text-[#697077]">Período:</span>
-          <Link
-            href={linkDoPeriodo(periodoMes)}
-            aria-current={mesAtivo ? "true" : undefined}
-            className={mesAtivo ? "font-semibold text-brand" : "text-brand underline"}
-          >
-            Mês atual
-          </Link>
-          <Link
-            href={linkDoPeriodo(periodoSemestre)}
-            aria-current={semestreAtivo ? "true" : undefined}
-            className={semestreAtivo ? "font-semibold text-brand" : "text-brand underline"}
-          >
-            Semestre atual
-          </Link>
-        </div>
-      </form>
+        <BarraFiltros
+          key={JSON.stringify(valores)}
+          basePath="/relatorios/movimentacao"
+          campos={campos}
+          valores={valores}
+        />
+      </div>
 
       <div className="relatorio-scroll">
         <div className="relatorio-container">
@@ -222,13 +166,26 @@ export default async function RelatorioMovimentacaoPage({
             <header className="relatorio-header">
               <h1 className="titulo-relatorio">{titulo}</h1>
               <div className="meta-info">
-                {produto && (
+                {produtosSelecionados.length > 0 && (
                   <p>
-                    Produto: {produto.codigo} - {produto.descricao}
+                    {extrato ? "Produto" : "Produtos"}:{" "}
+                    {produtosSelecionados
+                      .map((p) => `${p.codigo} - ${p.descricao}`)
+                      .join(", ")}
                   </p>
                 )}
-                {destinatario && <p>Destinatário: {destinatario.nome}</p>}
-                {fornecedor && <p>Fornecedor: {fornecedor.nome}</p>}
+                {destinatariosSelecionados.length > 0 && (
+                  <p>
+                    Destinatário{destinatariosSelecionados.length === 1 ? "" : "s"}:{" "}
+                    {destinatariosSelecionados.map((d) => d.nome).join(", ")}
+                  </p>
+                )}
+                {fornecedoresSelecionados.length > 0 && (
+                  <p>
+                    Fornecedor{fornecedoresSelecionados.length === 1 ? "" : "es"}:{" "}
+                    {fornecedoresSelecionados.map((f) => f.nome).join(", ")}
+                  </p>
+                )}
                 <p>
                   Período: {formatarDataISO(filtros.de)} a {formatarDataISO(filtros.ate)}
                 </p>

@@ -20,16 +20,16 @@ export async function GET(request: Request) {
   const { data, filtros } = await relatorioService.listarMovimentacoes({
     de: url.searchParams.get("de"),
     ate: url.searchParams.get("ate"),
-    produto: url.searchParams.get("produto"),
-    destinatario: url.searchParams.get("destinatario"),
-    fornecedor: url.searchParams.get("fornecedor"),
-    tipo: url.searchParams.get("tipo"),
+    produto: url.searchParams.getAll("produto"),
+    destinatario: url.searchParams.getAll("destinatario"),
+    fornecedor: url.searchParams.getAll("fornecedor"),
+    tipo: url.searchParams.getAll("tipo"),
   });
 
   const nome =
-    filtros.id_produto === null
-      ? "movimentacoes"
-      : `extrato-produto-${filtros.id_produto}`;
+    filtros.id_produtos.length === 1
+      ? `extrato-produto-${filtros.id_produtos[0]}`
+      : "movimentacoes";
 
   return new Response(gerarCsvMovimentacoes(data), {
     headers: {

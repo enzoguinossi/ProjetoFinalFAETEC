@@ -20,8 +20,8 @@ export async function GET(request: Request) {
   const { data } = await relatorioService.listarEntregas({
     de: url.searchParams.get("de"),
     ate: url.searchParams.get("ate"),
-    destinatario: url.searchParams.get("destinatario"),
-    status: url.searchParams.get("status"),
+    destinatario: url.searchParams.getAll("destinatario"),
+    status: url.searchParams.getAll("status"),
   });
 
   return new Response(gerarCsvEntregas(data), {

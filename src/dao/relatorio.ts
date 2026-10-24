@@ -29,7 +29,8 @@ export type ProdutosRelatorioFiltros = {
   situacao?: SituacaoProdutoRelatorio;
 };
 
-export const TIPOS_MOVIMENTACAO_RELATORIO = ["todos", "entrada", "saida"] as const;
+/** Tipos de movimentação que podem ser filtrados na Movimentação (lista vazia = todos). */
+export const TIPOS_MOVIMENTACAO_RELATORIO = ["entrada", "saida"] as const;
 export type TipoMovimentacaoRelatorio = (typeof TIPOS_MOVIMENTACAO_RELATORIO)[number];
 
 /** Tipo como aparece no relatório: o ajuste é a movimentação sem nota vinculada. */
@@ -66,13 +67,14 @@ export type MovimentacoesRelatorioFiltros = {
   de?: Date;
   /** Limite superior (inclusivo). */
   ate?: Date;
-  id_produto?: number | null;
-  /** Restringe às movimentações da nota de saída do destinatário. */
-  id_destinatario?: number | null;
-  /** Restringe às movimentações da nota de entrada do fornecedor. */
-  id_fornecedor?: number | null;
-  /** `entrada` = tem nota de entrada, `saida` = tem nota de saída, `todos` = tudo. */
-  tipo?: TipoMovimentacaoRelatorio;
+  /** Produtos selecionados; vazio não filtra. */
+  id_produtos?: number[];
+  /** Restringe às movimentações das notas de saída destes destinatários. */
+  id_destinatarios?: number[];
+  /** Restringe às movimentações das notas de entrada destes fornecedores. */
+  id_fornecedores?: number[];
+  /** `entrada` = tem nota de entrada, `saida` = tem nota de saída; vazio = tudo. */
+  tipos?: TipoMovimentacaoRelatorio[];
 };
 
 export type ProdutoFiltroRelatorio = {
@@ -92,7 +94,6 @@ export type FornecedorFiltroRelatorio = {
 };
 
 export const STATUS_EXPEDICAO_RELATORIO = [
-  "todas",
   "PLANEJADA",
   "EM_PERCURSO",
   "CONCLUIDA",
@@ -100,7 +101,6 @@ export const STATUS_EXPEDICAO_RELATORIO = [
 export type StatusExpedicaoRelatorio = (typeof STATUS_EXPEDICAO_RELATORIO)[number];
 
 export const STATUS_NOTA_RELATORIO = [
-  "todos",
   "PENDENTE",
   "BAIXA_TOTAL",
   "BAIXA_PARCIAL",
@@ -154,11 +154,14 @@ export type ExpedicoesRelatorioFiltros = {
   de?: Date | null;
   /** Limite superior do dia de `data_prevista` (meia-noite UTC), inclusivo. */
   ate?: Date | null;
-  id_expedicao?: number | null;
-  /** Restringe às expedições com alguma nota do destinatário. */
-  id_destinatario?: number | null;
-  id_condutor?: number | null;
-  status?: StatusExpedicaoRelatorio;
+  /** Expedições selecionadas; vazio não filtra. */
+  id_expedicoes?: number[];
+  /** Restringe às expedições com alguma nota dos destinatários. */
+  id_destinatarios?: number[];
+  /** Condutores selecionados; vazio não filtra. */
+  id_condutores?: number[];
+  /** Status selecionados; vazio não filtra. */
+  status?: StatusExpedicaoRelatorio[];
 };
 
 export type EntregaRelatorioRow = {
@@ -188,8 +191,10 @@ export type EntregasRelatorioFiltros = {
   de?: Date | null;
   /** Limite superior (inclusivo). */
   ate?: Date | null;
-  id_destinatario?: number | null;
-  status?: StatusNotaRelatorio;
+  /** Destinatários selecionados; vazio não filtra. */
+  id_destinatarios?: number[];
+  /** Status da nota selecionados; vazio não filtra. */
+  status?: StatusNotaRelatorio[];
 };
 
 export type ExpedicaoFiltroRelatorio = {
@@ -291,16 +296,23 @@ export class RelatorioDAO {
       if (filtros.de) where.data_hora.gte = filtros.de;
       if (filtros.ate) where.data_hora.lte = filtros.ate;
     }
-    if (filtros.id_produto) where.estoque = { id_produto: filtros.id_produto };
-    if (filtros.id_destinatario) {
-      where.notaSaida = { id_destinatario: filtros.id_destinatario };
+    if (filtros.id_produtos?.length) {
+      where.estoque = { id_produto: { in: filtros.id_produtos } };
     }
-    if (filtros.id_fornecedor) {
-      where.notaEntrada = { id_fornecedor: filtros.id_fornecedor };
+    if (filtros.id_destinatarios?.length) {
+      where.notaSaida = { id_destinatario: { in: filtros.id_destinatarios } };
+    }
+    if (filtros.id_fornecedores?.length) {
+      where.notaEntrada = { id_fornecedor: { in: filtros.id_fornecedores } };
     }
 
-    if (filtros.tipo === "entrada") where.id_nota_entrada = { not: null };
-    if (filtros.tipo === "saida") where.id_nota_saida = { not: null };
+    const tipos = filtros.tipos ?? [];
+    if (tipos.length === 1) {
+      where[tipos[0] === "entrada" ? "id_nota_entrada" : "id_nota_saida"] = { not: null };
+    } else if (tipos.length > 1) {
+      // Entrada e saída selecionadas: união das duas — o ajuste (sem nota) fica fora.
+      where.OR = [{ id_nota_entrada: { not: null } }, { id_nota_saida: { not: null } }];
+    }
 
     const movimentacoes = await prisma.movimentacaoEstoque.findMany({
       where,
@@ -393,10 +405,12 @@ export class RelatorioDAO {
     };
   }
 
-  /** Produtos ativos para o select de filtro do relatório. */
-  async listarProdutosAtivos(): Promise<ProdutoFiltroRelatorio[]> {
+  /** Produtos ativos para o filtro, mantendo os selecionados mesmo inativos. */
+  async listarProdutosAtivos(incluirIds: number[] = []): Promise<ProdutoFiltroRelatorio[]> {
     const produtos = await prisma.produto.findMany({
-      where: { ativo: true },
+      where: incluirIds.length
+        ? { OR: [{ ativo: true }, { id_produto: { in: incluirIds } }] }
+        : { ativo: true },
       select: { id_produto: true, descricao: true },
       orderBy: { descricao: "asc" },
     });
@@ -409,15 +423,16 @@ export class RelatorioDAO {
   }
 
   /**
-   * Destinatários ativos para o select de filtro, por razão social. O
-   * destinatário do filtro corrente entra mesmo inativo, para o select não
-   * perder a seleção.
+   * Destinatários ativos para o filtro, por razão social. Os selecionados
+   * entram mesmo inativos, para o filtro não perder a seleção.
    */
   async listarDestinatariosParaFiltro(
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<DestinatarioFiltroRelatorio[]> {
     const destinatarios = await prisma.destinatario.findMany({
-      where: incluirId ? { OR: [{ ativo: true }, { id_destinatario: incluirId }] } : { ativo: true },
+      where: incluirIds.length
+        ? { OR: [{ ativo: true }, { id_destinatario: { in: incluirIds } }] }
+        : { ativo: true },
       select: {
         id_destinatario: true,
         pessoaJuridica: { select: { razao_social: true } },
@@ -431,12 +446,14 @@ export class RelatorioDAO {
     }));
   }
 
-  /** Fornecedores ativos para o select de filtro, por razão social (mesma regra do destinatário). */
+  /** Fornecedores ativos para o filtro, por razão social (mesma regra do destinatário). */
   async listarFornecedoresParaFiltro(
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<FornecedorFiltroRelatorio[]> {
     const fornecedores = await prisma.fornecedor.findMany({
-      where: incluirId ? { OR: [{ ativo: true }, { id_fornecedor: incluirId }] } : { ativo: true },
+      where: incluirIds.length
+        ? { OR: [{ ativo: true }, { id_fornecedor: { in: incluirIds } }] }
+        : { ativo: true },
       select: {
         id_fornecedor: true,
         pessoaJuridica: { select: { razao_social: true } },
@@ -480,12 +497,18 @@ export class RelatorioDAO {
       if (filtros.de) where.data_prevista.gte = filtros.de;
       if (filtros.ate) where.data_prevista.lte = filtros.ate;
     }
-    if (filtros.id_expedicao) where.id_expedicao = filtros.id_expedicao;
-    if (filtros.id_condutor) where.id_funcionario_condutor = filtros.id_condutor;
-    if (filtros.id_destinatario) {
-      where.notas = { some: { notaSaida: { id_destinatario: filtros.id_destinatario } } };
+    if (filtros.id_expedicoes?.length) {
+      where.id_expedicao = { in: filtros.id_expedicoes };
     }
-    if (filtros.status && filtros.status !== "todas") where.status = filtros.status;
+    if (filtros.id_condutores?.length) {
+      where.id_funcionario_condutor = { in: filtros.id_condutores };
+    }
+    if (filtros.id_destinatarios?.length) {
+      where.notas = {
+        some: { notaSaida: { id_destinatario: { in: filtros.id_destinatarios } } },
+      };
+    }
+    if (filtros.status?.length) where.status = { in: filtros.status };
 
     const expedicoes = await prisma.expedicao.findMany({
       where,
@@ -572,8 +595,10 @@ export class RelatorioDAO {
       if (filtros.de) where.data_criacao.gte = filtros.de;
       if (filtros.ate) where.data_criacao.lte = filtros.ate;
     }
-    if (filtros.id_destinatario) where.id_destinatario = filtros.id_destinatario;
-    if (filtros.status && filtros.status !== "todos") where.status = filtros.status;
+    if (filtros.id_destinatarios?.length) {
+      where.id_destinatario = { in: filtros.id_destinatarios };
+    }
+    if (filtros.status?.length) where.status = { in: filtros.status };
 
     const notas = await prisma.notaSaida.findMany({
       where,
@@ -637,14 +662,14 @@ export class RelatorioDAO {
   }
 
   /**
-   * Expedições do período para o select de filtro, por data prevista
-   * decrescente. Sem período, todas as ativas. A expedição selecionada entra
-   * mesmo fora do período ou inativa, para o select não perder a seleção.
+   * Expedições do período para o filtro, por data prevista decrescente. Sem
+   * período, todas as ativas. As expedições selecionadas entram mesmo fora do
+   * período ou inativas, para o filtro não perder a seleção.
    */
   async listarExpedicoesParaFiltro(opts: {
     de?: Date | null;
     ate?: Date | null;
-    incluirId?: number | null;
+    incluirIds?: number[];
   } = {}): Promise<ExpedicaoFiltroRelatorio[]> {
     const periodo: Prisma.ExpedicaoWhereInput = { ativo: true };
     if (opts.de || opts.ate) {
@@ -654,8 +679,8 @@ export class RelatorioDAO {
     }
 
     const expedicoes = await prisma.expedicao.findMany({
-      where: opts.incluirId
-        ? { OR: [periodo, { id_expedicao: opts.incluirId }] }
+      where: opts.incluirIds?.length
+        ? { OR: [periodo, { id_expedicao: { in: opts.incluirIds } }] }
         : periodo,
       select: {
         id_expedicao: true,
@@ -675,11 +700,11 @@ export class RelatorioDAO {
 
   /** Condutores ativos (funcionário com `condutor = true`), por nome. */
   async listarCondutoresParaFiltro(
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<CondutorFiltroRelatorio[]> {
     const condutores = await prisma.funcionario.findMany({
-      where: incluirId
-        ? { OR: [{ ativo: true, condutor: true }, { id_funcionario: incluirId }] }
+      where: incluirIds.length
+        ? { OR: [{ ativo: true, condutor: true }, { id_funcionario: { in: incluirIds } }] }
         : { ativo: true, condutor: true },
       select: {
         id_funcionario: true,

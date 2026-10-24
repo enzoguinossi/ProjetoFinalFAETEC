@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import Button from "@/components/Button";
+import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { STATUS_EXPEDICAO_RELATORIO } from "@/dao/relatorio";
 import {
   formatarDataISO,
   metadadosEmissao,
@@ -40,34 +42,87 @@ export default async function RelatorioExpedicoesPage({
   const [expedicoes, destinatarios, condutores] = await Promise.all([
     relatorioService.expedicoesParaFiltro(
       { de: filtros.de, ate: filtros.ate },
-      filtros.id_expedicao,
+      filtros.id_expedicoes,
     ),
-    relatorioService.destinatariosParaFiltro(filtros.id_destinatario),
-    relatorioService.condutoresParaFiltro(filtros.id_condutor),
+    relatorioService.destinatariosParaFiltro(filtros.id_destinatarios),
+    relatorioService.condutoresParaFiltro(filtros.id_condutores),
   ]);
-  const expedicao =
-    expedicoes.find((e) => e.id_expedicao === filtros.id_expedicao) ?? null;
-  const destinatario =
-    destinatarios.find((d) => d.id_destinatario === filtros.id_destinatario) ?? null;
-  const condutor =
-    condutores.find((c) => c.id_funcionario === filtros.id_condutor) ?? null;
+  const expedicoesSelecionadas = expedicoes.filter((e) =>
+    filtros.id_expedicoes.includes(e.id_expedicao),
+  );
+  const destinatariosSelecionados = destinatarios.filter((d) =>
+    filtros.id_destinatarios.includes(d.id_destinatario),
+  );
+  const condutoresSelecionados = condutores.filter((c) =>
+    filtros.id_condutores.includes(c.id_funcionario),
+  );
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
-  const query = new URLSearchParams({
-    de: filtros.de,
-    ate: filtros.ate,
-    status: filtros.status,
-  });
-  if (filtros.id_expedicao !== null) {
-    query.set("expedicao", String(filtros.id_expedicao));
+  const campos: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    {
+      id: "expedicao",
+      rotulo: "Expedição",
+      tipo: "multi",
+      opcoes: expedicoes.map((e) => ({
+        valor: String(e.id_expedicao),
+        rotulo: `${e.codigo} - ${formatarDataISO(e.data_prevista)} - ${e.veiculo}`,
+      })),
+    },
+    {
+      id: "destinatario",
+      rotulo: "Destinatário",
+      tipo: "multi",
+      opcoes: destinatarios.map((d) => ({
+        valor: String(d.id_destinatario),
+        rotulo: d.nome,
+      })),
+    },
+    {
+      id: "condutor",
+      rotulo: "Condutor",
+      tipo: "multi",
+      opcoes: condutores.map((c) => ({
+        valor: String(c.id_funcionario),
+        rotulo: c.nome,
+      })),
+    },
+    {
+      id: "status",
+      rotulo: "Status",
+      tipo: "multi",
+      opcoes: STATUS_EXPEDICAO_RELATORIO.map((status) => ({
+        valor: status,
+        rotulo: rotuloStatusExpedicao(status),
+      })),
+    },
+  ];
+
+  const valores = {
+    periodo: { de: filtros.de, ate: filtros.ate },
+    expedicao: filtros.id_expedicoes.map(String),
+    destinatario: filtros.id_destinatarios.map(String),
+    condutor: filtros.id_condutores.map(String),
+    status: [...filtros.status],
+  };
+
+  const query = new URLSearchParams({ de: filtros.de, ate: filtros.ate });
+  if (filtros.id_expedicoes.length > 0) {
+    query.set("expedicao", filtros.id_expedicoes.join(","));
   }
-  if (filtros.id_destinatario !== null) {
-    query.set("destinatario", String(filtros.id_destinatario));
+  if (filtros.id_destinatarios.length > 0) {
+    query.set("destinatario", filtros.id_destinatarios.join(","));
   }
-  if (filtros.id_condutor !== null) {
-    query.set("condutor", String(filtros.id_condutor));
+  if (filtros.id_condutores.length > 0) {
+    query.set("condutor", filtros.id_condutores.join(","));
   }
+  if (filtros.status.length > 0) query.set("status", filtros.status.join(","));
+
+  const statusTexto =
+    filtros.status.length === 0
+      ? "Todas"
+      : filtros.status.map(rotuloStatusExpedicao).join(", ");
 
   return (
     <DashboardLayout title="Relatórios">
@@ -90,90 +145,14 @@ export default async function RelatorioExpedicoesPage({
         </div>
       </div>
 
-      <form
-        method="get"
-        action="/relatorios/expedicoes"
-        className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-border p-4"
-        data-print-hide
-      >
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          De
-          <input
-            type="date"
-            name="de"
-            defaultValue={filtros.de}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Até
-          <input
-            type="date"
-            name="ate"
-            defaultValue={filtros.ate}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Expedição
-          <select
-            name="expedicao"
-            defaultValue={filtros.id_expedicao ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todas as expedições</option>
-            {expedicoes.map((e) => (
-              <option key={e.id_expedicao} value={e.id_expedicao}>
-                {e.codigo} - {formatarDataISO(e.data_prevista)} - {e.veiculo}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Destinatário
-          <select
-            name="destinatario"
-            defaultValue={filtros.id_destinatario ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os destinatários</option>
-            {destinatarios.map((d) => (
-              <option key={d.id_destinatario} value={d.id_destinatario}>
-                {d.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Condutor
-          <select
-            name="condutor"
-            defaultValue={filtros.id_condutor ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os condutores</option>
-            {condutores.map((c) => (
-              <option key={c.id_funcionario} value={c.id_funcionario}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Status
-          <select
-            name="status"
-            defaultValue={filtros.status}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="todas">Todas</option>
-            <option value="PLANEJADA">Planejada</option>
-            <option value="EM_PERCURSO">Em percurso</option>
-            <option value="CONCLUIDA">Concluída</option>
-          </select>
-        </label>
-        <Button label="Filtrar" type="submit" />
-      </form>
+      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+        <BarraFiltros
+          key={JSON.stringify(valores)}
+          basePath="/relatorios/expedicoes"
+          campos={campos}
+          valores={valores}
+        />
+      </div>
 
       <div className="relatorio-scroll">
         <div className="relatorio-container">
@@ -181,10 +160,25 @@ export default async function RelatorioExpedicoesPage({
             <header className="relatorio-header">
               <h1 className="titulo-relatorio">Expedições por Período</h1>
               <div className="meta-info">
-                {expedicao && <p>Expedição: {expedicao.codigo}</p>}
-                {destinatario && <p>Destinatário: {destinatario.nome}</p>}
-                {condutor && <p>Condutor: {condutor.nome}</p>}
-                <p>Status: {rotuloStatusExpedicao(filtros.status)}</p>
+                {expedicoesSelecionadas.length > 0 && (
+                  <p>
+                    {expedicoesSelecionadas.length === 1 ? "Expedição" : "Expedições"}:{" "}
+                    {expedicoesSelecionadas.map((e) => e.codigo).join(", ")}
+                  </p>
+                )}
+                {destinatariosSelecionados.length > 0 && (
+                  <p>
+                    Destinatário{destinatariosSelecionados.length === 1 ? "" : "s"}:{" "}
+                    {destinatariosSelecionados.map((d) => d.nome).join(", ")}
+                  </p>
+                )}
+                {condutoresSelecionados.length > 0 && (
+                  <p>
+                    Condutor{condutoresSelecionados.length === 1 ? "" : "es"}:{" "}
+                    {condutoresSelecionados.map((c) => c.nome).join(", ")}
+                  </p>
+                )}
+                <p>Status: {statusTexto}</p>
                 <p>
                   Período: {formatarDataISO(filtros.de)} a {formatarDataISO(filtros.ate)}
                 </p>

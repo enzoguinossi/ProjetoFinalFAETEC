@@ -91,10 +91,10 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_produto: null,
-        id_destinatario: null,
-        id_fornecedor: null,
-        tipo: "todos",
+        id_produtos: [],
+        id_destinatarios: [],
+        id_fornecedores: [],
+        tipos: [],
       });
     });
 
@@ -105,35 +105,35 @@ describe("serviço de relatórios", () => {
       ).toMatchObject({ de: "2026-10-01", ate: "2026-10-31" });
     });
 
-    it("aceita período, produto, destinatário, fornecedor e tipo, inclusive em array", () => {
+    it("aceita período e listas de ids/tipos, repetidos ou separados por vírgula", () => {
       expect(
         normalizarFiltrosMovimentacao({
           de: "2026-09-01",
           ate: "2026-09-30",
-          produto: "7",
-          destinatario: "3",
+          produto: "7,8",
+          destinatario: ["3", "4,3"],
           fornecedor: ["5", "6"],
           tipo: ["saida", "entrada"],
         }),
       ).toEqual({
         de: "2026-09-01",
         ate: "2026-09-30",
-        id_produto: 7,
-        id_destinatario: 3,
-        id_fornecedor: 5,
-        tipo: "saida",
+        id_produtos: [7, 8],
+        id_destinatarios: [3, 4],
+        id_fornecedores: [5, 6],
+        tipos: ["saida", "entrada"],
       });
     });
 
-    it("ignora data, produto, destinatário, fornecedor e tipo inválidos", () => {
+    it("ignora data, ids e tipos inválidos", () => {
       expect(
         normalizarFiltrosMovimentacao(
           {
             de: "2026-02-30",
             ate: "ontem",
-            produto: "abc",
+            produto: "abc,0",
             destinatario: "0",
-            fornecedor: "-2",
+            fornecedor: "-2,3",
             tipo: "qualquer",
           },
           new Date("2026-10-24T15:30:00.000Z"),
@@ -141,10 +141,10 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_produto: null,
-        id_destinatario: null,
-        id_fornecedor: null,
-        tipo: "todos",
+        id_produtos: [],
+        id_destinatarios: [],
+        id_fornecedores: [3],
+        tipos: [],
       });
     });
 
@@ -237,19 +237,19 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_expedicao: null,
-        id_destinatario: null,
-        id_condutor: null,
-        status: "todas",
+        id_expedicoes: [],
+        id_destinatarios: [],
+        id_condutores: [],
+        status: [],
       });
     });
 
-    it("aceita período, expedição, destinatário, condutor e status, inclusive em array", () => {
+    it("aceita período e listas de ids/status, repetidos ou separados por vírgula", () => {
       expect(
         normalizarFiltrosExpedicoes({
           de: "2026-09-01",
           ate: "2026-09-30",
-          expedicao: "4",
+          expedicao: "4,5",
           destinatario: ["3", "5"],
           condutor: "7",
           status: ["EM_PERCURSO", "CONCLUIDA"],
@@ -257,10 +257,10 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-09-01",
         ate: "2026-09-30",
-        id_expedicao: 4,
-        id_destinatario: 3,
-        id_condutor: 7,
-        status: "EM_PERCURSO",
+        id_expedicoes: [4, 5],
+        id_destinatarios: [3, 5],
+        id_condutores: [7],
+        status: ["EM_PERCURSO", "CONCLUIDA"],
       });
     });
 
@@ -273,17 +273,17 @@ describe("serviço de relatórios", () => {
             expedicao: "abc",
             destinatario: "0",
             condutor: "-2",
-            status: "qualquer",
+            status: "qualquer,todas",
           },
           new Date("2026-10-24T15:30:00.000Z"),
         ),
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_expedicao: null,
-        id_destinatario: null,
-        id_condutor: null,
-        status: "todas",
+        id_expedicoes: [],
+        id_destinatarios: [],
+        id_condutores: [],
+        status: [],
       });
     });
   });
@@ -295,28 +295,28 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_destinatario: null,
-        status: "todos",
+        id_destinatarios: [],
+        status: [],
       });
     });
 
-    it("aceita período, destinatário e status, inclusive em array", () => {
+    it("aceita período, destinatários e status, repetidos ou separados por vírgula", () => {
       expect(
         normalizarFiltrosEntregas({
           de: "2026-09-01",
           ate: "2026-09-30",
-          destinatario: ["8", "9"],
+          destinatario: ["8", "9,8"],
           status: ["BAIXA_PARCIAL", "PENDENTE"],
         }),
       ).toEqual({
         de: "2026-09-01",
         ate: "2026-09-30",
-        id_destinatario: 8,
-        status: "BAIXA_PARCIAL",
+        id_destinatarios: [8, 9],
+        status: ["BAIXA_PARCIAL", "PENDENTE"],
       });
     });
 
-    it("ignora data, destinatário e status inválidos", () => {
+    it("ignora data, destinatários e status inválidos", () => {
       expect(
         normalizarFiltrosEntregas(
           {
@@ -330,8 +330,8 @@ describe("serviço de relatórios", () => {
       ).toEqual({
         de: "2026-10-01",
         ate: "2026-10-31",
-        id_destinatario: null,
-        status: "todos",
+        id_destinatarios: [],
+        status: [],
       });
     });
   });
@@ -348,9 +348,7 @@ describe("serviço de relatórios", () => {
       expect(formatarDataRelatorio(new Date("2026-10-24T15:30:00.000Z"))).toBe(
         "24/10/2026",
       );
-      expect(rotuloStatusExpedicao("todas")).toBe("Todas");
       expect(rotuloStatusExpedicao("EM_PERCURSO")).toBe("Em percurso");
-      expect(rotuloStatusNota("todos")).toBe("Todos");
       expect(rotuloStatusNota("BAIXA_COM_CORTE")).toBe("Baixa com corte");
     });
 

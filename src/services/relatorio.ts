@@ -46,10 +46,14 @@ export type FiltrosMovimentacao = {
   de: string;
   /** Data final (`YYYY-MM-DD`), inclusiva. */
   ate: string;
-  id_produto: number | null;
-  id_destinatario: number | null;
-  id_fornecedor: number | null;
-  tipo: TipoMovimentacaoRelatorio;
+  /** Produtos selecionados; lista vazia não filtra. */
+  id_produtos: number[];
+  /** Destinatários selecionados; lista vazia não filtra. */
+  id_destinatarios: number[];
+  /** Fornecedores selecionados; lista vazia não filtra. */
+  id_fornecedores: number[];
+  /** Tipos selecionados; lista vazia não filtra (inclui ajustes). */
+  tipos: TipoMovimentacaoRelatorio[];
 };
 
 export type FiltrosExpedicoes = {
@@ -57,10 +61,14 @@ export type FiltrosExpedicoes = {
   de: string;
   /** Data final de `data_prevista` (`YYYY-MM-DD`), inclusiva. */
   ate: string;
-  id_expedicao: number | null;
-  id_destinatario: number | null;
-  id_condutor: number | null;
-  status: StatusExpedicaoRelatorio;
+  /** Expedições selecionadas; lista vazia não filtra. */
+  id_expedicoes: number[];
+  /** Destinatários selecionados; lista vazia não filtra. */
+  id_destinatarios: number[];
+  /** Condutores selecionados; lista vazia não filtra. */
+  id_condutores: number[];
+  /** Status selecionados; lista vazia não filtra. */
+  status: StatusExpedicaoRelatorio[];
 };
 
 export type FiltrosEntregas = {
@@ -68,8 +76,10 @@ export type FiltrosEntregas = {
   de: string;
   /** Data final de `nota_saida.data_criacao` (`YYYY-MM-DD`), inclusiva. */
   ate: string;
-  id_destinatario: number | null;
-  status: StatusNotaRelatorio;
+  /** Destinatários selecionados; lista vazia não filtra. */
+  id_destinatarios: number[];
+  /** Status da nota selecionados; lista vazia não filtra. */
+  status: StatusNotaRelatorio[];
 };
 
 /** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
@@ -147,10 +157,45 @@ function idPositivo(bruto: string): number | null {
 }
 
 /**
+ * Quebra um parâmetro de filtro em valores: aceita o parâmetro repetido
+ * (`?produto=1&produto=2`) ou uma lista separada por vírgula (`?produto=1,2`).
+ */
+function listaDeValores(valor: string | string[] | null | undefined): string[] {
+  if (valor === null || valor === undefined) return [];
+  const partes = Array.isArray(valor) ? valor : [valor];
+  return partes
+    .flatMap((parte) => parte.split(","))
+    .map((parte) => parte.trim())
+    .filter((parte) => parte.length > 0);
+}
+
+/** Ids positivos, sem repetição, na ordem em que aparecem. */
+function idsNormalizados(valor: string | string[] | null | undefined): number[] {
+  const ids = new Set<number>();
+  for (const bruto of listaDeValores(valor)) {
+    const id = idPositivo(bruto);
+    if (id !== null) ids.add(id);
+  }
+  return [...ids];
+}
+
+/** Valores aceitos pelo domínio, sem repetição; desconhecidos são ignorados. */
+function opcoesNormalizadas<T extends string>(
+  valor: string | string[] | null | undefined,
+  permitidos: readonly T[],
+): T[] {
+  const opcoes = new Set<T>();
+  for (const bruto of listaDeValores(valor)) {
+    if (permitidos.includes(bruto as T)) opcoes.add(bruto as T);
+  }
+  return [...opcoes];
+}
+
+/**
  * Normaliza os filtros da Movimentação de Estoque. Data vazia ou inválida cai
  * no mês corrente (fuso de São Paulo) — `de` no dia 1 e `ate` no último dia.
- * Tipo inválido cai em `todos`; produto, destinatário e fornecedor
- * vazios/inválidos não filtram.
+ * Produto, destinatário, fornecedor e tipo aceitam múltiplos valores (repetidos
+ * ou separados por vírgula); lista vazia não filtra.
  */
 export function normalizarFiltrosMovimentacao(
   params: {
@@ -170,20 +215,20 @@ export function normalizarFiltrosMovimentacao(
   const de = dataValida(deBruto) ? deBruto : dePadrao;
   const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
 
-  const id_produto = idPositivo(primeiro(params.produto).trim());
-  const id_destinatario = idPositivo(primeiro(params.destinatario).trim());
-  const id_fornecedor = idPositivo(primeiro(params.fornecedor).trim());
-
-  const tipoBruto = primeiro(params.tipo).trim() as TipoMovimentacaoRelatorio;
-  const tipo = TIPOS_MOVIMENTACAO_RELATORIO.includes(tipoBruto) ? tipoBruto : "todos";
-
-  return { de, ate, id_produto, id_destinatario, id_fornecedor, tipo };
+  return {
+    de,
+    ate,
+    id_produtos: idsNormalizados(params.produto),
+    id_destinatarios: idsNormalizados(params.destinatario),
+    id_fornecedores: idsNormalizados(params.fornecedor),
+    tipos: opcoesNormalizadas(params.tipo, TIPOS_MOVIMENTACAO_RELATORIO),
+  };
 }
 
 /**
  * Normaliza os filtros de Expedições por Período. Data vazia ou inválida cai no
- * mês corrente (fuso de São Paulo). Expedição, destinatário e condutor
- * vazios/inválidos não filtram; status inválido cai em `todas`.
+ * mês corrente (fuso de São Paulo). Expedições, destinatários e condutores
+ * aceitam múltiplos ids; status aceita múltiplos valores. Lista vazia não filtra.
  */
 export function normalizarFiltrosExpedicoes(
   params: {
@@ -203,25 +248,20 @@ export function normalizarFiltrosExpedicoes(
   const de = dataValida(deBruto) ? deBruto : dePadrao;
   const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
 
-  const statusBruto = primeiro(params.status).trim() as StatusExpedicaoRelatorio;
-  const status = STATUS_EXPEDICAO_RELATORIO.includes(statusBruto)
-    ? statusBruto
-    : "todas";
-
   return {
     de,
     ate,
-    id_expedicao: idPositivo(primeiro(params.expedicao).trim()),
-    id_destinatario: idPositivo(primeiro(params.destinatario).trim()),
-    id_condutor: idPositivo(primeiro(params.condutor).trim()),
-    status,
+    id_expedicoes: idsNormalizados(params.expedicao),
+    id_destinatarios: idsNormalizados(params.destinatario),
+    id_condutores: idsNormalizados(params.condutor),
+    status: opcoesNormalizadas(params.status, STATUS_EXPEDICAO_RELATORIO),
   };
 }
 
 /**
  * Normaliza os filtros de Entregas por Instituição. Período pelo mês corrente
- * quando vazio/inválido; destinatário vazio/inválido não filtra; status
- * inválido cai em `todos`.
+ * quando vazio/inválido; destinatários e status aceitam múltiplos valores.
+ * Lista vazia não filtra.
  */
 export function normalizarFiltrosEntregas(
   params: {
@@ -239,14 +279,11 @@ export function normalizarFiltrosEntregas(
   const de = dataValida(deBruto) ? deBruto : dePadrao;
   const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
 
-  const statusBruto = primeiro(params.status).trim() as StatusNotaRelatorio;
-  const status = STATUS_NOTA_RELATORIO.includes(statusBruto) ? statusBruto : "todos";
-
   return {
     de,
     ate,
-    id_destinatario: idPositivo(primeiro(params.destinatario).trim()),
-    status,
+    id_destinatarios: idsNormalizados(params.destinatario),
+    status: opcoesNormalizadas(params.status, STATUS_NOTA_RELATORIO),
   };
 }
 
@@ -310,14 +347,14 @@ export function formatarDataRelatorio(valor: Date): string {
   }).format(valor);
 }
 
-/** Rótulo do status de expedição, incluindo `todas` como "Todas". */
+/** Rótulo do status de expedição. */
 export function rotuloStatusExpedicao(status: StatusExpedicaoRelatorio): string {
-  return status === "todas" ? "Todas" : ROTULOS_STATUS_EXPEDICAO[status];
+  return ROTULOS_STATUS_EXPEDICAO[status];
 }
 
-/** Rótulo do status da nota, incluindo `todos` como "Todos". */
+/** Rótulo do status da nota. */
 export function rotuloStatusNota(status: StatusNotaRelatorio): string {
-  return status === "todos" ? "Todos" : ROTULOS_STATUS_NOTA[status];
+  return ROTULOS_STATUS_NOTA[status];
 }
 
 /** Metadados exibidos no cabeçalho do relatório impresso. */
@@ -506,10 +543,10 @@ export class RelatorioService {
     const resultado = await relatorioDAO.listarMovimentacoes({
       de,
       ate,
-      id_produto: filtros.id_produto,
-      id_destinatario: filtros.id_destinatario,
-      id_fornecedor: filtros.id_fornecedor,
-      tipo: filtros.tipo,
+      id_produtos: filtros.id_produtos,
+      id_destinatarios: filtros.id_destinatarios,
+      id_fornecedores: filtros.id_fornecedores,
+      tipos: filtros.tipos,
     });
     return { ...resultado, filtros };
   }
@@ -530,9 +567,9 @@ export class RelatorioService {
     const resultado = await relatorioDAO.listarExpedicoesRelatorio({
       de,
       ate,
-      id_expedicao: filtros.id_expedicao,
-      id_destinatario: filtros.id_destinatario,
-      id_condutor: filtros.id_condutor,
+      id_expedicoes: filtros.id_expedicoes,
+      id_destinatarios: filtros.id_destinatarios,
+      id_condutores: filtros.id_condutores,
       status: filtros.status,
     });
     return { ...resultado, filtros };
@@ -552,43 +589,47 @@ export class RelatorioService {
     const resultado = await relatorioDAO.listarEntregasRelatorio({
       de,
       ate,
-      id_destinatario: filtros.id_destinatario,
+      id_destinatarios: filtros.id_destinatarios,
       status: filtros.status,
     });
     return { ...resultado, filtros };
   }
 
-  /** Expedições do período para o select de filtro (mantém a selecionada). */
+  /** Expedições do período para o filtro (mantém as selecionadas). */
   async expedicoesParaFiltro(
     periodo: { de: string; ate: string },
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<ExpedicaoFiltroRelatorio[]> {
     const { de, ate } = limitesDoPeriodoData(periodo);
-    return relatorioDAO.listarExpedicoesParaFiltro({ de, ate, incluirId });
+    return relatorioDAO.listarExpedicoesParaFiltro({ de, ate, incluirIds });
   }
 
-  /** Condutores ativos para o select de filtro (mantém o selecionado). */
+  /** Condutores ativos para o filtro (mantém os selecionados). */
   async condutoresParaFiltro(
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<CondutorFiltroRelatorio[]> {
-    return relatorioDAO.listarCondutoresParaFiltro(incluirId);
+    return relatorioDAO.listarCondutoresParaFiltro(incluirIds);
   }
 
-  /** Produtos ativos para o select de filtro. */
-  async produtosParaFiltro(): Promise<ProdutoFiltroRelatorio[]> {
-    return relatorioDAO.listarProdutosAtivos();
+  /** Produtos ativos para o filtro (mantém os selecionados, mesmo inativos). */
+  async produtosParaFiltro(
+    incluirIds: number[] = [],
+  ): Promise<ProdutoFiltroRelatorio[]> {
+    return relatorioDAO.listarProdutosAtivos(incluirIds);
   }
 
-  /** Destinatários para o select de filtro (ativos + o selecionado, se inativo). */
+  /** Destinatários para o filtro (ativos + os selecionados, se inativos). */
   async destinatariosParaFiltro(
-    incluirId?: number | null,
+    incluirIds: number[] = [],
   ): Promise<DestinatarioFiltroRelatorio[]> {
-    return relatorioDAO.listarDestinatariosParaFiltro(incluirId);
+    return relatorioDAO.listarDestinatariosParaFiltro(incluirIds);
   }
 
-  /** Fornecedores para o select de filtro (ativos + o selecionado, se inativo). */
-  async fornecedoresParaFiltro(incluirId?: number | null): Promise<FornecedorFiltroRelatorio[]> {
-    return relatorioDAO.listarFornecedoresParaFiltro(incluirId);
+  /** Fornecedores para o filtro (ativos + os selecionados, se inativos). */
+  async fornecedoresParaFiltro(
+    incluirIds: number[] = [],
+  ): Promise<FornecedorFiltroRelatorio[]> {
+    return relatorioDAO.listarFornecedoresParaFiltro(incluirIds);
   }
 
   /** Produto do filtro (para o cabeçalho do Extrato de Produto). */

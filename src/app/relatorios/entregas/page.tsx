@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import DashboardLayout from "@/components/DashboardLayout";
 import Button from "@/components/Button";
+import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { STATUS_NOTA_RELATORIO } from "@/dao/relatorio";
 import {
   formatarDataISO,
   formatarDataRelatorio,
@@ -37,21 +39,52 @@ export default async function RelatorioEntregasPage({
     await searchParams,
   );
   const destinatarios = await relatorioService.destinatariosParaFiltro(
-    filtros.id_destinatario,
+    filtros.id_destinatarios,
   );
-  const destinatario =
-    destinatarios.find((d) => d.id_destinatario === filtros.id_destinatario) ?? null;
+  const destinatariosSelecionados = destinatarios.filter((d) =>
+    filtros.id_destinatarios.includes(d.id_destinatario),
+  );
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
-  const query = new URLSearchParams({
-    de: filtros.de,
-    ate: filtros.ate,
-    status: filtros.status,
-  });
-  if (filtros.id_destinatario !== null) {
-    query.set("destinatario", String(filtros.id_destinatario));
+  const campos: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    {
+      id: "destinatario",
+      rotulo: "Destinatário",
+      tipo: "multi",
+      opcoes: destinatarios.map((d) => ({
+        valor: String(d.id_destinatario),
+        rotulo: d.nome,
+      })),
+    },
+    {
+      id: "status",
+      rotulo: "Status",
+      tipo: "multi",
+      opcoes: STATUS_NOTA_RELATORIO.map((status) => ({
+        valor: status,
+        rotulo: rotuloStatusNota(status),
+      })),
+    },
+  ];
+
+  const valores = {
+    periodo: { de: filtros.de, ate: filtros.ate },
+    destinatario: filtros.id_destinatarios.map(String),
+    status: [...filtros.status],
+  };
+
+  const query = new URLSearchParams({ de: filtros.de, ate: filtros.ate });
+  if (filtros.id_destinatarios.length > 0) {
+    query.set("destinatario", filtros.id_destinatarios.join(","));
   }
+  if (filtros.status.length > 0) query.set("status", filtros.status.join(","));
+
+  const statusTexto =
+    filtros.status.length === 0
+      ? "Todos"
+      : filtros.status.map(rotuloStatusNota).join(", ");
 
   return (
     <DashboardLayout title="Relatórios">
@@ -76,64 +109,14 @@ export default async function RelatorioEntregasPage({
         </div>
       </div>
 
-      <form
-        method="get"
-        action="/relatorios/entregas"
-        className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-border p-4"
-        data-print-hide
-      >
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Destinatário
-          <select
-            name="destinatario"
-            defaultValue={filtros.id_destinatario ?? ""}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="">Todos os destinatários</option>
-            {destinatarios.map((d) => (
-              <option key={d.id_destinatario} value={d.id_destinatario}>
-                {d.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          De
-          <input
-            type="date"
-            name="de"
-            defaultValue={filtros.de}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Até
-          <input
-            type="date"
-            name="ate"
-            defaultValue={filtros.ate}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Status
-          <select
-            name="status"
-            defaultValue={filtros.status}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="todos">Todos</option>
-            <option value="PENDENTE">Pendente</option>
-            <option value="BAIXA_TOTAL">Baixa total</option>
-            <option value="BAIXA_PARCIAL">Baixa parcial</option>
-            <option value="BAIXA_COM_CORTE">Baixa com corte</option>
-            <option value="EM_PERCURSO">Em percurso</option>
-            <option value="ABERTA">Aberta</option>
-            <option value="CANCELADA">Cancelada</option>
-          </select>
-        </label>
-        <Button label="Filtrar" type="submit" />
-      </form>
+      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+        <BarraFiltros
+          key={JSON.stringify(valores)}
+          basePath="/relatorios/entregas"
+          campos={campos}
+          valores={valores}
+        />
+      </div>
 
       <div className="relatorio-scroll">
         <div className="relatorio-container">
@@ -141,8 +124,13 @@ export default async function RelatorioEntregasPage({
             <header className="relatorio-header">
               <h1 className="titulo-relatorio">Entregas por Instituição</h1>
               <div className="meta-info">
-                {destinatario && <p>Destinatário: {destinatario.nome}</p>}
-                <p>Status: {rotuloStatusNota(filtros.status)}</p>
+                {destinatariosSelecionados.length > 0 && (
+                  <p>
+                    Destinatário{destinatariosSelecionados.length === 1 ? "" : "s"}:{" "}
+                    {destinatariosSelecionados.map((d) => d.nome).join(", ")}
+                  </p>
+                )}
+                <p>Status: {statusTexto}</p>
                 <p>
                   Período: {formatarDataISO(filtros.de)} a {formatarDataISO(filtros.ate)}
                 </p>
