@@ -4,6 +4,7 @@ import {
   formatarDataISO,
   formatarDataRelatorio,
   formatarQuantidadeCsv,
+  gerarCsvAuditoria,
   gerarCsvDestinatarios,
   gerarCsvEntregas,
   gerarCsvExpedicoes,
@@ -15,6 +16,7 @@ import {
   limitesDoPeriodo,
   limitesDoPeriodoData,
   metadadosEmissao,
+  normalizarFiltrosAuditoria,
   normalizarFiltrosDestinatarios,
   normalizarFiltrosEntregas,
   normalizarFiltrosExpedicoes,
@@ -31,6 +33,7 @@ import {
   rotuloTipoDestinatario,
 } from "@/services/relatorio";
 import type {
+  AuditoriaRelatorioRow,
   DestinatarioRelatorioRow,
   EntregaRelatorioRow,
   ExpedicaoRelatorioRow,
@@ -566,6 +569,88 @@ describe("serviço de relatórios", () => {
       expect(csv).toBe(
         "\uFEFFCódigo;Razão social;CNPJ;Situação;Endereço;E-mail;Telefone\r\n" +
           "000002;Fornecedor B;;Inativo;—;;\r\n",
+      );
+    });
+  });
+
+  describe("Auditoria — filtros e CSV", () => {
+    it("usa o mês corrente e listas vazias como padrão", () => {
+      expect(
+        normalizarFiltrosAuditoria({}, new Date("2026-10-24T15:30:00.000Z")),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_usuarios: [],
+        entidades: [],
+        acoes: [],
+      });
+    });
+
+    it("aceita período, usuários, entidades e ações, repetidos ou separados por vírgula", () => {
+      expect(
+        normalizarFiltrosAuditoria({
+          de: "2026-09-01",
+          ate: "2026-09-30",
+          usuario: ["3", "4,3"],
+          entidade: ["Produto", "Usuario", "Produto"],
+          acao: ["CRIAR", "ALTERAR,CRIAR"],
+        }),
+      ).toEqual({
+        de: "2026-09-01",
+        ate: "2026-09-30",
+        id_usuarios: [3, 4],
+        entidades: ["Produto", "Usuario"],
+        acoes: ["CRIAR", "ALTERAR"],
+      });
+    });
+
+    it("ignora data e ids inválidos e descarta textos vazios", () => {
+      expect(
+        normalizarFiltrosAuditoria(
+          {
+            de: "2026-13-01",
+            ate: "amanhã",
+            usuario: "abc",
+            entidade: " , ",
+            acao: "",
+          },
+          new Date("2026-10-24T15:30:00.000Z"),
+        ),
+      ).toEqual({
+        de: "2026-10-01",
+        ate: "2026-10-31",
+        id_usuarios: [],
+        entidades: [],
+        acoes: [],
+      });
+    });
+
+    it("gera o CSV com BOM, cabeçalho, separador e registro afetado", () => {
+      const linha: AuditoriaRelatorioRow = {
+        id_registro_auditoria: 7,
+        data_hora: new Date("2026-10-24T15:30:00.000Z"),
+        usuario: "Ana Auditora",
+        acao: "ALTERAR",
+        entidade: "Produto",
+        id_entidade_afetada: 10,
+      };
+      const semRegistro: AuditoriaRelatorioRow = {
+        ...linha,
+        id_registro_auditoria: 8,
+        data_hora: new Date("2026-10-24T16:45:00.000Z"),
+        usuario: "sem_nome",
+        acao: "LOGIN",
+        entidade: "Usuario",
+        id_entidade_afetada: null,
+      };
+
+      const csv = gerarCsvAuditoria([linha, semRegistro]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFData/hora;Usuário;Ação;Entidade;Registro\r\n" +
+          "24/10/2026 12:30;Ana Auditora;ALTERAR;Produto;10\r\n" +
+          "24/10/2026 13:45;sem_nome;LOGIN;Usuario;—\r\n",
       );
     });
   });

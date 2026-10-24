@@ -71,6 +71,7 @@ const relatorios: CartaoRelatorio[] = [
     titulo: "Auditoria",
     descricao:
       "Trilha de auditoria do sistema, com usuário, período, entidade e ação.",
+    href: "/relatorios/auditoria",
   },
 ];
 

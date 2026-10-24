@@ -1165,6 +1165,176 @@ describe("relatorioDAO", () => {
     });
   });
 
+  describe("listarAuditoriaRelatorio", () => {
+    it("filtra o período inclusivo, o usuário, a entidade e a ação em ordem decrescente", async () => {
+      const { usuario: ana } = await criarUsuario({ nome: "Ana Auditora" });
+      const { usuario: bruno } = await criarUsuario({ nome: "Bruno Auditor" });
+
+      const criarRegistro = (
+        idUsuario: number,
+        dataHora: string,
+        acao: string,
+        entidade: string,
+        idEntidade: number | null,
+      ) =>
+        prismaTeste.registroAuditoria.create({
+          data: {
+            id_usuario: idUsuario,
+            data_hora: new Date(dataHora),
+            acao,
+            entidade,
+            id_entidade_afetada: idEntidade,
+          },
+        });
+
+      const antigo = await criarRegistro(
+        ana.id_usuario,
+        "2026-10-01T12:00:00.000Z",
+        "CRIAR",
+        "Produto",
+        10,
+      );
+      const alteracao = await criarRegistro(
+        bruno.id_usuario,
+        "2026-10-20T12:00:00.000Z",
+        "ALTERAR",
+        "Produto",
+        10,
+      );
+      const login = await criarRegistro(
+        ana.id_usuario,
+        "2026-10-25T12:00:00.000Z",
+        "LOGIN",
+        "Usuario",
+        null,
+      );
+      await criarRegistro(
+        ana.id_usuario,
+        "2026-09-30T23:59:59.000Z",
+        "CRIAR",
+        "Produto",
+        11,
+      );
+      await criarRegistro(
+        ana.id_usuario,
+        "2026-11-01T00:00:00.000Z",
+        "CRIAR",
+        "Produto",
+        12,
+      );
+
+      const periodo = {
+        de: new Date("2026-10-01T00:00:00.000Z"),
+        ate: new Date("2026-10-31T23:59:59.000Z"),
+      };
+      const todos = await relatorioDAO.listarAuditoriaRelatorio(periodo);
+      expect(todos.data.map((r) => r.id_registro_auditoria)).toEqual([
+        login.id_registro_auditoria,
+        alteracao.id_registro_auditoria,
+        antigo.id_registro_auditoria,
+      ]);
+      expect(todos.total).toBe(3);
+      expect(todos.data[0]).toMatchObject({
+        usuario: "Ana Auditora",
+        acao: "LOGIN",
+        entidade: "Usuario",
+        id_entidade_afetada: null,
+      });
+      expect(todos.data[1]).toMatchObject({
+        usuario: "Bruno Auditor",
+        acao: "ALTERAR",
+        entidade: "Produto",
+        id_entidade_afetada: 10,
+      });
+
+      const porUsuario = await relatorioDAO.listarAuditoriaRelatorio({
+        ...periodo,
+        id_usuarios: [ana.id_usuario],
+      });
+      expect(porUsuario.data.map((r) => r.id_registro_auditoria)).toEqual([
+        login.id_registro_auditoria,
+        antigo.id_registro_auditoria,
+      ]);
+      expect(porUsuario.total).toBe(2);
+
+      const porEntidade = await relatorioDAO.listarAuditoriaRelatorio({
+        ...periodo,
+        entidades: ["Usuario"],
+      });
+      expect(porEntidade.data.map((r) => r.id_registro_auditoria)).toEqual([
+        login.id_registro_auditoria,
+      ]);
+      expect(porEntidade.total).toBe(1);
+
+      const porAcao = await relatorioDAO.listarAuditoriaRelatorio({
+        ...periodo,
+        acoes: ["ALTERAR"],
+      });
+      expect(porAcao.data.map((r) => r.id_registro_auditoria)).toEqual([
+        alteracao.id_registro_auditoria,
+      ]);
+      expect(porAcao.total).toBe(1);
+
+      const combinado = await relatorioDAO.listarAuditoriaRelatorio({
+        ...periodo,
+        id_usuarios: [ana.id_usuario],
+        entidades: ["Produto"],
+        acoes: ["CRIAR"],
+      });
+      expect(combinado.data.map((r) => r.id_registro_auditoria)).toEqual([
+        antigo.id_registro_auditoria,
+      ]);
+      expect(combinado.total).toBe(1);
+    });
+
+    it("usa o login quando o usuário não tem nome e lista os filtros distintos", async () => {
+      const semNome = await criarUsuario({ nome: "", login: "sem_nome" });
+      const { usuario: inativo } = await criarUsuario({ nome: "Inativo" });
+      await prismaTeste.usuario.update({
+        where: { id_usuario: inativo.id_usuario },
+        data: { ativo: false },
+      });
+
+      await prismaTeste.registroAuditoria.create({
+        data: {
+          id_usuario: semNome.usuario.id_usuario,
+          data_hora: new Date("2026-10-10T12:00:00.000Z"),
+          acao: "CRIAR",
+          entidade: "Usuario",
+          id_entidade_afetada: semNome.usuario.id_usuario,
+        },
+      });
+      await prismaTeste.registroAuditoria.create({
+        data: {
+          id_usuario: inativo.id_usuario,
+          data_hora: new Date("2026-10-11T12:00:00.000Z"),
+          acao: "DESATIVAR",
+          entidade: "Expedicao",
+          id_entidade_afetada: 5,
+        },
+      });
+
+      const resultado = await relatorioDAO.listarAuditoriaRelatorio();
+      expect(resultado.data.find((r) => r.acao === "CRIAR")?.usuario).toBe("sem_nome");
+
+      const usuarios = await relatorioDAO.listarUsuariosParaFiltroAuditoria();
+      expect(usuarios.map((u) => u.nome)).toEqual(["sem_nome"]);
+      expect(usuarios[0]?.id_usuario).toBe(semNome.usuario.id_usuario);
+
+      const entidades = await relatorioDAO.listarEntidadesParaFiltroAuditoria();
+      expect(entidades).toEqual(["Expedicao", "Usuario"]);
+
+      const acoes = await relatorioDAO.listarAcoesParaFiltroAuditoria();
+      expect(acoes).toEqual(["CRIAR", "DESATIVAR"]);
+    });
+
+    it("devolve lista vazia e total zerado sem registros", async () => {
+      const resultado = await relatorioDAO.listarAuditoriaRelatorio();
+      expect(resultado.data).toEqual([]);
+      expect(resultado.total).toBe(0);
+    });
+  });
+
   describe("listas para os selects", () => {
     it("lista condutores ativos por nome e mantém o selecionado inativo", async () => {
       const bruno = await criarFuncionario({ nome: "Bruno", condutor: true });

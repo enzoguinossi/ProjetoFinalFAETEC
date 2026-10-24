@@ -11,6 +11,8 @@ import {
   STATUS_NOTA_RELATORIO,
   TIPOS_DESTINATARIO_RELATORIO,
   TIPOS_MOVIMENTACAO_RELATORIO,
+  type AuditoriaRelatorioFiltros,
+  type AuditoriaRelatorioRow,
   type CondutorFiltroRelatorio,
   type DestinatarioFiltroRelatorio,
   type DestinatarioRelatorioRow,
@@ -40,6 +42,7 @@ import {
   type StatusNotaRelatorio,
   type TipoDestinatarioRelatorio,
   type TipoMovimentacaoRelatorio,
+  type UsuarioFiltroRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
 
@@ -96,6 +99,17 @@ export type FiltrosEntregas = {
   id_destinatarios: number[];
   /** Status da nota selecionados; lista vazia não filtra. */
   status: StatusNotaRelatorio[];
+};
+
+/** Filtros do relatório de Auditoria; lista vazia não filtra. */
+export type FiltrosAuditoria = {
+  /** Data inicial de `registro_auditoria.data_hora` (`YYYY-MM-DD`). */
+  de: string;
+  /** Data final de `registro_auditoria.data_hora` (`YYYY-MM-DD`), inclusiva. */
+  ate: string;
+  id_usuarios: number[];
+  entidades: string[];
+  acoes: string[];
 };
 
 /** Filtro do relatório de vencimento: limite em dias ou todos. */
@@ -259,6 +273,11 @@ function idsNormalizados(valor: string | string[] | null | undefined): number[] 
   return [...ids];
 }
 
+/** Textos livres (entidade/ação) sem repetição; vazio não entra. */
+function textosNormalizados(valor: string | string[] | null | undefined): string[] {
+  return [...new Set(listaDeValores(valor))];
+}
+
 /** Valores aceitos pelo domínio, sem repetição; desconhecidos são ignorados. */
 function opcoesNormalizadas<T extends string>(
   valor: string | string[] | null | undefined,
@@ -364,6 +383,38 @@ export function normalizarFiltrosEntregas(
     ate,
     id_destinatarios: idsNormalizados(params.destinatario),
     status: opcoesNormalizadas(params.status, STATUS_NOTA_RELATORIO),
+  };
+}
+
+/**
+ * Normaliza os filtros da Auditoria: período em `registro_auditoria.data_hora`
+ * (padrão = mês corrente, fuso de São Paulo), usuários por id e entidade/ação
+ * por texto. Todos aceitam múltiplos valores (repetidos ou separados por
+ * vírgula); lista vazia não filtra.
+ */
+export function normalizarFiltrosAuditoria(
+  params: {
+    de?: string | string[] | null;
+    ate?: string | string[] | null;
+    usuario?: string | string[] | null;
+    entidade?: string | string[] | null;
+    acao?: string | string[] | null;
+  } = {},
+  agora: Date = new Date(),
+): FiltrosAuditoria {
+  const { de: dePadrao, ate: atePadrao } = periodoMesAtual(agora);
+
+  const deBruto = primeiro(params.de).trim();
+  const ateBruto = primeiro(params.ate).trim();
+  const de = dataValida(deBruto) ? deBruto : dePadrao;
+  const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
+
+  return {
+    de,
+    ate,
+    id_usuarios: idsNormalizados(params.usuario),
+    entidades: textosNormalizados(params.entidade),
+    acoes: textosNormalizados(params.acao),
   };
 }
 
@@ -719,6 +770,25 @@ export function gerarCsvFornecedores(linhas: FornecedorRelatorioRow[]): string {
   return `\uFEFF${corpo}\r\n`;
 }
 
+/**
+ * CSV da Auditoria (RF023/RF024), com a mesma formatação pt-BR: BOM UTF-8,
+ * separador `;` e decimal com vírgula. A linha traz a data/hora do registro.
+ */
+export function gerarCsvAuditoria(linhas: AuditoriaRelatorioRow[]): string {
+  const cabecalho = ["Data/hora", "Usuário", "Ação", "Entidade", "Registro"];
+  const registros = linhas.map((linha) => [
+    formatarDataHoraRelatorio(linha.data_hora),
+    linha.usuario,
+    linha.acao,
+    linha.entidade,
+    linha.id_entidade_afetada === null ? "—" : String(linha.id_entidade_afetada),
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
 export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
@@ -841,6 +911,47 @@ export class RelatorioService {
     const filtros = normalizarFiltrosFornecedores(params);
     const resultado = await relatorioDAO.listarFornecedoresRelatorio(filtros);
     return { ...resultado, filtros };
+  }
+
+  /**
+   * Trilha de auditoria do período, com usuário, entidade e ação em
+   * multi-seleção. Os filtros são normalizados e o período vira os instantes
+   * UTC do dia local em São Paulo.
+   */
+  async listarAuditoria(
+    params: {
+      de?: string | string[] | null;
+      ate?: string | string[] | null;
+      usuario?: string | string[] | null;
+      entidade?: string | string[] | null;
+      acao?: string | string[] | null;
+    } = {},
+  ): Promise<{ data: AuditoriaRelatorioRow[]; total: number; filtros: FiltrosAuditoria }> {
+    const filtros = normalizarFiltrosAuditoria(params);
+    const { de, ate } = limitesDoPeriodo(filtros);
+    const daoFiltros: AuditoriaRelatorioFiltros = {
+      de,
+      ate,
+      id_usuarios: filtros.id_usuarios,
+      entidades: filtros.entidades,
+      acoes: filtros.acoes,
+    };
+    const resultado = await relatorioDAO.listarAuditoriaRelatorio(daoFiltros);
+    return { ...resultado, filtros };
+  }
+
+  /** Opções dos filtros da Auditoria: usuários ativos, entidades e ações. */
+  async opcoesFiltroAuditoria(): Promise<{
+    usuarios: UsuarioFiltroRelatorio[];
+    entidades: string[];
+    acoes: string[];
+  }> {
+    const [usuarios, entidades, acoes] = await Promise.all([
+      relatorioDAO.listarUsuariosParaFiltroAuditoria(),
+      relatorioDAO.listarEntidadesParaFiltroAuditoria(),
+      relatorioDAO.listarAcoesParaFiltroAuditoria(),
+    ]);
+    return { usuarios, entidades, acoes };
   }
 
   /** Expedições do período para o filtro (mantém as selecionadas). */

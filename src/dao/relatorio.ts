@@ -322,6 +322,42 @@ export type FornecedoresRelatorioFiltros = {
   situacoes?: SituacaoCadastroRelatorio[];
 };
 
+export type AuditoriaRelatorioRow = {
+  id_registro_auditoria: number;
+  /** Data/hora do registro (o service formata no fuso de São Paulo). */
+  data_hora: Date;
+  /** Nome do funcionário do usuário; `login` quando não houver nome. */
+  usuario: string;
+  acao: string;
+  entidade: string;
+  id_entidade_afetada: number | null;
+};
+
+export type AuditoriaRelatorioResult = {
+  data: AuditoriaRelatorioRow[];
+  /** Total de registros que atendem aos filtros. */
+  total: number;
+};
+
+export type AuditoriaRelatorioFiltros = {
+  /** Limite inferior (inclusivo) de `data_hora` já convertido para o instante UTC. */
+  de?: Date | null;
+  /** Limite superior (inclusivo). */
+  ate?: Date | null;
+  /** Usuários selecionados; vazio não filtra. */
+  id_usuarios?: number[];
+  /** Entidades selecionadas (`registro_auditoria.entidade`); vazio não filtra. */
+  entidades?: string[];
+  /** Ações selecionadas (`registro_auditoria.acao`); vazio não filtra. */
+  acoes?: string[];
+};
+
+export type UsuarioFiltroRelatorio = {
+  id_usuario: number;
+  /** Nome do funcionário; `login` quando não houver nome. */
+  nome: string;
+};
+
 /** Evita resíduo de ponto flutuante nas somas de quantidades (Float no banco). */
 function arredondar(valor: number): number {
   return Math.round(valor * 1000) / 1000;
@@ -1043,6 +1079,104 @@ export class RelatorioDAO {
       data_prevista: expedicao.data_prevista.toISOString().slice(0, 10),
       veiculo: expedicao.veiculo.placa,
     }));
+  }
+
+  /**
+   * Trilha de auditoria (RF023): registros de `registro_auditoria` do período
+   * (inclusivo), opcionalmente de usuários, entidades e ações. `data_hora`
+   * desce — o mais recente primeiro — e o total acompanha as linhas.
+   */
+  async listarAuditoriaRelatorio(
+    filtros: AuditoriaRelatorioFiltros = {},
+  ): Promise<AuditoriaRelatorioResult> {
+    const where: Prisma.RegistroAuditoriaWhereInput = {};
+
+    if (filtros.de || filtros.ate) {
+      where.data_hora = {};
+      if (filtros.de) where.data_hora.gte = filtros.de;
+      if (filtros.ate) where.data_hora.lte = filtros.ate;
+    }
+    if (filtros.id_usuarios?.length) {
+      where.id_usuario = { in: filtros.id_usuarios };
+    }
+    if (filtros.entidades?.length) {
+      where.entidade = { in: filtros.entidades };
+    }
+    if (filtros.acoes?.length) {
+      where.acao = { in: filtros.acoes };
+    }
+
+    const [registros, total] = await Promise.all([
+      prisma.registroAuditoria.findMany({
+        where,
+        select: {
+          id_registro_auditoria: true,
+          data_hora: true,
+          acao: true,
+          entidade: true,
+          id_entidade_afetada: true,
+          usuario: {
+            select: {
+              login: true,
+              funcionario: { select: { pessoaFisica: { select: { nome: true } } } },
+            },
+          },
+        },
+        orderBy: [{ data_hora: "desc" }, { id_registro_auditoria: "desc" }],
+      }),
+      prisma.registroAuditoria.count({ where }),
+    ]);
+
+    return {
+      data: registros.map((registro) => ({
+        id_registro_auditoria: registro.id_registro_auditoria,
+        data_hora: registro.data_hora,
+        usuario:
+          registro.usuario.funcionario.pessoaFisica.nome || registro.usuario.login,
+        acao: registro.acao,
+        entidade: registro.entidade,
+        id_entidade_afetada: registro.id_entidade_afetada,
+      })),
+      total,
+    };
+  }
+
+  /** Usuários ativos para o filtro da auditoria, por nome (login como reserva). */
+  async listarUsuariosParaFiltroAuditoria(): Promise<UsuarioFiltroRelatorio[]> {
+    const usuarios = await prisma.usuario.findMany({
+      where: { ativo: true },
+      select: {
+        id_usuario: true,
+        login: true,
+        funcionario: { select: { pessoaFisica: { select: { nome: true } } } },
+      },
+      orderBy: { funcionario: { pessoaFisica: { nome: "asc" } } },
+    });
+
+    return usuarios.map((usuario) => ({
+      id_usuario: usuario.id_usuario,
+      nome: usuario.funcionario.pessoaFisica.nome || usuario.login,
+    }));
+  }
+
+  /** Entidades distintas da trilha de auditoria, em ordem alfabética. */
+  async listarEntidadesParaFiltroAuditoria(): Promise<string[]> {
+    const registros = await prisma.registroAuditoria.findMany({
+      distinct: ["entidade"],
+      select: { entidade: true },
+      orderBy: { entidade: "asc" },
+    });
+    return registros.map((registro) => registro.entidade);
+  }
+
+  /** Ações distintas da trilha de auditoria, em ordem alfabética. */
+  async listarAcoesParaFiltroAuditoria(): Promise<string[]> {
+    const registros = await prisma.registroAuditoria.findMany({
+      distinct: ["acao"],
+      select: { acao: true },
+      orderBy: { acao: "asc" },
+    });
+    return registros.map((registro) => registro.acao);
   }
 
   /** Condutores ativos (funcionário com `condutor = true`), por nome. */
