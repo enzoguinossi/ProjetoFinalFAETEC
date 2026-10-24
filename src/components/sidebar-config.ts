@@ -83,21 +83,15 @@ export const cadastrosGroup: { label: string; icon: LucideIcon } = {
 };
 
 // Base sem largura: o modo (expandido ou rail) decide `w-*` e o overflow.
+// `h-full` preenche a linha abaixo do header (a sidebar não é mais coluna sticky).
 export const sidebarCls =
-  "h-screen bg-white flex flex-col shrink-0 sticky top-0 border-r border-border py-3 box-border transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "h-full bg-white flex flex-col shrink-0 border-r border-border py-3 box-border transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]";
 
 export const sidebarExpandedCls =
   "w-[var(--sidebar-width)] px-2 overflow-hidden";
 
-// Rail: só os ícones. `overflow-visible` deixa o menu do usuário escapar da rail.
+// Rail: só os ícones. `overflow-visible` deixa o conteúdo escapar da rail.
 export const sidebarCollapsedCls = "w-[72px] px-2 overflow-visible";
-
-export const headerCls = "shrink-0 flex flex-col items-center gap-2 w-full";
-export const logoAreaCls = "flex justify-center items-center w-full";
-export const buttonGroupCls = "flex justify-center gap-1 w-full";
-export const buttonGroupCollapsedCls = "flex flex-col items-center gap-1 w-full";
-export const iconBtnCls =
-  "w-9 h-9 flex items-center justify-center border-none rounded-lg bg-transparent cursor-pointer text-[#697077] transition-colors duration-150 hover:bg-[#f2f4f8] hover:text-[#001d6c]";
 
 export const navCls =
   "flex-1 min-h-0 w-full flex flex-col gap-1 overflow-y-auto overflow-x-hidden py-1 px-1 [scrollbar-width:thin] [scrollbar-color:#dde1e6_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#dde1e6]";
@@ -116,18 +110,105 @@ export const subItemCls =
   "flex items-center gap-2 w-full h-9 py-0 pl-2 pr-2 border-none bg-transparent cursor-pointer font-sans text-sm font-normal text-ink text-left rounded-lg transition-colors duration-150 box-border hover:bg-[#f2f4f8]";
 export const subItemActiveCls = "bg-[#e8f0fe]! text-[#001d6c]!";
 
-export const userInfoBaseCls =
-  "shrink-0 flex items-center w-full pt-2 border-t border-border bg-transparent border-l-0 border-r-0 border-b-0 cursor-pointer font-[inherit] text-left";
+/* ---------------------------------------------------------------------------
+ * Estado da sidebar persistido em localStorage.
+ *
+ * Lido como store externo (`useSyncExternalStore`): cada página remonta o
+ * `DashboardLayout`, e o store devolve o valor salvo já no primeiro render da
+ * navegação no cliente — sem `setState` dentro de efeito e sem divergir do HTML
+ * do servidor (que usa o padrão). As mutações são funcionais e gravam antes de
+ * notificar, então dois cliques rápidos sempre enxergam o estado mais recente.
+ * ------------------------------------------------------------------------- */
 
-export const userInfoCls = `${userInfoBaseCls} gap-[0.625rem]`;
+export type GrupoSidebar = "mov" | "expedicoes" | "cadastros";
+export type GruposSidebar = Record<GrupoSidebar, boolean>;
 
-// Rail: só o avatar, centralizado.
-export const userInfoCollapsedCls = `${userInfoBaseCls} justify-center`;
+export const gruposSidebarPadrao: GruposSidebar = {
+  mov: true,
+  expedicoes: true,
+  cadastros: true,
+};
 
-const userMenuBaseCls =
-  "absolute bottom-full mb-2 bg-white border border-[#dde1e6] rounded-[10px] shadow-[0_4px_16px_rgba(0,0,0,0.1)] overflow-hidden z-[100]";
+function criarStoreLocalStorage<T>(
+  chave: string,
+  padrao: T,
+  decodificar: (bruto: string) => T | null,
+  codificar: (valor: T) => string,
+) {
+  let brutoCache: string | null = null;
+  let valorCache: T = padrao;
+  let temCache = false;
+  const ouvintes = new Set<() => void>();
 
-export const userMenuCls = `${userMenuBaseCls} left-0 right-0`;
+  const snapshot = (): T => {
+    let bruto: string | null = null;
+    try {
+      bruto = window.localStorage.getItem(chave);
+    } catch {
+      bruto = null;
+    }
+    if (!temCache || bruto !== brutoCache) {
+      brutoCache = bruto;
+      valorCache = bruto ? (decodificar(bruto) ?? padrao) : padrao;
+      temCache = true;
+    }
+    return valorCache;
+  };
 
-// Fora da rail (56px úteis) o menu precisa de largura própria para não esmagar.
-export const userMenuCollapsedCls = `${userMenuBaseCls} left-0 w-56`;
+  const servidor = (): T => padrao;
+
+  const assinar = (ouvinte: () => void) => {
+    ouvintes.add(ouvinte);
+    const aoMudarArmazenamento = (e: StorageEvent) => {
+      if (e.key === null || e.key === chave) ouvinte();
+    };
+    window.addEventListener("storage", aoMudarArmazenamento);
+    return () => {
+      ouvintes.delete(ouvinte);
+      window.removeEventListener("storage", aoMudarArmazenamento);
+    };
+  };
+
+  const definir = (atualizar: (atual: T) => T) => {
+    const proximo = atualizar(snapshot());
+    const bruto = codificar(proximo);
+    try {
+      window.localStorage.setItem(chave, bruto);
+    } catch {
+      /* localStorage indisponível: mantém em memória */
+    }
+    brutoCache = bruto;
+    valorCache = proximo;
+    temCache = true;
+    ouvintes.forEach((ouvinte) => ouvinte());
+  };
+
+  return { snapshot, servidor, assinar, definir };
+}
+
+export const sidebarRecolhidaStore = criarStoreLocalStorage<boolean>(
+  "nexus.sidebar.collapsed",
+  false,
+  (bruto) => (bruto === "1" ? true : bruto === "0" ? false : null),
+  (valor) => (valor ? "1" : "0"),
+);
+
+export const sidebarGruposStore = criarStoreLocalStorage<GruposSidebar>(
+  "nexus.sidebar.grupos",
+  gruposSidebarPadrao,
+  (bruto) => {
+    try {
+      const salvo = JSON.parse(bruto) as Partial<GruposSidebar>;
+      return {
+        mov: typeof salvo.mov === "boolean" ? salvo.mov : gruposSidebarPadrao.mov,
+        expedicoes:
+          typeof salvo.expedicoes === "boolean" ? salvo.expedicoes : gruposSidebarPadrao.expedicoes,
+        cadastros:
+          typeof salvo.cadastros === "boolean" ? salvo.cadastros : gruposSidebarPadrao.cadastros,
+      };
+    } catch {
+      return null;
+    }
+  },
+  (valor) => JSON.stringify(valor),
+);

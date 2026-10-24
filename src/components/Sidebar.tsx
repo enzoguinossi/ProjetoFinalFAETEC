@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Bell, ChevronDown, LogOut, Settings } from "lucide-react";
-import { getUserInfo } from "@/app/actions/user";
-import { logoutAction } from "@/app/login/actions";
+import { ChevronDown } from "lucide-react";
 import {
   cadastroItems,
   cadastrosGroup,
@@ -17,11 +15,7 @@ import {
   sidebarCls,
   sidebarCollapsedCls,
   sidebarExpandedCls,
-  headerCls,
-  logoAreaCls,
-  buttonGroupCls,
-  buttonGroupCollapsedCls,
-  iconBtnCls,
+  sidebarGruposStore,
   navCls,
   navItemCls,
   navItemExpandedCls,
@@ -33,71 +27,29 @@ import {
   subItemsCls,
   subItemCls,
   subItemActiveCls,
-  userInfoCls,
-  userInfoCollapsedCls,
-  userMenuCls,
-  userMenuCollapsedCls,
+  type GrupoSidebar,
   type SidebarUser,
 } from "@/components/sidebar-config";
 
 interface SidebarProps {
   collapsed: boolean;
   onExpand?: () => void;
-}
-
-// Cache o módulo para evitar recarregar a cada navegação
-let cachedUser: SidebarUser | null = null;
-let cachePromise: Promise<typeof cachedUser> | null = null;
-
-function loadUser() {
-  if (cachedUser) return Promise.resolve(cachedUser);
-  if (cachePromise) return cachePromise;
-  cachePromise = (getUserInfo() as Promise<typeof cachedUser>).then((u) => {
-    cachedUser = u;
-    cachePromise = null;
-    return u;
-  });
-  return cachePromise;
+  user: SidebarUser | null;
 }
 
 const MovEstoqueIcon = movEstoqueGroup.icon;
 const ExpedicoesIcon = expedicoesGroup.icon;
 const CadastrosIcon = cadastrosGroup.icon;
 
-export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
-  const [cadastrosOpen, setCadastrosOpen] = useState(true);
-  const [movEstoqueOpen, setMovEstoqueOpen] = useState(true);
-  const [expedicoesOpen, setExpedicoesOpen] = useState(true);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<typeof cachedUser>(cachedUser);
-  const menuRef = useRef<HTMLDivElement>(null);
+export default function Sidebar({ collapsed, onExpand, user }: SidebarProps) {
+  // Grupos persistidos: sobrevivem à remontagem a cada navegação.
+  const grupos = useSyncExternalStore(
+    sidebarGruposStore.assinar,
+    sidebarGruposStore.snapshot,
+    sidebarGruposStore.servidor,
+  );
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    loadUser().then((u) => { if (u) setUser(u); });
-  }, []);
-
-  // Fecha o menu ao clicar fora
-  useEffect(() => {
-    if (!userMenuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setUserMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [userMenuOpen]);
-
-  async function handleLogout() {
-    cachedUser = null;
-    cachePromise = null;
-    await logoutAction();
-    router.push("/login");
-  }
-
-  const initial = user?.nome?.charAt(0).toUpperCase() ?? "?";
 
   const navigate = (path: string) => router.push(path);
 
@@ -118,14 +70,15 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
     ? expedicaoItems
     : expedicaoItems.filter((i) => user?.permissoes?.includes(i.permissao));
 
-  // No rail o grupo não abre: expande a sidebar e já deixa o grupo aberto.
-  const toggleGroup = (open: boolean, setOpen: Dispatch<SetStateAction<boolean>>) => {
+  // Atualizações funcionais: cliques rápidos nunca dependem do estado do closure.
+  // No rail o grupo não abre in-place: expande a sidebar e já deixa o grupo aberto.
+  const toggleGrupo = (id: GrupoSidebar) => {
     if (collapsed) {
       onExpand?.();
-      setOpen(true);
+      sidebarGruposStore.definir((atual) => (atual[id] ? atual : { ...atual, [id]: true }));
       return;
     }
-    setOpen(!open);
+    sidebarGruposStore.definir((atual) => ({ ...atual, [id]: !atual[id] }));
   };
 
   const itemCls = collapsed
@@ -138,26 +91,8 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
       className={`${sidebarCls} ${collapsed ? sidebarCollapsedCls : sidebarExpandedCls}`}
       data-figma="Sidebar"
       data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
+      data-print-hide
     >
-      {/* Cabeçalho fixo: logo + ações */}
-      <div className={headerCls}>
-        {!collapsed && (
-          <div className={logoAreaCls}>
-            <img src="/logo.svg" alt="Nexus" className="h-10 w-auto" />
-          </div>
-        )}
-
-        <div className={collapsed ? buttonGroupCollapsedCls : buttonGroupCls}>
-          <button type="button" className={iconBtnCls} aria-label="Configurações">
-            <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-          <button type="button" className={iconBtnCls} aria-label="Notificações">
-            <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
-      {/* Menu rolável — o bloco do usuário nunca é coberto */}
       <nav className={navCls} aria-label="Menu principal">
         {navTopItems.map((item) => {
           const Icon = item.icon;
@@ -188,12 +123,12 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
           <div>
             <button
               className={`${itemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
-              onClick={() => toggleGroup(movEstoqueOpen, setMovEstoqueOpen)}
+              onClick={() => toggleGrupo("mov")}
               title={collapsed ? movEstoqueGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={movEstoqueGroup.label}
               data-figma-variant={isMovEstoqueItemActive ? "ativo" : "inativo"}
-              data-figma-expanded={movEstoqueOpen ? "true" : "false"}
+              data-figma-expanded={grupos.mov ? "true" : "false"}
             >
               <MovEstoqueIcon
                 size={18}
@@ -207,13 +142,13 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
                   size={16}
                   strokeWidth={1.75}
                   className={navChevronCls}
-                  style={{ transform: movEstoqueOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  style={{ transform: grupos.mov ? "rotate(0deg)" : "rotate(-90deg)" }}
                   aria-hidden="true"
                 />
               )}
             </button>
 
-            {!collapsed && movEstoqueOpen && (
+            {!collapsed && grupos.mov && (
               <div className={subItemsCls}>
                 {visibleMovEstoqueItems.map((item) => {
                   const Icon = item.icon;
@@ -247,12 +182,12 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
           <div>
             <button
               className={`${itemCls} ${isExpedicaoItemActive ? navItemActiveCls : ""}`}
-              onClick={() => toggleGroup(expedicoesOpen, setExpedicoesOpen)}
+              onClick={() => toggleGrupo("expedicoes")}
               title={collapsed ? expedicoesGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={expedicoesGroup.label}
               data-figma-variant={isExpedicaoItemActive ? "ativo" : "inativo"}
-              data-figma-expanded={expedicoesOpen ? "true" : "false"}
+              data-figma-expanded={grupos.expedicoes ? "true" : "false"}
             >
               <ExpedicoesIcon
                 size={18}
@@ -266,13 +201,13 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
                   size={16}
                   strokeWidth={1.75}
                   className={navChevronCls}
-                  style={{ transform: expedicoesOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  style={{ transform: grupos.expedicoes ? "rotate(0deg)" : "rotate(-90deg)" }}
                   aria-hidden="true"
                 />
               )}
             </button>
 
-            {!collapsed && expedicoesOpen && (
+            {!collapsed && grupos.expedicoes && (
               <div className={subItemsCls}>
                 {visibleExpedicaoItems.map((item) => {
                   const Icon = item.icon;
@@ -306,12 +241,12 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
           <div>
             <button
               className={`${itemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
-              onClick={() => toggleGroup(cadastrosOpen, setCadastrosOpen)}
+              onClick={() => toggleGrupo("cadastros")}
               title={collapsed ? cadastrosGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={cadastrosGroup.label}
               data-figma-variant={isCadastroItemActive ? "ativo" : "inativo"}
-              data-figma-expanded={cadastrosOpen ? "true" : "false"}
+              data-figma-expanded={grupos.cadastros ? "true" : "false"}
             >
               <CadastrosIcon
                 size={18}
@@ -325,13 +260,13 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
                   size={16}
                   strokeWidth={1.75}
                   className={navChevronCls}
-                  style={{ transform: cadastrosOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  style={{ transform: grupos.cadastros ? "rotate(0deg)" : "rotate(-90deg)" }}
                   aria-hidden="true"
                 />
               )}
             </button>
 
-            {!collapsed && cadastrosOpen && (
+            {!collapsed && grupos.cadastros && (
               <div className={subItemsCls}>
                 {visibleCadastroItems.map((item) => {
                   const Icon = item.icon;
@@ -384,45 +319,6 @@ export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Rodapé fixo: informações do usuário (no rail, só o avatar) */}
-      <div className="relative w-full shrink-0" ref={menuRef}>
-        <button
-          className={collapsed ? userInfoCollapsedCls : userInfoCls}
-          onClick={() => setUserMenuOpen(!userMenuOpen)}
-          title={collapsed ? user?.nome ?? "Usuário" : undefined}
-          aria-label={collapsed ? "Menu do usuário" : undefined}
-        >
-          <div className="w-10 h-10 rounded-full bg-[#f2f4f8] flex items-center justify-center font-sans text-sm font-semibold text-[#001d6c] shrink-0">
-            {initial}
-          </div>
-          {!collapsed && (
-            <span className="font-sans text-xs text-black">{user?.nome ?? "Carregando..."}</span>
-          )}
-        </button>
-
-        {userMenuOpen && (
-          <div className={collapsed ? userMenuCollapsedCls : userMenuCls}>
-            <div className="flex flex-col gap-[2px] p-3">
-              <span className="font-sans text-[0.8125rem] font-semibold text-ink">{user?.nome}</span>
-              <span className="font-sans text-xs text-[#697077]">{user?.login}</span>
-              {user?.super_admin && (
-                <span className="font-sans text-[0.6875rem] font-semibold text-brand bg-[rgba(27,153,86,0.08)] px-[6px] py-[2px] rounded-[4px] self-start mt-1">
-                  Admin
-                </span>
-              )}
-            </div>
-            <hr className="border-t border-[#e2e2e2] m-0" />
-            <button
-              className="flex items-center gap-2 w-full px-3 py-[0.625rem] border-none bg-transparent cursor-pointer font-sans text-[0.8125rem] text-danger text-left transition-[background-color] duration-[120ms] hover:bg-danger-bg"
-              onClick={handleLogout}
-            >
-              <LogOut size={16} strokeWidth={1.75} aria-hidden="true" />
-              Sair
-            </button>
-          </div>
-        )}
-      </div>
     </aside>
   );
 }
