@@ -1,0 +1,97 @@
+name: Melhoria sugerida
+description: Sugira uma melhoria de módulo, com o impacto atual e o benefício esperado.
+title: "[Melhoria] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Uma melhoria = uma sugestão. Descreva o problema de trabalho, não só a solução.
+
+  - type: input
+    id: testador
+    attributes:
+      label: Quem sugere
+      placeholder: Seu nome
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modulo
+    attributes:
+      label: Módulo
+      options:
+        - Login / primeiro acesso
+        - Dashboard
+        - Pedidos
+        - Relatórios
+        - Cadastros — Usuários
+        - Cadastros — Funcionários
+        - Cadastros — Destinatários
+        - Cadastros — Produtos
+        - Cadastros — Fornecedores
+        - Cadastros — Veículos
+        - Mov. Estoque — Entrada
+        - Mov. Estoque — Saída
+        - Expedições — Expedições
+        - Expedições — Percursos
+        - Unidades de conversão (dentro de Produtos)
+    validations:
+      required: true
+
+  - type: input
+    id: tela
+    attributes:
+      label: Tela / URL
+      placeholder: https://localhost:3000/expedicoes/4
+    validations:
+      required: true
+
+  - type: textarea
+    id: situacao
+    attributes:
+      label: Situação atual
+      description: Como funciona hoje.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impacto
+    attributes:
+      label: O que incomoda
+      description: O impacto no trabalho — tempo perdido, risco de erro, retrabalho.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sugestao
+    attributes:
+      label: Sugestão
+      description: O que deveria mudar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: beneficio
+    attributes:
+      label: Benefício esperado
+      description: O que melhora na operação.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade
+      options:
+        - Alta
+        - Média
+        - Baixa
+    validations:
+      required: true
+
+  - type: input
+    id: referencia
+    attributes:
+      label: Referência
+      description: Link, print ou exemplo de outro sistema.
