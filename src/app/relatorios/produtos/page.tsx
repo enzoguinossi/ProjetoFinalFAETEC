@@ -9,7 +9,6 @@ import ImprimirButton from "./ImprimirButton";
 export const dynamic = "force-dynamic";
 
 type Params = {
-  busca?: string | string[];
   situacao?: string | string[];
 };
 
@@ -32,7 +31,6 @@ export default async function RelatorioProdutosPage({
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
   const query = new URLSearchParams({
-    busca: filtros.busca,
     situacao: filtros.situacao,
   }).toString();
 
@@ -62,16 +60,6 @@ export default async function RelatorioProdutosPage({
         className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-border p-4"
         data-print-hide
       >
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Busca
-          <input
-            type="text"
-            name="busca"
-            defaultValue={filtros.busca}
-            placeholder="Código ou descrição"
-            className="h-10 w-64 max-w-full px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          />
-        </label>
         <label className="flex flex-col gap-1 text-sm text-ink">
           Situação
           <select

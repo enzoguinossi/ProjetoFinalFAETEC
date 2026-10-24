@@ -16,7 +16,7 @@ const relatorios: CartaoRelatorio[] = [
   {
     titulo: "Lista de Produtos",
     descricao:
-      "Código, descrição, unidade, quantidade e saldo livre de cada produto, com filtros por busca e situação.",
+      "Código, descrição, unidade, quantidade e saldo livre de cada produto, com filtro por situação.",
     href: "/relatorios/produtos",
   },
   {

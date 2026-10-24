@@ -49,20 +49,8 @@ describe("relatorioDAO", () => {
       expect(todas.data.map((p) => p.descricao)).toEqual(["Ativo", "Inativo"]);
     });
 
-    it("busca por descrição e por código numérico do produto", async () => {
-      const alvo = await criarProduto({ descricao: "Leite integral" });
-      await criarProduto({ descricao: "Café" });
-
-      const porDescricao = await relatorioDAO.listarProdutosRelatorio({ busca: "leit" });
-      expect(porDescricao.data.map((p) => p.descricao)).toEqual(["Leite integral"]);
-
-      const codigo = String(alvo.id_produto).padStart(6, "0");
-      const porCodigo = await relatorioDAO.listarProdutosRelatorio({ busca: codigo });
-      expect(porCodigo.data.map((p) => p.id_produto)).toContain(alvo.id_produto);
-    });
-
     it("devolve listas vazias e totais zerados sem produtos", async () => {
-      const resultado = await relatorioDAO.listarProdutosRelatorio({ busca: "inexistente" });
+      const resultado = await relatorioDAO.listarProdutosRelatorio();
       expect(resultado.data).toEqual([]);
       expect(resultado.totais).toEqual({ quantidade: 0, livre: 0 });
     });

@@ -18,7 +18,6 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const { data } = await relatorioService.listarProdutos({
-    busca: url.searchParams.get("busca"),
     situacao: url.searchParams.get("situacao"),
   });
 

@@ -25,8 +25,6 @@ export type ProdutosRelatorioResult = {
 };
 
 export type ProdutosRelatorioFiltros = {
-  /** Código numérico (ID) ou trecho da descrição. */
-  busca?: string;
   /** `ativas` (padrão), `inativas` ou `todas`. */
   situacao?: SituacaoProdutoRelatorio;
 };
@@ -48,15 +46,6 @@ export class RelatorioDAO {
     const where: Prisma.ProdutoWhereInput = {};
 
     if (situacao !== "todas") where.ativo = situacao === "ativas";
-
-    const busca = filtros.busca?.trim();
-    if (busca) {
-      const condicoes: Prisma.ProdutoWhereInput[] = [
-        { descricao: { contains: busca } },
-      ];
-      if (/^\d+$/.test(busca)) condicoes.push({ id_produto: Number(busca) });
-      where.OR = condicoes;
-    }
 
     const produtos = await prisma.produto.findMany({
       where,

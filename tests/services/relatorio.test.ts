@@ -19,12 +19,8 @@ const linha: ProdutoRelatorioRow = {
 
 describe("serviço de relatórios", () => {
   describe("normalizarFiltrosProdutos", () => {
-    it("usa ativas como padrão e apara a busca", () => {
-      expect(normalizarFiltrosProdutos()).toEqual({ busca: "", situacao: "ativas" });
-      expect(normalizarFiltrosProdutos({ busca: "  arroz  " })).toEqual({
-        busca: "arroz",
-        situacao: "ativas",
-      });
+    it("usa ativas como padrão", () => {
+      expect(normalizarFiltrosProdutos()).toEqual({ situacao: "ativas" });
     });
 
     it("aceita situação válida, inclusive em array, e ignora valor inválido", () => {

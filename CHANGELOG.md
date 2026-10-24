@@ -13,7 +13,9 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
-Nada ainda.
+### Changed
+
+- **Lista de Produtos filtra apenas por situação:** o relatório de produtos (`/relatorios/produtos` e o CSV) deixou de ter busca por código/descrição; o filtro no servidor é só por situação (ativas/inativas/todas).
 
 ## [1.24.10.2026] - 2026-10-24
 

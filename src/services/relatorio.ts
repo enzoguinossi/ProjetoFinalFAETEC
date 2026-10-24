@@ -17,7 +17,7 @@ export type EmissaoRelatorio = {
   hora: string;
 };
 
-/** Lê um parâmetro de query que pode chegar repetido (`?busca=a&busca=b`). */
+/** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
 function primeiro(valor: string | string[] | null | undefined): string {
   if (Array.isArray(valor)) return valor[0] ?? "";
   return valor ?? "";
@@ -25,20 +25,18 @@ function primeiro(valor: string | string[] | null | undefined): string {
 
 /**
  * Normaliza os filtros vindos da tela/CSV. Situação inválida cai no padrão
- * `ativas`; a busca é aparada e vazia não filtra.
+ * `ativas`.
  */
 export function normalizarFiltrosProdutos(params: {
-  busca?: string | string[] | null;
   situacao?: string | string[] | null;
 } = {}): Required<ProdutosRelatorioFiltros> {
-  const busca = primeiro(params.busca).trim();
   const situacaoBruta = primeiro(params.situacao);
   const situacao: SituacaoProdutoRelatorio = SITUACOES_PRODUTO_RELATORIO.includes(
     situacaoBruta as SituacaoProdutoRelatorio,
   )
     ? (situacaoBruta as SituacaoProdutoRelatorio)
     : "ativas";
-  return { busca, situacao };
+  return { situacao };
 }
 
 /** Metadados exibidos no cabeçalho do relatório impresso. */
@@ -101,7 +99,6 @@ export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
 export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
-    busca?: string | string[] | null;
     situacao?: string | string[] | null;
   } = {}): Promise<ProdutosRelatorioResult & { filtros: Required<ProdutosRelatorioFiltros> }> {
     const filtros = normalizarFiltrosProdutos(params);
