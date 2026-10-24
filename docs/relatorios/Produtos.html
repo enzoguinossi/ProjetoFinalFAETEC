@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatorio - Lista de Produtos</title>
+  <link rel="stylesheet" href="README.md/Relatorio.css">
+</head>
+<body>
+
+  <div class="relatorio-container">
+    
+    <div class="conteudo-principal">
+      <!-- CABECALHO -->
+      <header class="relatorio-header">
+        <div>
+          <h1 class="titulo-relatorio">Relatorio - Lista de Produtos</h1>
+        </div>
+        <div class="meta-info">
+          <p>Emissao: {{DATA_EMISSAO}} {{HORA_EMISSAO}}</p>
+          <p>Pag: {{PAGINA_ATUAL}} / {{TOTAL_PAGINAS}}</p>
+        </div>
+      </header>
+
+      <!-- TABELA DE PRODUTOS -->
+      <table class="relatorio-tabela">
+        <thead>
+          <tr>
+            <th style="width: 8%;" class="col-centro">Codigo</th>
+            <th style="width: 27%;">Descricao</th>
+            <th style="width: 7%;" class="col-centro">Unid.</th>
+            <th style="width: 15%;">Grupo</th>
+            <th style="width: 15%;">Subgrupo</th>
+            <th style="width: 18%;">Fabricante</th>
+            <th style="width: 10%;" class="col-centro">Situacao</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-centro">{{CODIGO}}</td>
+            <td>{{DESCRICAO}}</td>
+            <td class="col-centro">{{UNIDADE}}</td>
+            <td>{{GRUPO}}</td>
+            <td>{{SUBGRUPO}}</td>
+            <td>{{FABRICANTE}}</td>
+            <td class="col-centro">{{SITUACAO}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RODAPE -->
+    <footer class="relatorio-footer">
+      <span>Emissor: {{USUARIO_EMISSOR}}</span>
+      <span>Documento gerado para uso interno</span>
+    </footer>
+
+  </div>
+
+</body>
+</html>
