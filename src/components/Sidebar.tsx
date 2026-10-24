@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, ChevronDown, LogOut, Settings } from "lucide-react";
 import { getUserInfo } from "@/app/actions/user";
@@ -15,12 +15,17 @@ import {
   navBottomItems,
   navTopItems,
   sidebarCls,
+  sidebarCollapsedCls,
+  sidebarExpandedCls,
   headerCls,
   logoAreaCls,
   buttonGroupCls,
+  buttonGroupCollapsedCls,
   iconBtnCls,
   navCls,
   navItemCls,
+  navItemExpandedCls,
+  navItemCollapsedCls,
   navItemActiveCls,
   navItemIconCls,
   navItemIconInactiveCls,
@@ -29,8 +34,16 @@ import {
   subItemCls,
   subItemActiveCls,
   userInfoCls,
+  userInfoCollapsedCls,
+  userMenuCls,
+  userMenuCollapsedCls,
   type SidebarUser,
 } from "@/components/sidebar-config";
+
+interface SidebarProps {
+  collapsed: boolean;
+  onExpand?: () => void;
+}
 
 // Cache o módulo para evitar recarregar a cada navegação
 let cachedUser: SidebarUser | null = null;
@@ -51,7 +64,7 @@ const MovEstoqueIcon = movEstoqueGroup.icon;
 const ExpedicoesIcon = expedicoesGroup.icon;
 const CadastrosIcon = cadastrosGroup.icon;
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, onExpand }: SidebarProps) {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
   const [movEstoqueOpen, setMovEstoqueOpen] = useState(true);
   const [expedicoesOpen, setExpedicoesOpen] = useState(true);
@@ -105,19 +118,36 @@ export default function Sidebar() {
     ? expedicaoItems
     : expedicaoItems.filter((i) => user?.permissoes?.includes(i.permissao));
 
+  // No rail o grupo não abre: expande a sidebar e já deixa o grupo aberto.
+  const toggleGroup = (open: boolean, setOpen: Dispatch<SetStateAction<boolean>>) => {
+    if (collapsed) {
+      onExpand?.();
+      setOpen(true);
+      return;
+    }
+    setOpen(!open);
+  };
+
+  const itemCls = collapsed
+    ? `${navItemCls} ${navItemCollapsedCls}`
+    : `${navItemCls} ${navItemExpandedCls}`;
+  const renderLabel = (text: string) => (collapsed ? null : <span>{text}</span>);
+
   return (
     <aside
-      className={sidebarCls}
+      className={`${sidebarCls} ${collapsed ? sidebarCollapsedCls : sidebarExpandedCls}`}
       data-figma="Sidebar"
       data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
     >
       {/* Cabeçalho fixo: logo + ações */}
       <div className={headerCls}>
-        <div className={logoAreaCls}>
-          <img src="/logo.svg" alt="Nexus" className="h-10 w-auto" />
-        </div>
+        {!collapsed && (
+          <div className={logoAreaCls}>
+            <img src="/logo.svg" alt="Nexus" className="h-10 w-auto" />
+          </div>
+        )}
 
-        <div className={buttonGroupCls}>
+        <div className={collapsed ? buttonGroupCollapsedCls : buttonGroupCls}>
           <button type="button" className={iconBtnCls} aria-label="Configurações">
             <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -135,8 +165,9 @@ export default function Sidebar() {
           return (
             <button
               key={item.path}
-              className={`${navItemCls} ${active ? navItemActiveCls : ""}`}
+              className={`${itemCls} ${active ? navItemActiveCls : ""}`}
               onClick={() => navigate(item.path)}
+              title={collapsed ? item.label : undefined}
               data-figma="SidebarItem"
               data-figma-label={item.label}
               data-figma-variant={active ? "ativo" : "inativo"}
@@ -147,7 +178,7 @@ export default function Sidebar() {
                 className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
                 aria-hidden="true"
               />
-              <span>{item.label}</span>
+              {renderLabel(item.label)}
             </button>
           );
         })}
@@ -156,8 +187,9 @@ export default function Sidebar() {
         {visibleMovEstoqueItems.length > 0 && (
           <div>
             <button
-              className={`${navItemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
-              onClick={() => setMovEstoqueOpen(!movEstoqueOpen)}
+              className={`${itemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
+              onClick={() => toggleGroup(movEstoqueOpen, setMovEstoqueOpen)}
+              title={collapsed ? movEstoqueGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={movEstoqueGroup.label}
               data-figma-variant={isMovEstoqueItemActive ? "ativo" : "inativo"}
@@ -169,17 +201,19 @@ export default function Sidebar() {
                 className={`${navItemIconCls} ${isMovEstoqueItemActive ? "" : navItemIconInactiveCls}`}
                 aria-hidden="true"
               />
-              <span>{movEstoqueGroup.label}</span>
-              <ChevronDown
-                size={16}
-                strokeWidth={1.75}
-                className={navChevronCls}
-                style={{ transform: movEstoqueOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                aria-hidden="true"
-              />
+              {renderLabel(movEstoqueGroup.label)}
+              {!collapsed && (
+                <ChevronDown
+                  size={16}
+                  strokeWidth={1.75}
+                  className={navChevronCls}
+                  style={{ transform: movEstoqueOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  aria-hidden="true"
+                />
+              )}
             </button>
 
-            {movEstoqueOpen && (
+            {!collapsed && movEstoqueOpen && (
               <div className={subItemsCls}>
                 {visibleMovEstoqueItems.map((item) => {
                   const Icon = item.icon;
@@ -212,8 +246,9 @@ export default function Sidebar() {
         {visibleExpedicaoItems.length > 0 && (
           <div>
             <button
-              className={`${navItemCls} ${isExpedicaoItemActive ? navItemActiveCls : ""}`}
-              onClick={() => setExpedicoesOpen(!expedicoesOpen)}
+              className={`${itemCls} ${isExpedicaoItemActive ? navItemActiveCls : ""}`}
+              onClick={() => toggleGroup(expedicoesOpen, setExpedicoesOpen)}
+              title={collapsed ? expedicoesGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={expedicoesGroup.label}
               data-figma-variant={isExpedicaoItemActive ? "ativo" : "inativo"}
@@ -225,17 +260,19 @@ export default function Sidebar() {
                 className={`${navItemIconCls} ${isExpedicaoItemActive ? "" : navItemIconInactiveCls}`}
                 aria-hidden="true"
               />
-              <span>{expedicoesGroup.label}</span>
-              <ChevronDown
-                size={16}
-                strokeWidth={1.75}
-                className={navChevronCls}
-                style={{ transform: expedicoesOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                aria-hidden="true"
-              />
+              {renderLabel(expedicoesGroup.label)}
+              {!collapsed && (
+                <ChevronDown
+                  size={16}
+                  strokeWidth={1.75}
+                  className={navChevronCls}
+                  style={{ transform: expedicoesOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  aria-hidden="true"
+                />
+              )}
             </button>
 
-            {expedicoesOpen && (
+            {!collapsed && expedicoesOpen && (
               <div className={subItemsCls}>
                 {visibleExpedicaoItems.map((item) => {
                   const Icon = item.icon;
@@ -268,8 +305,9 @@ export default function Sidebar() {
         {visibleCadastroItems.length > 0 && (
           <div>
             <button
-              className={`${navItemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
-              onClick={() => setCadastrosOpen(!cadastrosOpen)}
+              className={`${itemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
+              onClick={() => toggleGroup(cadastrosOpen, setCadastrosOpen)}
+              title={collapsed ? cadastrosGroup.label : undefined}
               data-figma="SidebarGroup"
               data-figma-label={cadastrosGroup.label}
               data-figma-variant={isCadastroItemActive ? "ativo" : "inativo"}
@@ -281,17 +319,19 @@ export default function Sidebar() {
                 className={`${navItemIconCls} ${isCadastroItemActive ? "" : navItemIconInactiveCls}`}
                 aria-hidden="true"
               />
-              <span>{cadastrosGroup.label}</span>
-              <ChevronDown
-                size={16}
-                strokeWidth={1.75}
-                className={navChevronCls}
-                style={{ transform: cadastrosOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-                aria-hidden="true"
-              />
+              {renderLabel(cadastrosGroup.label)}
+              {!collapsed && (
+                <ChevronDown
+                  size={16}
+                  strokeWidth={1.75}
+                  className={navChevronCls}
+                  style={{ transform: cadastrosOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                  aria-hidden="true"
+                />
+              )}
             </button>
 
-            {cadastrosOpen && (
+            {!collapsed && cadastrosOpen && (
               <div className={subItemsCls}>
                 {visibleCadastroItems.map((item) => {
                   const Icon = item.icon;
@@ -326,8 +366,9 @@ export default function Sidebar() {
           return (
             <button
               key={item.path}
-              className={`${navItemCls} ${active ? navItemActiveCls : ""}`}
+              className={`${itemCls} ${active ? navItemActiveCls : ""}`}
               onClick={() => navigate(item.path)}
+              title={collapsed ? item.label : undefined}
               data-figma="SidebarItem"
               data-figma-label={item.label}
               data-figma-variant={active ? "ativo" : "inativo"}
@@ -338,26 +379,30 @@ export default function Sidebar() {
                 className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
                 aria-hidden="true"
               />
-              <span>{item.label}</span>
+              {renderLabel(item.label)}
             </button>
           );
         })}
       </nav>
 
-      {/* Rodapé fixo: informações do usuário */}
+      {/* Rodapé fixo: informações do usuário (no rail, só o avatar) */}
       <div className="relative w-full shrink-0" ref={menuRef}>
         <button
-          className={userInfoCls}
+          className={collapsed ? userInfoCollapsedCls : userInfoCls}
           onClick={() => setUserMenuOpen(!userMenuOpen)}
+          title={collapsed ? user?.nome ?? "Usuário" : undefined}
+          aria-label={collapsed ? "Menu do usuário" : undefined}
         >
           <div className="w-10 h-10 rounded-full bg-[#f2f4f8] flex items-center justify-center font-sans text-sm font-semibold text-[#001d6c] shrink-0">
             {initial}
           </div>
-          <span className="font-sans text-xs text-black">{user?.nome ?? "Carregando..."}</span>
+          {!collapsed && (
+            <span className="font-sans text-xs text-black">{user?.nome ?? "Carregando..."}</span>
+          )}
         </button>
 
         {userMenuOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-[#dde1e6] rounded-[10px] shadow-[0_4px_16px_rgba(0,0,0,0.1)] overflow-hidden z-[100]">
+          <div className={collapsed ? userMenuCollapsedCls : userMenuCls}>
             <div className="flex flex-col gap-[2px] p-3">
               <span className="font-sans text-[0.8125rem] font-semibold text-ink">{user?.nome}</span>
               <span className="font-sans text-xs text-[#697077]">{user?.login}</span>

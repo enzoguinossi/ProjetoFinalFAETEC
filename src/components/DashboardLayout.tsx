@@ -15,7 +15,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-white text-ink" data-figma="AppShell">
       <div data-print-hide className="contents">
-        {sidebarOpen && <Sidebar />}
+        <Sidebar collapsed={!sidebarOpen} onExpand={() => setSidebarOpen(true)} />
       </div>
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Header */}
