@@ -6,8 +6,8 @@
 ## Objetivo atual
 
 **Em andamento: movimentação de estoque (KAN-140)**, na branch
-**`KAN-140-mov-estoque`** — **34 commits** sobre a `main` local (`1097e0f`) e **41** sobre
-`origin/main` (`6922050`), medidos em `1ca55a6`; **nada integrado nem publicado**.
+**`KAN-140-mov-estoque`** — **36 commits** sobre a `main` local (`1097e0f`) e **43** sobre
+`origin/main` (`6922050`), medidos em `fbb2146`; **nada integrado nem publicado**.
 
 Entregue nesta branch:
 
@@ -27,6 +27,9 @@ Entregue nesta branch:
 7. **Tipo de Saída** — Remessa (reserva), Avaria e Consumo Interno (baixa real na
    criação, sem destinatário e sem reserva), com itens inline sem campos de valor
    (`9f12115`).
+8. **Unidade padrão do sistema** — `UNIDADE` (fator 1) é única padrão e não excluível;
+   todo produto tem unidade obrigatória; excluir outra unidade revincula os produtos à
+   padrão (`fbb2146`).
 
 **Entregue antes:** release `1.17.10.2026`; documentação revisada e reorganizada;
 requisitos reclassificados.
@@ -91,6 +94,8 @@ requisitos reclassificados.
 | RUN-20261023-36 | Módulo de expedições | developer | concluído (`e119c4d`) | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261023-37 | Execução da entrega, baixa e conclusão | developer | concluído (`89c2f52`) | `KAN-140-mov-estoque` | KAN-140 |
 | RUN-20261024-38 | Tipo de saída (Remessa/Avaria/Consumo) e itens sem valores | developer | concluído (`9f12115`) | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261024-39 | Unidade padrão do sistema e conversão obrigatória | developer | concluído (`fbb2146`, junto do 40) | `KAN-140-mov-estoque` | KAN-140 |
+| RUN-20261024-40 | Unidade sem sigla e exclusão com revínculo à padrão | developer | concluído (`fbb2146`) | `KAN-140-mov-estoque` | KAN-140 |
 
 Os runs 04–12 não têm issue: **decisão explícita do usuário** de commitar sem chave. É uma
 **exceção consciente** à regra 1 de smart commits do `AGENTS.md`.
@@ -111,6 +116,9 @@ expedicao (veículo, condutor, data prevista, PLANEJADA/EM_PERCURSO/CONCLUIDA)
   `BAIXA_COM_CORTE`, `CANCELADA`.
 - `percurso`/`percurso_destinatario` continuam como template, **sem** `ativo` (exclusão
   física) e **não** são gravados na expedição.
+- `conversao_unidade`: `UNIDADE` (fator 1) é a única `padrao`, não excluível e com
+  nome/fator travados. Excluir outra unidade revincula os produtos à padrão. Todo produto
+  tem `id_conversao_padrao` **obrigatório**. Não existe `sigla`.
 
 ## Decisões de 2026-10-23 (substituem parte das de 19/10)
 
@@ -162,6 +170,10 @@ os pedidos vinculados precisam ser do destinatário da nota.
 
 ## Último checkpoint válido
 
+- **2026-10-24** — **unidade padrão** (`fbb2146`): `UNIDADE` (fator 1) é a única `padrao`,
+  não excluível, com nome/fator travados; `produto.ID_conversao_padrao` é **NOT NULL** e
+  recebe a padrão automaticamente; excluir outra unidade revincula os produtos à padrão.
+  Sem `sigla`. **263 testes**, lint, build e `figma:check` verdes.
 - **2026-10-24** — **Tipo de Saída** (`9f12115`): Remessa reserva; Avaria e Consumo Interno
   não têm destinatário, não reservam e baixam o estoque na criação; itens inline sem
   valores. **254 testes**, lint, build e `figma:check` verdes.
@@ -178,7 +190,7 @@ os pedidos vinculados precisam ser do destinatário da nota.
 
 ## Testes executados (2026-10-24, Orquestrador)
 
-- `npm test` → **254/254 (25 arquivos)**.
+- `npm test` → **263/263 (25 arquivos)**.
 - `npm run lint` → exit 0 · `npm run build` → *Compiled successfully* (18 rotas, incluindo
   `/expedicoes`, `/expedicoes/[id]` e `/expedicoes/percursos`).
 - `npm run figma:check` → *plugin verificado sem problemas* (47 cenários).
