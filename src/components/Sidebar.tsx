@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import {
   cadastroItems,
   cadastrosGroup,
@@ -33,6 +33,7 @@ import {
 
 interface SidebarProps {
   collapsed: boolean;
+  onToggle: () => void;
   onExpand?: () => void;
   user: SidebarUser | null;
 }
@@ -41,7 +42,7 @@ const MovEstoqueIcon = movEstoqueGroup.icon;
 const ExpedicoesIcon = expedicoesGroup.icon;
 const CadastrosIcon = cadastrosGroup.icon;
 
-export default function Sidebar({ collapsed, onExpand, user }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, onExpand, user }: SidebarProps) {
   // Grupos persistidos: sobrevivem à remontagem a cada navegação.
   const grupos = useSyncExternalStore(
     sidebarGruposStore.assinar,
@@ -93,6 +94,24 @@ export default function Sidebar({ collapsed, onExpand, user }: SidebarProps) {
       data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
       data-print-hide
     >
+      <div
+        className={`flex items-center shrink-0 px-1 pb-2 ${collapsed ? "justify-center" : "justify-end"}`}
+      >
+        <button
+          type="button"
+          className="flex items-center justify-center w-8 h-8 shrink-0 border-none bg-transparent text-[#697077] cursor-pointer rounded-md transition-colors duration-150 hover:bg-[#f2f4f8] hover:text-ink"
+          onClick={onToggle}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <PanelLeftClose size={18} strokeWidth={1.75} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+
       <nav className={navCls} aria-label="Menu principal">
         {navTopItems.map((item) => {
           const Icon = item.icon;

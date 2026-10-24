@@ -82,16 +82,16 @@ export const cadastrosGroup: { label: string; icon: LucideIcon } = {
   icon: Database,
 };
 
-// Base sem largura: o modo (expandido ou rail) decide `w-*` e o overflow.
-// `h-full` preenche a linha abaixo do header (a sidebar não é mais coluna sticky).
+// Base sem largura: a largura vem da coluna do grid do `DashboardLayout`
+// (256px aberta / 72px recolhida), que é quem anima a transição.
+// `w-full h-full` preenche a célula; o modo decide só padding e overflow.
 export const sidebarCls =
-  "h-full bg-white flex flex-col shrink-0 border-r border-border py-3 box-border transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]";
+  "w-full h-full min-h-0 bg-white flex flex-col shrink-0 border-r border-border py-3 box-border";
 
-export const sidebarExpandedCls =
-  "w-[var(--sidebar-width)] px-2 overflow-hidden";
+export const sidebarExpandedCls = "px-2 overflow-hidden";
 
 // Rail: só os ícones. `overflow-visible` deixa o conteúdo escapar da rail.
-export const sidebarCollapsedCls = "w-[72px] px-2 overflow-visible";
+export const sidebarCollapsedCls = "px-2 overflow-visible";
 
 export const navCls =
   "flex-1 min-h-0 w-full flex flex-col gap-1 overflow-y-auto overflow-x-hidden py-1 px-1 [scrollbar-width:thin] [scrollbar-color:#dde1e6_transparent] [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#dde1e6]";
