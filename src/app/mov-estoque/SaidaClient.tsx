@@ -109,7 +109,13 @@ export default function SaidaClient({
     },
     { key: "tipoLabel", label: "Tipo", width: "1.2fr", align: "center" },
     { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
-    { key: "itens", label: "Itens", width: "0.9fr", align: "right" },
+    {
+      key: "itens",
+      label: "Itens",
+      width: "0.9fr",
+      align: "right",
+      render: (_value, row) => formatarNumero(row.quantidade),
+    },
     { key: "statusLabel", label: "Status", width: "1.2fr", align: "center" },
     ...(podeConsultarNota || podeAlterarNota
       ? [

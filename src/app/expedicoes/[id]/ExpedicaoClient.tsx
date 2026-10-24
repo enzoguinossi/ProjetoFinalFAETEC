@@ -4,18 +4,15 @@ import { useEffect, useState } from "react";
 import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
-import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
 import { hojeISO } from "@/lib/formatar";
-import type { Column } from "@/components/DataTable";
 import type { PermissoesEntidade } from "@/types";
+import AdicionarNotasModal from "./AdicionarNotasModal";
 import {
-  adicionarNotaExpedicao,
   concluirExpedicao,
   despacharExpedicao,
   listarCondutoresParaExpedicao,
-  listarNotasElegiveis,
   listarVeiculosParaExpedicao,
   marcarNotaNaoEntregue,
   moverNotasExpedicao,
@@ -26,7 +23,6 @@ import {
   type CondutorExpedicaoRow,
   type ExpedicaoFormData,
   type ExpedicaoNotaRow,
-  type NotaElegivelRow,
   type VeiculoExpedicaoRow,
 } from "../actions";
 
@@ -52,19 +48,6 @@ const statusCls: Record<string, string> = {
   EM_PERCURSO: "bg-[#fff4e5] text-[#7a4100]",
   CONCLUIDA: "bg-[#e7f6ec] text-[#0f5132]",
 };
-
-const COLUNAS_NOTA: Column<NotaElegivelRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
-  { key: "itens", label: "Itens", width: "0.8fr", align: "right" },
-  {
-    key: "saldo_pendente",
-    label: "Saldo pendente",
-    width: "1.2fr",
-    align: "right",
-    render: (value) => formatarNumero(Number(value ?? 0)),
-  },
-];
 
 function EntregaForm({
   nota,
@@ -703,25 +686,12 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
         />
       </Modal>
 
-      <SearchEntityModal<NotaElegivelRow>
+      <AdicionarNotasModal
         open={buscandoNota}
         onClose={() => setBuscandoNota(false)}
-        onSelect={(nota) => {
-          void executar(
-            () =>
-              adicionarNotaExpedicao(
-                detalhe.id_expedicao,
-                nota.id_nota_saida,
-              ),
-            "Nota adicionada à expedição.",
-          );
-        }}
-        title="Adicionar nota à expedição"
-        columns={COLUNAS_NOTA}
-        loadPage={listarNotasElegiveis}
-        getItemId={(nota) => nota.id_nota_saida}
-        excludeIds={detalhe.notas.map((nota) => nota.id_nota_saida)}
-        placeholder="Filtrar por código ou destinatário..."
+        idExpedicao={detalhe.id_expedicao}
+        notas={detalhe.notas}
+        onAlterada={recarregar}
       />
 
       <ConfirmDialog
