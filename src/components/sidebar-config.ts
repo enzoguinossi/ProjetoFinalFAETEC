@@ -21,6 +21,7 @@ export const movEstoqueItems = [
 ];
 
 export const expedicaoItems = [
+  { label: "Expedições", path: "/expedicoes", icon: "/icons/nav/dados.svg", permissao: "expedicao.listar" },
   { label: "Percursos", path: "/expedicoes/percursos", icon: "/icons/nav/dados.svg", permissao: "percurso.listar" },
 ];
 
