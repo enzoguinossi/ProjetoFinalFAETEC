@@ -34,14 +34,14 @@ export default function DashboardLayout({
   return (
     <div className="flex flex-col h-screen bg-white text-ink" data-figma="AppShell">
       <header
-        className="flex items-center justify-between gap-2 w-full h-[var(--header-height)] min-h-10 px-3 bg-brand shrink-0 box-border"
+        className="flex items-center justify-between gap-2 w-full h-[var(--header-height)] min-h-10 px-4 bg-brand shrink-0 box-border"
         data-figma="AppBar"
         data-figma-title={title ?? ""}
         data-print-hide
       >
         <div className="flex items-center gap-2 min-w-0">
           <Link href="/dashboard" aria-label="Nexus" className="flex items-center shrink-0">
-            <img src="/logo_horizontal.svg" alt="Nexus" className="h-6 w-auto" />
+            <img src="/logo_horizontal.svg" alt="Nexus" className="h-10 w-auto" />
           </Link>
           <button
             type="button"
