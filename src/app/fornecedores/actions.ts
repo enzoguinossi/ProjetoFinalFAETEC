@@ -104,8 +104,9 @@ export async function createFornecedor(formData: FormData) {
 
     const endereco = lerEnderecoDoFormData(formData);
 
+    let id_fornecedor: number;
     try {
-      await fornecedorDAO.create({
+      const criado = await fornecedorDAO.create({
         razao_social: razao_social.trim(),
         cnpj: (formData.get("cnpj") as string) || undefined,
         contato: (formData.get("contato") as string) || undefined,
@@ -113,11 +114,12 @@ export async function createFornecedor(formData: FormData) {
         ...contatoResult.contatos,
         endereco: endereco.logradouro ? endereco : undefined,
       }, user.id_usuario);
+      id_fornecedor = criado.id_fornecedor;
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }
 
-    return { success: true };
+    return { success: true, id_fornecedor };
   });
 }
 

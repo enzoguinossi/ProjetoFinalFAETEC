@@ -1,0 +1,136 @@
+name: Erro encontrado
+description: Reporte um problema com módulo, passos para reproduzir e evidência.
+title: "[Erro] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Um reporte = um problema.** Sem os passos e a evidência não é possível reproduzir.
+        Não cole senhas nem dados pessoais.
+
+  - type: input
+    id: testador
+    attributes:
+      label: Testador
+      placeholder: Seu nome
+    validations:
+      required: true
+
+  - type: dropdown
+    id: modulo
+    attributes:
+      label: Módulo
+      description: Onde o problema aconteceu.
+      options:
+        - Login / primeiro acesso
+        - Dashboard
+        - Pedidos
+        - Relatórios
+        - Cadastros — Usuários
+        - Cadastros — Funcionários
+        - Cadastros — Destinatários
+        - Cadastros — Produtos
+        - Cadastros — Fornecedores
+        - Cadastros — Veículos
+        - Mov. Estoque — Entrada
+        - Mov. Estoque — Saída
+        - Expedições — Expedições
+        - Expedições — Percursos
+        - Unidades de conversão (dentro de Produtos)
+    validations:
+      required: true
+
+  - type: input
+    id: tela
+    attributes:
+      label: Tela / URL
+      placeholder: https://localhost:3000/mov-estoque/saida
+    validations:
+      required: true
+
+  - type: input
+    id: login
+    attributes:
+      label: Login usado no teste
+      placeholder: jeff
+    validations:
+      required: true
+
+  - type: input
+    id: navegador
+    attributes:
+      label: Navegador / dispositivo
+      placeholder: Chrome 141, desktop
+
+  - type: dropdown
+    id: severidade
+    attributes:
+      label: Severidade
+      options:
+        - Bloqueador — impede concluir o fluxo e não há contorno
+        - Crítico — risco de dado errado (estoque, reserva, baixa, permissão)
+        - Maior — função importante errada, com contorno manual
+        - Menor — comportamento secundário ou visual que atrapalha
+        - Cosmético — texto, ícone, espaçamento
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequencia
+    attributes:
+      label: Frequência
+      options:
+        - Sempre
+        - Às vezes
+        - Uma vez
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir
+      description: Comece pelo login e numere cada passo.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Resultado esperado
+    validations:
+      required: true
+
+  - type: textarea
+    id: obtido
+    attributes:
+      label: Resultado obtido
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidência
+      description: Arraste o print ou vídeo e cole a mensagem de erro, se houver.
+      placeholder: Arraste a imagem aqui.
+    validations:
+      required: true
+
+  - type: input
+    id: registro
+    attributes:
+      label: Registro envolvido
+      description: ID da nota, produto, expedição etc. Ajuda a reproduzir no banco.
+      placeholder: nota de saída 12 / produto 000003 / expedição 4
+
+  - type: textarea
+    id: observacoes
+    attributes:
+      label: Observações
+      description: Qualquer coisa que ajude a reproduzir.

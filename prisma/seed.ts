@@ -53,7 +53,9 @@ async function main() {
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
-    "remessa.criar", "remessa.alterar_status", "remessa.finalizar",
+    "nota_saida.alterar_status", "nota_saida.finalizar",
+    "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
+    "expedicao.listar", "expedicao.criar", "expedicao.alterar", "expedicao.consultar", "expedicao.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",
@@ -68,13 +70,32 @@ async function main() {
   }
   console.log(`  ✅ ${permissoes.length} permissões`);
 
-  // ── Limpeza: perfis não são mais desativados ────────────────────
-  const obsoleta = await prisma.permissao.findUnique({ where: { nome: "perfil.desativar" } });
-  if (obsoleta) {
+  // ── Limpeza: permissões obsoletas ───────────────────────────────
+  // `remessa.*` e `rota.*` são nomes de modelos antigos, já fundidos na nota de
+  // saída e na expedição. Eles aparecem aqui de propósito: esta lista não é o
+  // modelo atual, serve para limpar ambientes que ainda tenham as permissões
+  // antigas.
+  const obsoletas = [
+    "perfil.desativar",
+    "percurso.desativar",
+    "rota.listar",
+    "rota.criar",
+    "rota.alterar",
+    "rota.consultar",
+    "rota.desativar",
+    "remessa.criar",
+    "remessa.alterar",
+    "remessa.alterar_status",
+    "remessa.consultar",
+    "remessa.finalizar",
+  ];
+  for (const nome of obsoletas) {
+    const obsoleta = await prisma.permissao.findUnique({ where: { nome } });
+    if (!obsoleta) continue;
     await prisma.perfilPermissao.deleteMany({ where: { id_permissao: obsoleta.id_permissao } });
     await prisma.usuarioPermissao.deleteMany({ where: { id_permissao: obsoleta.id_permissao } });
     await prisma.permissao.delete({ where: { id_permissao: obsoleta.id_permissao } });
-    console.log("  ✅ Permissão obsoleta perfil.desativar removida");
+    console.log(`  ✅ Permissão obsoleta ${nome} removida`);
   }
 
   // ── Perfis-template ─────────────────────────────────────────────
@@ -86,7 +107,7 @@ async function main() {
         "produto.consultar", "produto.criar",
         "estoque.entrada", "estoque.ver_saldo",
         "nota_saida.criar", "nota_saida.consultar", "nota_saida.alterar",
-        "remessa.criar", "remessa.alterar_status", "remessa.finalizar",
+        "nota_saida.alterar_status", "nota_saida.finalizar",
         "destinatario.consultar",
         "inventario.contar",
       ],
@@ -123,19 +144,28 @@ async function main() {
   }
 
   // ── Unidades de Conversão ───────────────────────────────────────
+  // UNIDADE (fator 1) é a unidade padrão do sistema: existe exatamente
+  // uma com `padrao = true` e ela não pode ser excluída nem ter nome
+  // ou fator alterados pela interface.
   const conversoes = [
-    { nome: "UNIDADE", fator: 1, descricao: "Unidade avulsa" },
-    { nome: "PACOTE", fator: 10, descricao: "Pacote com 10 unidades" },
-    { nome: "CAIXA", fator: 50, descricao: "Caixa com 50 unidades" },
+    { nome: "UNIDADE", fator: 1, descricao: "Unidade avulsa", padrao: true },
+    { nome: "PACOTE", fator: 10, descricao: "Pacote com 10 unidades", padrao: false },
+    { nome: "CAIXA", fator: 50, descricao: "Caixa com 50 unidades", padrao: false },
   ];
 
   for (const c of conversoes) {
     await prisma.conversaoUnidade.upsert({
       where: { nome: c.nome },
-      update: { fator: c.fator, descricao: c.descricao },
+      update: { fator: c.fator, descricao: c.descricao, padrao: c.padrao },
       create: c,
     });
   }
+
+  // Invariante: apenas a UNIDADE é padrão.
+  await prisma.conversaoUnidade.updateMany({
+    where: { NOT: { nome: "UNIDADE" } },
+    data: { padrao: false },
+  });
   console.log("  ✅ Conversões de unidade");
 
   console.log("\n✨ Seed concluído!");

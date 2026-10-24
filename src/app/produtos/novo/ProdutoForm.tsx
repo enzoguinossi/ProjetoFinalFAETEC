@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { createProduto, updateProduto, getProduto, searchProdutos } from "../actions";
+import { createProduto, updateProduto, getProduto, listarProdutos } from "../actions";
 import type { ProdutoFormData } from "../actions";
 import DataTable from "@/components/DataTable";
 import SearchEntityModal from "@/components/SearchEntityModal";
+import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
@@ -18,6 +19,7 @@ interface Conversao {
   nome: string;
   fator: number;
   descricao: string | null;
+  padrao: boolean;
 }
 
 interface TipoCodigo {
@@ -58,7 +60,11 @@ export default function ProdutoForm({
   const [composto, setComposto] = useState(initialData?.composto ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [descricao, setDescricao] = useState(initialData?.descricao ?? "");
-  const [idConversao, setIdConversao] = useState(initialData?.id_conversao_padrao ?? null);
+  const [idConversao, setIdConversao] = useState<number | null>(
+    initialData?.id_conversao_padrao ??
+      conversoes.find((c) => c.padrao)?.id_conversao ??
+      null,
+  );
   const [conversoesAtuais, setConversoesAtuais] = useState<Conversao[]>(conversoes);
   const [unidadesModalOpen, setUnidadesModalOpen] = useState(false);
 
@@ -72,9 +78,9 @@ export default function ProdutoForm({
   const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
 
   const insumoColumns: import("@/components/DataTable").Column<InsumoEntry>[] = [
-    { key: "descricao", label: "Produto", width: "3fr" },
+    { key: "descricao", label: "Produto", width: "3fr", align: "left" },
     {
-      key: "qtd", label: "Quantidade", width: "1fr",
+      key: "qtd", label: "Quantidade", width: "1fr", align: "right",
       render: (value: string | number, row: InsumoEntry) => (
         <input
           type="number"
@@ -190,10 +196,10 @@ export default function ProdutoForm({
             <select
               className={`${INPUT_CLASS} flex-1`}
               name="id_conversao"
+              required
               value={idConversao ?? ""}
               onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
             >
-              <option value="">Selecione...</option>
               {conversoesAtuais.map((c) => (
                 <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
               ))}
@@ -287,21 +293,35 @@ export default function ProdutoForm({
         </div>
       </form>
 
-      <SearchEntityModal
+      <SearchEntityModal<ProdutoListRow>
         open={buscandoIdx !== null}
         onClose={() => { setBuscandoIdx(null); setEditandoIns(null); }}
         onSelect={onSelectInsumo}
-        searchAction={searchProdutos}
+        title="Selecionar Produto"
+        columns={COLUNAS_PRODUTO}
+        loadPage={listarProdutos}
         getItemId={(item) => item.id_produto}
-        getItemLabel={(item) => item.descricao}
         excludeIds={insumos.map((i) => i.id).filter((id) => id > 0)}
+        placeholder="Filtrar produto por código ou descrição..."
       />
 
       <UnidadesModal
         open={unidadesModalOpen}
         onClose={() => setUnidadesModalOpen(false)}
         initial={conversoesAtuais}
-        onChanged={(lista) => setConversoesAtuais(lista.map((u) => ({ id_conversao: u.id_conversao, nome: u.nome, fator: u.fator, descricao: u.descricao })))}
+        onChanged={(lista) => {
+          const mapeadas = lista.map((u) => ({
+            id_conversao: u.id_conversao,
+            nome: u.nome,
+            fator: u.fator,
+            descricao: u.descricao,
+            padrao: u.padrao,
+          }));
+          setConversoesAtuais(mapeadas);
+          if (idConversao === null) {
+            setIdConversao(mapeadas.find((c) => c.padrao)?.id_conversao ?? null);
+          }
+        }}
       />
 
       <Modal

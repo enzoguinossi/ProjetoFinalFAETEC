@@ -23,8 +23,8 @@ interface Props {
 }
 
 const columns: Column<FornecedorListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "razao", label: "Razão Social", width: "5fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "razao", label: "Razão Social", width: "5fr", align: "left" },
 ];
 
 export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Props) {

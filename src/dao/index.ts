@@ -5,5 +5,8 @@ export { fornecedorDAO } from "./fornecedor";
 export { veiculoDAO } from "./veiculo";
 export { produtoDAO } from "./produto";
 export { estoqueDAO } from "./estoque";
+export { notaEntradaDAO } from "./nota-entrada";
 export { tipoCodigoDAO } from "./tipo-codigo";
 export { conversaoUnidadeDAO } from "./conversao-unidade";
+export { notaSaidaDAO } from "./nota-saida";
+export { percursoDAO } from "./percurso";

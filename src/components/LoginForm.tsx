@@ -65,7 +65,7 @@ export default function LoginForm() {
         </div>
 
         {/* Versão */}
-        <div className="text-center font-[family-name:monospace] text-xs text-[#8a8f9a] pb-1">V1.0.0</div>
+        <div className="text-center font-[family-name:monospace] text-xs text-[#8a8f9a] pb-1">{`V${process.env.NEXT_PUBLIC_APP_VERSION}`}</div>
       </form>
     </div>
   );

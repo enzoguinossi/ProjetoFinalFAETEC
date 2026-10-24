@@ -20,8 +20,8 @@ interface Props {
 }
 
 const columns = [
-  { key: "tipo" as const, label: "Tipo", width: "1.5fr" },
-  { key: "valor" as const, label: "Código", width: "2fr" },
+  { key: "tipo" as const, label: "Tipo", width: "1.5fr", align: "left" as const },
+  { key: "valor" as const, label: "Código", width: "2fr", align: "center" as const },
 ];
 
 export default function CodigosSection({

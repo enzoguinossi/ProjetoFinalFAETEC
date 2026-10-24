@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatorio - Funcionarios</title>
+  <link rel="stylesheet" href="Relatorio.css">
+</head>
+<body>
+
+  <div class="relatorio-container">
+    
+    <div class="conteudo-principal">
+      <!-- CABECALHO -->
+      <header class="relatorio-header">
+        <div>
+          <h1 class="titulo-relatorio">Relatorio de Funcionarios</h1>
+        </div>
+        <div class="meta-info">
+          <p>Emissao: {{DATA_EMISSAO}} {{HORA_EMISSAO}}</p>
+          <p>Pag: {{PAGINA_ATUAL}} / {{TOTAL_PAGINAS}}</p>
+        </div>
+      </header>
+
+      <!-- TABELA DE FUNCIONARIOS -->
+      <table class="relatorio-tabela">
+        <thead>
+          <tr>
+            <th style="width: 8%;" class="col-centro">Codigo</th>
+            <th style="width: 20%;">Nome</th>
+            <th style="width: 13%;" class="col-centro">CPF</th>
+            <th style="width: 13%;">Cargo</th>
+            <th style="width: 9%;" class="col-centro">Condutor</th>
+            <th style="width: 9%;" class="col-centro">Situacao</th>
+            <th style="width: 17%;">E-mail Principal</th>
+            <th style="width: 11%;" class="col-centro">Telefone</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-centro">{{CODIGO}}</td>
+            <td>{{NOME}}</td>
+            <td class="col-centro">{{CPF}}</td>
+            <td>{{CARGO}}</td>
+            <td class="col-centro">{{CONDUTOR}}</td>
+            <td class="col-centro">{{SITUACAO}}</td>
+            <td>{{EMAIL_PRINCIPAL}}</td>
+            <td class="col-centro">{{TELEFONE_PRINCIPAL}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RODAPE -->
+    <footer class="relatorio-footer">
+      <span>Emissor: {{USUARIO_EMISSOR}}</span>
+      <span>Documento gerado para uso interno</span>
+    </footer>
+
+  </div>
+
+</body>
+</html>

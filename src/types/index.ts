@@ -1,16 +1,13 @@
 // ── Constantes ──────────────────────────────────────────────────────
 
 export const STATUS_NOTA_SAIDA = [
-  "ABERTA", "EM_ANDAMENTO", "BAIXA_TOTAL",
-  "BAIXA_PARCIAL", "BAIXA_COM_CORTE", "CANCELADA",
+  "ABERTA", "EM_PERCURSO", "PENDENTE",
+  "BAIXA_TOTAL", "BAIXA_PARCIAL", "BAIXA_COM_CORTE", "CANCELADA",
 ] as const;
 export type StatusNotaSaida = (typeof STATUS_NOTA_SAIDA)[number];
 
-export const STATUS_REMESSA = [
-  "EM_PREPARACAO", "PRONTO_PARA_ENTREGA", "EM_PERCURSO",
-  "PENDENTE", "FINALIZADO_TOTAL", "FINALIZADO_PARCIAL",
-] as const;
-export type StatusRemessa = (typeof STATUS_REMESSA)[number];
+export const STATUS_EXPEDICAO = ["PLANEJADA", "EM_PERCURSO", "CONCLUIDA"] as const;
+export type StatusExpedicao = (typeof STATUS_EXPEDICAO)[number];
 
 export const STATUS_PEDIDO = ["PENDENTE", "CONFIRMADO", "RECUSADO"] as const;
 export type StatusPedido = (typeof STATUS_PEDIDO)[number];
@@ -29,7 +26,7 @@ export type TipoTelefone = (typeof TIPO_TELEFONE)[number];
 export const TIPO_DESTINATARIO = ["ESCOLA", "CRECHE"] as const;
 export type TipoDestinatario = (typeof TIPO_DESTINATARIO)[number];
 
-export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_ROTA"] as const;
+export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_EXPEDICAO"] as const;
 export type StatusVeiculo = (typeof STATUS_VEICULO)[number];
 
 export const STATUS_INVENTARIO = [

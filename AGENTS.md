@@ -10,7 +10,7 @@ O sistema centraliza:
 * controle de estoque;
 * pedidos e notas de saída;
 * remessas e entregas;
-* rotas e percursos;
+* expedições e percursos;
 * inventário;
 * usuários, perfis e permissões;
 * auditoria;
@@ -164,6 +164,12 @@ As convenções documentadas são:
 * entidades de cadastro possuem `ativo`;
 * **hard delete é proibido** para entidades de cadastro;
 * desativação deve ser utilizada no lugar de exclusão física.
+* **Exceções (sem `ativo`, exclusão física):** `conversao_unidade` e `percurso` são
+  excluídos fisicamente e não possuem `ativo`; as demais entidades de cadastro continuam
+  com desativação (`ativo = false`). A unidade **padrão** do sistema (UNIDADE/1) é a
+  exceção dentro da exceção: não pode ser excluída nem ter nome ou fator alterados
+  — só a descrição é editável. Ao excluir uma unidade que não é a padrão, os produtos
+  que a usavam são revinculados à unidade padrão.
 
 Preserve as convenções existentes do projeto.
 
@@ -199,27 +205,37 @@ quantidade_atual += quantidade_convertida
 
 e gera registro de movimentação de estoque.
 
-## 8.2 Nota de saída
+## 8.2 Reserva (nota de saída Remessa)
 
-Criar uma Nota de Saída **reserva** estoque:
+Criar uma **nota de saída do tipo Remessa (`SAIDA`) com itens e destinatário** reserva estoque:
 
 ```text
 saldo_reservado += quantidade
 ```
 
-A criação da nota não representa baixa física definitiva.
+A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa. Criar a
+nota também não representa baixa física definitiva.
+
+**Avaria (`AVARIA`) e Consumo Interno (`CONSUMO_INTERNO`)** não são remessa: não têm destinatário,
+**não reservam** e dão **baixa real na criação** (`quantidade_atual -= quantidade`, com movimentação
+negativa e `ID_nota_saida`); a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`. A
+reserva acima vale apenas para Remessa.
 
 ## 8.3 Cancelamento
 
-O cancelamento libera a reserva:
+O cancelamento da **nota de saída em Remessa** libera a reserva:
 
 ```text
 saldo_reservado -= quantidade
 ```
 
-## 8.4 Remessa finalizada
+A nota vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
+sem debitar a reserva outra vez. Notas de Avaria/Consumo Interno já baixadas não são canceláveis —
+são histórico; a correção é uma nota nova.
 
-A baixa definitiva ocorre quando a remessa é finalizada:
+## 8.4 Nota baixada
+
+A baixa definitiva ocorre quando a entrega da nota é finalizada:
 
 ```text
 quantidade_atual -= quantidade_entregue
@@ -255,7 +271,7 @@ do vencimento.
 
 Uma entrega parcial gera uma pendência automática para os itens restantes.
 
-Os itens não entregues permanecem comprometidos conforme o modelo de reserva e podem seguir para nova remessa/rota.
+Os itens não entregues permanecem comprometidos conforme o modelo de reserva e podem seguir para nova remessa/expedição.
 
 A "pendência" é a própria remessa `PENDENTE` criada no split (vinculada por `remessa.ID_destinatario`) — sem tabela nova. Decisão do usuário de 2026-10-19, detalhada em `docs/dominio/ENTENDIMENTO.md` §3.11.2; o sentido da regra não mudou.
 
@@ -389,22 +405,25 @@ para excluir fisicamente entidades de cadastro.
 
 Quando a entidade possuir `ativo`, utilize a desativação prevista pelo domínio.
 
+**Exceções:** `conversao_unidade` e `percurso` são excluídos fisicamente e **não possuem
+`ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. A unidade
+**padrão** (`padrao = true`, UNIDADE/1) **não pode ser excluída** nem ter nome ou
+fator alterados; ao excluir uma unidade que não é a padrão, os produtos que a usavam são
+**revinculados à unidade padrão**. As demais
+entidades de cadastro continuam com desativação.
+
 Históricos operacionais e registros de auditoria devem permanecer preservados.
 
 ---
 
-# 14. Remessas e rotas
+# 14. Entregas e expedições
 
 O ciclo operacional principal é:
 
 ```text
-Nota de Saída
+Nota de Saída (destinatário + itens + reserva)
     ↓
-Reserva de estoque
-    ↓
-Remessa
-    ↓
-Rota
+Expedição (manifesto: veículo, condutor, ordem)
     ↓
 Preparação
     ↓
@@ -417,18 +436,17 @@ Baixa
 
 Status e transições devem respeitar o modelo documentado.
 
-Uma remessa pendente pode ser adicionada posteriormente a outra rota.
+Uma nota pendente pode ser adicionada posteriormente a outra expedição.
 
-Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante.
+Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante;
+a pendência é a própria nota em `BAIXA_PARCIAL` (sem split e sem remessa).
 
 Não implemente um novo fluxo de entrega sem verificar:
 
 * `nota_saida`;
 * `item_nota_saida`;
-* `remessa`;
-* `item_remessa`;
-* `rota`;
-* `rota_remessa`;
+* `expedicao`;
+* `expedicao_nota`;
 * `coleta`.
 
 ---

@@ -14,6 +14,7 @@ interface Conversao {
   nome: string;
   fator: number;
   descricao: string | null;
+  padrao: boolean;
 }
 
 interface TipoCodigo {
@@ -45,8 +46,8 @@ export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: 
   }));
 
   const insumoColumns: Column<InsumoEntry>[] = [
-    { key: "descricao", label: "Produto", width: "3fr" },
-    { key: "qtd", label: "Quantidade", width: "1fr" },
+    { key: "descricao", label: "Produto", width: "3fr", align: "left" },
+    { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
   ];
 
   const insumoActions: Action<InsumoEntry>[] = [
@@ -70,8 +71,7 @@ export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: 
 
         <div className="flex flex-col gap-2">
           <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Entrada</label>
-          <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_padrao ?? ""} disabled>
-            <option value="">Selecione...</option>
+          <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_padrao} disabled>
             {conversoes.map((c) => (
               <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
             ))}

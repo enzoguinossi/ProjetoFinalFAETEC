@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatorio - Extrato de Produto</title>
+  <link rel="stylesheet" href="Relatorio.css">
+</head>
+<body>
+
+  <div class="relatorio-container">
+    
+    <div class="conteudo-principal">
+      <!-- CABECALHO -->
+      <header class="relatorio-header">
+        <div>
+          <h1 class="titulo-relatorio">Extrato de Produto</h1>
+          <p style="font-size: 8.5pt; font-weight: bold; margin-top: 4px;">
+            Produto: {{CODIGO_PRODUTO}} - {{NOME_PRODUTO}}
+          </p>
+        </div>
+        <div class="meta-info">
+          <p>Emissao: {{DATA_EMISSAO}} {{HORA_EMISSAO}}</p>
+          <p>Pag: {{PAGINA_ATUAL}} / {{TOTAL_PAGINAS}}</p>
+        </div>
+      </header>
+
+      <!-- TABELA DE MOVIMENTAÇÕES -->
+      <table class="relatorio-tabela">
+        <thead>
+          <tr>
+            <th style="width: 14%;" class="col-centro">Data</th>
+            <th style="width: 26%;">Documento</th>
+            <th style="width: 30%;">Tipo Mov.</th>
+            <th style="width: 30%;" class="col-direita">Quantidade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-centro">{{DATA_MOVIMENTO}}</td>
+            <td>{{DOCUMENTO}}</td>
+            <td>{{TIPO_MOVIMENTO}}</td>
+            <td class="col-direita">{{QUANTIDADE}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RODAPE -->
+    <footer class="relatorio-footer">
+      <span>Emissor: {{USUARIO_EMISSOR}}</span>
+      <span>Documento gerado para uso interno</span>
+    </footer>
+
+  </div>
+
+</body>
+</html>

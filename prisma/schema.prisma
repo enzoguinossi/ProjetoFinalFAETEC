@@ -107,18 +107,18 @@ model PessoaJuridica {
 }
 
 model Funcionario {
-  id_funcionario     Int                   @id @default(autoincrement()) @map("ID_funcionario")
-  id_pessoa_fisica   Int                   @unique @map("ID_pessoa_fisica")
-  cargo              String?               @map("cargo")
-  ativo              Boolean               @default(true) @map("ativo")
-  condutor           Boolean               @default(false) @map("condutor")
-  contagens          ContagemInventario[]
-  pessoaFisica       PessoaFisica          @relation(fields: [id_pessoa_fisica], references: [id_pessoa_fisica])
-  funcionarioCodigos FuncionarioCodigo[]
-  emails             FuncionarioEmail[]
-  telefones          FuncionarioTelefone[]
-  usuario            Usuario?
-  remessasComoCondutor Remessa[]
+  id_funcionario         Int                   @id @default(autoincrement()) @map("ID_funcionario")
+  id_pessoa_fisica       Int                   @unique @map("ID_pessoa_fisica")
+  cargo                  String?               @map("cargo")
+  ativo                  Boolean               @default(true) @map("ativo")
+  condutor               Boolean               @default(false) @map("condutor")
+  contagens              ContagemInventario[]
+  pessoaFisica           PessoaFisica          @relation(fields: [id_pessoa_fisica], references: [id_pessoa_fisica])
+  funcionarioCodigos     FuncionarioCodigo[]
+  emails                 FuncionarioEmail[]
+  telefones              FuncionarioTelefone[]
+  usuario                Usuario?
+  expedicoesComoCondutor Expedicao[]
 
   @@map("funcionario")
 }
@@ -176,7 +176,7 @@ model Destinatario {
   telefones           DestinatarioTelefone[]
   pedidos             PedidoEscola[]
   percursos           PercursoDestinatario[]
-  remessas            Remessa[]
+  notasSaida          NotaSaida[]
 
   @@index([id_endereco], map: "destinatario_ID_endereco_fkey")
   @@map("destinatario")
@@ -189,7 +189,7 @@ model Endereco {
   complemento   String?        @map("complemento")
   bairro        String?        @map("bairro")
   cidade        String         @map("cidade")
-  uf            String?        @db.Char(2) @map("uf")
+  uf            String?        @map("uf") @db.Char(2)
   cep           String?        @map("cep")
   latitude      Float?         @map("latitude")
   longitude     Float?         @map("longitude")
@@ -202,7 +202,7 @@ model Endereco {
 model FuncionarioTelefone {
   id_funcionario_telefone Int          @id @default(autoincrement()) @map("ID_funcionario_telefone")
   id_funcionario          Int          @map("ID_funcionario")
-  numero                  String       @unique @db.VarChar(11) @map("numero")
+  numero                  String       @unique @map("numero") @db.VarChar(11)
   tipo                    TipoTelefone @map("tipo")
   principal               Boolean      @default(false) @map("principal")
   ativo                   Boolean      @default(true) @map("ativo")
@@ -215,7 +215,7 @@ model FuncionarioTelefone {
 model DestinatarioTelefone {
   id_destinatario_telefone Int          @id @default(autoincrement()) @map("ID_destinatario_telefone")
   id_destinatario          Int          @map("ID_destinatario")
-  numero                   String       @unique @db.VarChar(11) @map("numero")
+  numero                   String       @unique @map("numero") @db.VarChar(11)
   tipo                     TipoTelefone @map("tipo")
   principal                Boolean      @default(false) @map("principal")
   ativo                    Boolean      @default(true) @map("ativo")
@@ -228,7 +228,7 @@ model DestinatarioTelefone {
 model FornecedorTelefone {
   id_fornecedor_telefone Int          @id @default(autoincrement()) @map("ID_fornecedor_telefone")
   id_fornecedor          Int          @map("ID_fornecedor")
-  numero                 String       @unique @db.VarChar(11) @map("numero")
+  numero                 String       @unique @map("numero") @db.VarChar(11)
   tipo                   TipoTelefone @map("tipo")
   principal              Boolean      @default(false) @map("principal")
   ativo                  Boolean      @default(true) @map("ativo")
@@ -272,10 +272,11 @@ model FornecedorEmail {
 }
 
 model ConversaoUnidade {
-  id_conversao Int      @id @default(autoincrement()) @map("ID_conversao")
-  nome         String   @unique @map("nome")
-  fator        Float    @map("fator")
-  descricao    String?  @map("descricao")
+  id_conversao Int       @id @default(autoincrement()) @map("ID_conversao")
+  nome         String    @unique @map("nome")
+  fator        Float     @map("fator")
+  descricao    String?   @map("descricao")
+  padrao       Boolean   @default(false) @map("padrao")
   produtos     Produto[]
 
   @@map("conversao_unidade")
@@ -288,12 +289,12 @@ model Produto {
   perecivel           Boolean            @default(false) @map("perecivel")
   composto            Boolean            @default(false) @map("composto")
   data_validade       DateTime?          @map("data_validade") @db.Date
-  id_conversao_padrao Int?               @map("ID_conversao_padrao")
+  id_conversao_padrao Int                @map("ID_conversao_padrao")
   ativo               Boolean            @default(true) @map("ativo")
   estoques            Estoque[]
   itensNotaEntrada    ItemNotaEntrada[]
   itensPedido         ItemPedidoEscola[]
-  conversaoPadrao     ConversaoUnidade?  @relation(fields: [id_conversao_padrao], references: [id_conversao])
+  conversaoPadrao     ConversaoUnidade   @relation(fields: [id_conversao_padrao], references: [id_conversao])
   produtoCodigos      ProdutoCodigo[]
   insumosFilho        ProdutoInsumo[]    @relation("produto_filho")
   insumosPai          ProdutoInsumo[]    @relation("produto_pai")
@@ -328,7 +329,6 @@ model Estoque {
   itensColeta       ItemColeta[]
   itensInventario   ItemInventario[]
   itensNotaSaida    ItemNotaSaida[]
-  itensRemessa      ItemRemessa[]
   movimentacoes     MovimentacaoEstoque[]
   reservas          ReservaEstoque[]
 
@@ -344,20 +344,17 @@ model MovimentacaoEstoque {
   saldo_anterior  Float?       @map("saldo_anterior")
   saldo_posterior Float?       @map("saldo_posterior")
   id_nota_saida   Int?         @map("ID_nota_saida")
-  id_remessa      Int?         @map("ID_remessa")
   id_nota_entrada Int?         @map("ID_nota_entrada")
   data_hora       DateTime     @map("data_hora") @db.Timestamp(0)
   observacao      String?      @map("observacao") @db.Text
   estoque         Estoque      @relation(fields: [id_estoque], references: [id_estoque])
   notaEntrada     NotaEntrada? @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
   notaSaida       NotaSaida?   @relation(fields: [id_nota_saida], references: [id_nota_saida])
-  remessa         Remessa?     @relation(fields: [id_remessa], references: [id_remessa])
   usuario         Usuario      @relation(fields: [id_usuario], references: [id_usuario])
 
   @@index([id_estoque], map: "movimentacao_estoque_ID_estoque_fkey")
   @@index([id_nota_entrada], map: "movimentacao_estoque_ID_nota_entrada_fkey")
   @@index([id_nota_saida], map: "movimentacao_estoque_ID_nota_saida_fkey")
-  @@index([id_remessa], map: "movimentacao_estoque_ID_remessa_fkey")
   @@index([id_usuario], map: "movimentacao_estoque_ID_usuario_fkey")
   @@map("movimentacao_estoque")
 }
@@ -482,19 +479,24 @@ model ItemPedidoEscola {
 }
 
 model NotaSaida {
-  id_nota_saida    Int                   @id @default(autoincrement()) @map("ID_nota_saida")
-  data_criacao     DateTime              @map("data_criacao") @db.Timestamp(0)
-  tipo             TipoNotaSaida         @map("tipo")
-  status           StatusNotaSaida       @map("status")
-  observacao       String?               @map("observacao") @db.Text
-  ativo            Boolean               @default(true) @map("ativo")
-  coletas          Coleta[]
-  itens            ItemNotaSaida[]
-  movimentacoes    MovimentacaoEstoque[]
-  pedidos          PedidoEscola[]
-  remessas         Remessa[]
-  reservas         ReservaEstoque[]
+  id_nota_saida   Int                   @id @default(autoincrement()) @map("ID_nota_saida")
+  id_destinatario Int?                  @map("ID_destinatario")
+  data_criacao    DateTime              @map("data_criacao") @db.Timestamp(0)
+  tipo            TipoNotaSaida         @map("tipo")
+  status          StatusNotaSaida       @map("status")
+  urgente         Boolean               @default(false) @map("urgente")
+  observacao      String?               @map("observacao") @db.Text
+  ativo           Boolean               @default(true) @map("ativo")
+  anexos          Anexo[]
+  coletas         Coleta[]
+  expedicoes      ExpedicaoNota[]
+  itens           ItemNotaSaida[]
+  movimentacoes   MovimentacaoEstoque[]
+  pedidos         PedidoEscola[]
+  reservas        ReservaEstoque[]
+  destinatario    Destinatario?         @relation(fields: [id_destinatario], references: [id_destinatario])
 
+  @@index([id_destinatario], map: "nota_saida_ID_destinatario_fkey")
   @@map("nota_saida")
 }
 
@@ -511,47 +513,6 @@ model ItemNotaSaida {
   @@index([id_estoque], map: "item_nota_saida_ID_estoque_fkey")
   @@index([id_nota_saida], map: "item_nota_saida_ID_nota_saida_fkey")
   @@map("item_nota_saida")
-}
-
-model Remessa {
-  id_remessa      Int                   @id @default(autoincrement()) @map("ID_remessa")
-  id_nota_saida   Int                   @map("ID_nota_saida")
-  id_destinatario Int                   @map("ID_destinatario")
-  data_criacao    DateTime              @map("data_criacao") @db.Timestamp(0)
-  status                 StatusRemessa         @map("status")
-  id_funcionario_condutor Int?                 @map("ID_funcionario_condutor")
-  id_veiculo             Int?                  @map("ID_veiculo")
-  urgente                Boolean               @default(false) @map("urgente")
-  observacao             String?               @map("observacao") @db.Text
-  anexos                 Anexo[]
-  itens                  ItemRemessa[]
-  movimentacoes          MovimentacaoEstoque[]
-  condutor               Funcionario?          @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
-  destinatario           Destinatario          @relation(fields: [id_destinatario], references: [id_destinatario])
-  notaSaida              NotaSaida             @relation(fields: [id_nota_saida], references: [id_nota_saida])
-  veiculo                Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo])
-  rotas                  RotaRemessa[]
-
-  @@index([id_funcionario_condutor], map: "remessa_ID_funcionario_condutor_fkey")
-  @@index([id_destinatario], map: "remessa_ID_destinatario_fkey")
-  @@index([id_nota_saida], map: "remessa_ID_nota_saida_fkey")
-  @@index([id_veiculo], map: "remessa_ID_veiculo_fkey")
-  @@map("remessa")
-}
-
-model ItemRemessa {
-  id_item_remessa       Int     @id @default(autoincrement()) @map("ID_item_remessa")
-  id_remessa            Int     @map("ID_remessa")
-  id_estoque            Int     @map("ID_estoque")
-  quantidade_solicitada Float   @map("quantidade_solicitada")
-  quantidade_separada   Float?  @map("quantidade_separada")
-  quantidade_entregue   Float?  @map("quantidade_entregue")
-  estoque               Estoque @relation(fields: [id_estoque], references: [id_estoque])
-  remessa               Remessa @relation(fields: [id_remessa], references: [id_remessa])
-
-  @@index([id_estoque], map: "item_remessa_ID_estoque_fkey")
-  @@index([id_remessa], map: "item_remessa_ID_remessa_fkey")
-  @@map("item_remessa")
 }
 
 model Coleta {
@@ -586,9 +547,7 @@ model Percurso {
   id_percurso   Int                    @id @default(autoincrement()) @map("ID_percurso")
   nome          String                 @map("nome")
   descricao     String?                @map("descricao") @db.Text
-  ativo         Boolean                @default(true) @map("ativo")
   destinatarios PercursoDestinatario[]
-  rotas         Rota[]
 
   @@map("percurso")
 }
@@ -605,32 +564,36 @@ model PercursoDestinatario {
   @@map("percurso_destinatario")
 }
 
-model Rota {
-  id_rota       Int           @id @default(autoincrement()) @map("ID_rota")
-  data_criacao  DateTime      @map("data_criacao") @db.Timestamp(0)
-  data_prevista DateTime?     @map("data_prevista") @db.Date
-  id_percurso   Int?          @map("ID_percurso")
-  observacao    String?       @map("observacao") @db.Text
-  ativo         Boolean       @default(true) @map("ativo")
-  percurso      Percurso?     @relation(fields: [id_percurso], references: [id_percurso])
-  remessas      RotaRemessa[]
+model Expedicao {
+  id_expedicao            Int             @id @default(autoincrement()) @map("ID_expedicao")
+  id_veiculo              Int             @map("ID_veiculo")
+  id_funcionario_condutor Int             @map("ID_funcionario_condutor")
+  data_criacao            DateTime        @map("data_criacao") @db.Timestamp(0)
+  data_prevista           DateTime        @map("data_prevista") @db.Date
+  observacao              String?         @map("observacao") @db.Text
+  status                  StatusExpedicao @default(PLANEJADA) @map("status")
+  ativo                   Boolean         @default(true) @map("ativo")
+  notas                   ExpedicaoNota[]
+  condutor                Funcionario     @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
+  veiculo                 Veiculo         @relation(fields: [id_veiculo], references: [id_veiculo])
 
-  @@index([id_percurso], map: "rota_ID_percurso_fkey")
-  @@map("rota")
+  @@index([id_funcionario_condutor], map: "expedicao_ID_funcionario_condutor_fkey")
+  @@index([id_veiculo], map: "expedicao_ID_veiculo_fkey")
+  @@map("expedicao")
 }
 
-model RotaRemessa {
-  id_rota_remessa Int      @id @default(autoincrement()) @map("ID_rota_remessa")
-  id_rota         Int      @map("ID_rota")
-  id_remessa      Int      @map("ID_remessa")
-  ordem_visita    Int      @map("ordem_visita")
-  data_adicao     DateTime @map("data_adicao") @db.Timestamp(0)
-  remessa         Remessa  @relation(fields: [id_remessa], references: [id_remessa])
-  rota            Rota     @relation(fields: [id_rota], references: [id_rota])
+model ExpedicaoNota {
+  id_expedicao_nota Int       @id @default(autoincrement()) @map("ID_expedicao_nota")
+  id_expedicao      Int       @map("ID_expedicao")
+  id_nota_saida     Int       @map("ID_nota_saida")
+  ordem_visita      Int       @map("ordem_visita")
+  data_adicao       DateTime  @map("data_adicao") @db.Timestamp(0)
+  notaSaida         NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  expedicao         Expedicao @relation(fields: [id_expedicao], references: [id_expedicao])
 
-  @@index([id_remessa], map: "rota_remessa_ID_remessa_fkey")
-  @@index([id_rota], map: "rota_remessa_ID_rota_fkey")
-  @@map("rota_remessa")
+  @@index([id_nota_saida], map: "expedicao_nota_ID_nota_saida_fkey")
+  @@index([id_expedicao], map: "expedicao_nota_ID_expedicao_fkey")
+  @@map("expedicao_nota")
 }
 
 model Veiculo {
@@ -639,36 +602,27 @@ model Veiculo {
   modelo         String?         @map("modelo")
   status         StatusVeiculo   @map("status")
   ativo          Boolean         @default(true) @map("ativo")
-  remessas       Remessa[]
+  expedicoes     Expedicao[]
   veiculoCodigos VeiculoCodigo[]
 
   @@map("veiculo")
 }
 
 model NotaEntrada {
-  id_nota_entrada  Int                      @id @default(autoincrement()) @map("ID_nota_entrada")
-  id_fornecedor    Int?                     @map("ID_fornecedor")
-  data_criacao     DateTime                 @map("data_criacao") @db.Timestamp(0)
-  tipo             TipoNotaEntrada          @map("tipo")
-  data_recebimento DateTime?                @map("data_recebimento") @db.Date
-  observacao       String?                  @map("observacao") @db.Text
-  ativo            Boolean                  @default(true) @map("ativo")
+  id_nota_entrada  Int                   @id @default(autoincrement()) @map("ID_nota_entrada")
+  id_fornecedor    Int?                  @map("ID_fornecedor")
+  data_criacao     DateTime              @map("data_criacao") @db.Timestamp(0)
+  tipo             TipoNotaEntrada       @map("tipo")
+  data_recebimento DateTime?             @map("data_recebimento") @db.Date
+  observacao       String?               @map("observacao") @db.Text
+  chave_acesso     String?               @unique @map("chave_acesso") @db.VarChar(44)
+  ativo            Boolean               @default(true) @map("ativo")
   itens            ItemNotaEntrada[]
   movimentacoes    MovimentacaoEstoque[]
-  fornecedor       Fornecedor?              @relation(fields: [id_fornecedor], references: [id_fornecedor])
-  chavesAcesso     NotaEntradaChaveAcesso[]
+  fornecedor       Fornecedor?           @relation(fields: [id_fornecedor], references: [id_fornecedor])
 
   @@index([id_fornecedor], map: "nota_entrada_ID_fornecedor_fkey")
   @@map("nota_entrada")
-}
-
-model NotaEntradaChaveAcesso {
-  id_nota_entrada Int         @map("ID_nota_entrada")
-  chave_acesso    String      @unique @map("chave_acesso")
-  notaEntrada     NotaEntrada @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
-
-  @@id([id_nota_entrada, chave_acesso])
-  @@map("nota_entrada_chave_acesso")
 }
 
 model ItemNotaEntrada {
@@ -688,16 +642,16 @@ model ItemNotaEntrada {
 }
 
 model Anexo {
-  id_anexo            Int      @id @default(autoincrement()) @map("ID_anexo")
-  nome_arquivo        String   @map("nome_arquivo")
-  url                 String   @map("url")
-  tipo_mime           String?  @map("tipo_mime")
-  data_upload         DateTime @map("data_upload") @db.Timestamp(0)
-  id_remessa          Int?     @map("ID_remessa")
-  ativo               Boolean  @default(true) @map("ativo")
-  remessa             Remessa? @relation(fields: [id_remessa], references: [id_remessa])
+  id_anexo      Int        @id @default(autoincrement()) @map("ID_anexo")
+  nome_arquivo  String     @map("nome_arquivo")
+  url           String     @map("url")
+  tipo_mime     String?    @map("tipo_mime")
+  data_upload   DateTime   @map("data_upload") @db.Timestamp(0)
+  id_nota_saida Int?       @map("ID_nota_saida")
+  ativo         Boolean    @default(true) @map("ativo")
+  notaSaida     NotaSaida? @relation(fields: [id_nota_saida], references: [id_nota_saida])
 
-  @@index([id_remessa], map: "anexo_ID_remessa_fkey")
+  @@index([id_nota_saida], map: "anexo_ID_nota_saida_fkey")
   @@map("anexo")
 }
 
@@ -793,26 +747,24 @@ enum TipoNotaSaida {
 
 enum StatusNotaSaida {
   ABERTA
-  EM_ANDAMENTO
+  EM_PERCURSO
+  PENDENTE
   BAIXA_TOTAL
   BAIXA_PARCIAL
   BAIXA_COM_CORTE
   CANCELADA
 }
 
-enum StatusRemessa {
-  EM_PREPARACAO
-  PRONTO_PARA_ENTREGA
+enum StatusExpedicao {
+  PLANEJADA
   EM_PERCURSO
-  PENDENTE
-  FINALIZADO_TOTAL
-  FINALIZADO_PARCIAL
+  CONCLUIDA
 }
 
 enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
-  EM_ROTA
+  EM_EXPEDICAO
 }
 
 enum StatusPedido {

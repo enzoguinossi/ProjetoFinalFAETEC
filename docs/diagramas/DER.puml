@@ -119,19 +119,20 @@ enum TipoTelefone {
   COMERCIAL
 }
 
-enum StatusRemessa {
-  EM_PREPARACAO
-  PRONTO_PARA_ENTREGA
+enum StatusNotaSaida {
+  ABERTA
   EM_PERCURSO
   PENDENTE
-  FINALIZADO_TOTAL
-  FINALIZADO_PARCIAL
+  BAIXA_TOTAL
+  BAIXA_PARCIAL
+  BAIXA_COM_CORTE
+  CANCELADA
 }
 
 enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
-  EM_ROTA
+  EM_EXPEDICAO
 }
 
 ' =========================================================
@@ -292,7 +293,6 @@ entity "movimentacao_estoque" as mov {
   saldo_anterior : FLOAT
   saldo_posterior : FLOAT
   ID_nota_saida : INT <<FK>>
-  ID_remessa : INT <<FK>>
   ID_nota_entrada : INT <<FK>>
   * data_hora : TIMESTAMP
   observacao : TEXT
@@ -393,9 +393,11 @@ entity "item_pedido_escola" as item_pedido {
 entity "nota_saida" as nota {
   * ID_nota_saida : INT <<PK>>
   --
+  ID_destinatario : INT <<FK>>
   * data_criacao : TIMESTAMP
   * tipo : ENUM(SAIDA, DESMONTAGEM, CONSUMO_INTERNO, AVARIA)
-  * status : ENUM(ABERTA, EM_ANDAMENTO, BAIXA_TOTAL, BAIXA_PARCIAL, BAIXA_COM_CORTE, CANCELADA)
+  * status : StatusNotaSaida
+  * urgente : BOOLEAN
   observacao : TEXT
   * ativo : BOOLEAN
 }
@@ -408,33 +410,6 @@ entity "item_nota_saida" as item_nota {
   * qtd_esperada : FLOAT
   * qtd_entregue : FLOAT
   observacao : TEXT
-}
-
-' =========================================================
-' REMESSA
-' =========================================================
-
-entity "remessa" as remessa {
-  * ID_remessa : INT <<PK>>
-  --
-  * ID_nota_saida : INT <<FK>>
-  * ID_destinatario : INT <<FK>>
-  * data_criacao : TIMESTAMP
-  * status : StatusRemessa
-  ID_funcionario_condutor : INT <<FK>>
-  ID_veiculo : INT <<FK>>
-  * urgente : BOOLEAN
-  observacao : TEXT
-}
-
-entity "item_remessa" as item_rem {
-  * ID_item_remessa : INT <<PK>>
-  --
-  * ID_remessa : INT <<FK>>
-  * ID_estoque : INT <<FK>>
-  * quantidade_solicitada : FLOAT
-  quantidade_separada : FLOAT
-  quantidade_entregue : FLOAT
 }
 
 ' =========================================================
@@ -467,7 +442,6 @@ entity "percurso" as percurso {
   --
   * nome : VARCHAR
   descricao : TEXT
-  * ativo : BOOLEAN
 }
 
 entity "percurso_destinatario" as perc_dest {
@@ -477,21 +451,23 @@ entity "percurso_destinatario" as perc_dest {
   * ordem_visita : INT
 }
 
-entity "rota" as rota {
-  * ID_rota : INT <<PK>>
+entity "expedicao" as expedicao {
+  * ID_expedicao : INT <<PK>>
   --
+  ID_veiculo : INT <<FK>>
+  ID_funcionario_condutor : INT <<FK>>
   * data_criacao : TIMESTAMP
   data_prevista : DATE
-  ID_percurso : INT <<FK>>
   observacao : TEXT
+  * status : ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA)
   * ativo : BOOLEAN
 }
 
-entity "rota_remessa" as rota_rem {
-  * ID_rota_remessa : INT <<PK>>
+entity "expedicao_nota" as expedicao_nota {
+  * ID_expedicao_nota : INT <<PK>>
   --
-  * ID_rota : INT <<FK>>
-  * ID_remessa : INT <<FK>>
+  * ID_expedicao : INT <<FK>>
+  * ID_nota_saida : INT <<FK>>
   * ordem_visita : INT
   * data_adicao : TIMESTAMP
 }
@@ -521,12 +497,8 @@ entity "nota_entrada" as nota_entrada {
   * tipo : ENUM(ENTRADA, DESMONTAGEM)
   data_recebimento : DATE
   observacao : TEXT
+  chave_acesso : VARCHAR(44) <<UK>>
   * ativo : BOOLEAN
-}
-
-entity "nota_entrada_chave_acesso" as chave_acesso {
-  * ID_nota_entrada : INT <<PK, FK>>
-  * chave_acesso : VARCHAR <<UK>>
 }
 
 entity "item_nota_entrada" as item_nota_entrada {
@@ -551,7 +523,7 @@ entity "anexo" as anexo {
   * url : VARCHAR
   tipo_mime : VARCHAR
   * data_upload : TIMESTAMP
-  ID_remessa : INT <<FK>>
+  ID_nota_saida : INT <<FK>>
   * ativo : BOOLEAN
 }
 
@@ -659,7 +631,6 @@ produto ||--o{ estoque
 produto ||--o{ insumo
 produto ||--o{ item_nota_entrada
 estoque ||--o{ item_nota
-estoque ||--o{ item_rem
 estoque ||--o{ mov
 estoque ||--o{ reserva
 estoque ||--o{ item_inv
@@ -679,33 +650,29 @@ insumo "0..*" --> "1" produto : "filho"
 destinatario ||--o{ pedido
 pedido ||--|{ item_pedido
 
-' Nota Saida / Remessa
+' Nota Saida / Coleta
 nota ||--o{ pedido
 nota ||--|{ item_nota
-nota ||--o{ remessa
 nota ||--o{ coleta
-nota ||--o{ reserva
-destinatario ||--o{ remessa
+destinatario ||--o{ nota
 destinatario ||--o{ coleta
-remessa ||--|{ item_rem
+nota ||--o{ reserva
 coleta ||--|{ item_coleta
-funcionario ||--o{ remessa
-veiculo ||--o{ remessa
 
-' Percurso / Rota
+' Percurso / Expedição
 percurso ||--|{ perc_dest
 destinatario ||--o{ perc_dest
-percurso ||--o{ rota
-rota ||--o{ rota_rem
-remessa ||--o{ rota_rem
+expedicao ||--o{ expedicao_nota
+nota ||--o{ expedicao_nota
+funcionario ||--o{ expedicao
+veiculo ||--o{ expedicao
 
 ' Nota de Entrada
 fornecedor ||--o{ nota_entrada
 nota_entrada ||--|{ item_nota_entrada
-nota_entrada ||--o{ chave_acesso
 
 ' Anexos
-remessa ||--o{ anexo
+nota ||--o{ anexo
 
 ' Acessos / Auditoria
 usuario ||--o{ usuario_permissao

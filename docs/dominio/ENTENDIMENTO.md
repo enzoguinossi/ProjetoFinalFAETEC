@@ -1,6 +1,6 @@
 # Entendimento do Projeto — Nexus
 
-> Sistema de Controle de Estoque e Logística de Remessas
+> Sistema de Controle de Estoque e Logística de Entregas
 > Projeto Final FAETEC — Turma Técnico em Informática 2026
 
 ---
@@ -27,9 +27,9 @@ Um sistema web que centraliza:
 - **Controle de Estoque** — substitui a contagem manual e planilhas Excel
 - **Cadastro de Produtos** — com fotos, lotes, validade, composição
 - **Gestão de Pedidos (Notas de Saída)** — transcrição dos pedidos em papel para o sistema
-- **Reserva de Estoque** — ao criar uma nota, o sistema reserva os produtos no estoque
-- **Remessas** — tentativas de entrega vinculadas a notas de saída
-- **Rotas** — organização diária das entregas em ordem de visita (com suporte a templates)
+- **Reserva de Estoque** — ao criar uma nota de saída com itens, o sistema reserva os produtos no estoque
+- **Entregas** — notas de saída com destinatário, itens e status de entrega
+- **Expedições** — organização diária das entregas em ordem de visita (com suporte a templates)
 - **Auditoria** — registro de toda ação feita no sistema
 - **Relatórios** — periódicos (diário, mensal, semestral)
 
@@ -38,7 +38,7 @@ Um sistema web que centraliza:
 | Perfil | Pessoa | Acesso | Permissões |
 |--------|--------|--------|------------|
 | **Super Admin** | Felipe | Completo: config, usuários, auditoria, relatórios gerenciais | Flag `super_admin` — burla toda checagem |
-| **Operador do Galpão** | Jonathan | Recebimento, conferência (leitor código de barras), montagem de remessas, kanban | Perfil "Operador" aplicado + individuais |
+| **Operador do Galpão** | Jonathan | Recebimento, conferência (leitor código de barras), montagem de saídas, kanban | Perfil "Operador" aplicado + individuais |
 | **Auxiliar Administrativo** | "Menina da Baixa" | Baixa de notas, consumo interno, inventário, documentos fiscais | Perfil "Auxiliar" aplicado + individuais |
 
 ### 1.4 Stack Tecnológica
@@ -67,7 +67,7 @@ projetofinalfaetec/
 │   ├── types/             # Interfaces e tipos TypeScript
 │   └── proxy.ts           # Proteção das rotas privadas (sessão)
 ├── prisma/
-│   ├── schema.prisma      # Modelo de dados (52 entidades)
+│   ├── schema.prisma      # Modelo de dados (51 entidades)
 │   └── seed.ts            # Seed de referência
 ├── prisma.config.ts       # Configuração do Prisma 7
 ├── docs/                  # Documentação (ver docs/README.md)
@@ -168,8 +168,8 @@ Regras:
 - Nem toda pessoa física é funcionário
 - FK 1:1 garante que cada PF pode ter no máximo um funcionário
 - **Ser condutor é uma flag do próprio funcionário** (`funcionario.condutor`) — não existe
-  tabela `condutor`, nem dados de CNH no modelo. A remessa aponta para o funcionário
-  condutor pela FK `remessa.ID_funcionario_condutor → funcionario` (opcional)
+  tabela `condutor`, nem dados de CNH no modelo. A expedição aponta para o funcionário
+  condutor pela FK obrigatória `expedicao.ID_funcionario_condutor → funcionario`
 
 #### 3.3.2 Usuário (1:1 com Funcionário — opcional)
 
@@ -184,7 +184,7 @@ usuario
 
 Regras:
 - **Todo usuário DEVE ser um funcionário cadastrado**
-- Nem todo funcionário é usuário (ex: motorista só aparece nas remessas, sem login)
+- Nem todo funcionário é usuário (ex: motorista só aparece nas expedições, sem login)
 - FK 1:1 para Funcionario — um funcionário pode ter no máximo um usuário
 - `senha_hash` é **nullable**: o usuário é criado sem senha e o campo só é preenchido no
   fluxo de definição de senha (primeiro acesso ou redefinição). Enquanto for nulo, o login
@@ -193,17 +193,18 @@ Regras:
 #### 3.3.3 Condutor — flag do funcionário (não é entidade)
 
 Não existe tabela `condutor`. O papel de condutor é a flag booleana
-`funcionario.condutor` (default `FALSE`), marcada no cadastro do funcionário; a remessa
-guarda **quem** dirigiu em `remessa.ID_funcionario_condutor`, uma FK opcional para
+`funcionario.condutor` (default `FALSE`), marcada no cadastro do funcionário; a expedição
+guarda **quem** dirigiu em `expedicao.ID_funcionario_condutor`, uma FK obrigatória para
 `funcionario`:
 
 ```
-remessa
-├── ID_funcionario_condutor  INT FK → funcionario NULL   ← quem dirigiu a entrega
+expedicao
+├── ID_funcionario_condutor  INT FK → funcionario NOT NULL   ← quem dirigiu a entrega
 ```
 
 Regras:
-- Só um funcionário cadastrado pode ser condutor de uma remessa
+- Só um funcionário cadastrado, **ativo e marcado como `condutor`** pode ser condutor de uma
+  expedição
 - Um funcionário pode ou não estar marcado como condutor
 - Não há atributos próprios de condutor (CNH, categoria, validade) no modelo
 
@@ -292,7 +293,7 @@ produto
 ├── perecivel             BOOLEAN DEFAULT FALSE
 ├── composto              BOOLEAN DEFAULT FALSE
 ├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
-├── ID_conversao_padrao   INT FK NULL
+├── ID_conversao_padrao   INT FK NOT NULL           ← unidade padrão do sistema quando não informada
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
@@ -309,17 +310,23 @@ conversao_unidade
 ├── ID_conversao       INT PK auto_increment
 ├── nome               VARCHAR NOT NULL UNIQUE  ← nome livre (o seed cria UNIDADE, PACOTE e CAIXA)
 ├── fator              FLOAT NOT NULL          ← 1, 10, 50 no seed
-└── descricao          VARCHAR
+├── descricao          VARCHAR
+└── padrao             BOOLEAN NOT NULL DEFAULT FALSE  ← exatamente uma TRUE (UNIDADE)
 ```
 
 Regras:
 - O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
 - O fator sempre **multiplica** a quantidade na entrada
 - Ao criar um documento de entrada, o usuário pode selecionar qualquer conversão
-- Se o produto tiver `ID_conversao_padrao`, esse valor é pré-selecionado (economiza cliques)
+- Todo produto tem `ID_conversao_padrao` **obrigatório**: quando o formulário não informa, o
+  cadastro grava a unidade padrão do sistema (economiza cliques)
 - O fator pode ser editado manualmente no momento da entrada **sem alterar o template**
 - Unidades **não são desativadas**: podem ser criadas, editadas e excluídas fisicamente
-- Ao excluir uma unidade, os produtos que a usavam como `ID_conversao_padrao` são **desvinculados** (`NULL`)
+- Existe **exatamente uma** unidade com `padrao = TRUE` — a `UNIDADE` (fator 1). Ela não
+  pode ser excluída nem ter nome ou fator alterados; somente a descrição é editável
+- Ao excluir uma unidade que não é a padrão, os produtos que a usavam (`ID_conversao_padrao`)
+  são **revinculados à unidade padrão** — a FK é obrigatória, então não há desvinculação
+  e a exclusão não é recusada por uso; a auditoria registra os produtos revinculados
 - Na **nota de entrada** não se guarda a unidade, apenas o **fator de conversão** aplicado (`fator_conversao`)
 
 #### 3.6.2 Produto Composto (BOM — Bill of Materials)
@@ -353,7 +360,7 @@ estoque (saldo real — controle de quantidade)
 ├── ID_estoque            INT PK auto_increment
 ├── ID_produto            INT FK NOT NULL
 ├── quantidade_atual      FLOAT NOT NULL          ← saldo físico real no galpão
-├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída
+├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída abertas
 ├── data_entrada          DATE NOT NULL
 └── ativo                 BOOLEAN DEFAULT TRUE
 
@@ -375,9 +382,9 @@ Regras:
 | Momento | Ação | Impacto |
 |---------|------|---------|
 | Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += X` |
-| Cria Nota Saída | Cria `reserva_estoque` | `saldo_reservado += X` |
-| Cancelamento de Nota | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
-| Remessa finalizada (total/parcial) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
+| Criar Nota de Saída com itens | Cria `reserva_estoque` | `saldo_reservado += X` |
+| Cancelamento de Nota de Saída | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
+| Nota baixada (total/parcial/corte) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
 | Desmontagem de composto | Baixa pai + entrada filhos | Vide 3.6.2 |
 | Ajuste de inventário | Acerto manual | `quantidade_atual = novo_valor` |
 
@@ -397,7 +404,6 @@ movimentacao_estoque
 ├── saldo_posterior       FLOAT                  ← snapshot do quantidade_atual depois
 ├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
 ├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída (apenas baixas reais)
-├── ID_remessa            INT FK NULL              ← veio de uma remessa
 ├── data_hora             TIMESTAMP NOT NULL
 └── observacao            TEXT
 ```
@@ -408,7 +414,7 @@ movimentacao_estoque
 |----------------|---------------|
 | `ID_nota_entrada` + nota_entrada.tipo = 'ENTRADA' | Entrada de mercadoria |
 | `ID_nota_entrada` + nota_entrada.tipo = 'DESMONTAGEM' | Entrada de insumos |
-| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' + `ID_remessa` | Saída por entrega |
+| `ID_nota_saida` + nota_saida.tipo = 'SAIDA' | Saída por entrega |
 | `ID_nota_saida` + nota_saida.tipo = 'CONSUMO_INTERNO' | Baixa por consumo |
 | `ID_nota_saida` + nota_saida.tipo = 'AVARIA' | Baixa por avaria |
 | `ID_nota_saida` + nota_saida.tipo = 'DESMONTAGEM' | Baixa do produto composto |
@@ -432,14 +438,15 @@ reserva_estoque
 ```
 
 Regras:
-- **Reservar:** cria nota saída → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
-- **Liberar:** cancela nota ou remessa finalizada → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`
+- **Reservar:** criar a **nota de saída** com destinatário e itens (`item_nota_saida`) → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
+- **Liberar:** cancelar a nota → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`; na baixa (total/parcial/corte) a reserva dos itens entregues também é liberada
+- A reserva pertence **à própria nota de saída**, que carrega os itens e o destinatário — não existe mais um nível intermediário de remessa
 - A consulta de saldo disponível usa `saldo_disponivel = quantidade_atual - saldo_reservado` (`saldo_reservado` está no `estoque`, atualizado em tempo real)
 - A `reserva_estoque` é a trilha de auditoria para conferência posterior
 
 #### 3.8.2 Correção de Notas (Regra de Editabilidade)
 
-Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e uma `movimentacao_estoque` corretiva.
+Notas de entrada e saída **podem ser editadas** após confirmadas, mas toda edição gera rastro automático no `registro_auditoria` e a trilha correspondente (`movimentacao_estoque` ou `reserva_estoque`, conforme o caso).
 
 ```
 Usuário edita item_nota_entrada.quantidade de 10 para 15
@@ -456,7 +463,7 @@ Usuário edita item_nota_entrada.quantidade de 10 para 15
 3. estoque.quantidade_atual += 5
 ```
 
-**Fluxo de correção de Nota Saída:**
+**Fluxo de correção da Nota de Saída (itens ainda não entregues):**
 ```
 Usuário edita item_nota_saida.qtd_esperada de 20 para 15
   ↓
@@ -473,8 +480,9 @@ Usuário edita item_nota_saida.qtd_esperada de 20 para 15
 Regras:
 - `registro_auditoria` sempre captura snapshots antes/depois em JSON
 - Correção em nota de entrada: gera `movimentacao_estoque` (altera `quantidade_atual`)
-- Correção em nota de saída: gera `reserva_estoque` (altera `saldo_reservado`)
-- Se o item editado já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
+- Correção em nota de saída aberta: gera `reserva_estoque` (altera `saldo_reservado`), pelo delta
+- Correção em `item_nota_saida` de baixa interna (`CONSUMO_INTERNO`, `AVARIA`, `DESMONTAGEM`): gera `movimentacao_estoque` (altera `quantidade_atual`)
+- Se o item já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
 
 ---
 
@@ -526,7 +534,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 | **Múltiplas contagens** | Vários funcionários contam o mesmo item | Cada contagem vira um registro em `contagem_inventario`. |
 | **Finalizar contagem** | Usuário encerra a contagem | status = AGUARDANDO_APROVACAO. Sistema calcula média das contagens e dispara pendências de ajuste |
 | **Revisão** | Aprovador vê planilha comparativa: `quantidade_sistema` + contagens individuais + média | Pode escolher uma contagem específica ou usar a média |
-| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada`, `ID_nota_saida` nem `ID_remessa` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
+| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada` nem `ID_nota_saida` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
 | **Finalização** | Inventário é encerrado | status = FINALIZADO. Movimentações dos produtos DESBLOQUEADAS |
 
 #### 3.9.2 Regras do Inventário
@@ -539,7 +547,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 
 ---
 
-### 3.10 Bloco: Percurso e Rota
+### 3.10 Bloco: Percurso e Expedição
 
 #### 3.10.1 Percurso (Template)
 
@@ -547,8 +555,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 percurso
 ├── ID_percurso           INT PK auto_increment
 ├── nome                  VARCHAR NOT NULL     ← "Escolas da roça", "Longe→perto"
-├── descricao             TEXT
-└── ativo                 BOOLEAN DEFAULT TRUE
+└── descricao             TEXT
 
 percurso_destinatario
 ├── ID_percurso           INT FK → percurso
@@ -557,26 +564,42 @@ percurso_destinatario
 ├── PRIMARY KEY (ID_percurso, ID_destinatario)
 ```
 
-#### 3.10.2 Rota (Instância do Dia)
+Regras:
+- O percurso é um atalho de ordenação: guarda apenas o nome, a descrição e a ordem das
+  visitas. Não possui `ativo` e **não é desativado** — excluir é **físico** e permanente
+  (o registro e as visitas são apagados; a auditoria guarda o snapshot anterior).
+- O nome é único entre **todos** os percursos existentes.
+
+#### 3.10.2 Expedição (Instância do Dia)
 
 ```
-rota
-├── ID_rota               INT PK auto_increment
+expedicao
+├── ID_expedicao          INT PK auto_increment
+├── ID_veiculo            INT FK → veiculo NOT NULL        ← veículo que roda no dia
+├── ID_funcionario_condutor INT FK → funcionario NOT NULL  ← quem dirige (não há tabela condutor)
 ├── data_criacao          TIMESTAMP NOT NULL
-├── data_prevista         DATE                  ← qual dia vai rodar
-├── ID_percurso           INT FK → percurso NULL  ← template usado como base (opcional)
+├── data_prevista         DATE NOT NULL             ← qual dia vai rodar
 ├── observacao            TEXT
+├── status                ENUM(PLANEJADA, EM_PERCURSO, CONCLUIDA) DEFAULT PLANEJADA
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
 
 Regras:
-- Ao criar uma rota, o Jonathan pode selecionar um percurso pré-cadastrado
-- A ordem pode ser editada livremente **sem alterar o template original**
-- A rota não precisa de nome — é filtrável por data, destinatários, remessas
+- **A expedição é o manifesto do dia**: guarda o veículo, o condutor e a ordem das notas que
+  transporta (`expedicao_nota`). Não armazena o percurso — o percurso só serve para ordenar os
+  destinatários no momento de montar a expedição.
+- **Data prevista, veículo e condutor são obrigatórios**: não existe expedição sem os três.
+  A data prevista vazia no formulário assume o dia atual no fuso de São Paulo; o veículo
+  precisa estar ativo e o condutor precisa ser funcionário ativo com `condutor = true`.
+- A ordem gravada na expedição é a sua própria (`expedicao_nota.ordem_visita`).
+- A expedição não precisa de nome — é filtrável por data, destinatários e notas
+- A expedição **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a
+  `CONCLUIDA` quando é encerrado. O status é próprio da expedição, independente do status das
+  notas que ela transporta.
 
 ---
 
-### 3.11 Bloco: Pedido, Nota Saída, Remessa e Coleta
+### 3.11 Bloco: Pedido, Nota Saída e Coleta
 
 #### 3.11.0 Pedido da Escola (Solicitação)
 
@@ -609,11 +632,16 @@ Regras:
   consolidado); a nota, por sua vez, **agrega N pedidos** (1:N)
 - Um pedido RECUSADO não gera nota
 
-#### 3.11.1 Nota Saída (Compromisso Oficial)
+#### 3.11.1 Nota Saída (Entrega)
 
-Representa o compromisso de entrega. Ao ser criada, **reserva o estoque**. A nota **não tem
-destinatário** — ela é o documento que **agrega remessas**, e são as remessas (e coletas) que
-carregam o destinatário da entrega.
+Representa a entrega. A nota **é** a unidade que carrega destinatário, itens, reserva e status —
+não existe mais um nível intermediário de remessa. Para `tipo = SAIDA`, o destinatário
+(`ID_destinatario`) é obrigatório na camada de serviço e os itens ficam em `item_nota_saida`.
+
+Os tipos `CONSUMO_INTERNO`, `AVARIA` e `DESMONTAGEM` são **baixas internas sem entrega**: não têm
+destinatário, não passam por reserva e dão baixa física direto na confirmação. O formulário de saída
+opera com **Remessa** (`SAIDA`), **Avaria** (`AVARIA`) e **Consumo Interno** (`CONSUMO_INTERNO`);
+`DESMONTAGEM` tem fluxo próprio e é recusada por esse formulário.
 
 A nota também **consolida pedidos** (decisão do usuário, 2026-10-19): ela **agrega os pedidos**
 que consolida (1:N), e o vínculo fica em `pedido_escola.ID_nota_saida` — a nota **não** tem
@@ -622,16 +650,19 @@ coluna de pedido. Cada pedido pertence a **no máximo uma** nota.
 ```
 nota_saida
 ├── ID_nota_saida           INT PK auto_increment
+├── ID_destinatario         INT FK → destinatario NULL  ← obrigatório para tipo SAIDA
 ├── data_criacao            TIMESTAMP NOT NULL
 ├── tipo                    ENUM('SAIDA','DESMONTAGEM','CONSUMO_INTERNO','AVARIA')
 ├── status                  ENUM(
                               'ABERTA',
-                              'EM_ANDAMENTO',
+                              'EM_PERCURSO',
+                              'PENDENTE',
                               'BAIXA_TOTAL',
                               'BAIXA_PARCIAL',
                               'BAIXA_COM_CORTE',
                               'CANCELADA'
                             )
+├── urgente                 BOOLEAN DEFAULT FALSE
 ├── observacao              TEXT
 └── ativo                   BOOLEAN DEFAULT TRUE
 
@@ -645,60 +676,53 @@ item_nota_saida
 ```
 
 Regras:
-- Ao criar `item_nota_saida`, o **estoque é reservado** (`saldo_reservado += qtd_esperada`)
-- `qtd_entregue` é atualizado automaticamente conforme remessas e coletas são finalizadas
-- Se a nota for cancelada, a **reserva é liberada** (`saldo_reservado -= qtd_esperada`)
-- A nota **não tem destinatário** (decisão do usuário, 2026-10-19): é tratada como uma
-  **coleção de remessas**, e o destinatário da entrega está em `remessa.ID_destinatario` e
-  `coleta.ID_destinatario` — nunca na nota
-- A nota **agrega os pedidos** que consolida (decisão do usuário, 2026-10-19), pelo vínculo
-  `pedido_escola.ID_nota_saida`: uma nota tem **N** pedidos; um pedido está em **no máximo uma**
-  nota
-- A nota pode gerar **várias remessas** e/ou **coletas**
-- Status: ABERTA (criada), EM_ANDAMENTO (entregas em curso), BAIXA_TOTAL (tudo entregue), BAIXA_PARCIAL (parte entregue, resto vai), BAIXA_COM_CORTE (parte entregue, resto não vai), CANCELADA (nada entregue)
+- Criar uma nota `SAIDA` (Remessa) com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`) e
+  grava `item_nota_saida` e `reserva_estoque` na mesma transação (decisão do usuário, 2026-10-23)
+- Criar uma nota `AVARIA` ou `CONSUMO_INTERNO` **não reserva**: dá baixa real na criação
+  (`quantidade_atual -= quantidade`), grava a `movimentacao_estoque` com quantidade negativa e
+  `ID_nota_saida`, e a nota nasce `BAIXA_TOTAL` com `qtd_entregue = qtd_esperada`
+- Saldo insuficiente apenas **avisa** (RN001), nunca bloqueia — na Remessa o aviso considera o
+  disponível (`quantidade_atual − saldo_reservado`); na baixa direta, a `quantidade_atual` (que pode
+  ficar negativa)
+- Só a nota `SAIDA` `ABERTA` é editável: a edição corrige a reserva **pelo delta** e pode acrescentar
+  item; remover item é recusado (RN004). Avaria e Consumo Interno são histórico e não são editáveis
+- Cancelar só é permitido em `SAIDA` `ABERTA`: libera `saldo_reservado -= qtd_esperada` em cada item e
+  muda para `CANCELADA`; a segunda tentativa é recusada sem debitar de novo. Avaria/Consumo Interno
+  não são canceláveis — a correção é uma nota nova
+- A nota pode entrar em **várias expedições** (`expedicao_nota`) e/ou gerar **coletas**
+- Status: `ABERTA` (criada, aguardando expedição), `EM_PERCURSO` (saiu para entrega),
+  `PENDENTE` (não entregue, reserva mantida), `BAIXA_TOTAL` (tudo entregue),
+  `BAIXA_PARCIAL` (parte entregue, o restante continua reservado), `BAIXA_COM_CORTE` (parte
+  entregue e o restante não será entregue), `CANCELADA` (nada entregue)
 
-#### 3.11.2 Remessa (Entrega via Rota)
+#### 3.11.2 Baixa da Nota e Pendência (RN003)
 
-```
-remessa
-├── ID_remessa             INT PK auto_increment
-├── ID_nota_saida          INT FK NOT NULL
-├── ID_destinatario        INT FK NOT NULL
-├── data_criacao           TIMESTAMP NOT NULL
-├── status                 ENUM(
-                              'EM_PREPARACAO',
-                              'PRONTO_PARA_ENTREGA',
-                              'EM_PERCURSO',
-                              'PENDENTE',
-                              'FINALIZADO_TOTAL',
-                              'FINALIZADO_PARCIAL'
-                            )
-├── ID_funcionario_condutor INT FK → funcionario NULL   ← quem dirigiu (não há tabela condutor)
-├── ID_veiculo             INT FK → veiculo NULL
-├── urgente                BOOLEAN DEFAULT FALSE
-└── observacao             TEXT
+A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
+`quantidade_atual -= qtd_entregue` e `saldo_reservado -= qtd_entregue`, com a
+`movimentacao_estoque` correspondente.
 
-item_remessa
-├── ID_item_remessa        INT PK auto_increment
-├── ID_remessa             INT FK NOT NULL
-├── ID_estoque            INT FK NOT NULL
-├── quantidade_solicitada  FLOAT NOT NULL
-├── quantidade_separada    FLOAT
-├── quantidade_entregue    FLOAT
-```
+- **`BAIXA_TOTAL`**: todos os itens foram entregues.
+- **`BAIXA_PARCIAL`**: parte dos itens foi entregue e o restante continua reservado. A
+  **pendência é a própria nota** em `BAIXA_PARCIAL` — **sem split e sem nota nova**. O que falta
+  entregar é derivado de `item_nota_saida.qtd_esperada − qtd_entregue`, e a nota pode seguir para
+  outra expedição.
+- **`BAIXA_COM_CORTE`**: parte foi entregue e o restante não será entregue; a reserva restante é
+  liberada.
+- **`PENDENTE`**: a tentativa de entrega não ocorreu (ex.: escola fechada); a reserva permanece e
+  a nota pode ser adicionada a outra expedição.
 
-Regras:
-- Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
-- Remessa PENDENTE pode ser realocada em outra rota
-- **A remessa `PENDENTE` criada no split é o "registro automático de pendência vinculado ao
-  destinatário" da RN003** (decisão do usuário, 2026-10-19): não existe tabela de pendência e
-  nenhuma é necessária — o vínculo com o destinatário é a própria coluna
-  `remessa.ID_destinatario`, e o que falta entregar continua derivado de
-  `item_nota_saida.qtd_esperada − qtd_entregue`
+A execução acontece **dentro da expedição em `EM_PERCURSO`**, por nota e por item: a quantidade
+informada é o **total entregue** (o sistema aplica o delta sobre `qtd_entregue`), o **corte** libera
+a reserva do restante e o atalho **não entregue** mantém tudo reservado. A baixa física não é
+bloqueada por `quantidade_atual` insuficiente — divergência de inventário não impede registrar uma
+entrega que aconteceu (RN001) —, mas nunca deixa `saldo_reservado` negativo. A segunda tentativa
+numa nota já finalizada é recusada sem debitar de novo. Ao **concluir** a expedição, as notas ainda
+em percurso passam a `PENDENTE`, a expedição vai para `CONCLUIDA` e o veículo volta a `DISPONIVEL`
+quando não está em outra expedição em percurso.
 
 #### 3.11.3 Coleta (Retirada Direta na Escola)
 
-Representa retirada presencial por urgência — sem rota, sem condutor, sem veículo.
+Representa retirada presencial por urgência — sem expedição, sem condutor, sem veículo.
 
 ```
 coleta
@@ -717,32 +741,30 @@ item_coleta
 
 Regras:
 - Chegou e pegou — sem agendamento, sem status
-- Ao registrar, `item_nota_saida.qtd_entregue` é atualizado e o estoque dá baixa
+- Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o estoque dá baixa
 
-#### 3.11.4 Rota × Remessa (N:N com ordem)
+#### 3.11.4 Expedição × Nota (N:N com ordem)
 
 ```
-rota_remessa
-├── ID_rota_remessa        INT PK auto_increment   ← PK independente!
-├── ID_rota                INT FK → rota
-├── ID_remessa             INT FK → remessa
-├── ordem_visita           INT                      ← posição na rota naquele dia
+expedicao_nota
+├── ID_expedicao_nota      INT PK auto_increment   ← PK independente!
+├── ID_expedicao           INT FK → expedicao
+├── ID_nota_saida          INT FK → nota_saida
+├── ordem_visita           INT                      ← posição na expedição naquele dia
 ├── data_adicao            TIMESTAMP
 ```
 
-A PK independente permite que **a mesma remessa apareça em rotas diferentes** (ex: tentativa falhou no dia X, entra na rota do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
+A PK independente permite que **a mesma nota apareça em expedições diferentes** (ex: tentativa falhou no dia X, entra na expedição do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
 
 #### 3.11.5 Ciclo de Vida Completo
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  Cria Nota Saída → reserva estoque (saldo_reservado +=)  │
+│  Cria Nota Saída (destinatário + itens) → reserva estoque│
 │         ↓                                                │
-│  Cria Remessa → EM_PREPARACAO                            │
+│  ABERTA                                                  │
 │         ↓                                                │
-│  Adiciona na Rota do dia (rota_remessa + ordem_visita)   │
-│         ↓                                                │
-│  PRONTO_PARA_ENTREGA                                     │
+│  Adiciona na Expedição do dia (expedicao_nota)            │
 │         ↓                                                │
 │  EM_PERCURSO (saiu pra entrega)                          │
 │         ↓                                                │
@@ -750,27 +772,26 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 │  ▼                 ▼                                     │
 │  Sucesso          Falha                                  │
 │  ↓                 ↓                                     │
-│  FINALIZADO_TOTAL PENDENTE                               │
+│  BAIXA_TOTAL      PENDENTE                               │
 │  (baixa real do   (reserva mantida, pode                 │
-│   estoque)         criar nova remessa)                   │
+│   estoque)         entrar em outra expedição)            │
 │                                                          │
 │  Entrega Parcial:                                         │
 │  ┌──────────────────────────────────┐                    │
-│  │  Remessa com 10 itens           │                    │
+│  │  Nota com 10 itens              │                    │
 │  │  ↓                               │                    │
 │  │  Entrega 6 itens                │                    │
 │  │  ↓                               │                    │
-│  │  SPLIT:                          │                    │
-│  │  ├── Remessa A (6 itens) →      │                    │
-│  │  │   FINALIZADO_PARCIAL          │                    │
-│  │  │   (baixa no estoque)          │                    │
-│  │  └── Remessa B (4 itens) →      │                    │
-│  │      PENDENTE (nova remessa,     │                    │
-│  │      mesma nota_saida, pode      │                    │
-│  │      entrar em outra rota)       │                    │
+│  │  BAIXA_PARCIAL                   │                    │
+│  │  (a pendência é a MESMA nota,    │                    │
+│  │   resto ainda reservado, pode    │                    │
+│  │   entrar em outra expedição)     │                    │
 │  └──────────────────────────────────┘                    │
 └──────────────────────────────────────────────────────────┘
 ```
+
+Esse ciclo é o da **Remessa** (`SAIDA`). **Avaria** e **Consumo Interno** não entram nele: nascem
+`BAIXA_TOTAL`, já com a baixa física registrada na criação, e permanecem no histórico.
 
 ---
 
@@ -786,12 +807,8 @@ nota_entrada
 ├── tipo                  ENUM('ENTRADA','DESMONTAGEM')
 ├── data_recebimento      DATE
 ├── observacao            TEXT
+├── chave_acesso          VARCHAR(44) NULL UNIQUE  ← no máximo uma chave NF-e por nota
 └── ativo                 BOOLEAN DEFAULT TRUE
-
-nota_entrada_chave_acesso   ← opcional, 0 ou mais chaves NF-e
-├── ID_nota_entrada       INT FK NOT NULL
-├── chave_acesso          VARCHAR(44) UNIQUE NOT NULL
-└── PRIMARY KEY (ID_nota_entrada, chave_acesso)
 
 item_nota_entrada
 ├── ID_item_nota_entrada  INT PK auto_increment
@@ -806,6 +823,9 @@ item_nota_entrada
 Regras:
 - A entrada pode ser feita **com ou sem** chave de acesso de NF-e
 - A chave de acesso, quando informada, deve ser uma chave válida de NF-e (44 caracteres)
+- A nota tem **no máximo uma** chave de acesso: ela é a coluna `nota_entrada.chave_acesso`
+  (nullable e única) — não existe mais a tabela `nota_entrada_chave_acesso`
+- A unicidade da coluna impede a mesma chave em duas notas
 - A conversão de unidade é aplicada no momento da entrada
 - Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:
@@ -823,7 +843,7 @@ veiculo
 ├── ID_veiculo             INT PK auto_increment
 ├── placa                  VARCHAR NOT NULL UNIQUE
 ├── modelo                 VARCHAR
-├── status                 ENUM('DISPONIVEL','INDISPONIVEL','EM_ROTA')
+├── status                 ENUM('DISPONIVEL','INDISPONIVEL','EM_EXPEDICAO')
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
@@ -838,7 +858,7 @@ anexo
 ├── url                    VARCHAR NOT NULL
 ├── tipo_mime              VARCHAR
 ├── data_upload            TIMESTAMP
-├── ID_remessa             INT FK → remessa NULL
+├── ID_nota_saida          INT FK → nota_saida NULL
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
@@ -861,7 +881,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**68** no total):
+Permissões criadas por `prisma/seed.ts` (**77** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -874,8 +894,9 @@ Permissões criadas por `prisma/seed.ts` (**68** no total):
 | `perfil` | listar, criar, alterar, consultar, excluir |
 | `estoque` | entrada, saida, ver_saldo |
 | `nota_entrada` | criar, alterar, consultar, cancelar |
-| `nota_saida` | criar, alterar, consultar, cancelar |
-| `remessa` | criar, alterar_status, finalizar |
+| `nota_saida` | criar, alterar, consultar, cancelar, alterar_status, finalizar |
+| `percurso` | listar, criar, alterar, consultar, excluir |
+| `expedicao` | listar, criar, alterar, consultar, desativar |
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
 | `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
@@ -883,6 +904,8 @@ Permissões criadas por `prisma/seed.ts` (**68** no total):
 
 > Perfil **não é desativado**: `perfil.excluir` é exclusão física (`src/services/permissao.ts`).
 > O seed remove a permissão obsoleta `perfil.desativar` caso ela exista no banco.
+> Percurso **não é desativado**: `percurso.excluir` é exclusão física. O seed remove a
+> permissão obsoleta `percurso.desativar` caso ela exista no banco.
 
 #### 3.15.2 Perfil (Template)
 
@@ -968,7 +991,6 @@ As seguintes entidades **não exigem permissão** para acesso, pois são dados o
   páginas por `listParaEntidade()` e o tipo é revalidado no servidor por `tipoPermitido()`
   (`src/services/codigo.ts` → `src/lib/codigo.ts`). A ausência de `tipo_codigo.*` no seed é
   consequência desse desenho, não esquecimento.
-- `rota`, `percurso` — livre (não há telas ainda)
 - `endereco` — vinculado à entidade que o possui
 - `telefone`, `email` — vinculado à entidade que os possui
 
@@ -994,7 +1016,7 @@ registro_auditoria
 ├── ID_usuario             INT FK NOT NULL
 ├── data_hora              TIMESTAMP NOT NULL
 ├── acao                   VARCHAR NOT NULL   ← ver lista abaixo
-├── entidade               VARCHAR NOT NULL   ← 'Produto', 'Remessa', etc.
+├── entidade               VARCHAR NOT NULL   ← 'Produto', 'NotaSaida', etc.
 ├── ID_entidade_afetada    INT                ← ID do registro afetado
 ├── dados_anteriores       JSON               ← snapshot antes da alteração
 └── dados_novos            JSON               ← snapshot depois da alteração
@@ -1042,7 +1064,7 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 | Relatório | Filtros | Formato |
 |-----------|---------|---------|
 | Movimentação de Estoque | Período, produto, tipo de movimentação | PDF, CSV/XLSX |
-| Expedições por Período | Data, rota, destinatário, condutor | PDF, CSV/XLSX |
+| Expedições por Período | Data, expedição, destinatário, condutor | PDF, CSV/XLSX |
 | Entregas por Instituição | Destinatário, período, status | PDF, CSV/XLSX |
 | Produtos Próximos ao Vencimento | Dias para vencer | PDF |
 | **Listagem Simplificada de Produtos** | — | PDF, CSV/XLSX |
@@ -1061,5 +1083,5 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 > - [`../diagramas/fluxo_atual.puml`](../diagramas/fluxo_atual.puml) e
 >   [`../diagramas/fluxosAtuais/`](../diagramas/fluxosAtuais/) (6 sub-fluxos) — o fluxo
 >   **AS-IS manual** descrito em §1.1 (papel, Trello, Excel, celular). **Não** representam o
->   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → reserva → remessa → rota →
+>   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída com reserva → expedição →
 >   percurso → entrega → baixa)

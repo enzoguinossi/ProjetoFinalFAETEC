@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório - Base Compartilhada</title>
+  <style>
+    /* ==========================================================================
+       ESTILOS DE RELATÓRIO DE IMPRESSÃO (A4)
+       Paleta: Preto, Cinza e Branco
+       ========================================================================== */
+
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+      color: #000000;
+      background-color: #f0f0f0; /* Fundo suave para visualização em tela */
+      padding: 20px 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* Container simula a folha A4 em tela */
+    .relatorio-container {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 20mm 15mm;
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .conteudo-principal {
+      flex: 1;
+    }
+
+    /* Cabeçalho */
+    .relatorio-header {
+      border-bottom: 2px solid #000000;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .relatorio-header .titulo-relatorio {
+      font-size: 16pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #000000;
+    }
+
+    .relatorio-header .meta-info {
+      font-size: 9pt;
+      color: #555555;
+      text-align: right;
+    }
+
+    /* Tabela de Dados */
+    .relatorio-tabela {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 10pt;
+    }
+
+    .relatorio-tabela th,
+    .relatorio-tabela td {
+      border: 1px solid #333333;
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    .relatorio-tabela th {
+      background-color: #333333;
+      color: #ffffff;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 9pt;
+    }
+
+    .relatorio-tabela tbody tr:nth-child(even) {
+      background-color: #f8f8f8;
+    }
+
+    .relatorio-tabela .col-centro {
+      text-align: center;
+    }
+
+    .relatorio-tabela .col-direita {
+      text-align: right;
+    }
+
+    /* Totalizadores */
+    .relatorio-tabela tr.linha-totalizador td {
+      background-color: #e6e6e6;
+      font-weight: bold;
+      border-top: 2px solid #000000;
+      color: #000000;
+    }
+
+    /* Rodapé */
+    .relatorio-footer {
+      border-top: 1px solid #888888;
+      padding-top: 8px;
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8pt;
+      color: #666666;
+    }
+
+    /* Ajustes específicos para impressão */
+    @media print {
+      body {
+        background-color: #ffffff;
+        padding: 0;
+      }
+
+      .relatorio-container {
+        width: 100%;
+        min-height: auto;
+        padding: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="relatorio-container">
+    
+    <div class="conteudo-principal">
+      <!-- CABEÇALHO -->
+      <header class="relatorio-header">
+        <div>
+          <h1 class="titulo-relatorio">{{NOME_RELATORIO}}</h1>
+        </div>
+        <div class="meta-info">
+          <p>Emissão: {{DATA_EMISSAO}} {{HORA_EMISSAO}}</p>
+          <p>Pág: {{PAGINA_ATUAL}} / {{TOTAL_PAGINAS}}</p>
+        </div>
+      </header>
+
+      <!-- TABELA COM PLACEHOLDERS DE EXEMPLO -->
+      <table class="relatorio-tabela">
+        <thead>
+          <tr>
+            <th>Código do Produto</th>
+            <th>Descrição do Produto</th>
+            <th class="col-centro">Qtd. Estoque</th>
+            <th class="col-centro">Qtd. Livre</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>000001</td>
+            <td>Cadeira</td>
+            <td class="col-centro">6</td>
+            <td class="col-centro">4</td>
+          </tr>
+          <tr>
+            <td>000002</td>
+            <td>Mesa</td>
+            <td class="col-centro">2</td>
+            <td class="col-centro">2</td>
+          </tr>
+          <tr>
+            <td>000003</td>
+            <td>Quadro</td>
+            <td class="col-centro">3</td>
+            <td class="col-centro">1</td>
+          </tr>
+          <tr>
+            <td>000004</td>
+            <td>Giz</td>
+            <td class="col-centro">8</td>
+            <td class="col-centro">6</td>
+          </tr>
+          <tr>
+            <td>000005</td>
+            <td>Papel Higiênico</td>
+            <td class="col-centro">2</td>
+            <td class="col-centro">1</td>
+          </tr>
+          <tr>
+            <td>000006</td>
+            <td>Sabão em Pó</td>
+            <td class="col-centro">0</td>
+            <td class="col-centro">0</td>
+          </tr>
+          <tr>
+            <td>000007</td>
+            <td>Pano de Chão</td>
+            <td class="col-centro">5</td>
+            <td class="col-centro">4</td>
+          </tr>
+          <tr>
+            <td>000008</td>
+            <td>Kit Escolar</td>
+            <td class="col-centro">5</td>
+            <td class="col-centro">4</td>
+          </tr>
+          <tr>
+            <td>000009</td>
+            <td>Pacote Lápis de Cor</td>
+            <td class="col-centro">1</td>
+            <td class="col-centro">0</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="linha-totalizador">
+            <td colspan="2" class="col-direita">Quantidade em Estoque:</td>
+            <td class="col-centro" colspan="2">{{TOTAL_ESTOQUE}}</td>
+          </tr>
+          <tr class="linha-totalizador">
+            <td colspan="2" class="col-direita">Quantidade Livre:</td>
+            <td class="col-centro" colspan="2">{{TOTAL_LIVRE}}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- RODAPÉ -->
+    <footer class="relatorio-footer">
+      <span>Emissor: {{USUARIO_EMISSOR}}</span>
+      <span>Documento gerado para uso interno</span>
+    </footer>
+
+  </div>
+
+</body>
+</html>

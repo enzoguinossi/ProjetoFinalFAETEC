@@ -7,16 +7,10 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
 import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
-import { formatarCodigo } from "@/lib/formatar";
+import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
-export type ProdutoListRow = {
-  id_produto: number;
-  codigo: string;
-  descricao: string;
-  qtd: string;
-  livre: string;
-};
+export type { ProdutoListRow };
 
 export type ProdutoItem = { id_produto: number; descricao: string };
 
@@ -26,41 +20,26 @@ export type ProdutoFormData = {
   perecivel: boolean;
   composto: boolean;
   data_validade: string | null;
-  id_conversao_padrao: number | null;
+  id_conversao_padrao: number;
   foto_url: string | null;
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
   insumos: { id: number; descricao: string; qtd: number }[];
 };
 
-type ProdutoComEstoque = {
-  id_produto: number;
-  descricao: string;
-  estoques: { quantidade_atual: number; saldo_reservado: number }[];
-};
-
-function produtoParaLinha(p: ProdutoComEstoque): ProdutoListRow {
-  const qtd = p.estoques.reduce((s, e) => s + Number(e.quantidade_atual), 0);
-  const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
-  return {
-    id_produto: p.id_produto,
-    codigo: formatarCodigo(p.id_produto),
-    descricao: p.descricao,
-    qtd: String(qtd),
-    livre: String(qtd - reservado),
-  };
-}
-
 export async function listarProdutos(
-  params: ListParams = {},
+  params: ListParams & { excludeIds?: number[] } = {},
 ): Promise<PaginatedResult<ProdutoListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "produto.listar"))) return resultadoVazio(params);
 
   if (params.search) {
-    const data = await produtoDAO.searchPriorizadoComEstoque(params.search);
+    const excluidos = new Set(params.excludeIds ?? []);
+    const data = (await produtoDAO.searchPriorizadoComEstoque(params.search))
+      .map(produtoParaLinha)
+      .filter((linha) => !excluidos.has(linha.id_produto));
     return {
-      data: data.map(produtoParaLinha),
+      data,
       total: data.length,
       page: 1,
       limit: data.length || (params.limit ?? 20),
@@ -68,19 +47,8 @@ export async function listarProdutos(
     };
   }
 
-  const resultado = await produtoDAO.list(params);
+  const resultado = await produtoDAO.list(params, params.excludeIds ?? []);
   return { ...resultado, data: resultado.data.map(produtoParaLinha) };
-}
-
-export async function searchProdutos(query: string) {
-  if (query.length < 2) return [];
-
-  const user = await requireUser();
-  if (!(await usuarioPodeAlguma(user, ["produto.listar", "produto.criar", "produto.alterar"]))) {
-    return [];
-  }
-
-  return produtoDAO.searchPriorizado(query);
 }
 
 /**

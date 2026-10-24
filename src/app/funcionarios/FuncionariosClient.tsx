@@ -23,10 +23,10 @@ interface Props {
 }
 
 const columns: Column<FuncionarioListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr" },
-  { key: "nome", label: "Nome", width: "3fr" },
-  { key: "cargo", label: "Cargo", width: "2fr" },
-  { key: "condutor", label: "Condutor", width: "1fr" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center" },
+  { key: "nome", label: "Nome", width: "3fr", align: "left" },
+  { key: "cargo", label: "Cargo", width: "2fr", align: "left" },
+  { key: "condutor", label: "Condutor", width: "1fr", align: "center" },
 ];
 
 export default function FuncionariosClient({ inicial, tiposCodigo, perms }: Props) {

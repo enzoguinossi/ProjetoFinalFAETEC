@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { produtoDAO } from "@/dao/produto";
 import { EntidadeComVinculosError } from "@/dao/_errors";
+import { produtoParaLinha } from "@/lib/produto-linha";
 import {
+  criarConversao,
   criarEstoque,
   criarNotaEntrada,
   criarProduto,
   criarTipoCodigo,
   criarUsuario,
+  garantirUnidadePadrao,
 } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
@@ -38,6 +41,17 @@ describe("produtoDAO", () => {
       expect(resultado.data[0]?.estoques).toHaveLength(1);
       expect(resultado.data[0]?.estoques[0]?.quantidade_atual).toBe(10);
       expect(resultado.data[0]).toHaveProperty("conversaoPadrao");
+    });
+
+    it("exclui os ids informados e mantém o total coerente", async () => {
+      const manter = await criarProduto({ descricao: "Manter" });
+      const excluir = await criarProduto({ descricao: "Excluir" });
+
+      const resultado = await produtoDAO.list({ page: 1, limit: 10 }, [excluir.id_produto]);
+
+      expect(resultado.total).toBe(1);
+      expect(resultado.totalPages).toBe(1);
+      expect(resultado.data.map((p) => p.id_produto)).toEqual([manter.id_produto]);
     });
   });
 
@@ -116,6 +130,36 @@ describe("produtoDAO", () => {
         { quantidade_atual: 8, saldo_reservado: 2 },
       ]);
     });
+
+    it("devolve a unidade de conversão padrão na busca priorizada (mesma forma do list)", async () => {
+      const tipo = await criarTipoCodigo("DIGITACAO");
+      const caixa = await criarConversao("CX", 12);
+      const comConversao = await criarProduto({
+        descricao: "Com caixa",
+        idConversaoPadrao: caixa.id_conversao,
+      });
+      const semConversao = await criarProduto({ descricao: "Sem caixa" });
+      await prismaTeste.produtoCodigo.createMany({
+        data: [
+          { id_produto: comConversao.id_produto, id_tipo_codigo: tipo.id_tipo_codigo, codigo: "ABC1" },
+          { id_produto: semConversao.id_produto, id_tipo_codigo: tipo.id_tipo_codigo, codigo: "ABC2" },
+        ],
+      });
+
+      const resultado = await produtoDAO.searchPriorizadoComEstoque("ABC");
+      const linhas = new Map(resultado.map((p) => [p.id_produto, produtoParaLinha(p)]));
+
+      expect(linhas.get(comConversao.id_produto)?.unidade).toBe("CX");
+      expect(linhas.get(semConversao.id_produto)?.unidade).toBe("UNIDADE");
+    });
+    it("produtoParaLinha devolve o nome da unidade padrão do produto", async () => {
+      const caixa = await criarConversao("CX12", 12);
+      const produto = await criarProduto({ idConversaoPadrao: caixa.id_conversao });
+
+      const linha = produtoParaLinha({ ...produto, conversaoPadrao: caixa, estoques: [] });
+
+      expect(linha.unidade).toBe("CX12");
+    });
   });
 
   describe("getById", () => {
@@ -176,6 +220,32 @@ describe("produtoDAO", () => {
         descricao: "Bolo",
         codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "BOLO-1" }],
       });
+    });
+
+    it("usa a unidade padrão quando o formulário não informa a unidade", async () => {
+      const { usuario } = await criarUsuario();
+      const padrao = await garantirUnidadePadrao();
+
+      const criado = await produtoDAO.createCompleto(
+        { descricao: "Sem unidade" },
+        usuario.id_usuario,
+      );
+
+      expect(criado.id_conversao_padrao).toBe(padrao.id_conversao);
+      expect(criado.conversaoPadrao).toMatchObject({ nome: "UNIDADE" });
+    });
+
+    it("respeita a unidade explícita no cadastro do produto", async () => {
+      const { usuario } = await criarUsuario();
+      const caixa = await criarConversao("CX12", 12);
+
+      const criado = await produtoDAO.createCompleto(
+        { descricao: "Com caixa", id_conversao_padrao: caixa.id_conversao },
+        usuario.id_usuario,
+      );
+
+      expect(criado.id_conversao_padrao).toBe(caixa.id_conversao);
+      expect(criado.conversaoPadrao).toMatchObject({ nome: "CX12" });
     });
   });
 

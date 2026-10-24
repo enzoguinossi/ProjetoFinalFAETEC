@@ -242,13 +242,13 @@ package "Produtos e Estoque" as Produtos {
       + saldo_posterior: Float
       + ID_nota_entrada: Integer
       + ID_nota_saida: Integer
-      + ID_remessa: Integer
       + data_hora: Timestamp
       + observacao: Text
     }
 
   class ReservaEstoque {
       + ID_reserva_estoque: Integer
+      + ID_nota_saida: Integer
       + quantidade: Float
       + saldo_anterior: Float
       + saldo_posterior: Float
@@ -277,7 +277,7 @@ Estoque "1" --> "*" ItemInventario : contado em >
 Produto "1" --> "*" ProdutoCodigo : possui >
 
 ' =========================================================
-' NOTAS, REMESSAS E ROTAS
+' NOTAS E ENTREGAS
 ' =========================================================
 package "Logística" as Logistica {
 
@@ -295,10 +295,11 @@ package "Logística" as Logistica {
 
     class NotaSaida {
           + ID_nota_saida: Integer
-          + ID_pedido_escola: Integer
+          + ID_destinatario: Integer
           + data_criacao: Timestamp
           + tipo: Enum
           + status: Enum
+          + urgente: Boolean
           + observacao: Text
           + ativo: Boolean
         }
@@ -308,21 +309,6 @@ package "Logística" as Logistica {
           + qtd_esperada: Float
           + qtd_entregue: Float
         }
-
-      class Remessa {
-      + ID_remessa: Integer
-      + data_criacao: Timestamp
-      + status: Enum
-      + urgente: Boolean
-      + observacao: Text
-    }
-
-    class ItemRemessa {
-      + ID_item_remessa: Integer
-      + quantidade_solicitada: Float
-      + quantidade_separada: Float
-      + quantidade_entregue: Float
-    }
 
     class Coleta {
       + ID_coleta: Integer
@@ -339,23 +325,25 @@ package "Logística" as Logistica {
     + ID_percurso: Integer
     + nome: String
     + descricao: Text
-    + ativo: Boolean
   }
 
   class PercursoDestinatario {
     + ordem_visita: Integer
   }
 
-  class Rota {
-    + ID_rota: Integer
+  class Expedicao {
+    + ID_expedicao: Integer
+    + ID_veiculo: Integer
+    + ID_funcionario_condutor: Integer
     + data_criacao: Timestamp
     + data_prevista: Date
     + observacao: Text
+    + status: Enum
     + ativo: Boolean
   }
 
-  class RotaRemessa {
-    + ID_rota_remessa: Integer
+  class ExpedicaoNota {
+    + ID_expedicao_nota: Integer
     + ordem_visita: Integer
     + data_adicao: Timestamp
   }
@@ -381,21 +369,17 @@ PedidoEscola "1" --> "*" ItemPedidoEscola : contém >
 PedidoEscola "1" --> "0..1" NotaSaida : gera >
 Destinatario "1" --> "*" PedidoEscola : solicita >
 NotaSaida "1" --> "*" ItemNotaSaida : contém >
-NotaSaida "1" --> "*" Remessa : gera >
 NotaSaida "1" --> "*" Coleta : gera >
-Remessa "1" --> "*" ItemRemessa : contém >
 Coleta "1" --> "*" ItemColeta : contém >
-Remessa "1" --> "*" Anexo : anexa >
+NotaSaida "1" --> "*" Anexo : anexa >
 Estoque "1" --> "*" ItemNotaSaida : reservado em >
-Estoque "1" --> "*" ItemRemessa : expedido em >
-Funcionario "0..1" --> "0..*" Remessa : conduz >
-Veiculo "0..1" --> "0..*" Remessa : vincula >
-Rota "1" --> "*" RotaRemessa : agrupa >
-Remessa "1" --> "*" RotaRemessa : alocada em >
+Funcionario "0..1" --> "0..*" Expedicao : conduz >
+Veiculo "0..1" --> "0..*" Expedicao : vincula >
+Expedicao "1" --> "*" ExpedicaoNota : agrupa >
+NotaSaida "1" --> "*" ExpedicaoNota : alocada em >
 Percurso "1" --> "*" PercursoDestinatario : define >
 Destinatario "1" --> "*" PercursoDestinatario : incluso em >
-Rota "0..1" --> "1" Percurso : baseado em (opcional) >
-Remessa "*" --> "1" Destinatario : destinada a >
+NotaSaida "*" --> "1" Destinatario : destinada a >
 
 ' =========================================================
 ' NOTA DE ENTRADA
@@ -407,11 +391,8 @@ package "Nota de Entrada" as NotaEntrada {
     + tipo: Enum
     + data_recebimento: Date
     + observacao: Text
-    + ativo: Boolean
-  }
-
-  class NotaEntradaChaveAcesso {
     + chave_acesso: String
+    + ativo: Boolean
   }
 
   class ItemNotaEntrada {
@@ -424,7 +405,6 @@ package "Nota de Entrada" as NotaEntrada {
 
 Fornecedor "1" --> "*" NotaEntrada : emite >
 NotaEntrada "1" --> "*" ItemNotaEntrada : contém >
-NotaEntrada "1" --> "*" NotaEntradaChaveAcesso : referência >
 Produto "1" --> "*" ItemNotaEntrada : listado em >
 
 ' =========================================================

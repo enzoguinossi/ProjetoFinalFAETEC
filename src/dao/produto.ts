@@ -2,15 +2,17 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
+import { conversaoUnidadeDAO } from "./conversao-unidade";
 import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
 
 export class ProdutoDAO {
-  async list(params: ListParams = {}) {
+  async list(params: ListParams = {}, exceptoIds: number[] = []) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.ProdutoWhereInput = { ativo: true };
     if (params.search) where.descricao = { contains: params.search };
+    if (exceptoIds.length > 0) where.id_produto = { notIn: exceptoIds };
     const [data, total] = await Promise.all([
       prisma.produto.findMany({
         skip, take, where,
@@ -102,6 +104,7 @@ export class ProdutoDAO {
         select: {
           id_produto: true,
           descricao: true,
+          conversaoPadrao: { select: { nome: true } },
           estoques: {
             where: { ativo: true },
             select: { quantidade_atual: true, saldo_reservado: true },
@@ -134,6 +137,14 @@ export class ProdutoDAO {
     },
     id_usuario: number,
   ) {
+    // A unidade padrão do produto é obrigatória: quando o formulário não
+    // informa, vale a unidade padrão do sistema (UNIDADE/1).
+    const idConversaoPadrao =
+      data.id_conversao_padrao ?? (await conversaoUnidadeDAO.getPadrao())?.id_conversao;
+    if (!idConversaoPadrao) {
+      throw new Error("Nenhuma unidade padrão configurada. Execute o seed do sistema.");
+    }
+
     return prisma.$transaction(async (tx) => {
       const p = await tx.produto.create({
         data: {
@@ -142,7 +153,7 @@ export class ProdutoDAO {
           perecivel: data.perecivel ?? false,
           composto: data.composto ?? false,
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
-          id_conversao_padrao: data.id_conversao_padrao,
+          id_conversao_padrao: idConversaoPadrao,
         },
       });
 
@@ -236,11 +247,10 @@ export class ProdutoDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [estoque, itensNotaSaida, itensNotaEntrada, itensRemessa, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
+    const [estoque, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
       client.estoque.count({ where: { id_produto: id } }),
       client.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
       client.itemNotaEntrada.count({ where: { id_produto: id } }),
-      client.itemRemessa.count({ where: { estoque: { id_produto: id } } }),
       client.itemPedidoEscola.count({ where: { id_produto: id } }),
       client.itemColeta.count({ where: { estoque: { id_produto: id } } }),
       client.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
@@ -251,7 +261,6 @@ export class ProdutoDAO {
     if (estoque > 0) vinculos.push(`${estoque} registro(s) de estoque`);
     if (itensNotaSaida > 0) vinculos.push(`${itensNotaSaida} item(ns) de nota de saída`);
     if (itensNotaEntrada > 0) vinculos.push(`${itensNotaEntrada} item(ns) de nota de entrada`);
-    if (itensRemessa > 0) vinculos.push(`${itensRemessa} item(ns) de remessa`);
     if (itensPedido > 0) vinculos.push(`${itensPedido} pedido(s) de escola`);
     if (itensColeta > 0) vinculos.push(`${itensColeta} item(ns) de coleta`);
     if (movimentacoes > 0) vinculos.push(`${movimentacoes} movimentação(ões) de estoque`);

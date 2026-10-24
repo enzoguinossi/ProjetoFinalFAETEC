@@ -123,13 +123,13 @@ export class FuncionarioDAO {
         });
       }
 
-      // Remove a marcação de condutor apenas se ele nunca foi usado em remessa.
+      // Remove a marcação de condutor apenas se ele nunca foi usado em expedição.
       if (data.condutor === false && antes.condutor) {
-        const usos = await tx.remessa.count({ where: { id_funcionario_condutor: id } });
+        const usos = await tx.expedicao.count({ where: { id_funcionario_condutor: id } });
         if (usos > 0) {
           throw new EntidadeComVinculosError(
             "Condutor",
-            [`${usos} remessa(s) utilizam este condutor`],
+            [`${usos} expedição(ões) utilizam este condutor`],
           );
         }
       }
@@ -187,16 +187,16 @@ export class FuncionarioDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [usuario, contagens, remessas] = await Promise.all([
+    const [usuario, contagens, expedicoes] = await Promise.all([
       client.usuario.count({ where: { id_funcionario: id } }),
       client.contagemInventario.count({ where: { id_funcionario: id } }),
-      client.remessa.count({ where: { id_funcionario_condutor: id } }),
+      client.expedicao.count({ where: { id_funcionario_condutor: id } }),
     ]);
 
     const vinculos: string[] = [];
     if (usuario > 0) vinculos.push(`${usuario} usuário(s) vinculado(s)`);
     if (contagens > 0) vinculos.push(`${contagens} contagem(ns) de inventário`);
-    if (remessas > 0) vinculos.push(`${remessas} remessa(s) como condutor`);
+    if (expedicoes > 0) vinculos.push(`${expedicoes} expedição(ões) como condutor`);
 
     return { podeExcluir: vinculos.length === 0, vinculos };
   }

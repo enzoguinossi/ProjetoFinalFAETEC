@@ -8,9 +8,32 @@ export async function criarTipoCodigo(nome: string, descricao?: string) {
 }
 
 export async function criarConversao(nome?: string, fator = 1) {
+  const nomeFinal = nome ?? `UN${proximo()}`;
   return prismaTeste.conversaoUnidade.create({
-    data: { nome: nome ?? `UN${proximo()}`, fator },
+    data: { nome: nomeFinal, fator },
   });
+}
+
+/**
+ * Garante a unidade padrão do sistema (UNIDADE/1) e a devolve.
+ * Todo produto precisa de uma unidade — a padrão é a escolha quando o teste
+ * não informa outra.
+ */
+export async function garantirUnidadePadrao() {
+  return prismaTeste.conversaoUnidade.upsert({
+    where: { nome: "UNIDADE" },
+    update: { padrao: true },
+    create: {
+      nome: "UNIDADE",
+      fator: 1,
+      descricao: "Unidade avulsa",
+      padrao: true,
+    },
+  });
+}
+
+export async function criarUnidadePadrao() {
+  return garantirUnidadePadrao();
 }
 
 export async function criarUsuario(
@@ -69,12 +92,14 @@ export async function criarProduto(
   } = {},
 ) {
   const n = proximo();
+  const idConversaoPadrao =
+    opts.idConversaoPadrao ?? (await garantirUnidadePadrao()).id_conversao;
   return prismaTeste.produto.create({
     data: {
       descricao: opts.descricao ?? `Produto ${n}`,
       perecivel: opts.perecivel ?? false,
       composto: opts.composto ?? false,
-      id_conversao_padrao: opts.idConversaoPadrao,
+      id_conversao_padrao: idConversaoPadrao,
       ativo: opts.ativo ?? true,
     },
   });
@@ -151,7 +176,7 @@ export async function criarVeiculo(
   opts: {
     placa?: string;
     modelo?: string;
-    status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA";
+    status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO";
     ativo?: boolean;
   } = {},
 ) {
@@ -166,12 +191,16 @@ export async function criarVeiculo(
   });
 }
 
-export async function criarNotaSaida() {
+export async function criarNotaSaida(
+  opts: { idDestinatario?: number; urgente?: boolean } = {},
+) {
   return prismaTeste.notaSaida.create({
     data: {
+      id_destinatario: opts.idDestinatario,
       data_criacao: new Date(),
       tipo: "SAIDA",
       status: "ABERTA",
+      urgente: opts.urgente ?? false,
     },
   });
 }
@@ -186,20 +215,27 @@ export async function criarItemNotaSaida(
   });
 }
 
-export async function criarRemessa(opts: {
-  idNotaSaida: number;
-  idDestinatario: number;
+export async function criarExpedicao(opts: {
   idVeiculo?: number;
   idCondutor?: number;
-}) {
-  return prismaTeste.remessa.create({
+  dataPrevista?: Date;
+  status?: "PLANEJADA" | "EM_PERCURSO" | "CONCLUIDA";
+} = {}) {
+  // Veículo, condutor e data prevista são obrigatórios na expedição: a fábrica
+  // cria os vínculos quando o teste não os informa.
+  const idVeiculo = opts.idVeiculo ?? (await criarVeiculo()).id_veiculo;
+  const idCondutor =
+    opts.idCondutor ??
+    (await criarFuncionario({ condutor: true })).funcionario.id_funcionario;
+  return prismaTeste.expedicao.create({
     data: {
-      id_nota_saida: opts.idNotaSaida,
-      id_destinatario: opts.idDestinatario,
       data_criacao: new Date(),
-      status: "EM_PREPARACAO",
-      id_veiculo: opts.idVeiculo,
-      id_funcionario_condutor: opts.idCondutor,
+      data_prevista:
+        opts.dataPrevista ??
+        new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`),
+      id_veiculo: idVeiculo,
+      id_funcionario_condutor: idCondutor,
+      status: opts.status ?? "PLANEJADA",
     },
   });
 }

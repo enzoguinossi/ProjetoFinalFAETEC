@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatorio - Lista de Produtos</title>
+  <link rel="stylesheet" href="Relatorio.css">
+</head>
+<body>
+
+  <div class="relatorio-container">
+    
+    <div class="conteudo-principal">
+      <!-- CABECALHO -->
+      <header class="relatorio-header">
+        <div>
+          <h1 class="titulo-relatorio">Relatorio - Lista de Produtos</h1>
+        </div>
+        <div class="meta-info">
+          <p>Emissao: {{DATA_EMISSAO}} {{HORA_EMISSAO}}</p>
+        </div>
+      </header>
+
+      <!-- TABELA DE PRODUTOS -->
+      <table class="relatorio-tabela">
+        <thead>
+          <tr>
+            <th style="width: 8%;" class="col-centro">Codigo</th>
+            <th style="width: 34%;">Descricao</th>
+            <th style="width: 9%;" class="col-centro">Unid.</th>
+            <th style="width: 17%;" class="col-direita">Quantidade</th>
+            <th style="width: 17%;" class="col-direita">Qtd. Livre</th>
+            <th style="width: 15%;" class="col-centro">Situacao</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-centro">{{CODIGO}}</td>
+            <td>{{DESCRICAO}}</td>
+            <td class="col-centro">{{UNIDADE}}</td>
+            <td class="col-direita">{{QUANTIDADE}}</td>
+            <td class="col-direita">{{QTD_LIVRE}}</td>
+            <td class="col-centro">{{SITUACAO}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- RODAPE -->
+    <footer class="relatorio-footer">
+      <span>Emissor: {{USUARIO_EMISSOR}}</span>
+      <span>Documento gerado para uso interno</span>
+    </footer>
+
+  </div>
+
+</body>
+</html>

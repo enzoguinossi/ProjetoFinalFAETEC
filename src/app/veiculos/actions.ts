@@ -20,7 +20,7 @@ export type VeiculoFormData = {
   id_veiculo: number;
   placa: string;
   modelo: string | null;
-  status: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA";
+  status: "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO";
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
 };
@@ -42,8 +42,8 @@ export async function listarVeiculos(
       status:
         v.status === "DISPONIVEL"
           ? "Ativo"
-          : v.status === "EM_ROTA"
-            ? "Em rota"
+          : v.status === "EM_EXPEDICAO"
+            ? "Em expedição"
             : "Indisponível",
     })),
   };
@@ -104,7 +104,7 @@ export async function updateVeiculo(formData: FormData) {
       await veiculoDAO.update(id, {
         placa: (formData.get("placa") as string)?.trim().toUpperCase(),
         modelo: (formData.get("modelo") as string) || undefined,
-        status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA",
+        status: formData.get("status") as "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO",
         codigos: codigoResult.codigos,
       }, user.id_usuario);
 

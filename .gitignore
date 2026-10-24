@@ -30,3 +30,6 @@ tsconfig.tsbuildinfo
 /out/figma-export/
 # Configuração local da exportação (pode conter a URL do banco de exportação)
 /tools/figma-export/.env
+
+# Execuções e contratos internos dos agentes (não são conteúdo do produto)
+/.ai-workflow/runs/

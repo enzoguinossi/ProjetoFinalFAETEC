@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getUserInfo } from "@/app/actions/user";
 import { logoutAction } from "@/app/login/actions";
 import {
   cadastroItems,
+  expedicaoItems,
+  movEstoqueItems,
   navItems,
   sidebarCls,
   logoAreaCls,
@@ -38,6 +40,8 @@ function loadUser() {
 
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
+  const [movEstoqueOpen, setMovEstoqueOpen] = useState(true);
+  const [expedicoesOpen, setExpedicoesOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [user, setUser] = useState<typeof cachedUser>(cachedUser);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -73,10 +77,20 @@ export default function Sidebar() {
 
   const isActive = (path: string) => pathname === path;
   const isCadastroItemActive = cadastroItems.some((i) => pathname === i.path);
+  const isMovEstoqueItemActive = movEstoqueItems.some((i) => pathname === i.path);
+  const isExpedicaoItemActive = expedicaoItems.some((i) => pathname === i.path);
 
   const visibleCadastroItems = user?.super_admin
     ? cadastroItems
     : cadastroItems.filter((i) => user?.permissoes?.includes(i.permissao));
+
+  const visibleMovEstoqueItems = user?.super_admin
+    ? movEstoqueItems
+    : movEstoqueItems.filter((i) => user?.permissoes?.includes(i.permissao));
+
+  const visibleExpedicaoItems = user?.super_admin
+    ? expedicaoItems
+    : expedicaoItems.filter((i) => user?.permissoes?.includes(i.permissao));
 
   return (
     <aside
@@ -101,18 +115,60 @@ export default function Sidebar() {
 
       {/* Menu */}
       <nav className={navCls}>
-        {navItems.map((item) => (
-          <button
-            key={item.path}
-            className={`${navItemCls} ${isActive(item.path) ? navItemActiveCls : ""}`}
-            onClick={() => navigate(item.path)}
-            data-figma="SidebarItem"
-            data-figma-label={item.label}
-            data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
-          >
-            <img src={item.icon} alt="" className="w-6 h-6 shrink-0" />
-            <span>{item.label}</span>
-          </button>
+        {navItems.map((item, index) => (
+          <Fragment key={item.path}>
+            <button
+              className={`${navItemCls} ${isActive(item.path) ? navItemActiveCls : ""}`}
+              onClick={() => navigate(item.path)}
+              data-figma="SidebarItem"
+              data-figma-label={item.label}
+              data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
+            >
+              <img src={item.icon} alt="" className="w-6 h-6 shrink-0" />
+              <span>{item.label}</span>
+            </button>
+
+            {/* Mov. Estoque (collapsible) — ocupa a posição do antigo item, após Dashboard */}
+            {index === 0 && (
+              <div>
+                <button
+                  className={`${navItemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
+                  onClick={() => setMovEstoqueOpen(!movEstoqueOpen)}
+                  data-figma="SidebarGroup"
+                  data-figma-label="Mov. Estoque"
+                  data-figma-variant={isMovEstoqueItemActive ? "ativo" : "inativo"}
+                  data-figma-expanded={movEstoqueOpen ? "true" : "false"}
+                >
+                  <img src="/icons/nav/estoque.svg" alt="" className="w-6 h-6 shrink-0" />
+                  <span>Mov. Estoque</span>
+                  <img
+                    src={movEstoqueOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
+                    alt=""
+                    className="w-3 h-3 shrink-0 ml-auto transition-transform duration-200 opacity-60"
+                    style={{ transform: movEstoqueOpen ? "rotate(0)" : "rotate(-90deg)" }}
+                  />
+                </button>
+
+                {movEstoqueOpen && (
+                  <div className={subItemsCls}>
+                    {visibleMovEstoqueItems.map((item) => (
+                      <button
+                        key={item.path}
+                        className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
+                        onClick={() => navigate(item.path)}
+                        data-figma="SidebarSubItem"
+                        data-figma-label={item.label}
+                        data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
+                      >
+                        <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
+                        <span>{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Fragment>
         ))}
 
         {/* Cadastros (collapsible) */}
@@ -153,6 +209,47 @@ export default function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* Expedições (collapsible) */}
+        {visibleExpedicaoItems.length > 0 && (
+          <div>
+            <button
+              className={`${navItemCls} ${isExpedicaoItemActive ? navItemActiveCls : ""}`}
+              onClick={() => setExpedicoesOpen(!expedicoesOpen)}
+              data-figma="SidebarGroup"
+              data-figma-label="Expedições"
+              data-figma-variant={isExpedicaoItemActive ? "ativo" : "inativo"}
+              data-figma-expanded={expedicoesOpen ? "true" : "false"}
+            >
+              <img src="/icons/cadastros/carro.svg" alt="" className="w-6 h-6 shrink-0" />
+              <span>Expedições</span>
+              <img
+                src={expedicoesOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
+                alt=""
+                className="w-3 h-3 shrink-0 ml-auto transition-transform duration-200 opacity-60"
+                style={{ transform: expedicoesOpen ? "rotate(0)" : "rotate(-90deg)" }}
+              />
+            </button>
+
+            {expedicoesOpen && (
+              <div className={subItemsCls}>
+                {visibleExpedicaoItems.map((item) => (
+                  <button
+                    key={item.path}
+                    className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
+                    onClick={() => navigate(item.path)}
+                    data-figma="SidebarSubItem"
+                    data-figma-label={item.label}
+                    data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
+                  >
+                    <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Informações do Usuário */}

@@ -8,145 +8,105 @@ sequência da release no mesmo dia.
 
 A convenção completa — como numerar releases do mesmo dia, como escrever uma entrada e a
 rastreabilidade versão ↔ issues ↔ commit — está em
-[`docs/processo/VERSIONAMENTO.md`](docs/processo/VERSIONAMENTO.md). O checklist de release está em
+[`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md). O checklist de release está em
 `.opencode/skills/release/SKILL.md`.
 
 ## [Unreleased]
 
+Esta seção consolida a entrega da movimentação de estoque (KAN-140), o relatório de
+Lista de Produtos (KAN-159) e as decisões de modelagem e documentação que as sustentam.
+
+### Added
+
+- **Nota de saída como entrega, com tipo de saída e unidade padrão (KAN-140):** a nota de
+  saída virou o documento central da entrega — com destinatário (obrigatório para
+  Remessa), itens e reserva — e ganhou o campo **Tipo de Saída**: Remessa, Avaria e
+  Consumo Interno. Remessa reserva estoque ao ser criada; Avaria e Consumo Interno não
+  têm destinatário, não reservam e dão baixa real na criação, com movimentação negativa
+  e nota nascida `BAIXA_TOTAL`. O cadastro de unidades ganhou a unidade padrão do
+  sistema (`UNIDADE`, fator 1), que não pode ser excluída nem ter nome ou fator
+  alterados, e todo produto passa a ter unidade obrigatória — ao excluir uma unidade que
+  não é a padrão, os produtos que a usavam são revinculados à padrão. Saldo insuficiente
+  continua apenas avisando (RN001).
+- **Movimentação de estoque — entrada e saída (KAN-140):** novo módulo em `/mov-estoque`
+  com abas Entrada e Saída. A entrada registra nota com fornecedor, data de recebimento,
+  chave de acesso NF-e opcional e itens com conversão de unidade; em transação única
+  grava nota, itens, atualização de `quantidade_atual`, movimentação de estoque e
+  auditoria. A saída cria a nota de entrega (Remessa) com reserva do estoque
+  (`saldo_reservado += quantidade`), urgência, condutor e veículo; saldo insuficiente só
+  avisa (RN001). Ambas as notas têm visualização e edição validadas no servidor — a
+  edição corrige estoque/reserva pelo delta, sempre em transação com auditoria
+  antes/depois — e não permitem remover item nem excluir a nota (RN004). A entrada
+  confirmada é imutável.
+- **Expedições, percursos, execução da entrega e baixa (KAN-140):** as expedições montam
+  o manifesto da entrega — veículo, condutor e data prevista obrigatórios — com as notas
+  e a ordem das visitas baseada em percursos cadastrados (`/expedicoes/percursos`, com
+  nome único e ordem editável). Em percurso, cada nota tem **Registrar entrega** (com
+  entrega parcial e corte do restante) e o cabeçalho tem **Concluir expedição**. A baixa
+  roda em transação única: `quantidade_atual` e `saldo_reservado` caem pelo delta
+  entregue e a movimentação é gravada; status da nota vira `BAIXA_TOTAL`, `BAIXA_PARCIAL`
+  (restante segue para outra expedição — RN003) ou `BAIXA_COM_CORTE`; cancelamento da
+  nota libera a reserva em transação idempotente (RN004).
+- **Relatórios — módulo e Lista de Produtos (KAN-157–KAN-163, KAN-159):** novo hub
+  `/relatorios` e o relatório de Lista de Produtos implementado, com filtros aplicados no
+  servidor (busca por código/descrição e situação), permissão `relatorio.gerar`, layout
+  A4 conforme os templates do PR #4 e exportação CSV com BOM UTF-8, separador `;` e
+  decimal com vírgula (RF024).
+- **Formulários de issue para erro e melhoria (KAN-140):** formulários de issue
+  padronizados (bug e melhoria) no repositório, para orientar o reporte com contexto de
+  versão, passos de reprodução e resultado esperado.
+- **Catálogo de permissões atualizado (KAN-140):** as permissões de `remessa.*` deram
+  lugar às de `nota_saida.*` (`criar`, `alterar`, `consultar`, `cancelar`,
+  `alterar_status`, `finalizar`) e à nova `percurso.excluir`; o seed é idempotente e o
+  catálogo final ficou com **77** permissões.
+
 ### Changed
 
-- **Documentação reorganizada por assunto:** `docs/` passou a ter três pastas — `dominio/`
-  (ENTENDIMENTO, REGRAS_NEGOCIO, REQUISITOS_FUNCIONAIS, REQUISITOS_NAO_FUNCIONAIS e o novo
-  IMPLEMENTACAO), `processo/` (VERSIONAMENTO, JIRA e WORKFLOW) e `diagramas/` (classes.puml,
-  DER.puml, fluxo_atual.puml e os 6 sub-fluxos de `fluxosAtuais/`). Os **16** arquivos foram
-  movidos com `git mv` (histórico preservado) e as antigas pastas `agents/` e `puml/` sob
-  `docs/` deixaram de existir; as referências internas foram atualizadas e os caminhos antigos
-  não aparecem mais em `grep`.
-- **`docs/README.md` (novo)** — índice da documentação: o que é o projeto em uma linha, a
-  tabela pasta → documento → para quê, e a indicação de que o modelo físico
-  (`prisma/schema.prisma`) é a fonte de verdade.
-- **`docs/dominio/IMPLEMENTACAO.md` (novo)** — mapa do que **já existe no código**: os 25
-  requisitos funcionais (o `RF008` não existe e a lacuna é preservada) e os 9 requisitos não
-  funcionais classificados em implementado/parcial/não implementado, cada linha com o arquivo
-  que a sustenta, mais 4 pontos em aberto (autor das mensagens automáticas do mural, forma do
-  registro de pendência da RN003, destino de `anexo.ID_documento_fiscal` e enforcement de
-  `tipo_codigo`) — os **4 foram resolvidos pelo usuário em 2026-10-19** e a seção passou a
-  registrar as decisões (ver a entrada "`docs/dominio/IMPLEMENTACAO.md` sem pontos em aberto",
-  abaixo).
-- **`ENTENDIMENTO.md` corrigido contra o schema (52 modelos):** removida a entidade
-  inexistente `condutor` — o condutor é a flag `funcionario.condutor` e a FK
-  `remessa.ID_funcionario_condutor`; `senha_hash` passou a nullable e `senha_alterada_em` foi
-  incluído; `saldo_reservado` e `endereco.uf` acrescentados; `anexo.ID_documento_fiscal`
-  então documentado como coluna sem tabela de destino (removida depois — ver `Removed`); a tabela de permissões passou a refletir as
-  **68** permissões criadas por `prisma/seed.ts` (`listar`/`excluir` incluídos,
-  `perfil.desativar` → `perfil.excluir`, sem `condutor.*`); a lista de valores de `acao` da
-  auditoria passou a vir de `src/dao/_audit.ts`; a movimentação de estoque deixou de ser
-  descrita com um "tipo" que a tabela não tem; a contagem de entidades foi corrigida para 52
-  e a stack para Next.js 16 sem Chart.js; os fluxos AS-IS (`fluxo_atual.puml` e
-  `fluxosAtuais/`) passaram a ser referenciados e separados do fluxo alvo.
-- **Diagramas alinhados ao schema:** `classes.puml` ganhou as 5 classes que faltavam
-  (MovimentacaoEstoque, ReservaEstoque, UsuarioPermissao, PerfilPermissao e
-  RegistroAuditoria) e passou a ter as **52** classes dos 52 modelos; `DER.puml` passou de 54
-  para **52** entidades (sem `condutor`/`condutor_codigo`), ganhou o relacionamento
-  `nota_entrada ||--o{ chave_acesso` e os campos `uf` e `senha_alterada_em`; a multiplicidade
-  invertida de `ConversaoUnidade` e os tipos `DECIMAL` (o schema usa `Float`) foram
-  corrigidos nos dois diagramas.
-- **`AGENTS.md`, `README.md` e os documentos de processo alinhados ao repositório real:** a
-  fonte de verdade (§2) e as referências de §24 apontam para os caminhos novos; a stack virou
-  "Next.js 16" e "MySQL/MariaDB (driver `@prisma/adapter-mariadb`)"; a árvore de §3 reflete o
-  layout real (com `src/proxy.ts` e sem as pastas de API, autenticação e dashboard, nem
-  diretório de migrations) e o uso de `prisma db push`; o `README.md` da raiz ficou enxuto (o que
-  é o projeto, stack, como rodar, comandos essenciais — com `test` e `db:generate` — e um link
-  para `docs/README.md`); no `JIRA.md`, o bullet que dizia que `#time` registra worklog foi
-  corrigido, o repositório passou a ser citado como `enzoguinossi/projetofinalfaetec` e o
-  exemplo de smart commit combinado ficou correto.
-- **`REQUISITOS_FUNCIONAIS.md`:** o cabeçalho passou a registrar que **`RF008` não existe** e
-  que a lacuna é preservada de propósito (sem renumerar e sem inventar requisito) — o total é
-  25 RFs.
-- **`mensagem_mural.ID_usuario` passou a ser opcional:** em `prisma/schema.prisma` a coluna
-  deixou de ser `NOT NULL` (`id_usuario Int?`) e a relação com `usuario` virou opcional, para
-  permitir as mensagens automáticas do sistema (RN002/RF014) sem autor humano — `NULL` passa a
-  significar "sem autor" e a coluna `automatica` marca o caso. O `count` de
-  `src/dao/usuario.ts` (`verificarRelacionamentos`) continua correto: mensagens com `NULL` não
-  são atribuídas a nenhum usuário. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
-- **RN003 realizada como a remessa `PENDENTE` (sem tabela nova):** o "registro automático de
-  pendência vinculado ao destinatário" da RN003 é a remessa com status `PENDENTE` criada no
-  *split* de uma entrega parcial, já vinculada por `remessa.ID_destinatario`; o que falta
-  entregar continua derivado de `item_nota_saida.qtd_esperada − qtd_entregue`. O texto da regra
-  em `docs/dominio/REGRAS_NEGOCIO.md` **não mudou de sentido** — ganhou uma linha de "Realização
-  no modelo", e `docs/dominio/ENTENDIMENTO.md` §3.11.2 passou a ligar o split à RN003. (Decisão
-  do usuário, 2026-10-19 — sem chave de issue.)
-- **`tipo_codigo` sem permissões é intencional (dado de referência):** não há CRUD, tela nem
-  Server Action de gestão — `src/dao/tipo-codigo.ts` só lê (`list`, `listParaEntidade`,
-  `getByNomes`) e os formulários apenas escolhem entre os tipos permitidos; por isso não existe
-  permissão `tipo_codigo.*` no seed. Registrada também a invariante de que o catálogo existe em
-  `TIPOS_CODIGO`/`TIPOS_POR_ENTIDADE` (`src/lib/codigo.ts`) e nas **6** linhas de `tipo_codigo`
-  criadas por `prisma/seed.ts`, e que **quem manda é o TypeScript** — `tiposPermitidosPara()` e
-  `tipoPermitido()` recusam tipo ausente da constante mesmo que exista no banco.
-  (`docs/dominio/ENTENDIMENTO.md` §3.15.6.) (Decisão do usuário, 2026-10-19 — sem chave de
-  issue.)
-- **`docs/dominio/IMPLEMENTACAO.md` sem pontos em aberto:** a seção foi substituída pelo
-  registro das **4** decisões de 2026-10-19 (autor das mensagens automáticas do mural, forma do
-  registro de pendência da RN003, destino de `anexo.ID_documento_fiscal` e enforcement de
-  `tipo_codigo`) — nenhuma delas permanece pendente.
-- **A nota de saída deixou de ter destinatário:** a coluna `nota_saida.ID_destinatario` saiu do
-  modelo em 2026-10-19 — a nota é o documento que **agrega remessas**, e são as remessas/coletas
-  que carregam o destinatário da entrega (`remessa.ID_destinatario`, `coleta.ID_destinatario`).
-  O vínculo do destinatário nas guardas de exclusão (`src/dao/destinatario.ts`) passou a ser
-  contado por **remessa e coleta** (além de pedido e percurso) — a guarda continua bloqueando a
-  remoção de um destinatário com entregas. `docs/dominio/ENTENDIMENTO.md` §3.11.1 e
-  `docs/diagramas/DER.puml` alinhados. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **Nota de saída e remessa fundidas em um só nível (KAN-140):** por decisão do usuário
+  de 2026-10-23, a nota de saída passou a ser a própria entrega — carrega destinatário,
+  itens, reserva e status — e a expedição virou o manifesto. Saíram do schema `Remessa`,
+  `ItemRemessa` e `StatusRemessa`; `StatusNotaSaida` agora é `ABERTA`, `EM_PERCURSO`,
+  `PENDENTE`, `BAIXA_TOTAL`, `BAIXA_PARCIAL`, `BAIXA_COM_CORTE` e `CANCELADA`; a reserva
+  passou a pertencer à nota (antes `ID_remessa`; antes disso `ID_nota_saida`). A RN003
+  passou a apontar a própria nota em `BAIXA_PARCIAL` como a pendência da entrega parcial
+  (sem *split* e sem tabela nova). Diagramas e documentos de domínio alinhados.
+- **Rota virou expedição e percurso passou a ser excluído fisicamente (KAN-140):** o
+  conceito de organização das entregas foi renomeado para **expedição**, inclusive no
+  modelo físico (`expedicao`, `expedicao_nota`, `StatusExpedicao`), e o status de veículo
+  em deslocamento virou `EM_EXPEDICAO`. `expedicao` deixou de guardar `ID_percurso` — o
+  percurso é apenas um atalho de ordenação na montagem — e `percurso` deixou de ter
+  `ativo`: a exclusão é física, com o snapshot anterior na auditoria.
+- **Chave de acesso da NF-e vira coluna da nota de entrada (KAN-140):** a tabela
+  `nota_entrada_chave_acesso` deixou de existir; a chave passou a ser a coluna nullable
+  e única `nota_entrada.chave_acesso VARCHAR(44)` — a nota tem no máximo uma chave. As
+  chaves existentes foram transportadas antes da queda da tabela.
 - **A nota de saída passa a consolidar pedidos (FK invertida):** o vínculo migrou de
-  `nota_saida.ID_pedido_escola` (única, no máximo uma nota por pedido) para
-  `pedido_escola.ID_nota_saida` — uma nota agrega **N** pedidos e cada pedido pertence a **no
-  máximo uma** nota. Os vínculos existentes foram transportados para o lado novo **antes** da
-  queda da coluna antiga: **0** linhas transportadas (nenhuma das 4 notas tinha
-  `ID_pedido_escola` não nulo e a tabela `pedido_escola` estava vazia). `ENTENDIMENTO.md`
-  §3.11.0/§3.11.1 e `DER.puml` (52 entidades) alinhados; `IMPLEMENTACAO.md` ganhou o **ponto em
-  aberto** *como* o pedido entra numa nota (nota nova a cada confirmação ou juntar-se a uma nota
-  aberta) — a regra não foi inventada. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
-- **Prioridades dos requisitos alinhadas à realidade operacional:** cinco requisitos passaram a
-  **Essencial** — `RF009` (era Desejável: é o único canal de notificação da RN002 e do `RF014`,
-  ambos Essenciais), `RF013` (era Importante: pré-requisito do `RF017a` — sem a conversão
-  caixa→unidade a entrada não registra a quantidade real), `RF016` (era Importante: é a única
-  forma de registrar saída que não é entrega — consumo interno e avaria), `RF024` (era
-  Importante: é a mesma capacidade do `RNF008`, que já é Essencial) e `RNF002` (era Importante:
-  incide sobre a busca por código de barras do `RF011`, Essencial, usada no balcão). O `RF022`
-  permanece **Importante** — o usuário decidiu **não** dividir rota/percurso. Só a coluna de
-  prioridade mudou; o texto e o escopo dos requisitos não foram alterados. (Decisão do usuário,
+  `nota_saida.ID_pedido_escola` para `pedido_escola.ID_nota_saida` — uma nota agrega
+  **N** pedidos e cada pedido pertence a no máximo uma nota. (Decisão do usuário,
   2026-10-19 — sem chave de issue.)
-- **`docs/dominio/ESCOPO_FORA.md` (novo) — os requisitos que não serão implementados:** reúne
-  `RF025` (importação de NF-e por XML) e `RNF009` (interoperabilidade, XML NF-e), ambos
-  mantidos como Desejáveis e remarcados "fora do escopo", com o critério de exclusão (nenhuma
-  regra de negócio nem requisito Essencial depende dele; a necessidade é atendida por outro
-  caminho já previsto na especificação; o custo é desproporcional ao ganho) e a observação de
-  que os dois descrevem **a mesma capacidade** e devem ser tratados como um item se voltarem
-  ao escopo. A necessidade de entrada de nota fica coberta pelo `RF017a`, que prevê a entrada
-  **com ou sem** chave de acesso NF-e. Ponteiros no cabeçalho de
-  `docs/dominio/REQUISITOS_FUNCIONAIS.md` e de `docs/dominio/REQUISITOS_NAO_FUNCIONAIS.md` e
-  linha nova no índice `docs/README.md`. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
-- **`RF018` (Quadro Kanban de Remessas) passou a fora do escopo:** o acompanhamento visual já
-  é feito no **Trello**, atualizado na rua, durante as entregas, por quem executa o serviço; o
-  projeto **não tem infraestrutura para hospedar o sistema online** e permitir acesso de
-  qualquer lugar, e um Kanban servido pelo Nexus exigiria uma **interface mobile dedicada** —
-  esforço muito acima do ganho. O status de cada remessa continua registrado no modelo, para
-  consultas e relatórios. `docs/dominio/ESCOPO_FORA.md` foi reescrito para justificar cada
-  exclusão em seção própria (critério, resumo e o que atende à necessidade). Em consequência,
-  o `RNF002` deixou de citar o Kanban: o requisito de desempenho trata agora só da busca por
-  código de barras. (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **Documentação reorganizada e requisitos alinhados:** `docs/` reorganizado por assunto
+  (`dominio/`, `processo/`, `diagramas/`, com novo `docs/README.md` e
+  `docs/dominio/IMPLEMENTACAO.md`), com divergências contra o código corrigidas
+  (ENTENDIMENTO, diagramas de classes e DER, AGENTS.md, README.md e JIRA.md). As
+  prioridades dos requisitos foram alinhadas à realidade operacional (RF009/RF013/
+  RF016/RF024/RNF002 → Essencial), o RF008 foi registrado como lacuna intencional, os
+  requisitos fora de escopo foram isolados em `docs/dominio/ESCOPO_FORA.md` (RF025,
+  RNF009 e o RF018 — Kanban — com justificativa) e o `mensagem_mural.ID_usuario` passou a
+  ser opcional para permitir mensagens automáticas do mural (RN002/RF014). (Decisões do
+  usuário de 2026-10-19 — sem chave de issue.)
 
 ### Removed
 
-- **`anexo.ID_documento_fiscal` removida do modelo:** a coluna era órfã — não existe modelo
-  `documento_fiscal`, não há FK e nenhum código em `src/**` a lê ou escreve. A remoção foi
-  precedida da conferência no banco, que deu **0** linhas com valor não nulo
-  (`SELECT COUNT(*) FROM anexo WHERE ID_documento_fiscal IS NOT NULL`). (Decisão do usuário,
-  2026-10-19 — sem chave de issue.)
-- **`nota_saida.ID_destinatario` removida do modelo:** a nota deixou de ter destinatário (ver a
-  entrada correspondente em *Changed*) e a coluna saiu de `prisma/schema.prisma`. A remoção foi
-  precedida da conferência no banco, que deu **1** linha com valor não nulo
-  (`SELECT COUNT(*) FROM nota_saida WHERE ID_destinatario IS NOT NULL`, sobre 4 notas). (Decisão
-  do usuário, 2026-10-19 — sem chave de issue.)
+- **`anexo.ID_documento_fiscal` removida do modelo:** a coluna era órfã — não existe
+  modelo `documento_fiscal`, não há FK e nenhum código em `src/**` a lê ou escreve. A
+  remoção foi precedida da conferência no banco, que deu **0** linhas com valor não nulo.
+  (Decisão do usuário, 2026-10-19 — sem chave de issue.)
+- **`nota_saida.ID_destinatario` removida do modelo (e revertida pela fusão):** a coluna
+  saiu em 2026-10-19, mas com a fusão nota/remessa (2026-10-23) `ID_destinatario` voltou
+  à nota de saída como FK opcional, obrigatória para o tipo Remessa, já que a nota
+  passou a ser a entrega. A remoção original foi precedida de conferência no banco (1
+  linha não nula, em 4 notas). (Decisões do usuário — sem chave de issue.)
+
 
 ## [1.17.10.2026] - 2026-10-17
 

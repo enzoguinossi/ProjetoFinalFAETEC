@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { veiculoDAO } from "@/dao/veiculo";
 import { EntidadeComVinculosError } from "@/dao/_errors";
 import {
-  criarDestinatario,
-  criarNotaSaida,
-  criarRemessa,
+  criarExpedicao,
   criarTipoCodigo,
   criarUsuario,
   criarVeiculo,
@@ -41,14 +39,14 @@ describe("veiculoDAO", () => {
     });
 
     it("filtra por status e ignora inativos", async () => {
-      await criarVeiculo({ status: "EM_ROTA" });
+      await criarVeiculo({ status: "EM_EXPEDICAO" });
       await criarVeiculo({ status: "DISPONIVEL" });
       await criarVeiculo({ status: "DISPONIVEL", ativo: false });
 
-      const emRota = await veiculoDAO.list({ status: "EM_ROTA" });
+      const emExpedicao = await veiculoDAO.list({ status: "EM_EXPEDICAO" });
       const disponiveis = await veiculoDAO.list({ status: "DISPONIVEL" });
 
-      expect(emRota.total).toBe(1);
+      expect(emExpedicao.total).toBe(1);
       expect(disponiveis.total).toBe(1);
     });
   });
@@ -114,7 +112,7 @@ describe("veiculoDAO", () => {
         {
           placa: "DEF5678",
           modelo: "HR",
-          status: "EM_ROTA",
+          status: "EM_EXPEDICAO",
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "NOVO" }],
         },
         usuario.id_usuario,
@@ -123,7 +121,7 @@ describe("veiculoDAO", () => {
       const noBanco = await prismaTeste.veiculo.findUniqueOrThrow({
         where: { id_veiculo: criado.id_veiculo },
       });
-      expect(noBanco).toMatchObject({ placa: "DEF5678", modelo: "HR", status: "EM_ROTA" });
+      expect(noBanco).toMatchObject({ placa: "DEF5678", modelo: "HR", status: "EM_EXPEDICAO" });
 
       const codigos = await prismaTeste.veiculoCodigo.findMany({
         where: { id_veiculo: criado.id_veiculo },
@@ -148,20 +146,14 @@ describe("veiculoDAO", () => {
       expect(resultado.vinculos).toEqual([]);
     });
 
-    it("bloqueia exclusão quando há remessa vinculada", async () => {
+    it("bloqueia exclusão quando há expedição vinculada", async () => {
       const veiculo = await criarVeiculo();
-      const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida();
-      await criarRemessa({
-        idNotaSaida: nota.id_nota_saida,
-        idDestinatario: destinatario.id_destinatario,
-        idVeiculo: veiculo.id_veiculo,
-      });
+      await criarExpedicao({ idVeiculo: veiculo.id_veiculo });
 
       const resultado = await veiculoDAO.verificarRelacionamentos(veiculo.id_veiculo);
 
       expect(resultado.podeExcluir).toBe(false);
-      expect(resultado.vinculos[0]).toContain("remessa");
+      expect(resultado.vinculos[0]).toContain("expedição");
     });
   });
 
@@ -187,16 +179,10 @@ describe("veiculoDAO", () => {
       expect(auditorias.map((a) => a.acao)).toEqual(["EXCLUIR"]);
     });
 
-    it("lança EntidadeComVinculosError quando há remessa", async () => {
+    it("lança EntidadeComVinculosError quando há expedição", async () => {
       const { usuario } = await criarUsuario();
       const veiculo = await criarVeiculo();
-      const { destinatario } = await criarDestinatario();
-      const nota = await criarNotaSaida();
-      await criarRemessa({
-        idNotaSaida: nota.id_nota_saida,
-        idDestinatario: destinatario.id_destinatario,
-        idVeiculo: veiculo.id_veiculo,
-      });
+      await criarExpedicao({ idVeiculo: veiculo.id_veiculo });
 
       await expect(
         veiculoDAO.hardDelete(veiculo.id_veiculo, usuario.id_usuario),

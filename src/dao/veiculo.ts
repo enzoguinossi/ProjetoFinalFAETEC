@@ -50,7 +50,7 @@ export class VeiculoDAO {
     });
   }
 
-  async update(id: number, data: { placa?: string; modelo?: string; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA"; codigos?: CodigoInput[] }, id_usuario: number) {
+  async update(id: number, data: { placa?: string; modelo?: string; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO"; codigos?: CodigoInput[] }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id }, include: { veiculoCodigos: true } });
       const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { placa: data.placa, modelo: data.modelo, status: data.status } });
@@ -75,11 +75,11 @@ export class VeiculoDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [remessas] = await Promise.all([
-      client.remessa.count({ where: { id_veiculo: id } }),
+    const [expedicoes] = await Promise.all([
+      client.expedicao.count({ where: { id_veiculo: id } }),
     ]);
     const vinculos: string[] = [];
-    if (remessas > 0) vinculos.push(`${remessas} remessa(s)`);
+    if (expedicoes > 0) vinculos.push(`${expedicoes} expedição(ões)`);
     return { podeExcluir: vinculos.length === 0, vinculos };
   }
 

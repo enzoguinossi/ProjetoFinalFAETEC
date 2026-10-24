@@ -24,22 +24,22 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF007 — Veículos | implementado | `src/app/veiculos/**`, `src/dao/veiculo.ts`, `STATUS_VEICULO` em `src/types/index.ts` |
 | *(RF008 não existe — lacuna preservada, ver `REQUISITOS_FUNCIONAIS.md`)* | — | — |
 | RF009 — Mural de mensagens | não implementado | Só um cartão **estático** no dashboard (`src/app/dashboard/page.tsx`); sem tela, serviço ou DAO de mural |
-| RF010 — Catálogo de produtos | implementado | `src/app/produtos/**`, `src/dao/produto.ts`, `src/components/UnidadesModal.tsx` |
+| RF010 — Catálogo de produtos | implementado | `src/app/produtos/**`, `src/dao/produto.ts`, `src/components/UnidadesModal.tsx`; o cadastro exige unidade (`ID_conversao_padrao` NOT NULL) e usa a unidade padrão quando o formulário não informa |
 | RF011 — Leitura por código de barras | parcial | Busca priorizada por código em `src/dao/produto.ts` e tipos EAN em `src/dao/tipo-codigo.ts`; **sem** tela/leitor dedicado |
-| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar`) e a tabela `movimentacao_estoque`; **sem** nota de entrada/saída/transferência e sem uso fora dos testes (`tests/dao/estoque.test.ts`) |
-| RF013 — Conversão de unidades | parcial | CRUD em `src/app/unidades/actions.ts`, `src/dao/conversao-unidade.ts` e `src/components/UnidadesModal.tsx`; a multiplicação na entrada depende de RF012/RF017a, que não existem |
+| RF012 — Movimentação de estoque | parcial | `src/dao/estoque.ts` (`movimentar`, `registrarEntrada`, `reservar`, `liberarReserva`, `ajustarReserva`, `baixar` e `baixarDireto`); entrada pela aba Entrada (RF017a) atualiza `quantidade_atual` e grava `movimentacao_estoque`; saída pela aba Saída (RF017b) reserva `saldo_reservado` na criação da nota Remessa; avaria/consumo interno usam `baixarDireto` (baixa imediata em `quantidade_atual`, sem reserva); a baixa física da Remessa acontece na execução da entrega dentro da expedição em percurso (RF022), com movimentação negativa e `ID_nota_saida`. **Sem** transferência |
+| RF013 — Conversão de unidades | implementado | CRUD em `src/app/unidades/actions.ts`, `src/dao/conversao-unidade.ts` e `src/components/UnidadesModal.tsx`; a unidade padrão do sistema (`UNIDADE`/1, `padrao = true`) não pode ser excluída nem ter nome ou fator alterados; ao excluir uma unidade que não é a padrão, os produtos que a usavam são revinculados à unidade padrão (auditoria com `produtos_revinculados`); o nome é exibido nas telas compactas (`src/lib/produto-linha.ts`, seletor e itens). A entrada calcula `quantidade_convertida = quantidade × fator` com fator editável no formulário (`src/services/nota-entrada.ts`) |
 | RF014 — Alertas de validade | não implementado | Nenhuma rotina gera alerta a partir de `produto.data_validade` |
 | RF015 — Gestão de inventário | não implementado | Sem código de inventário em `src/app`, `src/services` ou `src/dao` (só as tabelas no schema) |
-| RF016 — Baixas por consumo interno e avaria | não implementado | Nenhum fluxo de baixa por consumo/avaria |
-| RF017a — Nota de entrada | não implementado | Sem tela/serviço/DAO de nota de entrada |
-| RF017b — Nota de saída | não implementado | Sem tela/serviço/DAO de nota de saída |
-| RF018 — Quadro Kanban de remessas | não implementado | Apenas as constantes `STATUS_REMESSA` (`src/types/index.ts`); **fora do escopo** (`ESCOPO_FORA.md`) |
-| RF019 — Assistente de remessa (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia); **sem** assistente/tela; uso só em `tests/services/estoque.test.ts` |
-| RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); nada vinculado a remessa |
-| RF021 — Pendências e urgências | não implementado | Sem fluxo de pendência/urgência |
-| RF022 — Percurso e rota | não implementado | Sem tela/serviço/DAO (só as tabelas no schema) |
-| RF023 — Relatórios | não implementado | Item de menu `/relatorios` **sem página** (`src/components/sidebar-config.ts`) |
-| RF024 — Exportação de dados | não implementado | Sem geração de PDF/CSV/XLSX |
+| RF016 — Baixas por consumo interno e avaria | implementado | O formulário de saída aceita **Tipo de Saída** Remessa (`SAIDA`), Avaria (`AVARIA`) e Consumo Interno (`CONSUMO_INTERNO`); avaria/consumo não têm destinatário, não reservam e dão baixa real na criação (`src/dao/estoque.ts` `baixarDireto`, com movimentação negativa e `ID_nota_saida`), com a nota em `BAIXA_TOTAL`, `qtd_entregue = qtd_esperada` e auditoria `NotaSaida`/`CRIAR` (tipo, itens, saldos e movimentações). RN001 avisa sem bloquear. `DESMONTAGEM` é recusada nesse formulário (fluxo próprio) |
+| RF017a — Nota de entrada | implementado | Página `/mov-estoque` (aba Entrada) em `src/app/mov-estoque/**`, `src/services/nota-entrada.ts` e `src/dao/nota-entrada.ts`; grava nota (com a chave de acesso opcional na própria `nota_entrada`), itens, estoque, movimentação e auditoria em transação única. A listagem tem ações de visualizar (`nota_entrada.consultar`) e editar (`nota_entrada.alterar`), no mesmo formulário (`mode` create/edit/view): a edição altera cabeçalho, fator/quantidade de item existente e acrescenta itens novos, gerando `movimentacao_estoque` corretiva pelo delta de `quantidade_convertida` e auditoria `NotaEntrada`/`ALTERAR`; remover item e excluir a nota não são permitidos (RN004) |
+| RF017b — Nota de saída | implementado | Página `/mov-estoque` (aba Saída) em `src/app/mov-estoque/**`, `src/services/nota-saida.ts` e `src/dao/nota-saida.ts`; o cabeçalho tem **Tipo de Saída** (Remessa/Avaria/Consumo Interno), destinatário e urgência só em Remessa, e os itens usam o formato Código/Descrição/Unidade/Quantidade (sem valores). A nota `tipo = SAIDA` (Remessa) carrega **destinatário, urgência, itens e reserva** e é a própria entrega (não há mais remessa); criação grava nota, itens e reservas (`saldo_reservado += qtd_esperada`) em transação única, com aviso de RN001 e auditoria (`NotaSaida`/`CRIAR`); edição por delta de reserva e cancelamento idempotente só em `SAIDA` `ABERTA`. Avaria/Consumo Interno não têm destinatário, dão baixa na criação e não são editáveis nem canceláveis. A tela lista todos os tipos com a coluna **Tipo** e ver/editar/cancelar conforme o tipo. A **execução da entrega** (baixa do entregue, parcial, corte e não entregue) roda na expedição em percurso (RF022). Permissões: `nota_saida.criar/alterar/consultar/cancelar` (a tela continua acessível por `estoque.ver_saldo` ou `estoque.saida`) |
+| RF018 — Quadro Kanban de entregas | não implementado | Apenas as constantes `STATUS_NOTA_SAIDA` (`src/types/index.ts`); **fora do escopo** (`ESCOPO_FORA.md`) |
+| RF019 — Assistente de saída (RN001) | parcial | RN001 implementada em `src/services/estoque.ts` (`verificarDisponibilidade` avisa e não bloqueia) e na criação da nota de saída: a gravação continua mesmo acima do saldo e a Server Action devolve o aviso (RN001), exibido na tela; **sem** assistente dedicado |
+| RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); `anexo` já aponta para `nota_saida`, mas o fluxo não está implementado |
+| RF021 — Pendências e urgências | parcial | A nota tem a flag `urgente`; a pendência da entrega parcial é a própria nota em `BAIXA_PARCIAL` (RN003), com o restante da reserva mantido e elegível a outra expedição. A execução da entrega não entregue/parcial já registra o status e conclui a expedição; **sem** quadro de pendências dedicado |
+| RF022 — Percurso e expedição | implementado | **Percurso** em `src/app/expedicoes/percursos/**`, `src/services/percurso.ts` e `src/dao/percurso.ts`: CRUD com destinatários ordenados, exclusão física (auditoria `EXCLUIR` com o snapshot anterior) e nome único entre todos. **Expedição** em `src/app/expedicoes/**`, `src/services/expedicao.ts` e `src/dao/expedicao.ts`: criação com percurso, notas ordenadas, despacho (`EM_PERCURSO` + veículo), **execução da entrega** por nota (baixa total/parcial/corte e não entregue, com baixa de estoque e reserva na mesma transação) e conclusão (notas restantes `PENDENTE`, expedição `CONCLUIDA`, veículo `DISPONIVEL`). **Data prevista, veículo e condutor são obrigatórios** (colunas `NOT NULL`): a data vazia assume hoje no fuso de São Paulo (`src/lib/formatar.ts` `hojeISO`), o veículo precisa estar ativo e o condutor precisa ser funcionário ativo com `condutor = true` |
+| RF023 — Relatórios | parcial | Hub `/relatorios` com os relatórios previstos (os demais ainda como "em breve") e a **Lista de Produtos** em `/relatorios/produtos` (`src/app/relatorios/**`, `src/dao/relatorio.ts`, `src/services/relatorio.ts`): filtros no servidor por busca (código/descrição) e situação (ativas/inativas/todas), layout A4 para impressão/PDF, permissão `relatorio.gerar`. Pendentes: Extrato de Produto, Funcionários, Destinatários e Fornecedores |
+| RF024 — Exportação de dados | parcial | **CSV** da Lista de Produtos em `/relatorios/produtos/export` (`src/app/relatorios/produtos/export/route.ts`; BOM UTF-8, separador `;`, decimal com vírgula, mesmos filtros da tela) e **PDF** pela impressão do navegador (`window.print()`); **XLSX** ainda não implementado |
 | RF025 — Importação de NF-e (XML) | não implementado | Sem leitura de XML NF-e — **fora do escopo** (`ESCOPO_FORA.md`) |
 
 ## Requisitos não funcionais
@@ -53,7 +53,7 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RNF005 — Backup e integridade | parcial | Integridade referencial pelas FKs do Prisma; **sem** rotina de backup (nenhum script em `scripts/`) |
 | RNF006 — Hash de senha (BCrypt) | implementado | `bcryptjs` em `src/app/login/actions.ts`, `src/app/definir-senha/actions.ts` e `src/app/primeiro-acesso/actions.ts` |
 | RNF007 — Auditabilidade (snapshots JSON) | implementado | `src/dao/_audit.ts` e as colunas `Json` `dados_anteriores`/`dados_novos` |
-| RNF008 — Portabilidade (PDF/CSV/XLSX) | não implementado | Sem exportação em nenhum formato |
+| RNF008 — Portabilidade (PDF/CSV/XLSX) | parcial | Lista de Produtos: PDF pela impressão A4 do navegador e CSV em `/relatorios/produtos/export`; **sem XLSX** |
 | RNF009 — Interoperabilidade (XML NF-e) | não implementado | Sem processamento de XML NF-e |
 
 ## Decisões que estavam em aberto
@@ -65,9 +65,9 @@ em "Pontos em aberto", abaixo.)
 1. **Autor das mensagens automáticas do mural** — `mensagem_mural.ID_usuario` passou a ser
    **opcional**: `NULL` significa "sem autor" e a coluna `automatica` marca o caso
    (`RUN-20261017-08`).
-2. **Forma do "registro de pendência" da RN003** — a pendência **é** a remessa com status
-   `PENDENTE` criada no split da entrega parcial, vinculada por `remessa.ID_destinatario`;
-   **sem tabela nova** (`RUN-20261017-09`; ver `ENTENDIMENTO.md` §3.11.2).
+2. **Forma do "registro de pendência" da RN003** — a pendência **é** a própria nota de saída em
+   `BAIXA_PARCIAL`, vinculada por `nota_saida.ID_destinatario`; **sem *split*, sem nota nova e
+   sem tabela nova** (`RUN-20261023-35`; ver `ENTENDIMENTO.md` §3.11.2).
 3. **Destino de `anexo.ID_documento_fiscal`** — a coluna órfã foi **removida** do schema, em vez
    de nascer uma entidade fiscal (`RUN-20261017-08`).
 4. **Enforcement de `tipo_codigo`** — a ausência de permissões é **intencional**: é dado de
@@ -79,8 +79,8 @@ em "Pontos em aberto", abaixo.)
 - **Como um pedido entra numa nota de saída** — a decisão do usuário de **2026-10-19** definiu
   **que** a nota consolida pedidos (o vínculo é `pedido_escola.ID_nota_saida`, 1:N), mas **não**
   definiu **quando** o pedido é consolidado: **criar uma nota nova a cada pedido confirmado** ou
-  **juntar o pedido a uma nota já aberta** (por exemplo, a do mesmo destinatário). A regra **não
-  foi inventada** e o fluxo de nota de saída continua **não implementado** (RF017b) — o ponto
-  fica registrado para a implementação do módulo de expedições (KAN-142 / RF017b).
-  (`RUN-20261017-11`.)
+  **juntar o pedido a uma nota já aberta** (por exemplo, a do mesmo destinatário). O fluxo manual
+  de nota de saída com destinatário e itens foi implementado (RF017b), mas o **pedido** ainda não
+  entra nele: a consolidação pedido → nota continua em aberto, para o módulo de expedições
+  (KAN-142 / RF017b). (`RUN-20261017-11`; RF017b implementada em `RUN-20261019-15`.)
 
