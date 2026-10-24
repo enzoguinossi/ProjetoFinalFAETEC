@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import VeiculosClient from "./VeiculosClient";
 import { listarVeiculos } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
@@ -17,8 +16,8 @@ export default async function VeiculosPage() {
   ]);
 
   return (
-    <DashboardLayout title="Veículos">
+    <>
       <VeiculosClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

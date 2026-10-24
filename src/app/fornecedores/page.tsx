@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import FornecedoresClient from "./FornecedoresClient";
 import { listarFornecedores } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
@@ -17,8 +16,8 @@ export default async function FornecedoresPage() {
   ]);
 
   return (
-    <DashboardLayout title="Fornecedores">
+    <>
       <FornecedoresClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

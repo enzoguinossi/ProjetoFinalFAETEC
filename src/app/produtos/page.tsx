@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import ProdutosClient from "./ProdutosClient";
 import { listarProdutos } from "./actions";
 import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
@@ -19,8 +18,8 @@ export default async function ProdutosPage() {
   ]);
 
   return (
-    <DashboardLayout title="Produtos">
+    <>
       <ProdutosClient inicial={inicial} conversoes={conversoes} tiposCodigo={tiposCodigo} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

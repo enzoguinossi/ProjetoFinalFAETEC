@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import EntradaClient from "../EntradaClient";
 import { listarNotasEntrada, listarUnidadesEntrada } from "../actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
@@ -29,7 +28,7 @@ export default async function MovEstoqueEntradaPage() {
   ]);
 
   return (
-    <DashboardLayout title="Movimentação de Estoque">
+    <>
       <EntradaClient
         inicial={inicial}
         conversoes={conversoes}
@@ -39,6 +38,6 @@ export default async function MovEstoqueEntradaPage() {
         podeCriarFornecedor={podeCriarFornecedor}
         tiposCodigoFornecedor={tiposCodigo.map((t) => ({ id_tipo_codigo: t.id_tipo_codigo, nome: t.nome }))}
       />
-    </DashboardLayout>
+    </>
   );
 }

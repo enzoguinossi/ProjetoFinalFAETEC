@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import PrimeiroAcessoForm from "./PrimeiroAcessoForm";
 import { usuarioDAO } from "@/dao/usuario";
 import { getSession } from "@/lib/auth";
@@ -16,8 +15,8 @@ export default async function PrimeiroAcessoPage() {
   if (admin) redirect("/login");
 
   return (
-    <DashboardLayout title="Bem-vindo ao Nexus">
+    <div className="flex justify-center items-center min-h-screen bg-brand">
       <PrimeiroAcessoForm />
-    </DashboardLayout>
+    </div>
   );
 }

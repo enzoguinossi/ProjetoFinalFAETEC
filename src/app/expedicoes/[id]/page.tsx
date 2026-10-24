@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import { resolverPermissoes } from "@/lib/permissoes";
 import { notFound, redirect } from "next/navigation";
 import ExpedicaoClient from "./ExpedicaoClient";
@@ -22,8 +21,8 @@ export default async function ExpedicaoDetalhePage({
   if (!inicial) notFound();
 
   return (
-    <DashboardLayout title="Expedição">
+    <>
       <ExpedicaoClient inicial={inicial} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

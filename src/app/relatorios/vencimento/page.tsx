@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import Button from "@/components/Button";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
@@ -40,7 +39,7 @@ export default async function RelatorioVencimentoPage({
   const filtroTexto = rotuloDiasVencimento(filtros.dias);
 
   return (
-    <DashboardLayout title="Relatórios">
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ink m-0">
@@ -159,6 +158,6 @@ export default async function RelatorioVencimentoPage({
           </footer>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

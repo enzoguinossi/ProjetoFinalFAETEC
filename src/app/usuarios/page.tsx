@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import UsuariosClient from "./UsuariosClient";
 import { listarUsuarios } from "./actions";
 import { funcionarioDAO } from "@/dao/funcionario";
@@ -23,7 +22,7 @@ export default async function UsuariosPage() {
   for (const p of perfis) perfilPermissoes[p.id_perfil] = p.permissoes;
 
   return (
-    <DashboardLayout title="Usuários">
+    <>
       <UsuariosClient
         inicial={inicial}
         funcionarios={funcionarios}
@@ -32,6 +31,6 @@ export default async function UsuariosPage() {
         perfilPermissoes={perfilPermissoes}
         perms={perms}
       />
-    </DashboardLayout>
+    </>
   );
 }

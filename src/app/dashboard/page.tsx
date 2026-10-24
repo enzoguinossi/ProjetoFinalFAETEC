@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +6,7 @@ export default async function DashboardPage() {
   await requireUser();
 
   return (
-    <DashboardLayout title="Dashboard">
+    <>
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-white rounded-xl border border-border p-4 mb-4">
           <div className="text-[0.6875rem] text-[#8a8f9a] mb-1">ESTOQUE ATUAL</div>
@@ -44,6 +43,6 @@ export default async function DashboardPage() {
           <span className="text-brand text-[0.6875rem]">Em contagem</span>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

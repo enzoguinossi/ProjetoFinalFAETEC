@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import PerfisClient from "./PerfisClient";
 import { listarPerfisComPermissoes, listarPermissoesAgrupadas } from "./actions";
 import { redirect } from "next/navigation";
@@ -16,8 +15,8 @@ export default async function PerfisPage() {
   ]);
 
   return (
-    <DashboardLayout title="Perfis">
+    <>
       <PerfisClient rows={rows} grupos={grupos} />
-    </DashboardLayout>
+    </>
   );
 }

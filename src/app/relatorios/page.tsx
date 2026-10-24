@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 
@@ -80,7 +79,7 @@ export default async function RelatoriosPage() {
   if (!(await usuarioPode(user, "relatorio.gerar"))) redirect("/dashboard");
 
   return (
-    <DashboardLayout title="Relatórios">
+    <>
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-ink m-0">Relatórios</h2>
         <p className="text-sm text-[#697077] m-0">
@@ -120,6 +119,6 @@ export default async function RelatoriosPage() {
           ),
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

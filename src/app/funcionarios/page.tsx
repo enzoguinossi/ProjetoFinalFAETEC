@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import FuncionariosClient from "./FuncionariosClient";
 import { listarFuncionarios } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
@@ -17,8 +16,8 @@ export default async function FuncionariosPage() {
   ]);
 
   return (
-    <DashboardLayout title="Funcionários">
+    <>
       <FuncionariosClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

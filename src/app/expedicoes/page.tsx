@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import { resolverPermissoes } from "@/lib/permissoes";
 import { redirect } from "next/navigation";
 import ExpedicoesClient from "./ExpedicoesClient";
@@ -13,8 +12,8 @@ export default async function ExpedicoesPage() {
   const inicial = await listarExpedicoes({ page: 1, limit: 20 });
 
   return (
-    <DashboardLayout title="Expedições">
+    <>
       <ExpedicoesClient inicial={inicial} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

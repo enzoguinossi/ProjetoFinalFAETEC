@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import Button from "@/components/Button";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
 import { requireUser } from "@/lib/auth";
@@ -127,7 +126,7 @@ export default async function RelatorioMovimentacaoPage({
   if (filtros.tipos.length > 0) query.set("tipo", filtros.tipos.join(","));
 
   return (
-    <DashboardLayout title="Relatórios">
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ink m-0">{titulo}</h2>
@@ -277,6 +276,6 @@ export default async function RelatorioMovimentacaoPage({
           </footer>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

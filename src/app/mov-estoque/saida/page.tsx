@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import SaidaClient from "../SaidaClient";
 import { listarNotasSaida } from "../actions";
 import { redirect } from "next/navigation";
@@ -23,7 +22,7 @@ export default async function MovEstoqueSaidaPage() {
   const inicialSaida = await listarNotasSaida({ page: 1, limit: 20 });
 
   return (
-    <DashboardLayout title="Movimentação de Estoque">
+    <>
       <SaidaClient
         inicialSaida={inicialSaida}
         podeCriarSaida={podeCriarSaida}
@@ -31,6 +30,6 @@ export default async function MovEstoqueSaidaPage() {
         podeAlterarNota={podeAlterarNota}
         podeCancelarNota={podeCancelarNota}
       />
-    </DashboardLayout>
+    </>
   );
 }

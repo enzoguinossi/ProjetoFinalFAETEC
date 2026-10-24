@@ -1,4 +1,3 @@
-import DashboardLayout from "@/components/DashboardLayout";
 import DestinatariosClient from "./DestinatariosClient";
 import { listarDestinatarios } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
@@ -17,8 +16,8 @@ export default async function DestinatariosPage() {
   ]);
 
   return (
-    <DashboardLayout title="Destinatários">
+    <>
       <DestinatariosClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
-    </DashboardLayout>
+    </>
   );
 }

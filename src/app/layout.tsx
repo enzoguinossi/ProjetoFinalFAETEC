@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import AvisoProvider from "@/components/AvisoProvider";
+import AppShell from "@/components/AppShell";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={inter.variable}>
       <body>
-        <AvisoProvider>{children}</AvisoProvider>
+        <AvisoProvider>
+          <AppShell>{children}</AppShell>
+        </AvisoProvider>
       </body>
     </html>
   );
