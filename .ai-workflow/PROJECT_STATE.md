@@ -156,6 +156,19 @@ os pedidos vinculados precisam ser do destinatário da nota.
   `89c2f52` (execução/baixa).
 - Tag `v1.17.10.2026` é a única do projeto. **Nada publicado desde a release.**
 
+## Último checkpoint válido
+
+- **2026-10-23** — fusão **nota = entrega** (`85fceac`), módulo de **expedições**
+  (`e119c4d`) e **execução da entrega com baixa** (`89c2f52`); estado consolidado em
+  `c860277`. Árvore limpa, **246 testes**, lint, build e `figma:check` verdes. Banco de
+  dev recriado e vazio (só seed).
+- **2026-10-23** — rename rota → expedição (`9d53194`) e percurso com exclusão física
+  (`5333c07`); 232 testes.
+- **2026-10-22** — sincronização com o Jira: KAN-137 e KAN-146 concluídos; worklog de 8h
+  na KAN-140.
+- **2026-10-21** — coluna "Código" na expansão da nota de saída (`61ccc48`).
+- **2026-10-19** — movimentação de estoque: entrada, saída e cancelamento implementados.
+
 ## Testes executados (2026-10-23, Orquestrador)
 
 - `npm test` → **246/246 (25 arquivos)**.
