@@ -319,7 +319,7 @@ async function main() {
   /* ── Veículos ── */
   const veiculos = [
     { placa: "RIO2A18", modelo: "Ford Cargo 1719", status: "DISPONIVEL" as const },
-    { placa: "RJA4B32", modelo: "Mercedes-Benz Sprinter 416", status: "EM_ROTA" as const },
+    { placa: "RJA4B32", modelo: "Mercedes-Benz Sprinter 416", status: "EM_EXPEDICAO" as const },
     { placa: "RJC7D45", modelo: "Volkswagen Delivery 9.170", status: "INDISPONIVEL" as const },
     { placa: "RJD1E09", modelo: "Fiat Fiorino Furgão", status: "DISPONIVEL" as const },
   ];

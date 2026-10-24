@@ -29,7 +29,7 @@ Um sistema web que centraliza:
 - **Gestão de Pedidos (Notas de Saída)** — transcrição dos pedidos em papel para o sistema
 - **Reserva de Estoque** — ao criar uma remessa planejada, o sistema reserva os produtos no estoque
 - **Remessas** — tentativas de entrega vinculadas a notas de saída
-- **Rotas** — organização diária das entregas em ordem de visita (com suporte a templates)
+- **Expedições** — organização diária das entregas em ordem de visita (com suporte a templates)
 - **Auditoria** — registro de toda ação feita no sistema
 - **Relatórios** — periódicos (diário, mensal, semestral)
 
@@ -542,7 +542,7 @@ ajuste_inventario           ← aprovação manual das diferenças
 
 ---
 
-### 3.10 Bloco: Percurso e Rota
+### 3.10 Bloco: Percurso e Expedição
 
 #### 3.10.1 Percurso (Template)
 
@@ -565,11 +565,11 @@ Regras:
   (o registro e as visitas são apagados; a auditoria guarda o snapshot anterior).
 - O nome é único entre **todos** os percursos existentes.
 
-#### 3.10.2 Rota (Instância do Dia)
+#### 3.10.2 Expedição (Instância do Dia)
 
 ```
-rota
-├── ID_rota               INT PK auto_increment
+expedicao
+├── ID_expedicao          INT PK auto_increment
 ├── data_criacao          TIMESTAMP NOT NULL
 ├── data_prevista         DATE                  ← qual dia vai rodar
 ├── observacao            TEXT
@@ -578,11 +578,11 @@ rota
 ```
 
 Regras:
-- **A rota não armazena o percurso.** O percurso só serve para ordenar os destinatários no
-  momento de montar a rota; a ordem gravada na rota é a sua própria (`rota_remessa`).
-- A rota não precisa de nome — é filtrável por data, destinatários, remessas
-- A rota **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a
-  `CONCLUIDA` quando é encerrado. O status é próprio da rota, independente do status das
+- **A expedição não armazena o percurso.** O percurso só serve para ordenar os destinatários no
+  momento de montar a expedição; a ordem gravada na expedição é a sua própria (`expedicao_remessa`).
+- A expedição não precisa de nome — é filtrável por data, destinatários, remessas
+- A expedição **nasce `PLANEJADA`**; passa a `EM_PERCURSO` quando o percurso é iniciado e a
+  `CONCLUIDA` quando é encerrado. O status é próprio da expedição, independente do status das
   remessas que ela transporta.
 
 ---
@@ -679,7 +679,7 @@ Regras:
 - A nota pode gerar **várias remessas** e/ou **coletas**
 - Status: ABERTA (criada), EM_ANDAMENTO (entregas em curso), BAIXA_TOTAL (tudo entregue), BAIXA_PARCIAL (parte entregue, resto vai), BAIXA_COM_CORTE (parte entregue, resto não vai), CANCELADA (nada entregue)
 
-#### 3.11.2 Remessa (Entrega via Rota)
+#### 3.11.2 Remessa (Entrega via Expedição)
 
 ```
 remessa
@@ -721,7 +721,7 @@ Regras:
   histórico. Remessa em percurso ou finalizada **não** pode ser cancelada; o segundo
   cancelamento é recusado e não debita a reserva outra vez
 - Quando FINALIZADO_PARCIAL, sistema cria automaticamente nova remessa PENDENTE para itens restantes (split)
-- Remessa PENDENTE pode ser realocada em outra rota
+- Remessa PENDENTE pode ser realocada em outra expedição
 - **A remessa `PENDENTE` criada no split é o "registro automático de pendência vinculado ao
   destinatário" da RN003** (decisão do usuário, 2026-10-19): não existe tabela de pendência e
   nenhuma é necessária — o vínculo com o destinatário é a própria coluna
@@ -730,7 +730,7 @@ Regras:
 
 #### 3.11.3 Coleta (Retirada Direta na Escola)
 
-Representa retirada presencial por urgência — sem rota, sem condutor, sem veículo.
+Representa retirada presencial por urgência — sem expedição, sem condutor, sem veículo.
 
 ```
 coleta
@@ -751,18 +751,18 @@ Regras:
 - Chegou e pegou — sem agendamento, sem status
 - Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o estoque dá baixa
 
-#### 3.11.4 Rota × Remessa (N:N com ordem)
+#### 3.11.4 Expedição × Remessa (N:N com ordem)
 
 ```
-rota_remessa
-├── ID_rota_remessa        INT PK auto_increment   ← PK independente!
-├── ID_rota                INT FK → rota
+expedicao_remessa
+├── ID_expedicao_remessa   INT PK auto_increment   ← PK independente!
+├── ID_expedicao           INT FK → expedicao
 ├── ID_remessa             INT FK → remessa
-├── ordem_visita           INT                      ← posição na rota naquele dia
+├── ordem_visita           INT                      ← posição na expedição naquele dia
 ├── data_adicao            TIMESTAMP
 ```
 
-A PK independente permite que **a mesma remessa apareça em rotas diferentes** (ex: tentativa falhou no dia X, entra na rota do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
+A PK independente permite que **a mesma remessa apareça em expedições diferentes** (ex: tentativa falhou no dia X, entra na expedição do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
 
 #### 3.11.5 Ciclo de Vida Completo
 
@@ -774,7 +774,7 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 │         ↓                                                │
 │  EM_PREPARACAO                                           │
 │         ↓                                                │
-│  Adiciona na Rota do dia (rota_remessa + ordem_visita)   │
+│  Adiciona na Expedição do dia (expedicao_remessa)       │
 │         ↓                                                │
 │  PRONTO_PARA_ENTREGA                                     │
 │         ↓                                                │
@@ -801,7 +801,7 @@ A PK independente permite que **a mesma remessa apareça em rotas diferentes** (
 │  │  └── Remessa B (4 itens) →      │                    │
 │  │      PENDENTE (nova remessa,     │                    │
 │  │      mesma nota_saida, pode      │                    │
-│  │      entrar em outra rota)       │                    │
+│  │      entrar em outra expedição)  │                    │
 │  └──────────────────────────────────┘                    │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -856,7 +856,7 @@ veiculo
 ├── ID_veiculo             INT PK auto_increment
 ├── placa                  VARCHAR NOT NULL UNIQUE
 ├── modelo                 VARCHAR
-├── status                 ENUM('DISPONIVEL','INDISPONIVEL','EM_ROTA')
+├── status                 ENUM('DISPONIVEL','INDISPONIVEL','EM_EXPEDICAO')
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
@@ -910,7 +910,7 @@ Permissões criadas por `prisma/seed.ts` (**80** no total):
 | `nota_saida` | criar, alterar, consultar, cancelar |
 | `remessa` | criar, alterar, alterar_status, consultar, finalizar |
 | `percurso` | listar, criar, alterar, consultar, excluir |
-| `rota` | listar, criar, alterar, consultar, desativar |
+| `expedicao` | listar, criar, alterar, consultar, desativar |
 | `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
 | `relatorio` | gerar |
 | `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
@@ -1078,7 +1078,7 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 | Relatório | Filtros | Formato |
 |-----------|---------|---------|
 | Movimentação de Estoque | Período, produto, tipo de movimentação | PDF, CSV/XLSX |
-| Expedições por Período | Data, rota, destinatário, condutor | PDF, CSV/XLSX |
+| Expedições por Período | Data, expedição, destinatário, condutor | PDF, CSV/XLSX |
 | Entregas por Instituição | Destinatário, período, status | PDF, CSV/XLSX |
 | Produtos Próximos ao Vencimento | Dias para vencer | PDF |
 | **Listagem Simplificada de Produtos** | — | PDF, CSV/XLSX |
@@ -1097,5 +1097,5 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 > - [`../diagramas/fluxo_atual.puml`](../diagramas/fluxo_atual.puml) e
 >   [`../diagramas/fluxosAtuais/`](../diagramas/fluxosAtuais/) (6 sub-fluxos) — o fluxo
 >   **AS-IS manual** descrito em §1.1 (papel, Trello, Excel, celular). **Não** representam o
->   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → remessa (reserva) → rota →
+>   TO-BE do sistema: o fluxo alvo está em §3.11 (nota de saída → remessa (reserva) → expedição →
 >   percurso → entrega → baixa)

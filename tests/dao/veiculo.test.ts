@@ -41,14 +41,14 @@ describe("veiculoDAO", () => {
     });
 
     it("filtra por status e ignora inativos", async () => {
-      await criarVeiculo({ status: "EM_ROTA" });
+      await criarVeiculo({ status: "EM_EXPEDICAO" });
       await criarVeiculo({ status: "DISPONIVEL" });
       await criarVeiculo({ status: "DISPONIVEL", ativo: false });
 
-      const emRota = await veiculoDAO.list({ status: "EM_ROTA" });
+      const emExpedicao = await veiculoDAO.list({ status: "EM_EXPEDICAO" });
       const disponiveis = await veiculoDAO.list({ status: "DISPONIVEL" });
 
-      expect(emRota.total).toBe(1);
+      expect(emExpedicao.total).toBe(1);
       expect(disponiveis.total).toBe(1);
     });
   });
@@ -114,7 +114,7 @@ describe("veiculoDAO", () => {
         {
           placa: "DEF5678",
           modelo: "HR",
-          status: "EM_ROTA",
+          status: "EM_EXPEDICAO",
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "NOVO" }],
         },
         usuario.id_usuario,
@@ -123,7 +123,7 @@ describe("veiculoDAO", () => {
       const noBanco = await prismaTeste.veiculo.findUniqueOrThrow({
         where: { id_veiculo: criado.id_veiculo },
       });
-      expect(noBanco).toMatchObject({ placa: "DEF5678", modelo: "HR", status: "EM_ROTA" });
+      expect(noBanco).toMatchObject({ placa: "DEF5678", modelo: "HR", status: "EM_EXPEDICAO" });
 
       const codigos = await prismaTeste.veiculoCodigo.findMany({
         where: { id_veiculo: criado.id_veiculo },

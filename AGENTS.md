@@ -10,7 +10,7 @@ O sistema centraliza:
 * controle de estoque;
 * pedidos e notas de saída;
 * remessas e entregas;
-* rotas e percursos;
+* expedições e percursos;
 * inventário;
 * usuários, perfis e permissões;
 * auditoria;
@@ -262,7 +262,7 @@ do vencimento.
 
 Uma entrega parcial gera uma pendência automática para os itens restantes.
 
-Os itens não entregues permanecem comprometidos conforme o modelo de reserva e podem seguir para nova remessa/rota.
+Os itens não entregues permanecem comprometidos conforme o modelo de reserva e podem seguir para nova remessa/expedição.
 
 A "pendência" é a própria remessa `PENDENTE` criada no split (vinculada por `remessa.ID_destinatario`) — sem tabela nova. Decisão do usuário de 2026-10-19, detalhada em `docs/dominio/ENTENDIMENTO.md` §3.11.2; o sentido da regra não mudou.
 
@@ -404,7 +404,7 @@ Históricos operacionais e registros de auditoria devem permanecer preservados.
 
 ---
 
-# 14. Remessas e rotas
+# 14. Remessas e expedições
 
 O ciclo operacional principal é:
 
@@ -415,7 +415,7 @@ Reserva de estoque
     ↓
 Remessa
     ↓
-Rota
+Expedição
     ↓
 Preparação
     ↓
@@ -428,7 +428,7 @@ Baixa
 
 Status e transições devem respeitar o modelo documentado.
 
-Uma remessa pendente pode ser adicionada posteriormente a outra rota.
+Uma remessa pendente pode ser adicionada posteriormente a outra expedição.
 
 Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante.
 
@@ -438,8 +438,8 @@ Não implemente um novo fluxo de entrega sem verificar:
 * `item_nota_saida`;
 * `remessa`;
 * `item_remessa`;
-* `rota`;
-* `rota_remessa`;
+* `expedicao`;
+* `expedicao_remessa`;
 * `coleta`.
 
 ---

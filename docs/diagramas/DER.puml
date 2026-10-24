@@ -132,7 +132,7 @@ enum StatusRemessa {
 enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
-  EM_ROTA
+  EM_EXPEDICAO
 }
 
 ' =========================================================
@@ -477,8 +477,8 @@ entity "percurso_destinatario" as perc_dest {
   * ordem_visita : INT
 }
 
-entity "rota" as rota {
-  * ID_rota : INT <<PK>>
+entity "expedicao" as expedicao {
+  * ID_expedicao : INT <<PK>>
   --
   * data_criacao : TIMESTAMP
   data_prevista : DATE
@@ -487,10 +487,10 @@ entity "rota" as rota {
   * ativo : BOOLEAN
 }
 
-entity "rota_remessa" as rota_rem {
-  * ID_rota_remessa : INT <<PK>>
+entity "expedicao_remessa" as expedicao_rem {
+  * ID_expedicao_remessa : INT <<PK>>
   --
-  * ID_rota : INT <<FK>>
+  * ID_expedicao : INT <<FK>>
   * ID_remessa : INT <<FK>>
   * ordem_visita : INT
   * data_adicao : TIMESTAMP
@@ -688,11 +688,11 @@ coleta ||--|{ item_coleta
 funcionario ||--o{ remessa
 veiculo ||--o{ remessa
 
-' Percurso / Rota
+' Percurso / Expedição
 percurso ||--|{ perc_dest
 destinatario ||--o{ perc_dest
-rota ||--o{ rota_rem
-remessa ||--o{ rota_rem
+expedicao ||--o{ expedicao_rem
+remessa ||--o{ expedicao_rem
 
 ' Nota de Entrada
 fornecedor ||--o{ nota_entrada

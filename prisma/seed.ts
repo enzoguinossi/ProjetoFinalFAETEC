@@ -56,7 +56,7 @@ async function main() {
     "remessa.criar", "remessa.alterar", "remessa.alterar_status", "remessa.consultar",
     "remessa.finalizar",
     "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
-    "rota.listar", "rota.criar", "rota.alterar", "rota.consultar", "rota.desativar",
+    "expedicao.listar", "expedicao.criar", "expedicao.alterar", "expedicao.consultar", "expedicao.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",
@@ -72,7 +72,7 @@ async function main() {
   console.log(`  ✅ ${permissoes.length} permissões`);
 
   // ── Limpeza: permissões obsoletas ───────────────────────────────
-  const obsoletas = ["perfil.desativar", "percurso.desativar"];
+  const obsoletas = ["perfil.desativar", "percurso.desativar", "rota.listar", "rota.criar", "rota.alterar", "rota.consultar", "rota.desativar"];
   for (const nome of obsoletas) {
     const obsoleta = await prisma.permissao.findUnique({ where: { nome } });
     if (!obsoleta) continue;

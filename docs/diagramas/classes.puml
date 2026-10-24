@@ -345,8 +345,8 @@ package "Logística" as Logistica {
     + ordem_visita: Integer
   }
 
-  class Rota {
-    + ID_rota: Integer
+  class Expedicao {
+    + ID_expedicao: Integer
     + data_criacao: Timestamp
     + data_prevista: Date
     + observacao: Text
@@ -354,8 +354,8 @@ package "Logística" as Logistica {
     + ativo: Boolean
   }
 
-  class RotaRemessa {
-    + ID_rota_remessa: Integer
+  class ExpedicaoRemessa {
+    + ID_expedicao_remessa: Integer
     + ordem_visita: Integer
     + data_adicao: Timestamp
   }
@@ -390,8 +390,8 @@ Estoque "1" --> "*" ItemNotaSaida : reservado em >
 Estoque "1" --> "*" ItemRemessa : expedido em >
 Funcionario "0..1" --> "0..*" Remessa : conduz >
 Veiculo "0..1" --> "0..*" Remessa : vincula >
-Rota "1" --> "*" RotaRemessa : agrupa >
-Remessa "1" --> "*" RotaRemessa : alocada em >
+Expedicao "1" --> "*" ExpedicaoRemessa : agrupa >
+Remessa "1" --> "*" ExpedicaoRemessa : alocada em >
 Percurso "1" --> "*" PercursoDestinatario : define >
 Destinatario "1" --> "*" PercursoDestinatario : incluso em >
 Remessa "*" --> "1" Destinatario : destinada a >

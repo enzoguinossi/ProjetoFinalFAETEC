@@ -59,7 +59,7 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
         <select name="status" defaultValue={initialData?.status ?? "DISPONIVEL"} disabled={isView} className={ui.select}>
           <option value="DISPONIVEL">Disponível</option>
           <option value="INDISPONIVEL">Indisponível</option>
-          <option value="EM_ROTA">Em rota</option>
+          <option value="EM_EXPEDICAO">Em expedição</option>
         </select>
       </div>
       <CodigosSection

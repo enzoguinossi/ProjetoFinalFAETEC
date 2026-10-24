@@ -22,7 +22,7 @@
 | RF004 | Gerenciar Destinatários | O sistema deve permitir o cadastro de 105 a 108 escolas e creches municipais. Destinatário estende Pessoa Jurídica (CNPJ opcional). Endereço em tabela separada com logradouro, número, complemento, bairro, cidade, CEP, latitude e longitude. Código da escola via código personalizado do tipo COD_ESCOLA. | Essencial |
 | RF005 | Gerenciar Funcionários | O sistema deve permitir o cadastro de funcionários, que estendem Pessoa Física (nome, CPF opcional). Um funcionário pode ou não ser Usuário (ter login). Um funcionário pode ser marcado como Condutor através de um checkbox no formulário. | Essencial |
 | RF006 | Gerenciar Fornecedores | O sistema deve permitir o cadastro de fornecedores, que estendem Pessoa Jurídica (CNPJ opcional). Endereço opcional em tabela separada. | Essencial |
-| RF007 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo e status (DISPONIVEL, INDISPONIVEL, EM_ROTA). | Essencial |
+| RF007 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo e status (DISPONIVEL, INDISPONIVEL, EM_EXPEDICAO). | Essencial |
 | RF009 | Mural de Mensagens do Dia | O sistema deve disponibilizar um mural na tela inicial para exibição de avisos e recados diários entre a equipe, com título, conteúdo, data de publicação, data de expiração opcional e autor vinculado. | Essencial |
 
 ## Módulo 3: Controle de Estoque e Catálogo de Produtos
@@ -46,8 +46,8 @@
 | RF018 | Quadro Kanban de Remessas | O sistema deve gerenciar visualmente o fluxo das entregas pelos status: EM_PREPARACAO, PRONTO_PARA_ENTREGA, EM_PERCURSO, PENDENTE, FINALIZADO_TOTAL e FINALIZADO_PARCIAL. | Importante - fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |
 | RF019 | Assistente de Remessa | O sistema deve **avisar** o usuário quando o saldo disponível (quantidade_atual - saldo_reservado) for insuficiente, mas **permitir que a remessa prossiga**. | Essencial |
 | RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à remessa. | Essencial |
-| RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que remessas não entregues (PENDENTE) sejam adicionadas em uma nova rota. Retiradas diretas de urgência no galpão devem ser registradas como remessa com flag de urgente. Dando uma baixa parcial na remessa. | Essencial |
-| RF022 | Percurso e Rota | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e rotas como instâncias do dia. A rota pode ser baseada em um percurso ou criada do zero, e deve ser editável. A rota agrupa remessas com ordem de visita. | Essencial |
+| RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que remessas não entregues (PENDENTE) sejam adicionadas em uma nova expedição. Retiradas diretas de urgência no galpão devem ser registradas como remessa com flag de urgente. Dando uma baixa parcial na remessa. | Essencial |
+| RF022 | Percurso e Expedição | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e expedições como instâncias do dia. A expedição pode ser baseada em um percurso ou criada do zero, e deve ser editável. A expedição agrupa remessas com ordem de visita. | Essencial |
 
 ## Módulo 5: Relatórios, Consultas e Integrações
 

@@ -151,7 +151,7 @@ export async function criarVeiculo(
   opts: {
     placa?: string;
     modelo?: string;
-    status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA";
+    status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO";
     ativo?: boolean;
   } = {},
 ) {

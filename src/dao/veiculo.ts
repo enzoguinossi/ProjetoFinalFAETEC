@@ -50,7 +50,7 @@ export class VeiculoDAO {
     });
   }
 
-  async update(id: number, data: { placa?: string; modelo?: string; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_ROTA"; codigos?: CodigoInput[] }, id_usuario: number) {
+  async update(id: number, data: { placa?: string; modelo?: string; status?: "DISPONIVEL" | "INDISPONIVEL" | "EM_EXPEDICAO"; codigos?: CodigoInput[] }, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.veiculo.findUniqueOrThrow({ where: { id_veiculo: id }, include: { veiculoCodigos: true } });
       const depois = await tx.veiculo.update({ where: { id_veiculo: id }, data: { placa: data.placa, modelo: data.modelo, status: data.status } });

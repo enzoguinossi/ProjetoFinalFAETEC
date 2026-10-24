@@ -17,7 +17,7 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 - **CRUD de percursos de expedição `(KAN-140)`:** nova tela `/expedicoes/percursos`
   (grupo **Expedições** na sidebar, padrão do grupo Cadastros) para cadastrar os templates
-  ordenados de visitas que as rotas usarão como base. A listagem mostra nome e quantidade de
+  ordenados de visitas que as expedições usarão como base. A listagem mostra nome e quantidade de
   destinatários, com ações de visualizar, editar e excluir. O formulário exige
   nome (único entre todos os percursos) e ao menos um destinatário, sem repetição; a ordem
   das visitas é editável por setas e gravada em `ordem_visita` contínua a partir de 1. A
@@ -27,14 +27,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   excluir gravam auditoria (`Percurso`) e as permissões `percurso.*` são validadas no
   servidor. O seletor de destinatários tem listagem própria (não depende de
   `estoque.saida`). Testes em `tests/services/percurso.test.ts`.
-- **Base do módulo de expedições `(KAN-140)`:** a `rota` ganhou **status próprio** —
-  `enum StatusRota { PLANEJADA, EM_PERCURSO, CONCLUIDA }` no schema, com
-  `status StatusRota @default(PLANEJADA)` em `Rota` (a rota nasce planejada) e a constante
-  `STATUS_ROTA`/tipo `StatusRota` em `src/types/index.ts`. O seed passou a criar as
-  permissões de `percurso` (`listar`, `criar`, `alterar`, `consultar`, `excluir`) e de `rota`
-  (`listar`, `criar`, `alterar`, `consultar`, `desativar`), levando o catálogo de **70 para
-  80**. DER, `classes.puml` e `ENTENDIMENTO.md` (§3.10 e §3.15.1) refletem o status e as
-  novas permissões. Telas, DAOs, serviços e actions vêm nos runs seguintes.
+- **Base do módulo de expedições `(KAN-140)`:** a `expedicao` ganhou **status próprio** —
+  `enum StatusExpedicao { PLANEJADA, EM_PERCURSO, CONCLUIDA }` no schema, com
+  `status StatusExpedicao @default(PLANEJADA)` em `Expedicao` (a expedição nasce planejada) e
+  a constante `STATUS_EXPEDICAO`/tipo `StatusExpedicao` em `src/types/index.ts`. O seed passou
+  a criar as permissões de `percurso` (`listar`, `criar`, `alterar`, `consultar`, `excluir`) e
+  de `expedicao` (`listar`, `criar`, `alterar`, `consultar`, `desativar`), levando o catálogo
+  de **70 para 80**. DER, `classes.puml` e `ENTENDIMENTO.md` (§3.10 e §3.15.1) refletem o
+  status e as novas permissões. Telas, DAOs, serviços e actions vêm nos runs seguintes.
 - **Visualização e edição da nota de saída e da remessa `(KAN-140):** a listagem de
   `/mov-estoque` (aba Saída) ganhou a coluna de ações com visualizar
   (`nota_saida.consultar`) e editar (`nota_saida.alterar`) da nota, e cada remessa da
@@ -102,12 +102,25 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
-- **Percurso é excluído fisicamente e a rota não guarda o percurso `(KAN-140)`:** por
+- **Conceito de organização das entregas renomeado para expedição `(KAN-140)`:** por decisão do
+  usuário, o antigo nome do conceito deu lugar a **expedição** — inclusive no modelo físico. No
+  schema, os modelos são agora `Expedicao` (`@@map("expedicao")`) e `ExpedicaoRemessa`
+  (`@@map("expedicao_remessa")`), o enum é `StatusExpedicao`, as chaves são `id_expedicao*`
+  (`ID_expedicao*`) e `Remessa.expedicoes` substitui a coleção antiga; os demais campos não
+  mudaram e o DER/`classes.puml` seguem com **51** entidades/classes. As tabelas antigas
+  estavam vazias (0/0) e nenhum perfil/permissão de usuário usava as cinco permissões antigas,
+  então o rename não perdeu dados. As permissões do seed passaram a `expedicao.*` (catálogo
+  segue com **80**) e as antigas foram removidas do banco. `src/types/index.ts` passou a
+  exportar `STATUS_EXPEDICAO`/`StatusExpedicao`, e o status de veículo que indicava estar em
+  deslocamento virou **`EM_EXPEDICAO`** (rótulo "Em expedição" na tela de veículos).
+  `ENTENDIMENTO.md` (§3.10.2, §3.11.4, §3.15.1), `AGENTS.md` §14 e os diagramas foram
+  alinhados.
+- **Percurso é excluído fisicamente e a expedição não guarda o percurso `(KAN-140)`:** por
   decisão do usuário, `percurso` deixou de ter `ativo` e passou a ser **excluído
-  fisicamente** (como `unidade_conversao`); `rota` perdeu `ID_percurso` — o percurso é
-  apenas um atalho de ordenação no momento de montar a rota. Antes do `db push` foi excluído
-  o único percurso inativo existente (1 registro, 3 visitas) e confirmado que nenhuma rota o
-  referenciava. A permissão `percurso.desativar` virou `percurso.excluir` (catálogo segue com
+  fisicamente** (como `unidade_conversao`); `expedicao` perdeu `ID_percurso` — o percurso é
+  apenas um atalho de ordenação no momento de montar a expedição. Antes do `db push` foi
+  excluído o único percurso inativo existente (1 registro, 3 visitas) e confirmado que nenhuma
+  expedição o referenciava. A permissão `percurso.desativar` virou `percurso.excluir` (catálogo segue com
   **80**) e a órfã `percurso.desativar` foi removida do banco. A tela perdeu a coluna
   Situação e a ação Desativar: excluir usa `ConfirmDialog`, exige `percurso.excluir` e avisa
   que a ação é permanente; a auditoria grava `Percurso`/`EXCLUIR` com o snapshot anterior. O
@@ -227,7 +240,7 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   forma de registrar saída que não é entrega — consumo interno e avaria), `RF024` (era
   Importante: é a mesma capacidade do `RNF008`, que já é Essencial) e `RNF002` (era Importante:
   incide sobre a busca por código de barras do `RF011`, Essencial, usada no balcão). O `RF022`
-  permanece **Importante** — o usuário decidiu **não** dividir rota/percurso. Só a coluna de
+  permanece **Importante** — o usuário decidiu **não** dividir expedição/percurso. Só a coluna de
   prioridade mudou; o texto e o escopo dos requisitos não foram alterados. (Decisão do usuário,
   2026-10-19 — sem chave de issue.)
 - **`docs/dominio/ESCOPO_FORA.md` (novo) — os requisitos que não serão implementados:** reúne

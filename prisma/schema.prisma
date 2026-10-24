@@ -530,7 +530,7 @@ model Remessa {
   destinatario           Destinatario          @relation(fields: [id_destinatario], references: [id_destinatario])
   notaSaida              NotaSaida             @relation(fields: [id_nota_saida], references: [id_nota_saida])
   veiculo                Veiculo?              @relation(fields: [id_veiculo], references: [id_veiculo])
-  rotas                  RotaRemessa[]
+  expedicoes             ExpedicaoRemessa[]
 
   @@index([id_funcionario_condutor], map: "remessa_ID_funcionario_condutor_fkey")
   @@index([id_destinatario], map: "remessa_ID_destinatario_fkey")
@@ -603,30 +603,30 @@ model PercursoDestinatario {
   @@map("percurso_destinatario")
 }
 
-model Rota {
-  id_rota       Int           @id @default(autoincrement()) @map("ID_rota")
-  data_criacao  DateTime      @map("data_criacao") @db.Timestamp(0)
-  data_prevista DateTime?     @map("data_prevista") @db.Date
-  observacao    String?       @map("observacao") @db.Text
-  status        StatusRota    @default(PLANEJADA) @map("status")
-  ativo         Boolean       @default(true) @map("ativo")
-  remessas      RotaRemessa[]
+model Expedicao {
+  id_expedicao  Int                 @id @default(autoincrement()) @map("ID_expedicao")
+  data_criacao  DateTime            @map("data_criacao") @db.Timestamp(0)
+  data_prevista DateTime?           @map("data_prevista") @db.Date
+  observacao    String?             @map("observacao") @db.Text
+  status        StatusExpedicao     @default(PLANEJADA) @map("status")
+  ativo         Boolean             @default(true) @map("ativo")
+  remessas      ExpedicaoRemessa[]
 
-  @@map("rota")
+  @@map("expedicao")
 }
 
-model RotaRemessa {
-  id_rota_remessa Int      @id @default(autoincrement()) @map("ID_rota_remessa")
-  id_rota         Int      @map("ID_rota")
-  id_remessa      Int      @map("ID_remessa")
-  ordem_visita    Int      @map("ordem_visita")
-  data_adicao     DateTime @map("data_adicao") @db.Timestamp(0)
-  remessa         Remessa  @relation(fields: [id_remessa], references: [id_remessa])
-  rota            Rota     @relation(fields: [id_rota], references: [id_rota])
+model ExpedicaoRemessa {
+  id_expedicao_remessa Int         @id @default(autoincrement()) @map("ID_expedicao_remessa")
+  id_expedicao         Int         @map("ID_expedicao")
+  id_remessa           Int         @map("ID_remessa")
+  ordem_visita         Int         @map("ordem_visita")
+  data_adicao          DateTime    @map("data_adicao") @db.Timestamp(0)
+  remessa              Remessa     @relation(fields: [id_remessa], references: [id_remessa])
+  expedicao            Expedicao   @relation(fields: [id_expedicao], references: [id_expedicao])
 
-  @@index([id_remessa], map: "rota_remessa_ID_remessa_fkey")
-  @@index([id_rota], map: "rota_remessa_ID_rota_fkey")
-  @@map("rota_remessa")
+  @@index([id_remessa], map: "expedicao_remessa_ID_remessa_fkey")
+  @@index([id_expedicao], map: "expedicao_remessa_ID_expedicao_fkey")
+  @@map("expedicao_remessa")
 }
 
 model Veiculo {
@@ -797,7 +797,7 @@ enum StatusRemessa {
   CANCELADA
 }
 
-enum StatusRota {
+enum StatusExpedicao {
   PLANEJADA
   EM_PERCURSO
   CONCLUIDA
@@ -806,7 +806,7 @@ enum StatusRota {
 enum StatusVeiculo {
   DISPONIVEL
   INDISPONIVEL
-  EM_ROTA
+  EM_EXPEDICAO
 }
 
 enum StatusPedido {
