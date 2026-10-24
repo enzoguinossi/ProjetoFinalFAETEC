@@ -1,21 +1,30 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { Bell, ChevronDown, LogOut, Settings } from "lucide-react";
 import { getUserInfo } from "@/app/actions/user";
 import { logoutAction } from "@/app/login/actions";
 import {
   cadastroItems,
+  cadastrosGroup,
   expedicaoItems,
+  expedicoesGroup,
+  movEstoqueGroup,
   movEstoqueItems,
-  navItems,
+  navBottomItems,
+  navTopItems,
   sidebarCls,
+  headerCls,
   logoAreaCls,
   buttonGroupCls,
   iconBtnCls,
   navCls,
   navItemCls,
   navItemActiveCls,
+  navItemIconCls,
+  navItemIconInactiveCls,
+  navChevronCls,
   subItemsCls,
   subItemCls,
   subItemActiveCls,
@@ -37,6 +46,10 @@ function loadUser() {
   });
   return cachePromise;
 }
+
+const MovEstoqueIcon = movEstoqueGroup.icon;
+const ExpedicoesIcon = expedicoesGroup.icon;
+const CadastrosIcon = cadastrosGroup.icon;
 
 export default function Sidebar() {
   const [cadastrosOpen, setCadastrosOpen] = useState(true);
@@ -98,117 +111,102 @@ export default function Sidebar() {
       data-figma="Sidebar"
       data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
     >
-      {/* Logo */}
-      <div className={logoAreaCls}>
-        <img src="/logo.svg" alt="Nexus" className="w-[70.69px] h-auto" />
+      {/* Cabeçalho fixo: logo + ações */}
+      <div className={headerCls}>
+        <div className={logoAreaCls}>
+          <img src="/logo.svg" alt="Nexus" className="h-10 w-auto" />
+        </div>
+
+        <div className={buttonGroupCls}>
+          <button type="button" className={iconBtnCls} aria-label="Configurações">
+            <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          <button type="button" className={iconBtnCls} aria-label="Notificações">
+            <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
-      {/* Botões de ação */}
-      <div className={buttonGroupCls}>
-        <button className={iconBtnCls}>
-          <img src="/icons/actions/config.svg" alt="Configurações" />
-        </button>
-        <button className={iconBtnCls}>
-          <img src="/icons/actions/sino.svg" alt="Notificações" />
-        </button>
-      </div>
-
-      {/* Menu */}
-      <nav className={navCls}>
-        {navItems.map((item, index) => (
-          <Fragment key={item.path}>
+      {/* Menu rolável — o bloco do usuário nunca é coberto */}
+      <nav className={navCls} aria-label="Menu principal">
+        {navTopItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.path);
+          return (
             <button
-              className={`${navItemCls} ${isActive(item.path) ? navItemActiveCls : ""}`}
+              key={item.path}
+              className={`${navItemCls} ${active ? navItemActiveCls : ""}`}
               onClick={() => navigate(item.path)}
               data-figma="SidebarItem"
               data-figma-label={item.label}
-              data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
+              data-figma-variant={active ? "ativo" : "inativo"}
             >
-              <img src={item.icon} alt="" className="w-6 h-6 shrink-0" />
+              <Icon
+                size={18}
+                strokeWidth={1.75}
+                className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
+                aria-hidden="true"
+              />
               <span>{item.label}</span>
             </button>
+          );
+        })}
 
-            {/* Mov. Estoque (collapsible) — ocupa a posição do antigo item, após Dashboard */}
-            {index === 0 && (
-              <div>
-                <button
-                  className={`${navItemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
-                  onClick={() => setMovEstoqueOpen(!movEstoqueOpen)}
-                  data-figma="SidebarGroup"
-                  data-figma-label="Mov. Estoque"
-                  data-figma-variant={isMovEstoqueItemActive ? "ativo" : "inativo"}
-                  data-figma-expanded={movEstoqueOpen ? "true" : "false"}
-                >
-                  <img src="/icons/nav/estoque.svg" alt="" className="w-6 h-6 shrink-0" />
-                  <span>Mov. Estoque</span>
-                  <img
-                    src={movEstoqueOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
-                    alt=""
-                    className="w-3 h-3 shrink-0 ml-auto transition-transform duration-200 opacity-60"
-                    style={{ transform: movEstoqueOpen ? "rotate(0)" : "rotate(-90deg)" }}
-                  />
-                </button>
+        {/* Mov. Estoque (collapsible) */}
+        {visibleMovEstoqueItems.length > 0 && (
+          <div>
+            <button
+              className={`${navItemCls} ${isMovEstoqueItemActive ? navItemActiveCls : ""}`}
+              onClick={() => setMovEstoqueOpen(!movEstoqueOpen)}
+              data-figma="SidebarGroup"
+              data-figma-label={movEstoqueGroup.label}
+              data-figma-variant={isMovEstoqueItemActive ? "ativo" : "inativo"}
+              data-figma-expanded={movEstoqueOpen ? "true" : "false"}
+            >
+              <MovEstoqueIcon
+                size={18}
+                strokeWidth={1.75}
+                className={`${navItemIconCls} ${isMovEstoqueItemActive ? "" : navItemIconInactiveCls}`}
+                aria-hidden="true"
+              />
+              <span>{movEstoqueGroup.label}</span>
+              <ChevronDown
+                size={16}
+                strokeWidth={1.75}
+                className={navChevronCls}
+                style={{ transform: movEstoqueOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                aria-hidden="true"
+              />
+            </button>
 
-                {movEstoqueOpen && (
-                  <div className={subItemsCls}>
-                    {visibleMovEstoqueItems.map((item) => (
-                      <button
-                        key={item.path}
-                        className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
-                        onClick={() => navigate(item.path)}
-                        data-figma="SidebarSubItem"
-                        data-figma-label={item.label}
-                        data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
-                      >
-                        <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
-                        <span>{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {movEstoqueOpen && (
+              <div className={subItemsCls}>
+                {visibleMovEstoqueItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <button
+                      key={item.path}
+                      className={`${subItemCls} ${active ? subItemActiveCls : ""}`}
+                      onClick={() => navigate(item.path)}
+                      data-figma="SidebarSubItem"
+                      data-figma-label={item.label}
+                      data-figma-variant={active ? "ativo" : "inativo"}
+                    >
+                      <Icon
+                        size={18}
+                        strokeWidth={1.75}
+                        className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
+                        aria-hidden="true"
+                      />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
-          </Fragment>
-        ))}
-
-        {/* Cadastros (collapsible) */}
-        <div>
-          <button
-            className={`${navItemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
-            onClick={() => setCadastrosOpen(!cadastrosOpen)}
-            data-figma="SidebarGroup"
-            data-figma-label="Cadastros"
-            data-figma-variant={isCadastroItemActive ? "ativo" : "inativo"}
-            data-figma-expanded={cadastrosOpen ? "true" : "false"}
-          >
-            <img src="/icons/nav/cadastros.svg" alt="" className="w-6 h-6 shrink-0" />
-            <span>Cadastros</span>
-            <img
-              src={cadastrosOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
-              alt=""
-              className="w-3 h-3 shrink-0 ml-auto transition-transform duration-200 opacity-60"
-              style={{ transform: cadastrosOpen ? "rotate(0)" : "rotate(-90deg)" }}
-            />
-          </button>
-
-          {cadastrosOpen && (
-            <div className={subItemsCls}>
-              {visibleCadastroItems.map((item) => (
-                <button
-                  key={item.path}
-                  className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
-                  onClick={() => navigate(item.path)}
-                  data-figma="SidebarSubItem"
-                  data-figma-label={item.label}
-                  data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
-                >
-                  <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
-                  <span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Expedições (collapsible) */}
         {visibleExpedicaoItems.length > 0 && (
@@ -217,48 +215,142 @@ export default function Sidebar() {
               className={`${navItemCls} ${isExpedicaoItemActive ? navItemActiveCls : ""}`}
               onClick={() => setExpedicoesOpen(!expedicoesOpen)}
               data-figma="SidebarGroup"
-              data-figma-label="Expedições"
+              data-figma-label={expedicoesGroup.label}
               data-figma-variant={isExpedicaoItemActive ? "ativo" : "inativo"}
               data-figma-expanded={expedicoesOpen ? "true" : "false"}
             >
-              <img src="/icons/cadastros/carro.svg" alt="" className="w-6 h-6 shrink-0" />
-              <span>Expedições</span>
-              <img
-                src={expedicoesOpen ? "/icons/arrows/seta-aberta.svg" : "/icons/arrows/seta-fechada.svg"}
-                alt=""
-                className="w-3 h-3 shrink-0 ml-auto transition-transform duration-200 opacity-60"
-                style={{ transform: expedicoesOpen ? "rotate(0)" : "rotate(-90deg)" }}
+              <ExpedicoesIcon
+                size={18}
+                strokeWidth={1.75}
+                className={`${navItemIconCls} ${isExpedicaoItemActive ? "" : navItemIconInactiveCls}`}
+                aria-hidden="true"
+              />
+              <span>{expedicoesGroup.label}</span>
+              <ChevronDown
+                size={16}
+                strokeWidth={1.75}
+                className={navChevronCls}
+                style={{ transform: expedicoesOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                aria-hidden="true"
               />
             </button>
 
             {expedicoesOpen && (
               <div className={subItemsCls}>
-                {visibleExpedicaoItems.map((item) => (
-                  <button
-                    key={item.path}
-                    className={`${subItemCls} ${isActive(item.path) ? subItemActiveCls : ""}`}
-                    onClick={() => navigate(item.path)}
-                    data-figma="SidebarSubItem"
-                    data-figma-label={item.label}
-                    data-figma-variant={isActive(item.path) ? "ativo" : "inativo"}
-                  >
-                    <img src={item.icon} alt="" className="w-5 h-5 shrink-0 opacity-70" />
-                    <span>{item.label}</span>
-                  </button>
-                ))}
+                {visibleExpedicaoItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <button
+                      key={item.path}
+                      className={`${subItemCls} ${active ? subItemActiveCls : ""}`}
+                      onClick={() => navigate(item.path)}
+                      data-figma="SidebarSubItem"
+                      data-figma-label={item.label}
+                      data-figma-variant={active ? "ativo" : "inativo"}
+                    >
+                      <Icon
+                        size={18}
+                        strokeWidth={1.75}
+                        className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
+                        aria-hidden="true"
+                      />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
+
+        {/* Cadastros (collapsible) */}
+        {visibleCadastroItems.length > 0 && (
+          <div>
+            <button
+              className={`${navItemCls} ${isCadastroItemActive ? navItemActiveCls : ""}`}
+              onClick={() => setCadastrosOpen(!cadastrosOpen)}
+              data-figma="SidebarGroup"
+              data-figma-label={cadastrosGroup.label}
+              data-figma-variant={isCadastroItemActive ? "ativo" : "inativo"}
+              data-figma-expanded={cadastrosOpen ? "true" : "false"}
+            >
+              <CadastrosIcon
+                size={18}
+                strokeWidth={1.75}
+                className={`${navItemIconCls} ${isCadastroItemActive ? "" : navItemIconInactiveCls}`}
+                aria-hidden="true"
+              />
+              <span>{cadastrosGroup.label}</span>
+              <ChevronDown
+                size={16}
+                strokeWidth={1.75}
+                className={navChevronCls}
+                style={{ transform: cadastrosOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+                aria-hidden="true"
+              />
+            </button>
+
+            {cadastrosOpen && (
+              <div className={subItemsCls}>
+                {visibleCadastroItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <button
+                      key={item.path}
+                      className={`${subItemCls} ${active ? subItemActiveCls : ""}`}
+                      onClick={() => navigate(item.path)}
+                      data-figma="SidebarSubItem"
+                      data-figma-label={item.label}
+                      data-figma-variant={active ? "ativo" : "inativo"}
+                    >
+                      <Icon
+                        size={18}
+                        strokeWidth={1.75}
+                        className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
+                        aria-hidden="true"
+                      />
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {navBottomItems.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.path);
+          return (
+            <button
+              key={item.path}
+              className={`${navItemCls} ${active ? navItemActiveCls : ""}`}
+              onClick={() => navigate(item.path)}
+              data-figma="SidebarItem"
+              data-figma-label={item.label}
+              data-figma-variant={active ? "ativo" : "inativo"}
+            >
+              <Icon
+                size={18}
+                strokeWidth={1.75}
+                className={`${navItemIconCls} ${active ? "" : navItemIconInactiveCls}`}
+                aria-hidden="true"
+              />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Informações do Usuário */}
-      <div className="relative w-full" ref={menuRef}>
+      {/* Rodapé fixo: informações do usuário */}
+      <div className="relative w-full shrink-0" ref={menuRef}>
         <button
           className={userInfoCls}
           onClick={() => setUserMenuOpen(!userMenuOpen)}
         >
-          <div className="w-12 h-12 rounded-full bg-[#f2f4f8] flex items-center justify-center font-sans text-sm font-semibold text-[#001d6c] shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#f2f4f8] flex items-center justify-center font-sans text-sm font-semibold text-[#001d6c] shrink-0">
             {initial}
           </div>
           <span className="font-sans text-xs text-black">{user?.nome ?? "Carregando..."}</span>
@@ -280,9 +372,7 @@ export default function Sidebar() {
               className="flex items-center gap-2 w-full px-3 py-[0.625rem] border-none bg-transparent cursor-pointer font-sans text-[0.8125rem] text-danger text-left transition-[background-color] duration-[120ms] hover:bg-danger-bg"
               onClick={handleLogout}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <LogOut size={16} strokeWidth={1.75} aria-hidden="true" />
               Sair
             </button>
           </div>
