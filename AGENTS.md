@@ -202,9 +202,9 @@ quantidade_atual += quantidade_convertida
 
 e gera registro de movimentação de estoque.
 
-## 8.2 Reserva (nota de saída)
+## 8.2 Reserva (nota de saída Remessa)
 
-Criar uma **nota de saída com itens e destinatário** reserva estoque:
+Criar uma **nota de saída do tipo Remessa (`SAIDA`) com itens e destinatário** reserva estoque:
 
 ```text
 saldo_reservado += quantidade
@@ -213,16 +213,22 @@ saldo_reservado += quantidade
 A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa. Criar a
 nota também não representa baixa física definitiva.
 
+**Avaria (`AVARIA`) e Consumo Interno (`CONSUMO_INTERNO`)** não são remessa: não têm destinatário,
+**não reservam** e dão **baixa real na criação** (`quantidade_atual -= quantidade`, com movimentação
+negativa e `ID_nota_saida`); a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`. A
+reserva acima vale apenas para Remessa.
+
 ## 8.3 Cancelamento
 
-O cancelamento da **nota de saída** libera a reserva:
+O cancelamento da **nota de saída em Remessa** libera a reserva:
 
 ```text
 saldo_reservado -= quantidade
 ```
 
 A nota vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
-sem debitar a reserva outra vez.
+sem debitar a reserva outra vez. Notas de Avaria/Consumo Interno já baixadas não são canceláveis —
+são histórico; a correção é uma nota nova.
 
 ## 8.4 Nota baixada
 

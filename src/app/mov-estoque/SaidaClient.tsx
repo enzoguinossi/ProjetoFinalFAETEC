@@ -5,7 +5,7 @@ import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
-import type { Action, Column } from "@/components/DataTable";
+import type { Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
 import type { PaginatedResult } from "@/types";
@@ -25,19 +25,6 @@ interface Props {
 }
 
 type ModoModal = "view" | "edit";
-
-const columnsSaida: Column<NotaSaidaListRow>[] = [
-  {
-    key: "id_nota_saida",
-    label: "Código",
-    width: "0.9fr",
-    align: "left",
-    render: (value) => formatarCodigo(Number(value)),
-  },
-  { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
-  { key: "itens", label: "Itens", width: "0.9fr", align: "center" },
-  { key: "statusLabel", label: "Status", width: "1.2fr", align: "center" },
-];
 
 function formatarNumero(valor: number): string {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 6 }).format(valor);
@@ -111,26 +98,56 @@ export default function SaidaClient({
     }
   }
 
-  const acoesNota: Action<NotaSaidaListRow>[] = [
-    ...(podeConsultarNota
+  /** Ações por linha: nota não-Remessa já nasce baixada, então só visualiza. */
+  const columnsSaida: Column<NotaSaidaListRow>[] = [
+    {
+      key: "id_nota_saida",
+      label: "Código",
+      width: "0.9fr",
+      align: "left",
+      render: (value) => formatarCodigo(Number(value)),
+    },
+    { key: "tipoLabel", label: "Tipo", width: "1.2fr", align: "center" },
+    { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
+    { key: "itens", label: "Itens", width: "0.9fr", align: "center" },
+    { key: "statusLabel", label: "Status", width: "1.2fr", align: "center" },
+    ...(podeConsultarNota || podeAlterarNota
       ? [
           {
-            icon: "/icons/actions/Olho.svg",
-            label: "Visualizar",
-            onClick: (row: NotaSaidaListRow) => {
-              void abrirNota(row, "view");
-            },
-          },
-        ]
-      : []),
-    ...(podeAlterarNota
-      ? [
-          {
-            icon: "/icons/actions/Editar.svg",
-            label: "Editar",
-            onClick: (row: NotaSaidaListRow) => {
-              void abrirNota(row, "edit");
-            },
+            key: "podeEditar" as const,
+            label: "Ações",
+            width: "7.5rem",
+            align: "center" as const,
+            render: (_: unknown, row: NotaSaidaListRow) => (
+              <div className="flex items-center justify-center gap-[0.625rem]">
+                {podeConsultarNota && (
+                  <button
+                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-ink transition-[background-color] duration-[120ms] hover:bg-[rgba(0,0,0,0.06)]"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void abrirNota(row, "view");
+                    }}
+                    title="Visualizar"
+                    type="button"
+                  >
+                    <img src="/icons/actions/Olho.svg" alt="Visualizar" />
+                  </button>
+                )}
+                {podeAlterarNota && row.tipo === "SAIDA" && row.podeEditar && (
+                  <button
+                    className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-ink transition-[background-color] duration-[120ms] hover:bg-[rgba(0,0,0,0.06)]"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void abrirNota(row, "edit");
+                    }}
+                    title="Editar"
+                    type="button"
+                  >
+                    <img src="/icons/actions/Editar.svg" alt="Editar" />
+                  </button>
+                )}
+              </div>
+            ),
           },
         ]
       : []),
@@ -171,7 +188,12 @@ export default function SaidaClient({
               ? `Quantidade total: ${formatarNumero(nota.quantidade)}`
               : "Sem quantidade solicitada."}
           </span>
-          {podeCancelarNota && nota.podeCancelar ? (
+          {nota.tipo !== "SAIDA" ? (
+            <span className="font-sans text-xs text-[#697077]">
+              Nota de {nota.tipoLabel.toLowerCase()} já baixada — histórico, sem edição ou
+              cancelamento (RN004).
+            </span>
+          ) : podeCancelarNota && nota.podeCancelar ? (
             <Button
               label={cancelandoId === nota.id_nota_saida ? "Cancelando..." : "Cancelar nota"}
               variant="cancel"
@@ -217,7 +239,6 @@ export default function SaidaClient({
         columns={columnsSaida}
         data={resultadoSaida.data}
         idField="id_nota_saida"
-        actions={acoesNota}
         rowExpansivel={() => true}
         renderExpandido={renderItens}
         paginacaoServidor={{

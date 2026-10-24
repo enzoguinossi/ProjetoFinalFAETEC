@@ -96,8 +96,13 @@ export type ItemSaidaPayload = {
   quantidade_solicitada: number;
 };
 
+/** Tipos aceitos no formulário de saída (Remessa, Avaria e Consumo Interno). */
+export type TipoSaidaPayload = "SAIDA" | "AVARIA" | "CONSUMO_INTERNO";
+
 export type NovaSaidaPayload = {
-  id_destinatario: number;
+  tipo: TipoSaidaPayload;
+  /** Obrigatório só em Remessa. */
+  id_destinatario?: number | null;
   urgente?: boolean;
   observacao?: string | null;
   itens: ItemSaidaPayload[];
@@ -119,6 +124,8 @@ export type NotaSaidaItemDetalhe = {
   id_item_nota_saida: number;
   id_produto: number;
   descricao: string;
+  /** Unidade de conversão padrão do produto (`UN` quando não houver). */
+  unidade: string;
   quantidade_solicitada: number;
   quantidade_entregue: number;
 };
@@ -126,6 +133,8 @@ export type NotaSaidaItemDetalhe = {
 export type NotaSaidaListRow = {
   id_nota_saida: number;
   data: string;
+  tipo: string;
+  tipoLabel: string;
   destinatario: string;
   itens: NotaSaidaItemDetalhe[];
   /** Soma de `qtd_esperada` dos itens. */
@@ -133,7 +142,7 @@ export type NotaSaidaListRow = {
   status: string;
   statusLabel: string;
   podeCancelar: boolean;
-  /** Só notas `ABERTA` podem ser editadas. */
+  /** Só notas `ABERTA` (Remessa) podem ser editadas. */
   podeEditar: boolean;
 };
 
@@ -141,6 +150,8 @@ export type NotaSaidaListRow = {
 export type NotaSaidaFormData = {
   id_nota_saida: number;
   data: string;
+  tipo: TipoSaidaPayload;
+  tipoLabel: string;
   status: string;
   statusLabel: string;
   /** Só notas abertas são editáveis. */

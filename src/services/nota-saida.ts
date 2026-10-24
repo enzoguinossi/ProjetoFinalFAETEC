@@ -11,9 +11,16 @@ export type SaidaItemInput = {
   quantidade_solicitada: number;
 };
 
+/** Tipos que o formulário de saída aceita. `DESMONTAGEM` tem fluxo próprio. */
+export type TipoSaida = "SAIDA" | "AVARIA" | "CONSUMO_INTERNO";
+
+const TIPOS_SAIDA: TipoSaida[] = ["SAIDA", "AVARIA", "CONSUMO_INTERNO"];
+
 /** Nota de saída: a entrega leva destinatário, urgência, observação e itens. */
 export type SaidaInput = {
-  id_destinatario: number;
+  tipo: TipoSaida;
+  /** Obrigatório só em `SAIDA`; avaria/consumo interno não têm destinatário. */
+  id_destinatario?: number | null;
   urgente?: boolean;
   observacao?: string | null;
   itens: SaidaItemInput[];
@@ -24,7 +31,10 @@ export type SaidaItemAtualizacaoInput = SaidaItemInput & {
   id_item_nota_saida?: number | null;
 };
 
-export type AtualizacaoNotaSaidaInput = Omit<SaidaInput, "itens"> & {
+export type AtualizacaoNotaSaidaInput = {
+  id_destinatario: number;
+  urgente?: boolean;
+  observacao?: string | null;
   itens: SaidaItemAtualizacaoInput[];
 };
 
@@ -100,14 +110,21 @@ function produtosUnicos(itens: { id_produto: number }[]): string | null {
 
 export class NotaSaidaService {
   /**
-   * Valida a nota de saída e grava nota, itens, reservas e auditoria em uma
-   * única transação (via `notaSaidaDAO.create`). A reserva usa a
-   * `quantidade_solicitada`; saldo insuficiente apenas avisa (RN001), nunca
-   * bloqueia.
+   * Valida a nota de saída e grava nota, itens, reservas/baixas e auditoria em
+   * uma única transação (via `notaSaidaDAO.create`). Em `SAIDA` (Remessa) a
+   * reserva usa a `quantidade_solicitada`; `AVARIA` e `CONSUMO_INTERNO` não
+   * reservam: dão baixa real em `quantidade_atual` na criação. Saldo
+   * insuficiente apenas avisa (RN001), nunca bloqueia.
    */
   async registrar(input: SaidaInput, id_usuario: number): Promise<ResultadoSaida> {
-    const idDestinatario = idPositivo(input.id_destinatario);
-    if (!idDestinatario) {
+    const tipo = input.tipo;
+    if (!TIPOS_SAIDA.includes(tipo)) {
+      return { error: "Tipo de saída inválido." };
+    }
+
+    const ehRemessa = tipo === "SAIDA";
+    const idDestinatario = ehRemessa ? idPositivo(input.id_destinatario) : null;
+    if (ehRemessa && !idDestinatario) {
       return { error: "Selecione o destinatário da nota de saída." };
     }
 
@@ -118,8 +135,9 @@ export class NotaSaidaService {
     if (repetido) return { error: repetido };
 
     const data: NotaSaidaCriacao = {
+      tipo,
       id_destinatario: idDestinatario,
-      urgente: input.urgente ?? false,
+      urgente: ehRemessa ? (input.urgente ?? false) : false,
       observacao: input.observacao?.trim() || null,
       itens: itens.itens.map((item) => ({
         id_produto: item.id_produto,
@@ -163,6 +181,13 @@ export class NotaSaidaService {
 
     const existente = await notaSaidaDAO.getNotaSaida(idNota);
     if (!existente) return { error: "Nota de saída não encontrada." };
+
+    if (existente.tipo !== "SAIDA") {
+      return {
+        error:
+          "Notas de avaria e consumo interno são histórico e não podem ser editadas (RN004).",
+      };
+    }
 
     if (!STATUS_NOTA_SAIDA_EDITAVEL.includes(existente.status)) {
       const rotulo = ROTULOS_STATUS_NOTA_SAIDA[existente.status] ?? existente.status;

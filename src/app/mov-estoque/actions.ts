@@ -32,6 +32,7 @@ import type {
   NovaSaidaPayload,
   ProdutoEntradaDetalhe,
   SelecaoParams,
+  TipoSaidaPayload,
 } from "./tipos";
 
 const PERMISSOES_VER = ["estoque.ver_saldo", "estoque.entrada"];
@@ -258,6 +259,12 @@ const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
   CANCELADA: "Cancelada",
 };
 
+const ROTULOS_TIPO_NOTA_SAIDA: Record<string, string> = {
+  SAIDA: "Remessa",
+  AVARIA: "Avaria",
+  CONSUMO_INTERNO: "Consumo interno",
+};
+
 const STATUS_NOTA_SAIDA_CANCELAVEL = ["ABERTA"];
 const STATUS_NOTA_SAIDA_EDITAVEL = ["ABERTA"];
 
@@ -276,12 +283,15 @@ export async function listarNotasSaida(
         id_item_nota_saida: item.id_item_nota_saida,
         id_produto: item.estoque.produto.id_produto,
         descricao: item.estoque.produto.descricao,
+        unidade: item.estoque.produto.conversaoPadrao?.nome ?? "UN",
         quantidade_solicitada: Number(item.qtd_esperada),
         quantidade_entregue: Number(item.qtd_entregue),
       }));
       return {
         id_nota_saida: nota.id_nota_saida,
         data: formatarData(nota.data_criacao),
+        tipo: nota.tipo,
+        tipoLabel: ROTULOS_TIPO_NOTA_SAIDA[nota.tipo] ?? nota.tipo,
         destinatario,
         itens,
         quantidade: itens.reduce((acc, item) => acc + item.quantidade_solicitada, 0),
@@ -332,6 +342,8 @@ export async function obterNotaSaida(
   return {
     id_nota_saida: nota.id_nota_saida,
     data: formatarData(nota.data_criacao),
+    tipo: nota.tipo as TipoSaidaPayload,
+    tipoLabel: ROTULOS_TIPO_NOTA_SAIDA[nota.tipo] ?? nota.tipo,
     status: nota.status,
     statusLabel: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
     podeEditar: STATUS_NOTA_SAIDA_EDITAVEL.includes(nota.status),
@@ -343,6 +355,7 @@ export async function obterNotaSaida(
       id_item_nota_saida: item.id_item_nota_saida,
       id_produto: item.estoque.produto.id_produto,
       descricao: item.estoque.produto.descricao,
+      unidade: item.estoque.produto.conversaoPadrao?.nome ?? "UN",
       quantidade_solicitada: Number(item.qtd_esperada),
       quantidade_entregue: Number(item.qtd_entregue),
     })),

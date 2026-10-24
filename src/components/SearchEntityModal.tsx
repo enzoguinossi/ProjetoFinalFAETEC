@@ -28,6 +28,8 @@ interface SearchEntityModalProps<T> {
   excludeIds?: number[];
   pageSize?: number;
   placeholder?: string;
+  /** Texto que abre o filtro já preenchido (ex.: o que foi digitado na linha). */
+  initialSearch?: string;
 }
 
 const wrapperCls = "flex flex-col gap-3 w-full";
@@ -56,9 +58,10 @@ export default function SearchEntityModal<T>({
   excludeIds,
   pageSize = 10,
   placeholder = "Filtrar...",
+  initialSearch,
 }: SearchEntityModalProps<T>) {
-  const [busca, setBusca] = useState("");
-  const [buscaAplicada, setBuscaAplicada] = useState("");
+  const [busca, setBusca] = useState(initialSearch ?? "");
+  const [buscaAplicada, setBuscaAplicada] = useState(initialSearch?.trim() ?? "");
   const [page, setPage] = useState(1);
   const [tamanhoPagina, setTamanhoPagina] = useState(pageSize);
   const [resultado, setResultado] = useState<PaginatedResult<T> | null>(null);
@@ -75,7 +78,8 @@ export default function SearchEntityModal<T>({
     [exclusoesChave],
   );
 
-  // Ao abrir, foca o filtro.
+  // Ao abrir, foca o filtro. O texto inicial entra pelo estado na montagem
+  // (o consumidor remonta com `key` quando quer abrir já filtrado).
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);

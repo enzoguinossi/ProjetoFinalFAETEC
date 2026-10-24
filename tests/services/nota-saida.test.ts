@@ -24,6 +24,7 @@ async function prepararNota(
 
   const resultado = await notaSaidaService.registrar(
     {
+      tipo: "SAIDA",
       id_destinatario: destinatario.id_destinatario,
       itens: [{ id_produto: produto.id_produto, quantidade_solicitada: opts.quantidade ?? 3 }],
     },
@@ -57,6 +58,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         urgente: true,
         observacao: "Saída de teste",
@@ -111,6 +113,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 3 }],
       },
@@ -154,6 +157,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 5 }],
       },
@@ -179,6 +183,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 4 }],
       },
@@ -204,6 +209,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
       },
@@ -228,7 +234,7 @@ describe("notaSaidaService.registrar", () => {
     const { destinatario } = await criarDestinatario();
 
     const resultado = await notaSaidaService.registrar(
-      { id_destinatario: destinatario.id_destinatario, itens: [] },
+      { tipo: "SAIDA", id_destinatario: destinatario.id_destinatario, itens: [] },
       usuario.id_usuario,
     );
 
@@ -242,6 +248,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: 0,
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
       },
@@ -259,6 +266,7 @@ describe("notaSaidaService.registrar", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         itens: [
           { id_produto: produto.id_produto, quantidade_solicitada: 1 },
@@ -281,6 +289,7 @@ describe("notaSaidaService.registrar", () => {
     await expect(
       notaSaidaService.registrar(
         {
+          tipo: "SAIDA",
           id_destinatario: destinatario.id_destinatario,
           itens: [
             { id_produto: produto.id_produto, quantidade_solicitada: 2 },
@@ -737,6 +746,7 @@ describe("notaSaidaDAO.list", () => {
     for (let i = 0; i < 2; i++) {
       const resultado = await notaSaidaService.registrar(
         {
+          tipo: "SAIDA",
           id_destinatario: destinatario.id_destinatario,
           itens: [{ id_produto: produto.id_produto, quantidade_solicitada: i + 1 }],
         },
@@ -752,5 +762,199 @@ describe("notaSaidaDAO.list", () => {
     expect(pagina.data).toHaveLength(1);
     expect(pagina.data[0]?.destinatario?.pessoaJuridica.razao_social).toBe("Escola Municipal");
     expect(pagina.data[0]?.itens).toHaveLength(1);
+  });
+});
+
+describe("saída sem remessa (avaria e consumo interno)", () => {
+  it.each(["AVARIA", "CONSUMO_INTERNO"] as const)(
+    "%s baixa o estoque na criação, sem reserva e sem destinatário",
+    async (tipo) => {
+      const { usuario } = await criarUsuario();
+      const produto = await criarProduto();
+      const estoque = await criarEstoque(produto.id_produto, {
+        quantidadeAtual: 10,
+        saldoReservado: 2,
+      });
+
+      const resultado = await notaSaidaService.registrar(
+        {
+          tipo,
+          itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 4 }],
+        },
+        usuario.id_usuario,
+      );
+
+      expect("error" in resultado).toBe(false);
+      if ("error" in resultado) return;
+      expect(resultado.aviso).toBeNull();
+
+      const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
+        where: { id_nota_saida: resultado.nota.id_nota_saida },
+        include: { itens: true, reservas: true, movimentacoes: true },
+      });
+      expect(nota.tipo).toBe(tipo);
+      expect(nota.status).toBe("BAIXA_TOTAL");
+      expect(nota.id_destinatario).toBeNull();
+      expect(nota.urgente).toBe(false);
+      expect(nota.reservas).toHaveLength(0);
+      expect(nota.itens).toHaveLength(1);
+      expect(nota.itens[0]).toMatchObject({
+        id_estoque: estoque.id_estoque,
+        qtd_esperada: 4,
+        qtd_entregue: 4,
+      });
+      expect(nota.movimentacoes).toHaveLength(1);
+      expect(nota.movimentacoes[0]).toMatchObject({
+        id_estoque: estoque.id_estoque,
+        id_nota_saida: nota.id_nota_saida,
+        quantidade: -4,
+        saldo_anterior: 10,
+        saldo_posterior: 6,
+      });
+
+      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+        where: { id_estoque: estoque.id_estoque },
+      });
+      expect(estoqueApos.quantidade_atual).toBe(6);
+      expect(estoqueApos.saldo_reservado).toBe(2);
+
+      const auditorias = await auditoriasDe("NotaSaida", nota.id_nota_saida);
+      expect(auditorias).toHaveLength(1);
+      expect(auditorias[0]?.acao).toBe("CRIAR");
+      expect(auditorias[0]?.dados_novos).toMatchObject({
+        tipo,
+        status: "BAIXA_TOTAL",
+        id_destinatario: null,
+        itens: [
+          {
+            id_estoque: estoque.id_estoque,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 4,
+            quantidade_entregue: 4,
+          },
+        ],
+        movimentacoes: [
+          {
+            id_estoque: estoque.id_estoque,
+            quantidade: -4,
+            saldo_anterior: 10,
+            saldo_posterior: 6,
+          },
+        ],
+      });
+    },
+  );
+
+  it("RN001: avaria acima do saldo avisa e grava com quantidade_atual negativa", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 2,
+      saldoReservado: 1,
+    });
+
+    const resultado = await notaSaidaService.registrar(
+      {
+        tipo: "AVARIA",
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 5 }],
+      },
+      usuario.id_usuario,
+    );
+
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+    expect(resultado.aviso).toContain("Saldo insuficiente");
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.quantidade_atual).toBe(-3);
+    expect(estoqueApos.saldo_reservado).toBe(1);
+
+    const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+      where: { id_nota_saida: resultado.nota.id_nota_saida },
+    });
+    expect(movimentacao).toMatchObject({
+      quantidade: -5,
+      saldo_anterior: 2,
+      saldo_posterior: -3,
+    });
+  });
+
+  it("recusa DESMONTAGEM e tipo desconhecido sem gravar nada", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
+
+    const desmontagem = await notaSaidaService.registrar(
+      {
+        tipo: "DESMONTAGEM" as never,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
+      },
+      usuario.id_usuario,
+    );
+    const desconhecido = await notaSaidaService.registrar(
+      {
+        tipo: "OUTRO" as never,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
+      },
+      usuario.id_usuario,
+    );
+
+    expect(desmontagem).toEqual({ error: "Tipo de saída inválido." });
+    expect(desconhecido).toEqual({ error: "Tipo de saída inválido." });
+    expect(await prismaTeste.notaSaida.count()).toBe(0);
+  });
+
+  it("desfaz tudo quando o produto não tem estoque ativo", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+
+    await expect(
+      notaSaidaService.registrar(
+        {
+          tipo: "CONSUMO_INTERNO",
+          itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+        },
+        usuario.id_usuario,
+      ),
+    ).rejects.toThrow(/estoque ativo/);
+
+    expect(await prismaTeste.notaSaida.count()).toBe(0);
+    expect(await prismaTeste.itemNotaSaida.count()).toBe(0);
+    expect(await prismaTeste.movimentacaoEstoque.count()).toBe(0);
+  });
+
+  it("lista todos os tipos ativos com o tipo no retorno", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
+    const { destinatario } = await criarDestinatario();
+
+    const remessa = await notaSaidaService.registrar(
+      {
+        tipo: "SAIDA",
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in remessa).toBe(false);
+
+    const avaria = await notaSaidaService.registrar(
+      {
+        tipo: "AVARIA",
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in avaria).toBe(false);
+
+    const pagina = await notaSaidaDAO.list();
+    expect(pagina.total).toBe(2);
+    expect(new Set(pagina.data.map((nota) => nota.tipo))).toEqual(
+      new Set(["SAIDA", "AVARIA"]),
+    );
+    expect(pagina.data.find((nota) => nota.tipo === "AVARIA")?.destinatario).toBeNull();
   });
 });

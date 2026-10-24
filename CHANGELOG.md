@@ -15,6 +15,19 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Tipo de Saída com avaria e consumo interno `(KAN-140)`:** o formulário de saída ganhou **Tipo de
+  Saída** (Remessa / Avaria / Consumo Interno) e itens inline no formato do ERP
+  (Código/Descrição/Unidade/Quantidade), sem campos de valor. Remessa (`SAIDA`) mantém destinatário
+  obrigatório, urgência, reserva (`saldo_reservado += qtd`) e status `ABERTA`. Avaria (`AVARIA`) e
+  Consumo Interno (`CONSUMO_INTERNO`) não têm destinatário, não reservam e dão **baixa real na
+  criação**: `quantidade_atual -= qtd` e `movimentacao_estoque` negativa com `ID_nota_saida`, nota em
+  `BAIXA_TOTAL` e `qtd_entregue = qtd_esperada`. RN001 continua apenas avisando (o saldo pode ficar
+  negativo) e a auditoria `NotaSaida`/`CRIAR` guarda tipo, itens, saldos e movimentações. Notas de
+  avaria/consumo são histórico: não são editáveis nem canceláveis. A listagem passou a mostrar todos
+  os tipos, com a coluna **Tipo** e destinatário `—` quando não há pessoa. Código em
+  `src/dao/estoque.ts` (`baixarDireto`), `src/dao/nota-saida.ts`, `src/services/nota-saida.ts`,
+  `src/app/mov-estoque/**`, `src/lib/produto-linha.ts` e `src/components/SearchEntityModal.tsx`
+  (`initialSearch`); testes em `tests/services/nota-saida.test.ts` e `tests/lib/produto-linha.test.ts`.
 - **Execução da entrega e baixa da nota `(KAN-140)`:** dentro da expedição em percurso, cada nota
   ganhou **Registrar entrega** (modal por item com esperada, já entregue, entrega total e o
   interruptor **cortar o restante**) e o atalho **Não entregue**; o cabeçalho ganhou **Concluir

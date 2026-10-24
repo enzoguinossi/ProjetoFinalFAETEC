@@ -10,9 +10,17 @@ export type NotaSaidaItemCriacao = {
   quantidade_solicitada: number;
 };
 
+/**
+ * Tipo aceito na criação da saída. `DESMONTAGEM` é fluxo próprio e não passa
+ * pelo formulário de saída.
+ */
+export type NotaSaidaTipo = "SAIDA" | "AVARIA" | "CONSUMO_INTERNO";
+
 /** Dados da nota de saída: a nota é a entrega (destinatário, itens e reserva). */
 export type NotaSaidaCriacao = {
-  id_destinatario: number;
+  tipo: NotaSaidaTipo;
+  /** Obrigatório só em `SAIDA`; avaria/consumo interno não têm destinatário. */
+  id_destinatario: number | null;
   urgente: boolean;
   observacao: string | null;
   itens: NotaSaidaItemCriacao[];
@@ -55,6 +63,7 @@ export type ResultadoCancelamentoNotaSaida =
 function snapshotNotaSaida(
   nota: {
     id_nota_saida: number;
+    tipo: string;
     id_destinatario: number | null;
     urgente: boolean;
     observacao: string | null;
@@ -65,10 +74,12 @@ function snapshotNotaSaida(
     id_estoque: number;
     id_produto: number;
     quantidade_solicitada: number;
+    quantidade_entregue?: number;
   }[],
 ) {
   return {
     id_nota_saida: nota.id_nota_saida,
+    tipo: nota.tipo,
     id_destinatario: nota.id_destinatario,
     urgente: nota.urgente,
     observacao: nota.observacao,
@@ -78,6 +89,7 @@ function snapshotNotaSaida(
       id_estoque: item.id_estoque,
       id_produto: item.id_produto,
       quantidade_solicitada: item.quantidade_solicitada,
+      quantidade_entregue: item.quantidade_entregue ?? null,
     })),
   };
 }
@@ -100,10 +112,10 @@ async function saldoDisponivelNoCliente(
 }
 
 export class NotaSaidaDAO {
-  /** Notas de saída (tipo SAIDA), da mais recente para a mais antiga. */
+  /** Todas as notas de saída ativas (Remessa, Avaria e Consumo Interno). */
   async list(params: PaginationParams = {}) {
     const { skip, take } = buildPagination(params);
-    const where = { ativo: true, tipo: "SAIDA" as const };
+    const where = { ativo: true };
 
     const [data, total] = await Promise.all([
       prisma.notaSaida.findMany({
@@ -120,7 +132,15 @@ export class NotaSaidaDAO {
           itens: {
             include: {
               estoque: {
-                include: { produto: { select: { id_produto: true, descricao: true } } },
+                include: {
+                  produto: {
+                    select: {
+                      id_produto: true,
+                      descricao: true,
+                      conversaoPadrao: { select: { nome: true } },
+                    },
+                  },
+                },
               },
             },
             orderBy: { id_item_nota_saida: "asc" },
@@ -141,21 +161,31 @@ export class NotaSaidaDAO {
   }
 
   /**
-   * Cria a nota de saída com destinatário, itens e reservas em uma única
-   * transação. Cada item reserva `quantidade_solicitada` (`saldo_reservado`)
-   * e grava `item_nota_saida` (`qtd_esperada`). Saldo insuficiente apenas
-   * avisa (RN001), nunca bloqueia; o aviso volta para a tela. Qualquer falha
-   * desfaz tudo.
+   * Cria a nota de saída em uma única transação, conforme o tipo:
+   *
+   * - `SAIDA` (Remessa): destinatário, reserva (`saldo_reservado += qtd`) e
+   *   status `ABERTA` — a baixa acontece na execução da entrega.
+   * - `AVARIA`/`CONSUMO_INTERNO`: sem destinatário e sem reserva; cada item
+   *   baixa `quantidade_atual` na hora (`baixarDireto` + movimentação negativa)
+   *   e a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`.
+   *
+   * Saldo insuficiente apenas avisa (RN001), nunca bloqueia; o aviso volta para
+   * a tela. Qualquer falha desfaz tudo.
    */
   async create(data: NotaSaidaCriacao, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
+      const ehRemessa = data.tipo === "SAIDA";
+      if (ehRemessa && !data.id_destinatario) {
+        throw new Error("Selecione o destinatário da nota de saída.");
+      }
+
       const nota = await tx.notaSaida.create({
         data: {
-          id_destinatario: data.id_destinatario,
+          id_destinatario: ehRemessa ? data.id_destinatario : null,
           data_criacao: new Date(),
-          tipo: "SAIDA",
-          status: "ABERTA",
-          urgente: data.urgente,
+          tipo: data.tipo,
+          status: ehRemessa ? "ABERTA" : "BAIXA_TOTAL",
+          urgente: ehRemessa ? data.urgente : false,
           observacao: data.observacao,
         },
       });
@@ -165,6 +195,7 @@ export class NotaSaidaDAO {
         id_estoque: number;
         id_produto: number;
         quantidade_solicitada: number;
+        quantidade_entregue: number;
       }[] = [];
       const reservasGravadas: {
         id_reserva_estoque: number;
@@ -173,49 +204,102 @@ export class NotaSaidaDAO {
         saldo_anterior: number;
         saldo_posterior: number;
       }[] = [];
+      const movimentacoesGravadas: {
+        id_movimentacao: number;
+        id_estoque: number;
+        quantidade: number;
+        saldo_anterior: number;
+        saldo_posterior: number;
+      }[] = [];
       const avisos: string[] = [];
 
       for (const item of data.itens) {
-        const saldo = await saldoDisponivelNoCliente(tx, item.id_produto);
-        if (item.quantidade_solicitada > saldo.disponivel) {
-          const rotulo = saldo.descricao ?? `produto ${item.id_produto}`;
-          avisos.push(
-            `Saldo insuficiente de ${rotulo} (disponível ${saldo.disponivel}, solicitado ${item.quantidade_solicitada})`,
+        if (ehRemessa) {
+          const saldo = await saldoDisponivelNoCliente(tx, item.id_produto);
+          if (item.quantidade_solicitada > saldo.disponivel) {
+            const rotulo = saldo.descricao ?? `produto ${item.id_produto}`;
+            avisos.push(
+              `Saldo insuficiente de ${rotulo} (disponível ${saldo.disponivel}, solicitado ${item.quantidade_solicitada})`,
+            );
+          }
+
+          const reserva = await estoqueDAO.reservar(
+            {
+              id_produto: item.id_produto,
+              id_nota_saida: nota.id_nota_saida,
+              id_usuario,
+              quantidade: item.quantidade_solicitada,
+              observacao: "Reserva da nota de saída",
+            },
+            tx,
           );
-        }
 
-        const reserva = await estoqueDAO.reservar(
-          {
-            id_produto: item.id_produto,
-            id_nota_saida: nota.id_nota_saida,
-            id_usuario,
-            quantidade: item.quantidade_solicitada,
-            observacao: "Reserva da nota de saída",
-          },
-          tx,
-        );
+          const itemCriado = await tx.itemNotaSaida.create({
+            data: {
+              id_nota_saida: nota.id_nota_saida,
+              id_estoque: reserva.estoque.id_estoque,
+              qtd_esperada: item.quantidade_solicitada,
+            },
+          });
 
-        const itemCriado = await tx.itemNotaSaida.create({
-          data: {
-            id_nota_saida: nota.id_nota_saida,
+          itensGravados.push({
+            id_item_nota_saida: itemCriado.id_item_nota_saida,
             id_estoque: reserva.estoque.id_estoque,
-            qtd_esperada: item.quantidade_solicitada,
-          },
-        });
+            id_produto: item.id_produto,
+            quantidade_solicitada: item.quantidade_solicitada,
+            quantidade_entregue: Number(itemCriado.qtd_entregue),
+          });
+          reservasGravadas.push({
+            id_reserva_estoque: reserva.reserva.id_reserva_estoque,
+            id_estoque: reserva.estoque.id_estoque,
+            quantidade: item.quantidade_solicitada,
+            saldo_anterior: reserva.saldo_anterior,
+            saldo_posterior: reserva.saldo_posterior,
+          });
+        } else {
+          const baixa = await estoqueDAO.baixarDireto(
+            {
+              id_produto: item.id_produto,
+              id_nota_saida: nota.id_nota_saida,
+              id_usuario,
+              quantidade: item.quantidade_solicitada,
+              observacao: `Baixa imediata da nota de ${
+                data.tipo === "AVARIA" ? "avaria" : "consumo interno"
+              }`,
+            },
+            tx,
+          );
 
-        itensGravados.push({
-          id_item_nota_saida: itemCriado.id_item_nota_saida,
-          id_estoque: reserva.estoque.id_estoque,
-          id_produto: item.id_produto,
-          quantidade_solicitada: item.quantidade_solicitada,
-        });
-        reservasGravadas.push({
-          id_reserva_estoque: reserva.reserva.id_reserva_estoque,
-          id_estoque: reserva.estoque.id_estoque,
-          quantidade: item.quantidade_solicitada,
-          saldo_anterior: reserva.saldo_anterior,
-          saldo_posterior: reserva.saldo_posterior,
-        });
+          if (item.quantidade_solicitada > baixa.saldo_anterior) {
+            avisos.push(
+              `Saldo insuficiente de ${baixa.descricao} (disponível ${baixa.saldo_anterior}, solicitado ${item.quantidade_solicitada})`,
+            );
+          }
+
+          const itemCriado = await tx.itemNotaSaida.create({
+            data: {
+              id_nota_saida: nota.id_nota_saida,
+              id_estoque: baixa.estoque.id_estoque,
+              qtd_esperada: item.quantidade_solicitada,
+              qtd_entregue: item.quantidade_solicitada,
+            },
+          });
+
+          itensGravados.push({
+            id_item_nota_saida: itemCriado.id_item_nota_saida,
+            id_estoque: baixa.estoque.id_estoque,
+            id_produto: item.id_produto,
+            quantidade_solicitada: item.quantidade_solicitada,
+            quantidade_entregue: item.quantidade_solicitada,
+          });
+          movimentacoesGravadas.push({
+            id_movimentacao: baixa.movimentacao.id_movimentacao,
+            id_estoque: baixa.estoque.id_estoque,
+            quantidade: Number(baixa.movimentacao.quantidade),
+            saldo_anterior: baixa.saldo_anterior,
+            saldo_posterior: baixa.saldo_posterior,
+          });
+        }
       }
 
       await registrarAuditoria(
@@ -227,6 +311,7 @@ export class NotaSaidaDAO {
         {
           ...snapshotNotaSaida(nota, itensGravados),
           reservas: reservasGravadas,
+          movimentacoes: movimentacoesGravadas,
         },
         tx,
       );
@@ -235,6 +320,7 @@ export class NotaSaidaDAO {
         nota,
         itens: itensGravados,
         reservas: reservasGravadas,
+        movimentacoes: movimentacoesGravadas,
         aviso:
           avisos.length > 0
             ? `${avisos.join("; ")}. A saída foi gravada mesmo assim (RN001).`
@@ -243,10 +329,10 @@ export class NotaSaidaDAO {
     });
   }
 
-  /** Nota de saída com destinatário, itens (com o produto) e reservas. */
+  /** Nota de saída (qualquer tipo) com destinatário, itens e reservas. */
   async getNotaSaida(id: number) {
     return prisma.notaSaida.findFirst({
-      where: { id_nota_saida: id, tipo: "SAIDA", ativo: true },
+      where: { id_nota_saida: id, ativo: true },
       include: {
         destinatario: {
           select: {
@@ -257,7 +343,15 @@ export class NotaSaidaDAO {
         itens: {
           include: {
             estoque: {
-              include: { produto: { select: { id_produto: true, descricao: true } } },
+              include: {
+                produto: {
+                  select: {
+                    id_produto: true,
+                    descricao: true,
+                    conversaoPadrao: { select: { nome: true } },
+                  },
+                },
+              },
             },
           },
           orderBy: { id_item_nota_saida: "asc" },
@@ -458,11 +552,18 @@ export class NotaSaidaDAO {
   ): Promise<ResultadoCancelamentoNotaSaida> {
     return prisma.$transaction(async (tx) => {
       const nota = await tx.notaSaida.findFirst({
-        where: { id_nota_saida, tipo: "SAIDA", ativo: true },
+        where: { id_nota_saida, ativo: true },
         include: { itens: { orderBy: { id_item_nota_saida: "asc" } } },
       });
 
       if (!nota) return { error: "Nota de saída não encontrada." };
+
+      if (nota.tipo !== "SAIDA") {
+        return {
+          error:
+            "Notas de avaria e consumo interno dão baixa na criação e são histórico — não podem ser canceladas (RN004).",
+        };
+      }
 
       if (nota.status === "CANCELADA") {
         return { error: "Nota de saída já está cancelada." };

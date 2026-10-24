@@ -103,6 +103,7 @@ export class ProdutoDAO {
         select: {
           id_produto: true,
           descricao: true,
+          conversaoPadrao: { select: { nome: true } },
           estoques: {
             where: { ativo: true },
             select: { quantidade_atual: true, saldo_reservado: true },

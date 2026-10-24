@@ -6,14 +6,17 @@ export type ProdutoListRow = {
   id_produto: number;
   codigo: string;
   descricao: string;
+  /** Nome da unidade de conversão padrão do produto (`UN` quando não houver). */
+  unidade: string;
   qtd: string;
   livre: string;
 };
 
-/** Colunas da listagem/seletor de produto (Código · Descrição · Quantidade · Qtd. Livre). */
+/** Colunas da listagem/seletor de produto (Código · Descrição · Unidade · Quantidade · Qtd. Livre). */
 export const COLUNAS_PRODUTO: Column<ProdutoListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr" },
   { key: "descricao", label: "Descrição", width: "2fr" },
+  { key: "unidade", label: "Unidade", width: "0.8fr" },
   { key: "qtd", label: "Quantidade", width: "1fr" },
   { key: "livre", label: "Qtd. Livre", width: "1fr" },
 ];
@@ -21,6 +24,7 @@ export const COLUNAS_PRODUTO: Column<ProdutoListRow>[] = [
 type ProdutoComEstoque = {
   id_produto: number;
   descricao: string;
+  conversaoPadrao?: { nome: string } | null;
   estoques: { quantidade_atual: number; saldo_reservado: number }[];
 };
 
@@ -35,6 +39,7 @@ export function produtoParaLinha(p: ProdutoComEstoque): ProdutoListRow {
     id_produto: p.id_produto,
     codigo: formatarCodigo(p.id_produto),
     descricao: p.descricao,
+    unidade: p.conversaoPadrao?.nome ?? "UN",
     qtd: String(qtd),
     livre: String(qtd - reservado),
   };

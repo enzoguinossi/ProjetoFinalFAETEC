@@ -629,7 +629,9 @@ não existe mais um nível intermediário de remessa. Para `tipo = SAIDA`, o des
 (`ID_destinatario`) é obrigatório na camada de serviço e os itens ficam em `item_nota_saida`.
 
 Os tipos `CONSUMO_INTERNO`, `AVARIA` e `DESMONTAGEM` são **baixas internas sem entrega**: não têm
-destinatário, não passam por reserva e dão baixa física direto na confirmação.
+destinatário, não passam por reserva e dão baixa física direto na confirmação. O formulário de saída
+opera com **Remessa** (`SAIDA`), **Avaria** (`AVARIA`) e **Consumo Interno** (`CONSUMO_INTERNO`);
+`DESMONTAGEM` tem fluxo próprio e é recusada por esse formulário.
 
 A nota também **consolida pedidos** (decisão do usuário, 2026-10-19): ela **agrega os pedidos**
 que consolida (1:N), e o vínculo fica em `pedido_escola.ID_nota_saida` — a nota **não** tem
@@ -664,13 +666,19 @@ item_nota_saida
 ```
 
 Regras:
-- Criar uma nota `SAIDA` com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`) e
+- Criar uma nota `SAIDA` (Remessa) com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`) e
   grava `item_nota_saida` e `reserva_estoque` na mesma transação (decisão do usuário, 2026-10-23)
-- Saldo insuficiente apenas **avisa** (RN001), nunca bloqueia
-- Só a nota `ABERTA` é editável: a edição corrige a reserva **pelo delta** e pode acrescentar
-  item; remover item é recusado (RN004)
-- Cancelar só é permitido em `ABERTA`: libera `saldo_reservado -= qtd_esperada` em cada item e
-  muda para `CANCELADA`; a segunda tentativa é recusada sem debitar de novo
+- Criar uma nota `AVARIA` ou `CONSUMO_INTERNO` **não reserva**: dá baixa real na criação
+  (`quantidade_atual -= quantidade`), grava a `movimentacao_estoque` com quantidade negativa e
+  `ID_nota_saida`, e a nota nasce `BAIXA_TOTAL` com `qtd_entregue = qtd_esperada`
+- Saldo insuficiente apenas **avisa** (RN001), nunca bloqueia — na Remessa o aviso considera o
+  disponível (`quantidade_atual − saldo_reservado`); na baixa direta, a `quantidade_atual` (que pode
+  ficar negativa)
+- Só a nota `SAIDA` `ABERTA` é editável: a edição corrige a reserva **pelo delta** e pode acrescentar
+  item; remover item é recusado (RN004). Avaria e Consumo Interno são histórico e não são editáveis
+- Cancelar só é permitido em `SAIDA` `ABERTA`: libera `saldo_reservado -= qtd_esperada` em cada item e
+  muda para `CANCELADA`; a segunda tentativa é recusada sem debitar de novo. Avaria/Consumo Interno
+  não são canceláveis — a correção é uma nota nova
 - A nota pode entrar em **várias expedições** (`expedicao_nota`) e/ou gerar **coletas**
 - Status: `ABERTA` (criada, aguardando expedição), `EM_PERCURSO` (saiu para entrega),
   `PENDENTE` (não entregue, reserva mantida), `BAIXA_TOTAL` (tudo entregue),
@@ -771,6 +779,9 @@ A PK independente permite que **a mesma nota apareça em expedições diferentes
 │  └──────────────────────────────────┘                    │
 └──────────────────────────────────────────────────────────┘
 ```
+
+Esse ciclo é o da **Remessa** (`SAIDA`). **Avaria** e **Consumo Interno** não entram nele: nascem
+`BAIXA_TOTAL`, já com a baixa física registrada na criação, e permanecem no histórico.
 
 ---
 

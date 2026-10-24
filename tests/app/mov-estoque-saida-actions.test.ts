@@ -46,6 +46,7 @@ describe("actions da nota de saída", () => {
 
     const resultado = await notaSaidaService.registrar(
       {
+        tipo: "SAIDA",
         id_destinatario: destinatario.id_destinatario,
         observacao: "observação original",
         itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 3 }],
@@ -150,6 +151,7 @@ describe("actions da nota de saída", () => {
     const { destinatario } = await criarDestinatario();
 
     const resultado = await criarNotaSaida({
+      tipo: "SAIDA",
       id_destinatario: destinatario.id_destinatario,
       itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
     });
@@ -167,6 +169,7 @@ describe("actions da nota de saída", () => {
     const { destinatario } = await criarDestinatario();
 
     const resultado = await criarNotaSaida({
+      tipo: "SAIDA",
       id_destinatario: destinatario.id_destinatario,
       itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 1 }],
     });
