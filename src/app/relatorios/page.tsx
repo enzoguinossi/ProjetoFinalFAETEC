@@ -45,15 +45,32 @@ const relatorios: CartaoRelatorio[] = [
   },
   {
     titulo: "Funcionários",
-    descricao: "Listagem de funcionários com cargo e situação.",
+    descricao:
+      "Funcionários cadastrados, com código, CPF, cargo, condutor, situação e contato principal.",
+    href: "/relatorios/funcionarios",
   },
   {
     titulo: "Destinatários",
-    descricao: "Escolas e creches atendidas, com contato e endereço.",
+    descricao:
+      "Escolas e creches atendidas, com CNPJ, tipo, situação, endereço e contato principal.",
+    href: "/relatorios/destinatarios",
   },
   {
     titulo: "Fornecedores",
-    descricao: "Fornecedores cadastrados, com contato e situação.",
+    descricao:
+      "Fornecedores cadastrados, com CNPJ, situação, endereço e contato principal.",
+    href: "/relatorios/fornecedores",
+  },
+  {
+    titulo: "Produtos Próximos ao Vencimento",
+    descricao:
+      "Produtos perecíveis com validade, dias restantes e situação, com filtro de dias para vencer.",
+    href: "/relatorios/vencimento",
+  },
+  {
+    titulo: "Auditoria",
+    descricao:
+      "Trilha de auditoria do sistema, com usuário, período, entidade e ação.",
   },
 ];
 

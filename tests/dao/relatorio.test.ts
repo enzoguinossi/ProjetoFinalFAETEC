@@ -828,6 +828,343 @@ describe("relatorioDAO", () => {
     });
   });
 
+  describe("listarProdutosVencimento", () => {
+    const hoje = new Date("2026-10-24T00:00:00.000Z");
+
+    it("lista só perecíveis com validade, ordena por validade e calcula dias e situação", async () => {
+      const caixa = await criarConversao("CX");
+      const vencido = await criarProduto({
+        descricao: "Leite",
+        perecivel: true,
+        dataValidade: new Date("2026-10-20T00:00:00.000Z"),
+        idConversaoPadrao: caixa.id_conversao,
+      });
+      const venceHoje = await criarProduto({
+        descricao: "Iogurte",
+        perecivel: true,
+        dataValidade: new Date("2026-10-24T00:00:00.000Z"),
+      });
+      const aVencer = await criarProduto({
+        descricao: "Queijo",
+        perecivel: true,
+        dataValidade: new Date("2026-11-10T00:00:00.000Z"),
+      });
+      await criarProduto({
+        descricao: "Arroz",
+        perecivel: false,
+        dataValidade: new Date("2026-10-25T00:00:00.000Z"),
+      });
+      await criarProduto({ descricao: "Sem validade", perecivel: true });
+
+      await criarEstoque(vencido.id_produto, { quantidadeAtual: 3 });
+      await criarEstoque(vencido.id_produto, { quantidadeAtual: 2.5 });
+      await criarEstoque(vencido.id_produto, { quantidadeAtual: 99, ativo: false });
+      await criarEstoque(venceHoje.id_produto, { quantidadeAtual: 1 });
+      await criarEstoque(aVencer.id_produto, { quantidadeAtual: 4 });
+
+      const resultado = await relatorioDAO.listarProdutosVencimento({
+        dias: "todos",
+        hoje,
+      });
+
+      expect(resultado.data.map((p) => p.descricao)).toEqual([
+        "Leite",
+        "Iogurte",
+        "Queijo",
+      ]);
+      expect(resultado.data[0]).toMatchObject({
+        id_produto: vencido.id_produto,
+        codigo: String(vencido.id_produto).padStart(6, "0"),
+        unidade: "CX",
+        quantidade: 5.5,
+        validade: "2026-10-20",
+        dias_restantes: -4,
+        situacao: "Vencido (4)",
+      });
+      expect(resultado.data[1]).toMatchObject({
+        dias_restantes: 0,
+        situacao: "Vence hoje",
+      });
+      expect(resultado.data[2]).toMatchObject({
+        dias_restantes: 17,
+        situacao: "Vence em 17",
+      });
+      expect(resultado.totais).toEqual({ itens: 3, vencidos: 1 });
+    });
+
+    it("limita os dias para vencer e marca OK o produto fora do primeiro alerta", async () => {
+      await criarProduto({
+        descricao: "Dois dias",
+        perecivel: true,
+        dataValidade: new Date("2026-10-26T00:00:00.000Z"),
+      });
+      await criarProduto({
+        descricao: "Trinta e oito dias",
+        perecivel: true,
+        dataValidade: new Date("2026-12-01T00:00:00.000Z"),
+      });
+      await criarProduto({
+        descricao: "Cem dias",
+        perecivel: true,
+        dataValidade: new Date("2027-02-01T00:00:00.000Z"),
+      });
+      await criarProduto({
+        descricao: "Duzentos e vinte dias",
+        perecivel: true,
+        dataValidade: new Date("2027-06-01T00:00:00.000Z"),
+      });
+
+      const trinta = await relatorioDAO.listarProdutosVencimento({ dias: 30, hoje });
+      expect(trinta.data.map((p) => p.descricao)).toEqual(["Dois dias"]);
+
+      const sessenta = await relatorioDAO.listarProdutosVencimento({ dias: 60, hoje });
+      expect(sessenta.data.map((p) => p.descricao)).toEqual([
+        "Dois dias",
+        "Trinta e oito dias",
+      ]);
+
+      const centoEVinte = await relatorioDAO.listarProdutosVencimento({
+        dias: 120,
+        hoje,
+      });
+      expect(centoEVinte.data.map((p) => p.descricao)).toEqual([
+        "Dois dias",
+        "Trinta e oito dias",
+        "Cem dias",
+      ]);
+      expect(centoEVinte.data[2]?.situacao).toBe("OK");
+      expect(centoEVinte.totais).toEqual({ itens: 3, vencidos: 0 });
+
+      const todos = await relatorioDAO.listarProdutosVencimento({
+        dias: "todos",
+        hoje,
+      });
+      expect(todos.data).toHaveLength(4);
+    });
+  });
+
+  describe("listarFuncionariosRelatorio", () => {
+    it("lista por nome com contato principal, condutor e situação, filtrando por situação", async () => {
+      const ana = await criarFuncionario({
+        nome: "Ana",
+        cpf: "11111111111",
+        cargo: "Conferente",
+        condutor: true,
+      });
+      const bruno = await criarFuncionario({
+        nome: "Bruno",
+        cpf: "22222222222",
+        ativo: false,
+      });
+
+      await prismaTeste.funcionarioEmail.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          endereco: "ana@nexus.test",
+          principal: true,
+        },
+      });
+      await prismaTeste.funcionarioEmail.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          endereco: "ana.secundario@nexus.test",
+          principal: false,
+        },
+      });
+      await prismaTeste.funcionarioTelefone.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          numero: "21999990001",
+          tipo: "CELULAR",
+          principal: true,
+        },
+      });
+      await prismaTeste.funcionarioTelefone.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          numero: "21999990002",
+          tipo: "FIXO",
+          principal: false,
+        },
+      });
+
+      const todos = await relatorioDAO.listarFuncionariosRelatorio();
+      expect(todos.data.map((f) => f.nome)).toEqual(["Ana", "Bruno"]);
+      expect(todos.data[0]).toMatchObject({
+        id_funcionario: ana.funcionario.id_funcionario,
+        codigo: String(ana.funcionario.id_funcionario).padStart(6, "0"),
+        cpf: "11111111111",
+        cargo: "Conferente",
+        condutor: true,
+        situacao: "Ativo",
+        email: "ana@nexus.test",
+        telefone: "21999990001",
+      });
+      expect(todos.data[1]).toMatchObject({
+        id_funcionario: bruno.funcionario.id_funcionario,
+        situacao: "Inativo",
+        email: null,
+        telefone: null,
+      });
+
+      const ativos = await relatorioDAO.listarFuncionariosRelatorio({
+        situacoes: ["ativos"],
+      });
+      expect(ativos.data.map((f) => f.nome)).toEqual(["Ana"]);
+
+      const inativos = await relatorioDAO.listarFuncionariosRelatorio({
+        situacoes: ["inativos"],
+      });
+      expect(inativos.data.map((f) => f.nome)).toEqual(["Bruno"]);
+
+      const ambos = await relatorioDAO.listarFuncionariosRelatorio({
+        situacoes: ["ativos", "inativos"],
+      });
+      expect(ambos.data.map((f) => f.nome)).toEqual(["Ana", "Bruno"]);
+    });
+  });
+
+  describe("listarDestinatariosRelatorio", () => {
+    it("lista com razão social, CNPJ, tipo, endereço e contato, filtrando situação e tipo", async () => {
+      const escola = await criarDestinatario({
+        razaoSocial: "Escola A",
+        tipo: "ESCOLA",
+      });
+      const creche = await criarDestinatario({
+        razaoSocial: "Creche B",
+        tipo: "CRECHE",
+        ativo: false,
+      });
+
+      await prismaTeste.pessoaJuridica.update({
+        where: { id_pessoa_juridica: escola.pessoaJuridica.id_pessoa_juridica },
+        data: { cnpj: "11222333000181" },
+      });
+      await prismaTeste.endereco.update({
+        where: { id_endereco: escola.endereco.id_endereco },
+        data: { numero: "10", bairro: "Centro" },
+      });
+      await prismaTeste.destinatarioEmail.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          endereco: "escola@nexus.test",
+          principal: true,
+        },
+      });
+      await prismaTeste.destinatarioTelefone.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          numero: "2133334444",
+          tipo: "COMERCIAL",
+          principal: true,
+        },
+      });
+
+      const todos = await relatorioDAO.listarDestinatariosRelatorio();
+      expect(todos.data.map((d) => d.razao_social)).toEqual(["Creche B", "Escola A"]);
+      expect(todos.data[0]).toMatchObject({
+        id_destinatario: creche.destinatario.id_destinatario,
+        tipo: "Creche",
+        situacao: "Inativo",
+        cnpj: null,
+        email: null,
+        telefone: null,
+      });
+      expect(todos.data[1]).toMatchObject({
+        codigo: String(escola.destinatario.id_destinatario).padStart(6, "0"),
+        cnpj: "11222333000181",
+        tipo: "Escola",
+        situacao: "Ativo",
+        endereco: `${escola.endereco.logradouro}, 10 - Centro - Rio de Janeiro`,
+        email: "escola@nexus.test",
+        telefone: "2133334444",
+      });
+
+      const ativos = await relatorioDAO.listarDestinatariosRelatorio({
+        situacoes: ["ativos"],
+      });
+      expect(ativos.data.map((d) => d.razao_social)).toEqual(["Escola A"]);
+
+      const creches = await relatorioDAO.listarDestinatariosRelatorio({
+        tipos: ["CRECHE"],
+      });
+      expect(creches.data.map((d) => d.razao_social)).toEqual(["Creche B"]);
+
+      const combinado = await relatorioDAO.listarDestinatariosRelatorio({
+        situacoes: ["ativos"],
+        tipos: ["CRECHE"],
+      });
+      expect(combinado.data).toEqual([]);
+    });
+  });
+
+  describe("listarFornecedoresRelatorio", () => {
+    it("lista com CNPJ, situação, endereço e contato, filtrando por situação", async () => {
+      const comEndereco = await criarFornecedor({
+        razaoSocial: "Fornecedor A",
+        comEndereco: true,
+      });
+      const semEndereco = await criarFornecedor({
+        razaoSocial: "Fornecedor B",
+        ativo: false,
+      });
+
+      await prismaTeste.pessoaJuridica.update({
+        where: { id_pessoa_juridica: comEndereco.pessoaJuridica.id_pessoa_juridica },
+        data: { cnpj: "22333444000192" },
+      });
+      await prismaTeste.endereco.update({
+        where: { id_endereco: comEndereco.endereco!.id_endereco },
+        data: { numero: "20", bairro: "Centro" },
+      });
+      await prismaTeste.fornecedorEmail.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          endereco: "fornecedor@nexus.test",
+          principal: true,
+        },
+      });
+      await prismaTeste.fornecedorTelefone.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          numero: "2144445555",
+          tipo: "COMERCIAL",
+          principal: true,
+        },
+      });
+
+      const todos = await relatorioDAO.listarFornecedoresRelatorio();
+      expect(todos.data.map((f) => f.razao_social)).toEqual([
+        "Fornecedor A",
+        "Fornecedor B",
+      ]);
+      expect(todos.data[0]).toMatchObject({
+        id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+        codigo: String(comEndereco.fornecedor.id_fornecedor).padStart(6, "0"),
+        cnpj: "22333444000192",
+        situacao: "Ativo",
+        endereco: `${comEndereco.endereco!.logradouro}, 20 - Centro - Rio de Janeiro`,
+        email: "fornecedor@nexus.test",
+        telefone: "2144445555",
+      });
+      expect(todos.data[1]).toMatchObject({
+        id_fornecedor: semEndereco.fornecedor.id_fornecedor,
+        situacao: "Inativo",
+        endereco: "—",
+      });
+
+      const ativos = await relatorioDAO.listarFornecedoresRelatorio({
+        situacoes: ["ativos"],
+      });
+      expect(ativos.data.map((f) => f.razao_social)).toEqual(["Fornecedor A"]);
+
+      const inativos = await relatorioDAO.listarFornecedoresRelatorio({
+        situacoes: ["inativos"],
+      });
+      expect(inativos.data.map((f) => f.razao_social)).toEqual(["Fornecedor B"]);
+    });
+  });
+
   describe("listas para os selects", () => {
     it("lista condutores ativos por nome e mantém o selecionado inativo", async () => {
       const bruno = await criarFuncionario({ nome: "Bruno", condutor: true });

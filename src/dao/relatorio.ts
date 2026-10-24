@@ -210,9 +210,171 @@ export type CondutorFiltroRelatorio = {
   nome: string;
 };
 
+/** Opções do filtro "Dias para vencer" (limite em dias; `todos` não filtra). */
+export const DIAS_VENCIMENTO_RELATORIO = [30, 60, 90, 120, "todos"] as const;
+export type DiasVencimentoRelatorio = (typeof DIAS_VENCIMENTO_RELATORIO)[number];
+
+/** Situação usada nos filtros em multi-seleção dos cadastros (vazio = todas). */
+export const SITUACOES_CADASTRO_RELATORIO = ["ativos", "inativos"] as const;
+export type SituacaoCadastroRelatorio = (typeof SITUACOES_CADASTRO_RELATORIO)[number];
+
+export const ROTULOS_SITUACAO_CADASTRO = {
+  ativos: "Ativos",
+  inativos: "Inativos",
+} as const;
+
+export const TIPOS_DESTINATARIO_RELATORIO = ["ESCOLA", "CRECHE"] as const;
+export type TipoDestinatarioRelatorio = (typeof TIPOS_DESTINATARIO_RELATORIO)[number];
+
+export const ROTULOS_TIPO_DESTINATARIO = {
+  ESCOLA: "Escola",
+  CRECHE: "Creche",
+} as const;
+
+export type ProdutoVencimentoRelatorioRow = {
+  id_produto: number;
+  /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
+  codigo: string;
+  descricao: string;
+  /** Nome da unidade de conversão padrão do produto. */
+  unidade: string;
+  /** Soma de `quantidade_atual` dos estoques ativos. */
+  quantidade: number;
+  /** `YYYY-MM-DD`: `data_validade` é DATE, sem hora. */
+  validade: string;
+  /** Dias entre a validade e hoje (negativo = vencido). */
+  dias_restantes: number;
+  /** `Vencido (N)`, `Vence hoje`, `Vence em N` ou `OK`. */
+  situacao: string;
+};
+
+export type ProdutosVencimentoRelatorioResult = {
+  data: ProdutoVencimentoRelatorioRow[];
+  totais: { itens: number; vencidos: number };
+};
+
+export type ProdutosVencimentoRelatorioFiltros = {
+  /** Limite em dias (30/60/90/120) ou `todos`; padrão `30`. */
+  dias?: DiasVencimentoRelatorio;
+  /** Dia de referência (meia-noite UTC). Sem ele, o dia UTC atual. */
+  hoje?: Date;
+};
+
+export type FuncionarioRelatorioRow = {
+  id_funcionario: number;
+  /** Código exibido no relatório (`formatarCodigo(ID_funcionario)`). */
+  codigo: string;
+  nome: string;
+  cpf: string | null;
+  cargo: string | null;
+  condutor: boolean;
+  situacao: "Ativo" | "Inativo";
+  /** E-mail principal do funcionário. */
+  email: string | null;
+  /** Telefone principal ativo do funcionário. */
+  telefone: string | null;
+};
+
+export type FuncionariosRelatorioResult = { data: FuncionarioRelatorioRow[] };
+
+export type FuncionariosRelatorioFiltros = {
+  /** `ativos`/`inativos`; vazio ou os dois não filtra. */
+  situacoes?: SituacaoCadastroRelatorio[];
+};
+
+export type DestinatarioRelatorioRow = {
+  id_destinatario: number;
+  /** Código exibido no relatório (`formatarCodigo(ID_destinatario)`). */
+  codigo: string;
+  razao_social: string;
+  cnpj: string | null;
+  tipo: (typeof ROTULOS_TIPO_DESTINATARIO)[TipoDestinatarioRelatorio];
+  situacao: "Ativo" | "Inativo";
+  /** Logradouro, número, bairro e cidade. */
+  endereco: string;
+  email: string | null;
+  telefone: string | null;
+};
+
+export type DestinatariosRelatorioResult = { data: DestinatarioRelatorioRow[] };
+
+export type DestinatariosRelatorioFiltros = {
+  situacoes?: SituacaoCadastroRelatorio[];
+  tipos?: TipoDestinatarioRelatorio[];
+};
+
+export type FornecedorRelatorioRow = {
+  id_fornecedor: number;
+  /** Código exibido no relatório (`formatarCodigo(ID_fornecedor)`). */
+  codigo: string;
+  razao_social: string;
+  cnpj: string | null;
+  situacao: "Ativo" | "Inativo";
+  /** Logradouro, número, bairro e cidade; `—` quando não há endereço. */
+  endereco: string;
+  email: string | null;
+  telefone: string | null;
+};
+
+export type FornecedoresRelatorioResult = { data: FornecedorRelatorioRow[] };
+
+export type FornecedoresRelatorioFiltros = {
+  situacoes?: SituacaoCadastroRelatorio[];
+};
+
 /** Evita resíduo de ponto flutuante nas somas de quantidades (Float no banco). */
 function arredondar(valor: number): number {
   return Math.round(valor * 1000) / 1000;
+}
+
+/** Meia-noite UTC do dia do valor — colunas `DATE` são gravadas assim. */
+function diaUtc(valor: Date): Date {
+  return new Date(Date.UTC(valor.getUTCFullYear(), valor.getUTCMonth(), valor.getUTCDate()));
+}
+
+function adicionarDias(dia: Date, dias: number): Date {
+  return new Date(dia.getTime() + dias * 24 * 60 * 60 * 1000);
+}
+
+function diferencaEmDias(validade: Date, hoje: Date): number {
+  return Math.round((diaUtc(validade).getTime() - diaUtc(hoje).getTime()) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Situação de validade. `OK` é o produto fora do primeiro alerta (mais de 90
+ * dias), usado com o filtro de 120 dias e com `todos`.
+ */
+function situacaoVencimento(dias: number): string {
+  if (dias < 0) return `Vencido (${Math.abs(dias)})`;
+  if (dias === 0) return "Vence hoje";
+  if (dias <= 90) return `Vence em ${dias}`;
+  return "OK";
+}
+
+/** `true`/`false` quando uma única situação foi escolhida; `undefined` não filtra. */
+function ativoFiltrado(
+  situacoes: SituacaoCadastroRelatorio[] | undefined,
+): boolean | undefined {
+  if (situacoes?.length === 1) return situacoes[0] === "ativos";
+  return undefined;
+}
+
+/** Endereço em uma linha: logradouro, número, bairro e cidade. */
+function formatarEndereco(
+  endereco: {
+    logradouro: string;
+    numero: string | null;
+    bairro: string | null;
+    cidade: string;
+  } | null,
+): string {
+  if (!endereco) return "—";
+  const logradouro = endereco.numero
+    ? `${endereco.logradouro}, ${endereco.numero}`
+    : endereco.logradouro;
+  return [logradouro, endereco.bairro, endereco.cidade]
+    .filter((parte): parte is string => Boolean(parte))
+    .join(" - ");
 }
 
 export class RelatorioDAO {
@@ -277,6 +439,191 @@ export class RelatorioDAO {
         quantidade: arredondar(totais.quantidade),
         livre: arredondar(totais.livre),
       },
+    };
+  }
+
+  /**
+   * Produtos perecíveis com validade cadastrada, ordenados pela validade. O
+   * filtro `dias` limita pela data de validade (inclui os já vencidos); `todos`
+   * não limita. A quantidade é a soma dos estoques ativos.
+   */
+  async listarProdutosVencimento(
+    filtros: ProdutosVencimentoRelatorioFiltros = {},
+  ): Promise<ProdutosVencimentoRelatorioResult> {
+    const dias = filtros.dias ?? 30;
+    const hoje = diaUtc(filtros.hoje ?? new Date());
+    const where: Prisma.ProdutoWhereInput = {
+      perecivel: true,
+      data_validade: { not: null },
+    };
+    if (dias !== "todos") {
+      where.data_validade = { not: null, lte: adicionarDias(hoje, dias) };
+    }
+
+    const produtos = await prisma.produto.findMany({
+      where,
+      select: {
+        id_produto: true,
+        descricao: true,
+        data_validade: true,
+        conversaoPadrao: { select: { nome: true } },
+        estoques: { where: { ativo: true }, select: { quantidade_atual: true } },
+      },
+      orderBy: [{ data_validade: "asc" }, { descricao: "asc" }],
+    });
+
+    const data: ProdutoVencimentoRelatorioRow[] = produtos.map((produto) => {
+      const validade = diaUtc(produto.data_validade as Date);
+      const diasRestantes = diferencaEmDias(validade, hoje);
+      const quantidade = produto.estoques.reduce(
+        (soma, estoque) => soma + Number(estoque.quantidade_atual),
+        0,
+      );
+
+      return {
+        id_produto: produto.id_produto,
+        codigo: formatarCodigo(produto.id_produto),
+        descricao: produto.descricao,
+        unidade: produto.conversaoPadrao?.nome ?? "—",
+        quantidade: arredondar(quantidade),
+        validade: validade.toISOString().slice(0, 10),
+        dias_restantes: diasRestantes,
+        situacao: situacaoVencimento(diasRestantes),
+      };
+    });
+
+    return {
+      data,
+      totais: {
+        itens: data.length,
+        vencidos: data.filter((linha) => linha.dias_restantes < 0).length,
+      },
+    };
+  }
+
+  /** Funcionários por nome, com CPF, cargo, condutor, situação e contato principal. */
+  async listarFuncionariosRelatorio(
+    filtros: FuncionariosRelatorioFiltros = {},
+  ): Promise<FuncionariosRelatorioResult> {
+    const where: Prisma.FuncionarioWhereInput = {};
+    const ativo = ativoFiltrado(filtros.situacoes);
+    if (ativo !== undefined) where.ativo = ativo;
+
+    const funcionarios = await prisma.funcionario.findMany({
+      where,
+      select: {
+        id_funcionario: true,
+        cargo: true,
+        ativo: true,
+        condutor: true,
+        pessoaFisica: { select: { nome: true, cpf: true } },
+        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        telefones: {
+          where: { principal: true, ativo: true },
+          select: { numero: true },
+          take: 1,
+        },
+      },
+      orderBy: { pessoaFisica: { nome: "asc" } },
+    });
+
+    return {
+      data: funcionarios.map((funcionario) => ({
+        id_funcionario: funcionario.id_funcionario,
+        codigo: formatarCodigo(funcionario.id_funcionario),
+        nome: funcionario.pessoaFisica.nome,
+        cpf: funcionario.pessoaFisica.cpf,
+        cargo: funcionario.cargo,
+        condutor: funcionario.condutor,
+        situacao: funcionario.ativo ? "Ativo" : "Inativo",
+        email: funcionario.emails[0]?.endereco ?? null,
+        telefone: funcionario.telefones[0]?.numero ?? null,
+      })),
+    };
+  }
+
+  /** Destinatários por razão social, com tipo, situação, endereço e contato principal. */
+  async listarDestinatariosRelatorio(
+    filtros: DestinatariosRelatorioFiltros = {},
+  ): Promise<DestinatariosRelatorioResult> {
+    const where: Prisma.DestinatarioWhereInput = {};
+    const ativo = ativoFiltrado(filtros.situacoes);
+    if (ativo !== undefined) where.ativo = ativo;
+    if (filtros.tipos?.length) where.tipo_destinatario = { in: filtros.tipos };
+
+    const destinatarios = await prisma.destinatario.findMany({
+      where,
+      select: {
+        id_destinatario: true,
+        tipo_destinatario: true,
+        ativo: true,
+        pessoaJuridica: { select: { razao_social: true, cnpj: true } },
+        endereco: {
+          select: { logradouro: true, numero: true, bairro: true, cidade: true },
+        },
+        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        telefones: {
+          where: { principal: true, ativo: true },
+          select: { numero: true },
+          take: 1,
+        },
+      },
+      orderBy: { pessoaJuridica: { razao_social: "asc" } },
+    });
+
+    return {
+      data: destinatarios.map((destinatario) => ({
+        id_destinatario: destinatario.id_destinatario,
+        codigo: formatarCodigo(destinatario.id_destinatario),
+        razao_social: destinatario.pessoaJuridica.razao_social,
+        cnpj: destinatario.pessoaJuridica.cnpj,
+        tipo: ROTULOS_TIPO_DESTINATARIO[destinatario.tipo_destinatario],
+        situacao: destinatario.ativo ? "Ativo" : "Inativo",
+        endereco: formatarEndereco(destinatario.endereco),
+        email: destinatario.emails[0]?.endereco ?? null,
+        telefone: destinatario.telefones[0]?.numero ?? null,
+      })),
+    };
+  }
+
+  /** Fornecedores por razão social, com situação, endereço e contato principal. */
+  async listarFornecedoresRelatorio(
+    filtros: FornecedoresRelatorioFiltros = {},
+  ): Promise<FornecedoresRelatorioResult> {
+    const where: Prisma.FornecedorWhereInput = {};
+    const ativo = ativoFiltrado(filtros.situacoes);
+    if (ativo !== undefined) where.ativo = ativo;
+
+    const fornecedores = await prisma.fornecedor.findMany({
+      where,
+      select: {
+        id_fornecedor: true,
+        ativo: true,
+        pessoaJuridica: { select: { razao_social: true, cnpj: true } },
+        endereco: {
+          select: { logradouro: true, numero: true, bairro: true, cidade: true },
+        },
+        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        telefones: {
+          where: { principal: true, ativo: true },
+          select: { numero: true },
+          take: 1,
+        },
+      },
+      orderBy: { pessoaJuridica: { razao_social: "asc" } },
+    });
+
+    return {
+      data: fornecedores.map((fornecedor) => ({
+        id_fornecedor: fornecedor.id_fornecedor,
+        codigo: formatarCodigo(fornecedor.id_fornecedor),
+        razao_social: fornecedor.pessoaJuridica.razao_social,
+        cnpj: fornecedor.pessoaJuridica.cnpj,
+        situacao: fornecedor.ativo ? "Ativo" : "Inativo",
+        endereco: formatarEndereco(fornecedor.endereco),
+        email: fornecedor.emails[0]?.endereco ?? null,
+        telefone: fornecedor.telefones[0]?.numero ?? null,
+      })),
     };
   }
 

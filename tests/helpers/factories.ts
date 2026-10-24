@@ -66,7 +66,13 @@ export async function criarUsuario(
 }
 
 export async function criarFuncionario(
-  opts: { nome?: string; cpf?: string; cargo?: string; condutor?: boolean } = {},
+  opts: {
+    nome?: string;
+    cpf?: string;
+    cargo?: string;
+    condutor?: boolean;
+    ativo?: boolean;
+  } = {},
 ) {
   const n = proximo();
   const pessoaFisica = await prismaTeste.pessoaFisica.create({
@@ -77,6 +83,7 @@ export async function criarFuncionario(
       id_pessoa_fisica: pessoaFisica.id_pessoa_fisica,
       cargo: opts.cargo,
       condutor: opts.condutor ?? false,
+      ativo: opts.ativo ?? true,
     },
   });
   return { funcionario, pessoaFisica };
@@ -89,6 +96,7 @@ export async function criarProduto(
     composto?: boolean;
     idConversaoPadrao?: number;
     ativo?: boolean;
+    dataValidade?: Date;
   } = {},
 ) {
   const n = proximo();
@@ -101,6 +109,7 @@ export async function criarProduto(
       composto: opts.composto ?? false,
       id_conversao_padrao: idConversaoPadrao,
       ativo: opts.ativo ?? true,
+      data_validade: opts.dataValidade,
     },
   });
 }

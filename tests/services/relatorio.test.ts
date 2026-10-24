@@ -4,26 +4,41 @@ import {
   formatarDataISO,
   formatarDataRelatorio,
   formatarQuantidadeCsv,
+  gerarCsvDestinatarios,
   gerarCsvEntregas,
   gerarCsvExpedicoes,
+  gerarCsvFornecedores,
+  gerarCsvFuncionarios,
   gerarCsvMovimentacoes,
   gerarCsvProdutos,
+  gerarCsvVencimento,
   limitesDoPeriodo,
   limitesDoPeriodoData,
   metadadosEmissao,
+  normalizarFiltrosDestinatarios,
   normalizarFiltrosEntregas,
   normalizarFiltrosExpedicoes,
+  normalizarFiltrosFornecedores,
+  normalizarFiltrosFuncionarios,
   normalizarFiltrosMovimentacao,
   normalizarFiltrosProdutos,
+  normalizarFiltrosVencimento,
   periodoSemestreAtual,
+  rotuloDiasVencimento,
+  rotuloSituacaoCadastro,
   rotuloStatusExpedicao,
   rotuloStatusNota,
+  rotuloTipoDestinatario,
 } from "@/services/relatorio";
 import type {
+  DestinatarioRelatorioRow,
   EntregaRelatorioRow,
   ExpedicaoRelatorioRow,
+  FornecedorRelatorioRow,
+  FuncionarioRelatorioRow,
   MovimentacaoRelatorioRow,
   ProdutoRelatorioRow,
+  ProdutoVencimentoRelatorioRow,
 } from "@/dao/relatorio";
 
 const linha: ProdutoRelatorioRow = {
@@ -414,6 +429,144 @@ describe("serviço de relatórios", () => {
       ]);
 
       expect(csv).toContain('"Escola ""Central""; anexo"');
+    });
+  });
+
+  describe("normalizarFiltrosVencimento", () => {
+    it("usa 30 dias como padrão e aceita os limites válidos e todos", () => {
+      expect(normalizarFiltrosVencimento()).toEqual({ dias: 30 });
+      expect(normalizarFiltrosVencimento({ dias: "60" })).toEqual({ dias: 60 });
+      expect(normalizarFiltrosVencimento({ dias: ["120"] })).toEqual({ dias: 120 });
+      expect(normalizarFiltrosVencimento({ dias: "todos" })).toEqual({ dias: "todos" });
+    });
+
+    it("ignora limite desconhecido ou vazio e cai em 30 dias", () => {
+      expect(normalizarFiltrosVencimento({ dias: "15" }).dias).toBe(30);
+      expect(normalizarFiltrosVencimento({ dias: "" }).dias).toBe(30);
+      expect(normalizarFiltrosVencimento({ dias: "abc" }).dias).toBe(30);
+    });
+  });
+
+  describe("normalizarFiltros dos cadastros", () => {
+    it("normaliza a situação de funcionários e fornecedores (vazio não filtra)", () => {
+      expect(normalizarFiltrosFuncionarios()).toEqual({ situacoes: [] });
+      expect(normalizarFiltrosFuncionarios({ situacao: "inativos" })).toEqual({
+        situacoes: ["inativos"],
+      });
+      expect(
+        normalizarFiltrosFuncionarios({ situacao: ["ativos", "inativos", "ativos"] }),
+      ).toEqual({ situacoes: ["ativos", "inativos"] });
+      expect(normalizarFiltrosFuncionarios({ situacao: "qualquer" })).toEqual({
+        situacoes: [],
+      });
+      expect(normalizarFiltrosFornecedores({ situacao: "ativos" })).toEqual({
+        situacoes: ["ativos"],
+      });
+    });
+
+    it("normaliza situação e tipo dos destinatários", () => {
+      expect(normalizarFiltrosDestinatarios()).toEqual({ situacoes: [], tipos: [] });
+      expect(
+        normalizarFiltrosDestinatarios({
+          situacao: "ativos",
+          tipo: ["CRECHE", "ESCOLA", "CRECHE", "qualquer"],
+        }),
+      ).toEqual({ situacoes: ["ativos"], tipos: ["CRECHE", "ESCOLA"] });
+    });
+
+    it("rotula as opções dos filtros", () => {
+      expect(rotuloSituacaoCadastro("ativos")).toBe("Ativos");
+      expect(rotuloTipoDestinatario("CRECHE")).toBe("Creche");
+      expect(rotuloDiasVencimento(30)).toBe("30 dias");
+      expect(rotuloDiasVencimento("todos")).toBe("Todos");
+    });
+  });
+
+  describe("CSV dos cadastros e do vencimento", () => {
+    it("gera o CSV de vencimento com validade, dias restantes e situação", () => {
+      const linhaVencimento: ProdutoVencimentoRelatorioRow = {
+        id_produto: 1,
+        codigo: "000001",
+        descricao: "Leite",
+        unidade: "CX",
+        quantidade: 10.5,
+        validade: "2026-10-20",
+        dias_restantes: -4,
+        situacao: "Vencido (4)",
+      };
+
+      const csv = gerarCsvVencimento([linhaVencimento]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFCódigo;Produto;Unidade;Quantidade;Validade;Dias restantes;Situação\r\n" +
+          "000001;Leite;CX;10,5;20/10/2026;-4;Vencido (4)\r\n",
+      );
+    });
+
+    it("gera o CSV de funcionários com condutor e contato principal", () => {
+      const funcionario: FuncionarioRelatorioRow = {
+        id_funcionario: 1,
+        codigo: "000001",
+        nome: "Ana",
+        cpf: "11111111111",
+        cargo: "Conferente",
+        condutor: true,
+        situacao: "Ativo",
+        email: "ana@nexus.test",
+        telefone: "21999990001",
+      };
+
+      const csv = gerarCsvFuncionarios([funcionario]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFCódigo;Nome;CPF;Cargo;Condutor;Situação;E-mail;Telefone\r\n" +
+          "000001;Ana;11111111111;Conferente;Sim;Ativo;ana@nexus.test;21999990001\r\n",
+      );
+    });
+
+    it("gera o CSV de destinatários com tipo, endereço e contato", () => {
+      const destinatario: DestinatarioRelatorioRow = {
+        id_destinatario: 1,
+        codigo: "000001",
+        razao_social: "Escola A",
+        cnpj: "11222333000181",
+        tipo: "Escola",
+        situacao: "Ativo",
+        endereco: "Rua A, 10 - Centro - Rio de Janeiro",
+        email: "escola@nexus.test",
+        telefone: "2133334444",
+      };
+
+      const csv = gerarCsvDestinatarios([destinatario]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFCódigo;Razão social;CNPJ;Tipo;Situação;Endereço;E-mail;Telefone\r\n" +
+          "000001;Escola A;11222333000181;Escola;Ativo;Rua A, 10 - Centro - Rio de Janeiro;escola@nexus.test;2133334444\r\n",
+      );
+    });
+
+    it("gera o CSV de fornecedores e deixa vazios os dados ausentes", () => {
+      const fornecedor: FornecedorRelatorioRow = {
+        id_fornecedor: 2,
+        codigo: "000002",
+        razao_social: "Fornecedor B",
+        cnpj: null,
+        situacao: "Inativo",
+        endereco: "—",
+        email: null,
+        telefone: null,
+      };
+
+      const csv = gerarCsvFornecedores([fornecedor]);
+
+      expect(csv.startsWith("\uFEFF")).toBe(true);
+      expect(csv).toBe(
+        "\uFEFFCódigo;Razão social;CNPJ;Situação;Endereço;E-mail;Telefone\r\n" +
+          "000002;Fornecedor B;;Inativo;—;;\r\n",
+      );
     });
   });
 });

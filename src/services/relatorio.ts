@@ -1,28 +1,44 @@
 import {
   relatorioDAO,
+  DIAS_VENCIMENTO_RELATORIO,
+  ROTULOS_SITUACAO_CADASTRO,
   ROTULOS_STATUS_EXPEDICAO,
   ROTULOS_STATUS_NOTA,
+  ROTULOS_TIPO_DESTINATARIO,
+  SITUACOES_CADASTRO_RELATORIO,
   SITUACOES_PRODUTO_RELATORIO,
   STATUS_EXPEDICAO_RELATORIO,
   STATUS_NOTA_RELATORIO,
+  TIPOS_DESTINATARIO_RELATORIO,
   TIPOS_MOVIMENTACAO_RELATORIO,
   type CondutorFiltroRelatorio,
   type DestinatarioFiltroRelatorio,
+  type DestinatarioRelatorioRow,
+  type DestinatariosRelatorioResult,
+  type DiasVencimentoRelatorio,
   type EntregaRelatorioRow,
   type EntregasRelatorioResult,
   type ExpedicaoFiltroRelatorio,
   type ExpedicaoRelatorioRow,
   type ExpedicoesRelatorioResult,
   type FornecedorFiltroRelatorio,
+  type FornecedorRelatorioRow,
+  type FornecedoresRelatorioResult,
+  type FuncionarioRelatorioRow,
+  type FuncionariosRelatorioResult,
   type MovimentacaoRelatorioRow,
   type MovimentacoesRelatorioResult,
   type ProdutoFiltroRelatorio,
   type ProdutoRelatorioRow,
+  type ProdutoVencimentoRelatorioRow,
   type ProdutosRelatorioFiltros,
   type ProdutosRelatorioResult,
+  type ProdutosVencimentoRelatorioResult,
+  type SituacaoCadastroRelatorio,
   type SituacaoProdutoRelatorio,
   type StatusExpedicaoRelatorio,
   type StatusNotaRelatorio,
+  type TipoDestinatarioRelatorio,
   type TipoMovimentacaoRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
@@ -82,6 +98,16 @@ export type FiltrosEntregas = {
   status: StatusNotaRelatorio[];
 };
 
+/** Filtro do relatório de vencimento: limite em dias ou todos. */
+export type FiltrosVencimento = { dias: DiasVencimentoRelatorio };
+
+/** Filtros dos cadastros em multi-seleção; lista vazia não filtra. */
+export type FiltrosFuncionarios = { situacoes: SituacaoCadastroRelatorio[] };
+export type FiltrosFornecedores = { situacoes: SituacaoCadastroRelatorio[] };
+export type FiltrosDestinatarios = FiltrosFuncionarios & {
+  tipos: TipoDestinatarioRelatorio[];
+};
+
 /** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
 function primeiro(valor: string | string[] | null | undefined): string {
   if (Array.isArray(valor)) return valor[0] ?? "";
@@ -104,6 +130,55 @@ export function normalizarFiltrosProdutos(params: {
   return { situacao };
 }
 
+/** Limite de dias válido; valor desconhecido cai no padrão de 30 dias. */
+function diasVencimentoNormalizado(
+  valor: string | string[] | null | undefined,
+): DiasVencimentoRelatorio {
+  const bruto = primeiro(valor).trim();
+  if (bruto === "todos") return "todos";
+  const numero = Number(bruto);
+  const valido = DIAS_VENCIMENTO_RELATORIO.some((dias) => dias === numero);
+  return valido ? (numero as DiasVencimentoRelatorio) : 30;
+}
+
+/** Normaliza o filtro "Dias para vencer" (30/60/90/120/todos; padrão 30). */
+export function normalizarFiltrosVencimento(
+  params: { dias?: string | string[] | null } = {},
+): FiltrosVencimento {
+  return { dias: diasVencimentoNormalizado(params.dias) };
+}
+
+/** Normaliza a situação dos cadastros; vazio ou os dois não filtra. */
+export function normalizarFiltrosFuncionarios(
+  params: { situacao?: string | string[] | null } = {},
+): FiltrosFuncionarios {
+  return {
+    situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
+  };
+}
+
+/** Normaliza situação e tipo dos destinatários (multi; vazio não filtra). */
+export function normalizarFiltrosDestinatarios(
+  params: {
+    situacao?: string | string[] | null;
+    tipo?: string | string[] | null;
+  } = {},
+): FiltrosDestinatarios {
+  return {
+    situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
+    tipos: opcoesNormalizadas(params.tipo, TIPOS_DESTINATARIO_RELATORIO),
+  };
+}
+
+/** Normaliza a situação dos fornecedores (multi; vazio não filtra). */
+export function normalizarFiltrosFornecedores(
+  params: { situacao?: string | string[] | null } = {},
+): FiltrosFornecedores {
+  return {
+    situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
+  };
+}
+
 /** Data de `agora` no fuso de São Paulo, no formato `YYYY-MM-DD`. */
 function dataSaoPaulo(agora: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
@@ -112,6 +187,11 @@ function dataSaoPaulo(agora: Date): string {
     month: "2-digit",
     day: "2-digit",
   }).format(agora);
+}
+
+/** Dia de hoje em São Paulo como meia-noite UTC — referência do vencimento. */
+function hojeUtcSaoPaulo(agora: Date = new Date()): Date {
+  return new Date(`${dataSaoPaulo(agora)}T00:00:00.000Z`);
 }
 
 /** `true` se o texto é uma data real no formato `YYYY-MM-DD`. */
@@ -357,6 +437,21 @@ export function rotuloStatusNota(status: StatusNotaRelatorio): string {
   return ROTULOS_STATUS_NOTA[status];
 }
 
+/** Rótulo da situação do cadastro (Ativos/Inativos). */
+export function rotuloSituacaoCadastro(situacao: SituacaoCadastroRelatorio): string {
+  return ROTULOS_SITUACAO_CADASTRO[situacao];
+}
+
+/** Rótulo do tipo de destinatário (Escola/Creche). */
+export function rotuloTipoDestinatario(tipo: TipoDestinatarioRelatorio): string {
+  return ROTULOS_TIPO_DESTINATARIO[tipo];
+}
+
+/** Rótulo do filtro "Dias para vencer": `30 dias` ... ou `Todos`. */
+export function rotuloDiasVencimento(dias: DiasVencimentoRelatorio): string {
+  return dias === "todos" ? "Todos" : `${dias} dias`;
+}
+
 /** Metadados exibidos no cabeçalho do relatório impresso. */
 export function metadadosEmissao(agora: Date = new Date()): EmissaoRelatorio {
   const data = new Intl.DateTimeFormat("pt-BR", {
@@ -513,6 +608,117 @@ export function gerarCsvEntregas(linhas: EntregaRelatorioRow[]): string {
   return `\uFEFF${corpo}\r\n`;
 }
 
+/**
+ * CSV de Produtos Próximos ao Vencimento: BOM UTF-8, separador `;` e decimal
+ * com vírgula, como nos demais relatórios.
+ */
+export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): string {
+  const cabecalho = [
+    "Código",
+    "Produto",
+    "Unidade",
+    "Quantidade",
+    "Validade",
+    "Dias restantes",
+    "Situação",
+  ];
+  const registros = linhas.map((linha) => [
+    linha.codigo,
+    linha.descricao,
+    linha.unidade,
+    formatarQuantidadeCsv(linha.quantidade),
+    formatarDataISO(linha.validade),
+    String(linha.dias_restantes),
+    linha.situacao,
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
+/** CSV da lista de Funcionários (RF023/RF024). */
+export function gerarCsvFuncionarios(linhas: FuncionarioRelatorioRow[]): string {
+  const cabecalho = [
+    "Código",
+    "Nome",
+    "CPF",
+    "Cargo",
+    "Condutor",
+    "Situação",
+    "E-mail",
+    "Telefone",
+  ];
+  const registros = linhas.map((linha) => [
+    linha.codigo,
+    linha.nome,
+    linha.cpf ?? "",
+    linha.cargo ?? "",
+    linha.condutor ? "Sim" : "Não",
+    linha.situacao,
+    linha.email ?? "",
+    linha.telefone ?? "",
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
+/** CSV da lista de Destinatários (RF023/RF024). */
+export function gerarCsvDestinatarios(linhas: DestinatarioRelatorioRow[]): string {
+  const cabecalho = [
+    "Código",
+    "Razão social",
+    "CNPJ",
+    "Tipo",
+    "Situação",
+    "Endereço",
+    "E-mail",
+    "Telefone",
+  ];
+  const registros = linhas.map((linha) => [
+    linha.codigo,
+    linha.razao_social,
+    linha.cnpj ?? "",
+    linha.tipo,
+    linha.situacao,
+    linha.endereco,
+    linha.email ?? "",
+    linha.telefone ?? "",
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
+/** CSV da lista de Fornecedores (RF023/RF024). */
+export function gerarCsvFornecedores(linhas: FornecedorRelatorioRow[]): string {
+  const cabecalho = [
+    "Código",
+    "Razão social",
+    "CNPJ",
+    "Situação",
+    "Endereço",
+    "E-mail",
+    "Telefone",
+  ];
+  const registros = linhas.map((linha) => [
+    linha.codigo,
+    linha.razao_social,
+    linha.cnpj ?? "",
+    linha.situacao,
+    linha.endereco,
+    linha.email ?? "",
+    linha.telefone ?? "",
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
 export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
@@ -592,6 +798,48 @@ export class RelatorioService {
       id_destinatarios: filtros.id_destinatarios,
       status: filtros.status,
     });
+    return { ...resultado, filtros };
+  }
+
+  /** Produtos perecíveis próximos ao vencimento, com os filtros normalizados. */
+  async listarProdutosVencimento(
+    params: { dias?: string | string[] | null } = {},
+  ): Promise<ProdutosVencimentoRelatorioResult & { filtros: FiltrosVencimento }> {
+    const filtros = normalizarFiltrosVencimento(params);
+    const resultado = await relatorioDAO.listarProdutosVencimento({
+      dias: filtros.dias,
+      hoje: hojeUtcSaoPaulo(),
+    });
+    return { ...resultado, filtros };
+  }
+
+  /** Funcionários do cadastro, com a situação selecionada (vazio não filtra). */
+  async listarFuncionarios(
+    params: { situacao?: string | string[] | null } = {},
+  ): Promise<FuncionariosRelatorioResult & { filtros: FiltrosFuncionarios }> {
+    const filtros = normalizarFiltrosFuncionarios(params);
+    const resultado = await relatorioDAO.listarFuncionariosRelatorio(filtros);
+    return { ...resultado, filtros };
+  }
+
+  /** Destinatários do cadastro, com situação e tipo selecionados. */
+  async listarDestinatarios(
+    params: {
+      situacao?: string | string[] | null;
+      tipo?: string | string[] | null;
+    } = {},
+  ): Promise<DestinatariosRelatorioResult & { filtros: FiltrosDestinatarios }> {
+    const filtros = normalizarFiltrosDestinatarios(params);
+    const resultado = await relatorioDAO.listarDestinatariosRelatorio(filtros);
+    return { ...resultado, filtros };
+  }
+
+  /** Fornecedores do cadastro, com a situação selecionada (vazio não filtra). */
+  async listarFornecedores(
+    params: { situacao?: string | string[] | null } = {},
+  ): Promise<FornecedoresRelatorioResult & { filtros: FiltrosFornecedores }> {
+    const filtros = normalizarFiltrosFornecedores(params);
+    const resultado = await relatorioDAO.listarFornecedoresRelatorio(filtros);
     return { ...resultado, filtros };
   }
 
