@@ -15,6 +15,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Added
 
+- **Módulo de Relatórios e Lista de Produtos `(KAN-159)`:** novo hub `/relatorios` (cards; os
+  demais relatórios como "em breve") e a tela `/relatorios/produtos`, com filtros aplicados no
+  servidor (busca por código/descrição e situação ativas/inativas/todas) e permissão
+  `relatorio.gerar`. O relatório usa o layout A4 de `docs/relatorios/` (`Produtos.html` +
+  `Relatorio.css`), com cabeçalho de emissão, tabela Código/Descrição/Unidade/Quantidade/
+  Qtd. Livre/Situação, totalizadores e rodapé com o emissor; a impressão (`window.print()`)
+  esconde sidebar e AppBar pelas marcas `data-print-hide` do `DashboardLayout`. O CSV em
+  `/relatorios/produtos/export` repete os filtros, com BOM UTF-8, separador `;` e decimal com
+  vírgula (RF024). DAO/serviço em `src/dao/relatorio.ts` e `src/services/relatorio.ts`; os
+  templates de `docs/relatorios/` foram corrigidos (CSS, nome do arquivo/README e colunas sem
+  origem no modelo). Testes em `tests/dao/relatorio.test.ts` e
+  `tests/services/relatorio.test.ts`.
 - **Expedição com data prevista, veículo e condutor obrigatórios `(KAN-140)`:** `expedicao.data_prevista`,
   `ID_veiculo` e `ID_funcionario_condutor` passaram a **`NOT NULL`**, e as relações `veiculo` e
   `condutor` deixaram de ser opcionais. O formulário de criação inicia a data com o dia atual

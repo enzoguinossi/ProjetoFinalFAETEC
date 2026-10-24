@@ -38,8 +38,8 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RF020 — Anexo de fotos | não implementado | Upload existe apenas para foto de produto (`src/lib/imagem.ts`); `anexo` já aponta para `nota_saida`, mas o fluxo não está implementado |
 | RF021 — Pendências e urgências | parcial | A nota tem a flag `urgente`; a pendência da entrega parcial é a própria nota em `BAIXA_PARCIAL` (RN003), com o restante da reserva mantido e elegível a outra expedição. A execução da entrega não entregue/parcial já registra o status e conclui a expedição; **sem** quadro de pendências dedicado |
 | RF022 — Percurso e expedição | implementado | **Percurso** em `src/app/expedicoes/percursos/**`, `src/services/percurso.ts` e `src/dao/percurso.ts`: CRUD com destinatários ordenados, exclusão física (auditoria `EXCLUIR` com o snapshot anterior) e nome único entre todos. **Expedição** em `src/app/expedicoes/**`, `src/services/expedicao.ts` e `src/dao/expedicao.ts`: criação com percurso, notas ordenadas, despacho (`EM_PERCURSO` + veículo), **execução da entrega** por nota (baixa total/parcial/corte e não entregue, com baixa de estoque e reserva na mesma transação) e conclusão (notas restantes `PENDENTE`, expedição `CONCLUIDA`, veículo `DISPONIVEL`). **Data prevista, veículo e condutor são obrigatórios** (colunas `NOT NULL`): a data vazia assume hoje no fuso de São Paulo (`src/lib/formatar.ts` `hojeISO`), o veículo precisa estar ativo e o condutor precisa ser funcionário ativo com `condutor = true` |
-| RF023 — Relatórios | não implementado | Item de menu `/relatorios` **sem página** (`src/components/sidebar-config.ts`) |
-| RF024 — Exportação de dados | não implementado | Sem geração de PDF/CSV/XLSX |
+| RF023 — Relatórios | parcial | Hub `/relatorios` com os relatórios previstos (os demais ainda como "em breve") e a **Lista de Produtos** em `/relatorios/produtos` (`src/app/relatorios/**`, `src/dao/relatorio.ts`, `src/services/relatorio.ts`): filtros no servidor por busca (código/descrição) e situação (ativas/inativas/todas), layout A4 para impressão/PDF, permissão `relatorio.gerar`. Pendentes: Extrato de Produto, Funcionários, Destinatários e Fornecedores |
+| RF024 — Exportação de dados | parcial | **CSV** da Lista de Produtos em `/relatorios/produtos/export` (`src/app/relatorios/produtos/export/route.ts`; BOM UTF-8, separador `;`, decimal com vírgula, mesmos filtros da tela) e **PDF** pela impressão do navegador (`window.print()`); **XLSX** ainda não implementado |
 | RF025 — Importação de NF-e (XML) | não implementado | Sem leitura de XML NF-e — **fora do escopo** (`ESCOPO_FORA.md`) |
 
 ## Requisitos não funcionais
@@ -53,7 +53,7 @@ A evidência é o caminho do arquivo que sustenta a classificação — não há
 | RNF005 — Backup e integridade | parcial | Integridade referencial pelas FKs do Prisma; **sem** rotina de backup (nenhum script em `scripts/`) |
 | RNF006 — Hash de senha (BCrypt) | implementado | `bcryptjs` em `src/app/login/actions.ts`, `src/app/definir-senha/actions.ts` e `src/app/primeiro-acesso/actions.ts` |
 | RNF007 — Auditabilidade (snapshots JSON) | implementado | `src/dao/_audit.ts` e as colunas `Json` `dados_anteriores`/`dados_novos` |
-| RNF008 — Portabilidade (PDF/CSV/XLSX) | não implementado | Sem exportação em nenhum formato |
+| RNF008 — Portabilidade (PDF/CSV/XLSX) | parcial | Lista de Produtos: PDF pela impressão A4 do navegador e CSV em `/relatorios/produtos/export`; **sem XLSX** |
 | RNF009 — Interoperabilidade (XML NF-e) | não implementado | Sem processamento de XML NF-e |
 
 ## Decisões que estavam em aberto

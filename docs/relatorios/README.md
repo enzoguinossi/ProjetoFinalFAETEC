@@ -17,12 +17,13 @@ Modelo padronizado em HTML5 e CSS3 para geracao de relatorios operacionais em fo
 
 | ID | Nome do Relatorio | Ficheiro | Status |
 | :--- | :--- | :--- | :--- |
-| KAN-158 | 0/5 Base Compartilhada | base/relatorios.css | Concluido |
-| KAN-159 | 1/5 Lista de Produtos | relatorios/01-lista-produtos.html | Em andamento |
-| KAN-161 | 2/5 Extrato de Produto | relatorios/02-extrato-produto.html | A fazer |
-| KAN-163 | 3/5 Funcionarios | relatorios/03-funcionarios.html | A fazer |
-| KAN-162 | 4/5 Destinatarios | relatorios/04-destinatarios.html | A fazer |
-| KAN-160 | 5/5 Fornecedores | relatorios/05-fornecedores.html | A fazer |
+| KAN-158 | 0/5 Base Compartilhada | Relatorio.css | Concluido |
+| KAN-159 | 1/5 Lista de Produtos | Produtos.html | Concluido |
+| KAN-161 | 2/5 Extrato de Produto | Extrato_produto.html | A fazer |
+| KAN-163 | 3/5 Funcionarios | Funcionarios.html | A fazer |
+| KAN-162 | 4/5 Destinatarios | Destinatarios.html | A fazer |
+| KAN-160 | 5/5 Fornecedores | Fornecedores.html | A fazer |
+| - | Documentacao do modelo | Projeto.html | Referencia |
 
 ---
 

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Relatorio - Extrato de Produto</title>
-  <link rel="stylesheet" href="README.md/Relatorio.css">
+  <link rel="stylesheet" href="Relatorio.css">
 </head>
 <body>
 
@@ -29,12 +29,10 @@
       <table class="relatorio-tabela">
         <thead>
           <tr>
-            <th style="width: 12%;" class="col-centro">Data</th>
-            <th style="width: 15%;">Documento</th>
-            <th style="width: 18%;">Tipo Mov.</th>
-            <th style="width: 15%;" class="col-direita">Quantidade</th>
-            <th style="width: 20%;" class="col-direita">Valor Unitario</th>
-            <th style="width: 20%;" class="col-direita">Valor Total</th>
+            <th style="width: 14%;" class="col-centro">Data</th>
+            <th style="width: 26%;">Documento</th>
+            <th style="width: 30%;">Tipo Mov.</th>
+            <th style="width: 30%;" class="col-direita">Quantidade</th>
           </tr>
         </thead>
         <tbody>
@@ -43,8 +41,6 @@
             <td>{{DOCUMENTO}}</td>
             <td>{{TIPO_MOVIMENTO}}</td>
             <td class="col-direita">{{QUANTIDADE}}</td>
-            <td class="col-direita">{{VALOR_UNITARIO}}</td>
-            <td class="col-direita">{{VALOR_TOTAL}}</td>
           </tr>
         </tbody>
       </table>

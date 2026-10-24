@@ -1,0 +1,170 @@
+/*
+ * Relatórios — layout A4 baseado em `docs/relatorios/Relatorio.css`.
+ * As classes globais `relatorio-*` só existem neste módulo.
+ */
+
+.relatorio-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.relatorio-container {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 15mm;
+  background: #ffffff;
+  color: #000000;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9pt;
+  line-height: 1.3;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.relatorio-conteudo {
+  flex: 1;
+  width: 100%;
+}
+
+.relatorio-header {
+  border-bottom: 2px solid #000000;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.relatorio-header .titulo-relatorio {
+  font-size: 15pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #000000;
+  margin: 0;
+}
+
+.relatorio-header .meta-info {
+  font-size: 8pt;
+  color: #555555;
+  text-align: right;
+}
+
+.relatorio-header .meta-info p {
+  margin: 0;
+}
+
+.relatorio-tabela {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 7.5pt;
+  word-wrap: break-word;
+}
+
+.relatorio-tabela th,
+.relatorio-tabela td {
+  border: 1px solid #333333;
+  padding: 5px 4px;
+  text-align: left;
+}
+
+.relatorio-tabela th {
+  background-color: #333333;
+  color: #ffffff;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 7.5pt;
+}
+
+.relatorio-tabela tbody tr:nth-child(even) {
+  background-color: #f8f8f8;
+}
+
+.relatorio-tabela tfoot td {
+  background-color: #eeeeee;
+  font-weight: bold;
+}
+
+.relatorio-tabela .col-centro {
+  text-align: center;
+}
+
+.relatorio-tabela .col-direita {
+  text-align: right;
+}
+
+.relatorio-vazio {
+  padding: 24px 4px;
+  text-align: center;
+  color: #555555;
+}
+
+.relatorio-footer {
+  border-top: 1px solid #888888;
+  padding-top: 8px;
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 8pt;
+  color: #666666;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Marcações inertes fora da impressão; aqui escondem sidebar, AppBar e ações. */
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* O shell do dashboard vira a própria folha. */
+  [data-figma="AppShell"] {
+    display: block !important;
+    min-height: 0 !important;
+    background: #ffffff !important;
+  }
+
+  [data-figma="AppShell"] > div {
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .relatorio-scroll {
+    overflow: visible !important;
+  }
+
+  .relatorio-container {
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .relatorio-tabela thead {
+    display: table-header-group;
+  }
+
+  .relatorio-tabela tr {
+    break-inside: avoid;
+  }
+}

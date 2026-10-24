@@ -1,0 +1,87 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import DashboardLayout from "@/components/DashboardLayout";
+import { requireUser } from "@/lib/auth";
+import { usuarioPode } from "@/lib/permissoes";
+
+export const dynamic = "force-dynamic";
+
+type CartaoRelatorio = {
+  titulo: string;
+  descricao: string;
+  href?: string;
+};
+
+const relatorios: CartaoRelatorio[] = [
+  {
+    titulo: "Lista de Produtos",
+    descricao:
+      "Código, descrição, unidade, quantidade e saldo livre de cada produto, com filtros por busca e situação.",
+    href: "/relatorios/produtos",
+  },
+  {
+    titulo: "Extrato de Produto",
+    descricao: "Movimentações de estoque de um produto em um período.",
+  },
+  {
+    titulo: "Funcionários",
+    descricao: "Listagem de funcionários com cargo e situação.",
+  },
+  {
+    titulo: "Destinatários",
+    descricao: "Escolas e creches atendidas, com contato e endereço.",
+  },
+  {
+    titulo: "Fornecedores",
+    descricao: "Fornecedores cadastrados, com contato e situação.",
+  },
+];
+
+export default async function RelatoriosPage() {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "relatorio.gerar"))) redirect("/dashboard");
+
+  return (
+    <DashboardLayout title="Relatórios">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-ink m-0">Relatórios</h2>
+        <p className="text-sm text-[#697077] m-0">
+          Documentos gerados a partir dos dados do sistema, prontos para impressão,
+          PDF e CSV.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
+        {relatorios.map((relatorio) =>
+          relatorio.href ? (
+            <Link
+              key={relatorio.titulo}
+              href={relatorio.href}
+              className="flex flex-col gap-2 bg-white rounded-xl border border-border p-5 text-ink no-underline transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+            >
+              <span className="text-base font-semibold">{relatorio.titulo}</span>
+              <span className="text-sm text-[#697077]">{relatorio.descricao}</span>
+              <span className="text-sm font-semibold text-brand mt-auto">
+                Abrir relatório →
+              </span>
+            </Link>
+          ) : (
+            <div
+              key={relatorio.titulo}
+              className="flex flex-col gap-2 bg-[#f2f4f8] rounded-xl border border-border p-5 text-ink"
+              aria-disabled
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base font-semibold">{relatorio.titulo}</span>
+                <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-[#697077] bg-white border border-border rounded-full px-2 py-0.5">
+                  Em breve
+                </span>
+              </div>
+              <span className="text-sm text-[#697077]">{relatorio.descricao}</span>
+            </div>
+          ),
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
