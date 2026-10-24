@@ -9,10 +9,8 @@ import { sidebarRecolhidaStore, type SidebarUser } from "./sidebar-config";
 
 export default function DashboardLayout({
   children,
-  title,
 }: {
   children: React.ReactNode;
-  title?: string;
 }) {
   // Estado do recolhido persistido: sobrevive à remontagem a cada navegação.
   const recolhida = useSyncExternalStore(
@@ -56,15 +54,8 @@ export default function DashboardLayout({
         <header
           className="flex flex-1 items-center justify-between gap-2 min-w-0 px-5 bg-brand box-border"
           data-figma="AppBar"
-          data-figma-title={title ?? ""}
           data-print-hide
         >
-          {title && (
-            <h1 className="font-display text-[1.25rem] [font-weight:590] tracking-[-0.028125rem] leading-[1.5625rem] text-white m-0 truncate min-w-0">
-              {title}
-            </h1>
-          )}
-
           <div className="flex items-center gap-1 shrink-0 ml-auto">
             <button type="button" className={headerIconBtnCls} aria-label="Configurações">
               <Settings size={18} strokeWidth={1.75} aria-hidden="true" />

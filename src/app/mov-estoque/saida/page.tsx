@@ -22,14 +22,12 @@ export default async function MovEstoqueSaidaPage() {
   const inicialSaida = await listarNotasSaida({ page: 1, limit: 20 });
 
   return (
-    <>
-      <SaidaClient
-        inicialSaida={inicialSaida}
-        podeCriarSaida={podeCriarSaida}
-        podeConsultarNota={podeConsultarNota}
-        podeAlterarNota={podeAlterarNota}
-        podeCancelarNota={podeCancelarNota}
-      />
-    </>
+    <SaidaClient
+      inicialSaida={inicialSaida}
+      podeCriarSaida={podeCriarSaida}
+      podeConsultarNota={podeConsultarNota}
+      podeAlterarNota={podeAlterarNota}
+      podeCancelarNota={podeCancelarNota}
+    />
   );
 }

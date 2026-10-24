@@ -28,16 +28,14 @@ export default async function MovEstoqueEntradaPage() {
   ]);
 
   return (
-    <>
-      <EntradaClient
-        inicial={inicial}
-        conversoes={conversoes}
-        podeCriar={podeCriar}
-        podeConsultar={podeConsultar}
-        podeAlterar={podeAlterar}
-        podeCriarFornecedor={podeCriarFornecedor}
-        tiposCodigoFornecedor={tiposCodigo.map((t) => ({ id_tipo_codigo: t.id_tipo_codigo, nome: t.nome }))}
-      />
-    </>
+    <EntradaClient
+      inicial={inicial}
+      conversoes={conversoes}
+      podeCriar={podeCriar}
+      podeConsultar={podeConsultar}
+      podeAlterar={podeAlterar}
+      podeCriarFornecedor={podeCriarFornecedor}
+      tiposCodigoFornecedor={tiposCodigo.map((t) => ({ id_tipo_codigo: t.id_tipo_codigo, nome: t.nome }))}
+    />
   );
 }

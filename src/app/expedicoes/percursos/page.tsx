@@ -2,6 +2,7 @@ import PercursosClient from "./PercursosClient";
 import { listarPercursos } from "./actions";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import PageTitle from "@/components/PageTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function PercursosPage() {
 
   return (
     <>
+      <PageTitle>Percursos</PageTitle>
       <PercursosClient inicial={inicial} perms={perms} />
     </>
   );

@@ -94,9 +94,7 @@ export default function Sidebar({ collapsed, onToggle, onExpand, user }: Sidebar
       data-figma-variant={visibleCadastroItems.length > 0 ? "com-cadastros" : "sem-cadastros"}
       data-print-hide
     >
-      <div
-        className={`flex items-center shrink-0 px-1 pb-2 ${collapsed ? "justify-center" : "justify-end"}`}
-      >
+      <div className={`flex items-center ${collapsed ? "justify-center" : "justify-start"} shrink-0 px-1 pb-2`}>
         <button
           type="button"
           className="flex items-center justify-center w-8 h-8 shrink-0 border-none bg-transparent text-[#697077] cursor-pointer rounded-md transition-colors duration-150 hover:bg-[#f2f4f8] hover:text-ink"

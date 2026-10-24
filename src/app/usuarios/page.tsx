@@ -4,6 +4,7 @@ import { funcionarioDAO } from "@/dao/funcionario";
 import { permissaoService } from "@/services/permissao";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import PageTitle from "@/components/PageTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function UsuariosPage() {
 
   return (
     <>
+      <PageTitle>Usuários</PageTitle>
       <UsuariosClient
         inicial={inicial}
         funcionarios={funcionarios}

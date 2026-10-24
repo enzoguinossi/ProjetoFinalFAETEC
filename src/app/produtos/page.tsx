@@ -4,6 +4,7 @@ import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
+import PageTitle from "@/components/PageTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function ProdutosPage() {
 
   return (
     <>
+      <PageTitle>Produtos</PageTitle>
       <ProdutosClient inicial={inicial} conversoes={conversoes} tiposCodigo={tiposCodigo} perms={perms} />
     </>
   );

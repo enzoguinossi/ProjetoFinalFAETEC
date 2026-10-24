@@ -2,6 +2,7 @@ import { resolverPermissoes } from "@/lib/permissoes";
 import { notFound, redirect } from "next/navigation";
 import ExpedicaoClient from "./ExpedicaoClient";
 import { obterExpedicao } from "../actions";
+import PageTitle from "@/components/PageTitle";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function ExpedicaoDetalhePage({
 
   return (
     <>
+      <PageTitle>Expedições</PageTitle>
       <ExpedicaoClient inicial={inicial} perms={perms} />
     </>
   );
