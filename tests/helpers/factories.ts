@@ -313,9 +313,27 @@ export async function criarMovimentacao(
   idEstoque: number,
   idUsuario: number,
   quantidade = 1,
+  opts: {
+    dataHora?: Date;
+    saldoAnterior?: number | null;
+    saldoPosterior?: number | null;
+    idNotaEntrada?: number;
+    idNotaSaida?: number;
+    observacao?: string;
+  } = {},
 ) {
   return prismaTeste.movimentacaoEstoque.create({
-    data: { id_estoque: idEstoque, id_usuario: idUsuario, quantidade, data_hora: new Date() },
+    data: {
+      id_estoque: idEstoque,
+      id_usuario: idUsuario,
+      quantidade,
+      data_hora: opts.dataHora ?? new Date(),
+      saldo_anterior: opts.saldoAnterior,
+      saldo_posterior: opts.saldoPosterior,
+      id_nota_entrada: opts.idNotaEntrada,
+      id_nota_saida: opts.idNotaSaida,
+      observacao: opts.observacao,
+    },
   });
 }
 

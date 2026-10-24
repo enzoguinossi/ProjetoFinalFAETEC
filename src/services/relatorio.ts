@@ -1,20 +1,43 @@
 import {
   relatorioDAO,
   SITUACOES_PRODUTO_RELATORIO,
+  TIPOS_MOVIMENTACAO_RELATORIO,
+  type DestinatarioFiltroRelatorio,
+  type FornecedorFiltroRelatorio,
+  type MovimentacaoRelatorioRow,
+  type MovimentacoesRelatorioResult,
+  type ProdutoFiltroRelatorio,
   type ProdutoRelatorioRow,
   type ProdutosRelatorioFiltros,
   type ProdutosRelatorioResult,
   type SituacaoProdutoRelatorio,
+  type TipoMovimentacaoRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
 
 const FUSO = "America/Sao_Paulo";
+/**
+ * São Paulo não tem horário de verão desde 2019: o offset é fixo em UTC-3.
+ * Usado para transformar uma data `YYYY-MM-DD` no instante UTC do dia local.
+ */
+const OFFSET_SAO_PAULO = "-03:00";
 
 export type EmissaoRelatorio = {
   /** Data da emissão no formato DD/MM/AAAA (fuso America/Sao_Paulo). */
   data: string;
   /** Hora da emissão no formato HH:MM (fuso America/Sao_Paulo). */
   hora: string;
+};
+
+export type FiltrosMovimentacao = {
+  /** Data inicial (`YYYY-MM-DD`). */
+  de: string;
+  /** Data final (`YYYY-MM-DD`), inclusiva. */
+  ate: string;
+  id_produto: number | null;
+  id_destinatario: number | null;
+  id_fornecedor: number | null;
+  tipo: TipoMovimentacaoRelatorio;
 };
 
 /** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
@@ -37,6 +60,128 @@ export function normalizarFiltrosProdutos(params: {
     ? (situacaoBruta as SituacaoProdutoRelatorio)
     : "ativas";
   return { situacao };
+}
+
+/** Data de `agora` no fuso de São Paulo, no formato `YYYY-MM-DD`. */
+function dataSaoPaulo(agora: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(agora);
+}
+
+/** `true` se o texto é uma data real no formato `YYYY-MM-DD`. */
+function dataValida(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const data = new Date(`${iso}T00:00:00.000Z`);
+  return !Number.isNaN(data.getTime()) && data.toISOString().slice(0, 10) === iso;
+}
+
+function ultimoDiaDoMes(ano: number, mes: number): number {
+  return new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+}
+
+/** Primeiro e último dia do mês corrente (fuso de São Paulo), `YYYY-MM-DD`. */
+export function periodoMesAtual(agora: Date = new Date()): { de: string; ate: string } {
+  const [ano, mes] = dataSaoPaulo(agora).split("-").map(Number);
+  const mesTexto = String(mes).padStart(2, "0");
+  return {
+    de: `${ano}-${mesTexto}-01`,
+    ate: `${ano}-${mesTexto}-${String(ultimoDiaDoMes(ano, mes)).padStart(2, "0")}`,
+  };
+}
+
+/**
+ * Semestre corrente (fuso de São Paulo): janeiro–junho ou julho–dezembro,
+ * conforme o mês. É apenas um recorte de período do mesmo relatório.
+ */
+export function periodoSemestreAtual(agora: Date = new Date()): { de: string; ate: string } {
+  const [ano, mes] = dataSaoPaulo(agora).split("-").map(Number);
+  const inicio = mes <= 6 ? 1 : 7;
+  const fim = inicio + 5;
+  const mesTexto = (valor: number) => String(valor).padStart(2, "0");
+  return {
+    de: `${ano}-${mesTexto(inicio)}-01`,
+    ate: `${ano}-${mesTexto(fim)}-${String(ultimoDiaDoMes(ano, fim)).padStart(2, "0")}`,
+  };
+}
+
+/** Id de filtro: inteiro positivo ou `null` (vazio/inválido não filtra). */
+function idPositivo(bruto: string): number | null {
+  const numero = Number(bruto);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+/**
+ * Normaliza os filtros da Movimentação de Estoque. Data vazia ou inválida cai
+ * no mês corrente (fuso de São Paulo) — `de` no dia 1 e `ate` no último dia.
+ * Tipo inválido cai em `todos`; produto, destinatário e fornecedor
+ * vazios/inválidos não filtram.
+ */
+export function normalizarFiltrosMovimentacao(
+  params: {
+    de?: string | string[] | null;
+    ate?: string | string[] | null;
+    produto?: string | string[] | null;
+    destinatario?: string | string[] | null;
+    fornecedor?: string | string[] | null;
+    tipo?: string | string[] | null;
+  } = {},
+  agora: Date = new Date(),
+): FiltrosMovimentacao {
+  const { de: dePadrao, ate: atePadrao } = periodoMesAtual(agora);
+
+  const deBruto = primeiro(params.de).trim();
+  const ateBruto = primeiro(params.ate).trim();
+  const de = dataValida(deBruto) ? deBruto : dePadrao;
+  const ate = dataValida(ateBruto) ? ateBruto : atePadrao;
+
+  const id_produto = idPositivo(primeiro(params.produto).trim());
+  const id_destinatario = idPositivo(primeiro(params.destinatario).trim());
+  const id_fornecedor = idPositivo(primeiro(params.fornecedor).trim());
+
+  const tipoBruto = primeiro(params.tipo).trim() as TipoMovimentacaoRelatorio;
+  const tipo = TIPOS_MOVIMENTACAO_RELATORIO.includes(tipoBruto) ? tipoBruto : "todos";
+
+  return { de, ate, id_produto, id_destinatario, id_fornecedor, tipo };
+}
+
+/**
+ * Converte o período `YYYY-MM-DD` para os instantes UTC do dia local em São
+ * Paulo: o `de` começa às 00:00 e o `ate` termina às 23:59:59.999 (inclusivo).
+ */
+export function limitesDoPeriodo(filtros: Pick<FiltrosMovimentacao, "de" | "ate">): {
+  de: Date;
+  ate: Date;
+} {
+  return {
+    de: new Date(`${filtros.de}T00:00:00.000${OFFSET_SAO_PAULO}`),
+    ate: new Date(`${filtros.ate}T23:59:59.999${OFFSET_SAO_PAULO}`),
+  };
+}
+
+/** Data/hora para exibição e CSV: `DD/MM/AAAA HH:MM` no fuso de São Paulo. */
+export function formatarDataHoraRelatorio(valor: Date): string {
+  const data = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: FUSO,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(valor);
+  const hora = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: FUSO,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(valor);
+  return `${data} ${hora}`;
+}
+
+/** `YYYY-MM-DD` para `DD/MM/AAAA` (sem deslocar o dia por fuso). */
+export function formatarDataISO(iso: string): string {
+  const [ano, mes, dia] = iso.split("-");
+  return `${dia}/${mes}/${ano}`;
 }
 
 /** Metadados exibidos no cabeçalho do relatório impresso. */
@@ -96,6 +241,41 @@ export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
   return `\uFEFF${corpo}\r\n`;
 }
 
+/**
+ * CSV da Movimentação de Estoque (RF023/RF024), com a mesma formatação pt-BR
+ * da Lista de Produtos: BOM UTF-8, separador `;` e decimal com vírgula.
+ */
+export function gerarCsvMovimentacoes(linhas: MovimentacaoRelatorioRow[]): string {
+  const cabecalho = [
+    "Data",
+    "Produto",
+    "Tipo",
+    "Documento",
+    "Destinatário / Fornecedor",
+    "Quantidade",
+    "Saldo anterior",
+    "Saldo posterior",
+    "Usuário",
+    "Observação",
+  ];
+  const registros = linhas.map((linha) => [
+    formatarDataHoraRelatorio(linha.data_hora),
+    `${linha.codigo} - ${linha.produto}`,
+    linha.tipo,
+    linha.documento,
+    linha.destinatario_fornecedor,
+    formatarQuantidadeCsv(linha.quantidade),
+    linha.saldo_anterior === null ? "—" : formatarQuantidadeCsv(linha.saldo_anterior),
+    linha.saldo_posterior === null ? "—" : formatarQuantidadeCsv(linha.saldo_posterior),
+    linha.usuario,
+    linha.observacao ?? "",
+  ]);
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
 export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
@@ -104,6 +284,56 @@ export class RelatorioService {
     const filtros = normalizarFiltrosProdutos(params);
     const resultado = await relatorioDAO.listarProdutosRelatorio(filtros);
     return { ...resultado, filtros };
+  }
+
+  /**
+   * Movimentações de estoque do período, com os filtros normalizados. Sem
+   * produto informado, é o relatório de Movimentação; com produto, o Extrato
+   * de Produto (KAN-161). Destinatário e fornecedor filtram o relatório único.
+   */
+  async listarMovimentacoes(
+    params: {
+      de?: string | string[] | null;
+      ate?: string | string[] | null;
+      produto?: string | string[] | null;
+      destinatario?: string | string[] | null;
+      fornecedor?: string | string[] | null;
+      tipo?: string | string[] | null;
+    } = {},
+  ): Promise<MovimentacoesRelatorioResult & { filtros: FiltrosMovimentacao }> {
+    const filtros = normalizarFiltrosMovimentacao(params);
+    const { de, ate } = limitesDoPeriodo(filtros);
+    const resultado = await relatorioDAO.listarMovimentacoes({
+      de,
+      ate,
+      id_produto: filtros.id_produto,
+      id_destinatario: filtros.id_destinatario,
+      id_fornecedor: filtros.id_fornecedor,
+      tipo: filtros.tipo,
+    });
+    return { ...resultado, filtros };
+  }
+
+  /** Produtos ativos para o select de filtro. */
+  async produtosParaFiltro(): Promise<ProdutoFiltroRelatorio[]> {
+    return relatorioDAO.listarProdutosAtivos();
+  }
+
+  /** Destinatários para o select de filtro (ativos + o selecionado, se inativo). */
+  async destinatariosParaFiltro(
+    incluirId?: number | null,
+  ): Promise<DestinatarioFiltroRelatorio[]> {
+    return relatorioDAO.listarDestinatariosParaFiltro(incluirId);
+  }
+
+  /** Fornecedores para o select de filtro (ativos + o selecionado, se inativo). */
+  async fornecedoresParaFiltro(incluirId?: number | null): Promise<FornecedorFiltroRelatorio[]> {
+    return relatorioDAO.listarFornecedoresParaFiltro(incluirId);
+  }
+
+  /** Produto do filtro (para o cabeçalho do Extrato de Produto). */
+  async produtoParaFiltro(id_produto: number): Promise<ProdutoFiltroRelatorio | null> {
+    return relatorioDAO.obterProdutoFiltro(id_produto);
   }
 
   /** Nome do usuário emissor exibido no rodapé do relatório. */

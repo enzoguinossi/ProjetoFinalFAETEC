@@ -13,8 +13,13 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Added
+
+- **Relatório de Movimentação de Estoque e Extrato de Produto (KAN-161, RF023):** `/relatorios/movimentacao` lista as movimentações do período (padrão: mês atual, fuso de São Paulo) com filtros por produto e tipo (entradas/saídas/todas), sem busca livre. As linhas vêm em ordem cronológica com produto, tipo (Entrada/Saída/Ajuste), documento (`NE #`/`NS #`/`—`), quantidade, saldo anterior/posterior, usuário e observação, e o rodapé da tabela totaliza entradas e saídas. A tela tem layout A4 para impressão/PDF e exportação CSV (BOM, `;`, decimal com vírgula). Com `?produto=<id>` a mesma tela vira o **Extrato de Produto**, com o produto no cabeçalho. O hub `/relatorios` ganhou os cards dos dois relatórios.
+
 ### Changed
 
+- **Relatório de Movimentação único, com os filtros do usuário (RF023):** não há mais relatórios separados de movimentação/consolidado. `/relatorios/movimentacao` passou a ter também os filtros **destinatário** e **fornecedor** (selects, sem busca livre), ao lado de período, produto e tipo, e a coluna **Destinatário / Fornecedor** — o destinatário da saída ou o fornecedor da entrada, com `—` quando não houver. O semestre é só um recorte de período: atalhos **Mês atual** e **Semestre atual** preenchem `de`/`até` preservando os demais filtros. O CSV/exportação leva os mesmos filtros e colunas.
 - **Lista de Produtos filtra apenas por situação:** o relatório de produtos (`/relatorios/produtos` e o CSV) deixou de ter busca por código/descrição; o filtro no servidor é só por situação (ativas/inativas/todas).
 
 ## [1.24.10.2026] - 2026-10-24

@@ -19,11 +19,15 @@ Modelo padronizado em HTML5 e CSS3 para geracao de relatorios operacionais em fo
 | :--- | :--- | :--- | :--- |
 | KAN-158 | 0/5 Base Compartilhada | Relatorio.css | Concluido |
 | KAN-159 | 1/5 Lista de Produtos | Produtos.html | Concluido |
-| KAN-161 | 2/5 Extrato de Produto | Extrato_produto.html | A fazer |
+| KAN-161 | 2/5 Extrato de Produto | Extrato_produto.html | Concluido |
 | KAN-163 | 3/5 Funcionarios | Funcionarios.html | A fazer |
 | KAN-162 | 4/5 Destinatarios | Destinatarios.html | A fazer |
 | KAN-160 | 5/5 Fornecedores | Fornecedores.html | A fazer |
 | - | Documentacao do modelo | Projeto.html | Referencia |
+
+> O **Extrato de Produto** usa a mesma tela da **Movimentação de Estoque**
+> (`/relatorios/movimentacao`): basta escolher o produto no filtro (equivalente a
+> `?produto=<id>`). O título e o cabeçalho passam a identificar o produto.
 
 ---
 
