@@ -20,6 +20,19 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   sequências repetidas e dígitos verificadores), e `src/components/CnpjField.tsx` é usado pelos
   formulários de fornecedor e de destinatário. Cobertura em `tests/lib/cnpj.test.ts`.
   (KAN-138, KAN-154)
+- **Consulta de CNPJ na BrasilAPI e nome fantasia de pessoa jurídica (KAN-138, KAN-154):** o
+  botão **Consultar** ao lado do CNPJ (fornecedor e destinatário, criação e edição) consulta
+  `GET https://brasilapi.com.br/api/cnpj/v1/{cnpj}` e preenche **razão social**, **nome
+  fantasia** e **endereço completo, incluindo número**. A consulta valida o CNPJ no cliente e
+  no serviço antes da chamada, envia `User-Agent` próprio (`Nexus/3.24.10.2026`) — o padrão do
+  Node é bloqueado —, usa timeout de 8 s e cache em memória de 1 h por CNPJ (só sucesso).
+  **Sobrescreve** razão social, nome fantasia e endereço com o retorno da API e **não**
+  preenche e-mail/telefone; o usuário revisa antes de salvar. Situação cadastral diferente de
+  `ATIVA` **avisa sem bloquear**. 404 → "CNPJ não encontrado na Receita."; 403/429 → consulta
+  temporariamente indisponível; demais falhas → mensagem genérica. `pessoa_juridica` recebe
+  `nome_fantasia` (banco, tipos, Server Actions, DAOs e auditoria), exibido nos modais de
+  fornecedor e destinatário; relatórios e listagens não foram alterados. Cobertura em
+  `tests/services/consulta-cnpj.test.ts` e nos testes de DAO. (KAN-138, KAN-154)
 
 ### Changed
 

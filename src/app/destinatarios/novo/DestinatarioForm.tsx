@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { createDestinatario, updateDestinatario, buscarCep } from "../actions";
 import type { DestinatarioFormData } from "../actions";
+import { consultarCnpj } from "@/app/consulta-cnpj/actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
-import EnderecoFields from "@/components/EnderecoFields";
+import EnderecoFields, { type EnderecoInitial } from "@/components/EnderecoFields";
 import CnpjField from "@/components/CnpjField";
 import { normalizaTelefones } from "@/lib/contatos";
-import { formatarCnpj } from "@/lib/cnpj";
+import { formatarCnpj, validarCnpj } from "@/lib/cnpj";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
 import { useAviso } from "@/components/AvisoProvider";
@@ -32,11 +33,52 @@ export default function DestinatarioForm({
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
   const [razaoSocial, setRazaoSocial] = useState(initialData?.razao_social ?? "");
+  const [nomeFantasia, setNomeFantasia] = useState(initialData?.nome_fantasia ?? "");
   const [cnpj, setCnpj] = useState(formatarCnpj(initialData?.cnpj ?? ""));
+  const [consultando, setConsultando] = useState(false);
+  const [sugestaoEndereco, setSugestaoEndereco] = useState<EnderecoInitial | null>(null);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
   const [emails, setEmails] = useState<EmailEntry[]>(initialData?.emails ?? []);
   const [telefones, setTelefones] = useState<TelefoneEntry[]>(normalizaTelefones(initialData?.telefones));
+
+  async function consultarDadosCnpj() {
+    const validacao = validarCnpj(cnpj);
+    if (!validacao.ok) {
+      mostrarAviso(validacao.erro, "erro");
+      return;
+    }
+    setConsultando(true);
+    try {
+      const resultado = await consultarCnpj(validacao.cnpj);
+      if ("error" in resultado) {
+        mostrarAviso(resultado.error, "erro");
+        return;
+      }
+      const { empresa } = resultado;
+      setCnpj(formatarCnpj(empresa.cnpj));
+      setRazaoSocial(empresa.razao_social);
+      setNomeFantasia(empresa.nome_fantasia ?? "");
+      setSugestaoEndereco({
+        cep: empresa.endereco.cep,
+        logradouro: empresa.endereco.logradouro,
+        numero: empresa.endereco.numero,
+        complemento: empresa.endereco.complemento,
+        bairro: empresa.endereco.bairro,
+        cidade: empresa.endereco.cidade,
+        uf: empresa.endereco.uf,
+      });
+      if (empresa.situacao && empresa.situacao.toUpperCase() !== "ATIVA") {
+        mostrarAviso(`Dados preenchidos, mas a situação do CNPJ é ${empresa.situacao}.`, "cautela");
+      } else {
+        mostrarAviso("Dados do CNPJ preenchidos. Revise antes de salvar.", "sucesso");
+      }
+    } catch {
+      mostrarAviso("Não foi possível consultar o CNPJ. Tente novamente.", "erro");
+    } finally {
+      setConsultando(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,14 +118,34 @@ export default function DestinatarioForm({
             <input
               name="razao_social"
               required={!isView}
-              value={isView || isEdit ? razaoSocial : undefined}
-              onChange={isEdit ? (e) => setRazaoSocial(e.target.value) : undefined}
+              value={razaoSocial}
+              onChange={(e) => setRazaoSocial(e.target.value)}
               readOnly={isView}
               className={ui.input}
             />
           </div>
 
-          <CnpjField value={cnpj} onChange={setCnpj} readOnly={isView} />
+          <div className={ui.field}>
+            <label className={ui.label}>Nome fantasia</label>
+            {isView ? (
+              <p className={`${ui.input} leading-[2.5] m-0`}>{nomeFantasia || "—"}</p>
+            ) : (
+              <input
+                name="nome_fantasia"
+                value={nomeFantasia}
+                onChange={(e) => setNomeFantasia(e.target.value)}
+                className={ui.input}
+              />
+            )}
+          </div>
+
+          <CnpjField
+            value={cnpj}
+            onChange={setCnpj}
+            readOnly={isView}
+            onConsultar={consultarDadosCnpj}
+            consultando={consultando}
+          />
 
           <div className={ui.field}>
             <label className={ui.label}>Tipo</label>
@@ -99,6 +161,7 @@ export default function DestinatarioForm({
             required
             showCoords
             onLookup={buscarCep}
+            sugestao={sugestaoEndereco}
             initial={initialData ? {
               logradouro: initialData.endereco.logradouro,
               numero: initialData.endereco.numero,

@@ -42,7 +42,7 @@ export class DestinatarioDAO {
 
   async create(
     data: {
-      razao_social: string; cnpj?: string;
+      razao_social: string; nome_fantasia?: string; cnpj?: string;
       tipo_destinatario: "ESCOLA" | "CRECHE";
       endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
@@ -50,11 +50,13 @@ export class DestinatarioDAO {
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
-      const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
+      const pj = await tx.pessoaJuridica.create({
+        data: { razao_social: data.razao_social, nome_fantasia: data.nome_fantasia, cnpj: data.cnpj },
+      });
       await registrarAuditoria(
         id_usuario, "CRIAR", "PessoaJuridica", pj.id_pessoa_juridica,
         null,
-        { razao_social: data.razao_social },
+        { razao_social: data.razao_social, nome_fantasia: data.nome_fantasia ?? null },
         tx,
       );
 
@@ -96,7 +98,7 @@ export class DestinatarioDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
+      razao_social?: string; nome_fantasia?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
@@ -108,10 +110,14 @@ export class DestinatarioDAO {
         include: { pessoaJuridica: true, endereco: true, destinatarioCodigos: true, emails: true, telefones: true },
       });
 
-      if (data.razao_social !== undefined || data.cnpj !== undefined) {
+      if (data.razao_social !== undefined || data.cnpj !== undefined || data.nome_fantasia !== undefined) {
         await tx.pessoaJuridica.update({
           where: { id_pessoa_juridica: antes.id_pessoa_juridica },
-          data: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, cnpj: data.cnpj ?? antes.pessoaJuridica.cnpj },
+          data: {
+            razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social,
+            nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia,
+            cnpj: data.cnpj ?? antes.pessoaJuridica.cnpj,
+          },
         });
       }
 
@@ -164,8 +170,8 @@ export class DestinatarioDAO {
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         "Destinatario",
         id,
-        { razao_social: antes.pessoaJuridica.razao_social, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { razao_social: antes.pessoaJuridica.razao_social, nome_fantasia: antes.pessoaJuridica.nome_fantasia, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 

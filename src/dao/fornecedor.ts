@@ -40,18 +40,20 @@ export class FornecedorDAO {
 
   async create(
     data: {
-      razao_social: string; cnpj?: string;
+      razao_social: string; nome_fantasia?: string; cnpj?: string;
       endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
-      const pj = await tx.pessoaJuridica.create({ data: { razao_social: data.razao_social, cnpj: data.cnpj } });
+      const pj = await tx.pessoaJuridica.create({
+        data: { razao_social: data.razao_social, nome_fantasia: data.nome_fantasia, cnpj: data.cnpj },
+      });
       await registrarAuditoria(
         id_usuario, "CRIAR", "PessoaJuridica", pj.id_pessoa_juridica,
         null,
-        { razao_social: data.razao_social },
+        { razao_social: data.razao_social, nome_fantasia: data.nome_fantasia ?? null },
         tx,
       );
 
@@ -98,7 +100,7 @@ export class FornecedorDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; cnpj?: string; ativo?: boolean;
+      razao_social?: string; nome_fantasia?: string; cnpj?: string; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
@@ -110,10 +112,14 @@ export class FornecedorDAO {
         include: { pessoaJuridica: true, endereco: true, fornecedorCodigos: true, emails: true, telefones: true },
       });
 
-      if (data.razao_social !== undefined || data.cnpj !== undefined) {
+      if (data.razao_social !== undefined || data.cnpj !== undefined || data.nome_fantasia !== undefined) {
         await tx.pessoaJuridica.update({
           where: { id_pessoa_juridica: antes.id_pessoa_juridica },
-          data: { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, cnpj: data.cnpj ?? antes.pessoaJuridica.cnpj },
+          data: {
+            razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social,
+            nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia,
+            cnpj: data.cnpj ?? antes.pessoaJuridica.cnpj,
+          },
         });
       }
 
@@ -166,8 +172,8 @@ export class FornecedorDAO {
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         "Fornecedor",
         id,
-        { razao_social: antes.pessoaJuridica.razao_social, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { razao_social: antes.pessoaJuridica.razao_social, nome_fantasia: antes.pessoaJuridica.nome_fantasia, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 

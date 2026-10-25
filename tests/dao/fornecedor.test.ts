@@ -59,6 +59,7 @@ describe("fornecedorDAO", () => {
       const criado = await fornecedorDAO.create(
         {
           razao_social: "Fornecedor Novo",
+          nome_fantasia: "Fantasia Nova",
           cnpj: "99888777000166",
           endereco: { logradouro: "Av Central", cidade: "Duque de Caxias", uf: "RJ" },
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "FOR-2" }],
@@ -69,11 +70,16 @@ describe("fornecedorDAO", () => {
       );
 
       expect(criado.pessoaJuridica.razao_social).toBe("Fornecedor Novo");
+      expect(criado.pessoaJuridica.nome_fantasia).toBe("Fantasia Nova");
       expect(criado.endereco?.logradouro).toBe("Av Central");
 
       const auditoriasPj = await auditoriasDe("PessoaJuridica", criado.id_pessoa_juridica);
       const auditoriasForn = await auditoriasDe("Fornecedor", criado.id_fornecedor);
       expect(auditoriasPj.map((a) => a.acao)).toEqual(["CRIAR"]);
+      expect(auditoriasPj[0]?.dados_novos).toMatchObject({
+        razao_social: "Fornecedor Novo",
+        nome_fantasia: "Fantasia Nova",
+      });
       expect(auditoriasForn.map((a) => a.acao)).toEqual(["CRIAR"]);
       expect(auditoriasForn[0]?.dados_novos).toMatchObject({
         emails: [{ endereco: "novo@for.com", principal: true }],
@@ -96,12 +102,17 @@ describe("fornecedorDAO", () => {
   describe("update", () => {
     it("altera dados e substitui listas com auditoria ALTERAR", async () => {
       const { usuario } = await criarUsuario();
-      const { fornecedor } = await criarFornecedor({ razaoSocial: "Antigo", comEndereco: true });
+      const { fornecedor } = await criarFornecedor({
+        razaoSocial: "Antigo",
+        nomeFantasia: "Fantasia Antiga",
+        comEndereco: true,
+      });
 
       await fornecedorDAO.update(
         fornecedor.id_fornecedor,
         {
           razao_social: "Novo",
+          nome_fantasia: "Fantasia Nova",
           ativo: true,
           emails: [{ endereco: "novo@for.com", principal: true }],
         },
@@ -110,14 +121,21 @@ describe("fornecedorDAO", () => {
 
       const noBanco = await fornecedorDAO.getById(fornecedor.id_fornecedor);
       expect(noBanco?.pessoaJuridica.razao_social).toBe("Novo");
+      expect(noBanco?.pessoaJuridica.nome_fantasia).toBe("Fantasia Nova");
       expect(noBanco?.ativo).toBe(true);
       expect(noBanco?.emails.map((e) => e.endereco)).toEqual(["novo@for.com"]);
 
       const auditorias = await auditoriasDe("Fornecedor", fornecedor.id_fornecedor);
       expect(auditorias).toHaveLength(1);
       expect(auditorias[0]?.acao).toBe("ALTERAR");
-      expect(auditorias[0]?.dados_anteriores).toMatchObject({ razao_social: "Antigo" });
-      expect(auditorias[0]?.dados_novos).toMatchObject({ razao_social: "Novo" });
+      expect(auditorias[0]?.dados_anteriores).toMatchObject({
+        razao_social: "Antigo",
+        nome_fantasia: "Fantasia Antiga",
+      });
+      expect(auditorias[0]?.dados_novos).toMatchObject({
+        razao_social: "Novo",
+        nome_fantasia: "Fantasia Nova",
+      });
     });
 
     it("atualiza endereço existente e substitui telefones", async () => {

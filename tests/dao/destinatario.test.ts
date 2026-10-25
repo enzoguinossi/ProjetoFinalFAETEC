@@ -71,6 +71,7 @@ describe("destinatarioDAO", () => {
       const criado = await destinatarioDAO.create(
         {
           razao_social: "Escola Nova",
+          nome_fantasia: "Escolinha Nova",
           cnpj: "11222333000144",
           tipo_destinatario: "CRECHE",
           endereco: { logradouro: "Rua A", numero: "10", cidade: "Niterói", uf: "RJ" },
@@ -82,11 +83,16 @@ describe("destinatarioDAO", () => {
       );
 
       expect(criado.pessoaJuridica.razao_social).toBe("Escola Nova");
+      expect(criado.pessoaJuridica.nome_fantasia).toBe("Escolinha Nova");
       expect(criado.endereco.cidade).toBe("Niterói");
 
       const auditoriasPj = await auditoriasDe("PessoaJuridica", criado.id_pessoa_juridica);
       const auditoriasDest = await auditoriasDe("Destinatario", criado.id_destinatario);
       expect(auditoriasPj.map((a) => a.acao)).toEqual(["CRIAR"]);
+      expect(auditoriasPj[0]?.dados_novos).toMatchObject({
+        razao_social: "Escola Nova",
+        nome_fantasia: "Escolinha Nova",
+      });
       expect(auditoriasDest.map((a) => a.acao)).toEqual(["CRIAR"]);
       expect(auditoriasDest[0]?.dados_novos).toMatchObject({ tipo: "CRECHE" });
     });
@@ -95,12 +101,16 @@ describe("destinatarioDAO", () => {
   describe("update", () => {
     it("altera dados, atualiza endereço parcialmente e substitui listas", async () => {
       const { usuario } = await criarUsuario();
-      const { destinatario } = await criarDestinatario({ razaoSocial: "Antiga" });
+      const { destinatario } = await criarDestinatario({
+        razaoSocial: "Antiga",
+        nomeFantasia: "Fantasia Antiga",
+      });
 
       await destinatarioDAO.update(
         destinatario.id_destinatario,
         {
           razao_social: "Nova",
+          nome_fantasia: "Fantasia Nova",
           tipo_destinatario: "CRECHE",
           ativo: true,
           endereco: { cidade: "São Gonçalo" },
@@ -112,6 +122,7 @@ describe("destinatarioDAO", () => {
 
       const noBanco = await destinatarioDAO.getById(destinatario.id_destinatario);
       expect(noBanco?.pessoaJuridica.razao_social).toBe("Nova");
+      expect(noBanco?.pessoaJuridica.nome_fantasia).toBe("Fantasia Nova");
       expect(noBanco?.tipo_destinatario).toBe("CRECHE");
       expect(noBanco?.endereco.cidade).toBe("São Gonçalo");
       expect(noBanco?.endereco.logradouro).toContain("Rua");
@@ -120,8 +131,14 @@ describe("destinatarioDAO", () => {
       const auditorias = await auditoriasDe("Destinatario", destinatario.id_destinatario);
       expect(auditorias).toHaveLength(1);
       expect(auditorias[0]?.acao).toBe("ALTERAR");
-      expect(auditorias[0]?.dados_anteriores).toMatchObject({ razao_social: "Antiga" });
-      expect(auditorias[0]?.dados_novos).toMatchObject({ razao_social: "Nova" });
+      expect(auditorias[0]?.dados_anteriores).toMatchObject({
+        razao_social: "Antiga",
+        nome_fantasia: "Fantasia Antiga",
+      });
+      expect(auditorias[0]?.dados_novos).toMatchObject({
+        razao_social: "Nova",
+        nome_fantasia: "Fantasia Nova",
+      });
     });
 
     it("registra DESATIVAR quando ativo vira false", async () => {

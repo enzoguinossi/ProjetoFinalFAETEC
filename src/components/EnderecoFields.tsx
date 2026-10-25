@@ -18,17 +18,29 @@ export type EnderecoValue = {
   longitude: string;
 };
 
-type EnderecoInitial = Partial<{
+export type EnderecoInitial = Partial<{
   [K in keyof EnderecoValue]: EnderecoValue[K] | null;
 }>;
 
 interface Props {
   initial?: EnderecoInitial | null;
+  /** Sugestão externa (ex.: consulta de CNPJ) mesclada nos campos quando chega. */
+  sugestao?: EnderecoInitial | null;
   disabled?: boolean;
   required?: boolean;
   showCoords?: boolean;
   onLookup: (cep: string) => Promise<ResultadoCep>;
 }
+
+const CAMPOS_SUGESTAO: (keyof EnderecoValue)[] = [
+  "cep",
+  "logradouro",
+  "numero",
+  "complemento",
+  "bairro",
+  "cidade",
+  "uf",
+];
 
 const roClass = "flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base";
 const colClass = "flex flex-1 flex-col gap-2";
@@ -66,6 +78,7 @@ function toValue(initial?: EnderecoInitial | null): EnderecoValue {
 
 export default function EnderecoFields({
   initial,
+  sugestao = null,
   disabled = false,
   required = false,
   showCoords = false,
@@ -73,7 +86,24 @@ export default function EnderecoFields({
 }: Props) {
   const [value, setValue] = useState<EnderecoValue>(toValue(initial));
   const [buscando, setBuscando] = useState(false);
+  const [sugestaoAplicada, setSugestaoAplicada] = useState<EnderecoInitial | null>(null);
   const mostrarAviso = useAviso();
+
+  // Ajuste de estado na renderização quando chega uma nova sugestão (ex.: consulta de CNPJ):
+  // mescla os campos informados sem descartar o que o usuário já digitou nos demais.
+  if (sugestao !== sugestaoAplicada) {
+    setSugestaoAplicada(sugestao);
+    if (sugestao) {
+      setValue((prev) => {
+        const proximo = { ...prev };
+        for (const campo of CAMPOS_SUGESTAO) {
+          const sugerido = sugestao[campo];
+          if (sugerido != null) proximo[campo] = sugerido;
+        }
+        return proximo;
+      });
+    }
+  }
 
   function set<K extends keyof EnderecoValue>(key: K, v: EnderecoValue[K]) {
     setValue((prev) => ({ ...prev, [key]: v }));

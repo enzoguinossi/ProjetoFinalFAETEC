@@ -21,6 +21,7 @@ export type DestinatarioListRow = {
 export type DestinatarioFormData = {
   id_destinatario: number;
   razao_social: string;
+  nome_fantasia: string | null;
   cnpj: string | null;
   tipo_destinatario: "ESCOLA" | "CRECHE";
   ativo: boolean;
@@ -50,6 +51,14 @@ function lerCnpj(formData: FormData): { cnpj?: string } | { error: string } {
   const resultado = validarCnpj(bruto);
   if (!resultado.ok) return { error: resultado.erro };
   return { cnpj: resultado.cnpj };
+}
+
+/**
+ * Lê o nome fantasia do formulário: vazio → undefined (não grava).
+ */
+function lerNomeFantasia(formData: FormData): string | undefined {
+  const valor = String(formData.get("nome_fantasia") ?? "").trim();
+  return valor || undefined;
 }
 
 export async function listarDestinatarios(
@@ -84,6 +93,7 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
   return {
     id_destinatario: d.id_destinatario,
     razao_social: d.pessoaJuridica.razao_social,
+    nome_fantasia: d.pessoaJuridica.nome_fantasia,
     cnpj: d.pessoaJuridica.cnpj,
     tipo_destinatario: d.tipo_destinatario,
     ativo: d.ativo,
@@ -121,6 +131,7 @@ export async function createDestinatario(formData: FormData) {
     try {
       await destinatarioDAO.create({
         razao_social: razao_social.trim(),
+        nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
         tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
         codigos: codigoResult.codigos,
@@ -157,6 +168,7 @@ export async function updateDestinatario(formData: FormData) {
     try {
       await destinatarioDAO.update(id, {
         razao_social: (formData.get("razao_social") as string)?.trim(),
+        nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
         tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
         ativo,

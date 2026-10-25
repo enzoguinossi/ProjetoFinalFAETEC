@@ -137,13 +137,14 @@ export async function criarEstoque(
 export async function criarDestinatario(
   opts: {
     razaoSocial?: string;
+    nomeFantasia?: string;
     tipo?: "ESCOLA" | "CRECHE";
     ativo?: boolean;
   } = {},
 ) {
   const n = proximo();
   const pessoaJuridica = await prismaTeste.pessoaJuridica.create({
-    data: { razao_social: opts.razaoSocial ?? `Escola ${n}` },
+    data: { razao_social: opts.razaoSocial ?? `Escola ${n}`, nome_fantasia: opts.nomeFantasia },
   });
   const endereco = await prismaTeste.endereco.create({
     data: { logradouro: `Rua ${n}`, cidade: "Rio de Janeiro" },
@@ -160,11 +161,11 @@ export async function criarDestinatario(
 }
 
 export async function criarFornecedor(
-  opts: { razaoSocial?: string; comEndereco?: boolean; ativo?: boolean } = {},
+  opts: { razaoSocial?: string; nomeFantasia?: string; comEndereco?: boolean; ativo?: boolean } = {},
 ) {
   const n = proximo();
   const pessoaJuridica = await prismaTeste.pessoaJuridica.create({
-    data: { razao_social: opts.razaoSocial ?? `Fornecedor ${n}` },
+    data: { razao_social: opts.razaoSocial ?? `Fornecedor ${n}`, nome_fantasia: opts.nomeFantasia },
   });
   const endereco = opts.comEndereco
     ? await prismaTeste.endereco.create({

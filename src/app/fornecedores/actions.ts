@@ -21,6 +21,7 @@ export type FornecedorListRow = {
 export type FornecedorFormData = {
   id_fornecedor: number;
   razao_social: string;
+  nome_fantasia: string | null;
   cnpj: string | null;
   ativo: boolean;
   endereco: {
@@ -49,6 +50,14 @@ function lerCnpj(formData: FormData): { cnpj?: string } | { error: string } {
   const resultado = validarCnpj(bruto);
   if (!resultado.ok) return { error: resultado.erro };
   return { cnpj: resultado.cnpj };
+}
+
+/**
+ * Lê o nome fantasia do formulário: vazio → undefined (não grava).
+ */
+function lerNomeFantasia(formData: FormData): string | undefined {
+  const valor = String(formData.get("nome_fantasia") ?? "").trim();
+  return valor || undefined;
 }
 
 export async function listarFornecedores(
@@ -83,6 +92,7 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
   return {
     id_fornecedor: f.id_fornecedor,
     razao_social: f.pessoaJuridica.razao_social,
+    nome_fantasia: f.pessoaJuridica.nome_fantasia,
     cnpj: f.pessoaJuridica.cnpj,
     ativo: f.ativo,
     endereco: f.endereco ? {
@@ -122,6 +132,7 @@ export async function createFornecedor(formData: FormData) {
     try {
       const criado = await fornecedorDAO.create({
         razao_social: razao_social.trim(),
+        nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,
@@ -158,6 +169,7 @@ export async function updateFornecedor(formData: FormData) {
     try {
       await fornecedorDAO.update(id, {
         razao_social: (formData.get("razao_social") as string)?.trim(),
+        nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
         ativo,
         codigos: codigoResult.codigos,
