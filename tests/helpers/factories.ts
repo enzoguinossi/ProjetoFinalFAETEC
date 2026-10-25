@@ -202,15 +202,29 @@ export async function criarVeiculo(
 }
 
 export async function criarNotaSaida(
-  opts: { idDestinatario?: number; urgente?: boolean } = {},
+  opts: {
+    idDestinatario?: number;
+    urgente?: boolean;
+    status?:
+      | "ABERTA"
+      | "EM_PERCURSO"
+      | "PENDENTE"
+      | "BAIXA_TOTAL"
+      | "BAIXA_PARCIAL"
+      | "BAIXA_COM_CORTE"
+      | "CANCELADA";
+    dataCriacao?: Date;
+    ativo?: boolean;
+  } = {},
 ) {
   return prismaTeste.notaSaida.create({
     data: {
       id_destinatario: opts.idDestinatario,
-      data_criacao: new Date(),
+      data_criacao: opts.dataCriacao ?? new Date(),
       tipo: "SAIDA",
-      status: "ABERTA",
+      status: opts.status ?? "ABERTA",
       urgente: opts.urgente ?? false,
+      ativo: opts.ativo ?? true,
     },
   });
 }
@@ -230,6 +244,7 @@ export async function criarExpedicao(opts: {
   idCondutor?: number;
   dataPrevista?: Date;
   status?: "PLANEJADA" | "EM_PERCURSO" | "CONCLUIDA";
+  ativo?: boolean;
 } = {}) {
   // Veículo, condutor e data prevista são obrigatórios na expedição: a fábrica
   // cria os vínculos quando o teste não os informa.
@@ -246,6 +261,7 @@ export async function criarExpedicao(opts: {
       id_veiculo: idVeiculo,
       id_funcionario_condutor: idCondutor,
       status: opts.status ?? "PLANEJADA",
+      ativo: opts.ativo ?? true,
     },
   });
 }

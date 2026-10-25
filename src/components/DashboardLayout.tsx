@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Bell, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import Sidebar from "./Sidebar";
 import UserMenu, { headerIconBtnCls, loadUser } from "./UserMenu";
+import MuralBell from "./dashboard/MuralBell";
 import { sidebarRecolhidaStore, type SidebarUser } from "./sidebar-config";
 
 export default function DashboardLayout({
@@ -60,9 +61,7 @@ export default function DashboardLayout({
             <button type="button" className={headerIconBtnCls} aria-label="Configurações">
               <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
-            <button type="button" className={headerIconBtnCls} aria-label="Notificações">
-              <Bell size={18} strokeWidth={1.75} aria-hidden="true" />
-            </button>
+            <MuralBell />
             <UserMenu user={user} />
           </div>
         </header>

@@ -132,6 +132,8 @@ model Usuario {
   senha_alterada_em    DateTime?             @map("senha_alterada_em") @db.Timestamp(0)
   super_admin          Boolean               @default(false) @map("super_admin")
   ultimo_acesso        DateTime?             @map("ultimo_acesso") @db.Timestamp(0)
+  /** Marca de leitura do mural — por usuário, porque o sistema é usado em vários terminais. */
+  mural_visto_em       DateTime?             @map("mural_visto_em") @db.Timestamp(0)
   ativo                Boolean               @default(true) @map("ativo")
   ajustesAprovados     AjusteInventario[]    @relation("ajuste_usuario_aprovacao")
   inventariosAbertos   Inventario[]          @relation("usuario_abertura")
@@ -721,6 +723,11 @@ model MensagemMural {
   data_expiracao    DateTime? @map("data_expiracao") @db.Timestamp(0)
   automatica        Boolean   @default(false) @map("automatica")
   ativo             Boolean   @default(true) @map("ativo")
+  /**
+   * Chave de idempotência da mensagem automática ativa (`validade:{id}:{faixa}`).
+   * Nula nas mensagens manuais e nas automáticas já desativadas (histórico).
+   */
+  chave             String?   @unique @map("chave")
   usuario           Usuario?  @relation(fields: [id_usuario], references: [id_usuario])
 
   @@index([id_usuario], map: "mensagem_mural_ID_usuario_fkey")

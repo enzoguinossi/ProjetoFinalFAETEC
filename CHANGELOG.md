@@ -13,6 +13,49 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Added
+
+- **Mural de mensagens no dashboard (KAN-156, RF009):** card próprio no dashboard, antes
+  dos gráficos e sem página `/mural`. Qualquer usuário autenticado vê as mensagens ativas
+  (manuais e automáticas); quem possui `mural.criar`/`mural.alterar`/`mural.excluir`
+  publica, edita e desativa mensagens manuais em modal, com autor, título opcional,
+  conteúdo e expiração opcional. As automáticas são somente leitura e levam o selo
+  **Sistema**. **Ver anteriores** abre o histórico auditável com as manuais
+  desativadas/expiradas e os alertas automáticos anteriores; nada é apagado fisicamente.
+  A edição de mensagem já desativada/expirada é recusada no serviço, preservando o
+  histórico (RN004).
+- **Sino de mensagens novas (KAN-156):** sino no header com a quantidade de mensagens
+  ativas publicadas depois da última leitura do usuário. A marca vive no banco
+  (`usuario.mural_visto_em`), então vários terminais compartilham o mesmo estado; o
+  componente consulta ao montar, a cada 60 s e ao voltar o foco/visibilidade, marca como
+  visto no clique e leva a `/dashboard#mural`.
+- **Alertas de validade no mural (KAN-140, RN002/RF014):** ao abrir o dashboard, cada
+  produto perecível ativo e com validade mantém **uma única mensagem automática ativa**,
+  na faixa de 90, 60, 45 ou 30 dias. Ao mudar de faixa, a mensagem anterior é desativada
+  (com a chave liberada) e permanece no histórico; produto vencido ou inativo tem a
+  mensagem ativa desativada. A geração é idempotente, tolerante a falhas por produto e
+  usa o dia civil de São Paulo.
+- **Gráficos e indicadores reais no dashboard (KAN-140, KAN-156):** `chart.js` +
+  `react-chartjs-2` alimentam três gráficos — movimentações de entrada/saída dos últimos
+  seis meses, top 5 produtos por saldo (com unidade) e notas de saída por status. Os KPI
+  (itens em estoque, produtos com saldo, saídas pendentes, expedições em percurso e
+  perecíveis vencendo em 30 dias) e a lista de pendências usam consultas reais, respeitam
+  `estoque.ver_saldo`, `nota_saida.consultar` e as permissões de expedição e mostram estado
+  vazio quando não há dados ou permissão.
+
+### Changed
+
+- **Dashboard:** os valores estáticos de KPI e de pendências foram substituídos por dados
+  reais; a ordem da tela passou a ser título → KPI → mural → gráficos → pendências.
+- **Banco de dados:** `mensagem_mural.chave` (única, usada pela mensagem automática ativa;
+  nula no histórico e nas manuais) e `usuario.mural_visto_em` (marca de leitura do mural).
+  Aplicados no banco de desenvolvimento com `prisma db push`; a produção depende da
+  próxima release.
+- **Cobertura:** `tests/dao/mural.test.ts`, `tests/dao/dashboard.test.ts`,
+  `tests/services/mural.test.ts` e `tests/services/alerta-validade.test.ts` cobrem
+  ativas/histórico, imutabilidade, permissões de leitura, sino, faixas 90/60/45/30,
+  idempotência, troca de faixa, produto vencido/inativo e as agregações do dashboard.
+
 ## [4.24.10.2026] - 2026-10-24
 
 Esta seção consolida o CNPJ de pessoa jurídica: `VARCHAR(14)` com validação e máscara,
