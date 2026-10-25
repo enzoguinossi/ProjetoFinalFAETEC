@@ -107,7 +107,7 @@ export class FuncionarioDAO {
 
   async update(
     id: number,
-    data: { nome?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
+    data: { nome?: string; cpf?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
@@ -116,11 +116,26 @@ export class FuncionarioDAO {
         include: { pessoaFisica: true, funcionarioCodigos: true, emails: true, telefones: true },
       });
 
-      if (data.nome !== undefined) {
+      const nomePf = data.nome ?? antes.pessoaFisica.nome;
+      const cpfPf = data.cpf !== undefined ? data.cpf : antes.pessoaFisica.cpf;
+
+      if (data.nome !== undefined || data.cpf !== undefined) {
         await tx.pessoaFisica.update({
           where: { id_pessoa_fisica: antes.id_pessoa_fisica },
-          data: { nome: data.nome },
+          data: {
+            ...(data.nome !== undefined ? { nome: data.nome } : {}),
+            ...(data.cpf !== undefined ? { cpf: data.cpf } : {}),
+          },
         });
+      }
+
+      if (nomePf !== antes.pessoaFisica.nome || cpfPf !== antes.pessoaFisica.cpf) {
+        await registrarAuditoria(
+          id_usuario, "ALTERAR", "PessoaFisica", antes.id_pessoa_fisica,
+          { nome: antes.pessoaFisica.nome, cpf: antes.pessoaFisica.cpf },
+          { nome: nomePf, cpf: cpfPf },
+          tx,
+        );
       }
 
       // Remove a marcação de condutor apenas se ele nunca foi usado em expedição.

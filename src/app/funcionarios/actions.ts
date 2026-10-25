@@ -122,6 +122,7 @@ export async function updateFuncionario(formData: FormData) {
         id,
         {
           nome: nome.trim(),
+          cpf: (formData.get("cpf") as string) || undefined,
           cargo: (formData.get("cargo") as string) || undefined,
           condutor: formData.get("condutor") === "on",
           ativo,

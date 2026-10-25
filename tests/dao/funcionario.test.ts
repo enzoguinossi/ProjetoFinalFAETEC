@@ -144,6 +144,29 @@ describe("funcionarioDAO", () => {
       expect(auditorias[0]?.dados_novos).toMatchObject({ nome: "Novo Nome" });
     });
 
+    it("grava CPF em funcionário sem CPF e audita PessoaFisica como ALTERAR", async () => {
+      const { usuario } = await criarUsuario();
+      const { funcionario, pessoaFisica } = await criarFuncionario({ nome: "Sem CPF" });
+
+      await funcionarioDAO.update(
+        funcionario.id_funcionario,
+        { cpf: "52998224725", cargo: "Motorista" },
+        usuario.id_usuario,
+      );
+
+      const noBanco = await funcionarioDAO.getById(funcionario.id_funcionario);
+      expect(noBanco?.pessoaFisica.cpf).toBe("52998224725");
+      expect(noBanco?.cargo).toBe("Motorista");
+
+      const auditoriasPf = await auditoriasDe("PessoaFisica", pessoaFisica.id_pessoa_fisica);
+      expect(auditoriasPf.map((a) => a.acao)).toEqual(["ALTERAR"]);
+      expect(auditoriasPf[0]?.dados_anteriores).toMatchObject({ nome: "Sem CPF", cpf: null });
+      expect(auditoriasPf[0]?.dados_novos).toMatchObject({ nome: "Sem CPF", cpf: "52998224725" });
+
+      const auditoriasFunc = await auditoriasDe("Funcionario", funcionario.id_funcionario);
+      expect(auditoriasFunc.map((a) => a.acao)).toEqual(["ALTERAR"]);
+    });
+
     it("registra DESATIVAR quando ativo vira false", async () => {
       const { usuario } = await criarUsuario();
       const { funcionario } = await criarUsuario();

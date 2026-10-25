@@ -31,6 +31,13 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   (largura da sidebar) e o relatório saía espremido à esquerda. A impressão agora
   transforma o grid em bloco, zera padding/overflow do `main` e o relatório ocupa a
   largura útil do A4, fluindo entre páginas.
+- **CPF e cargo do funcionário no formulário (KAN-153):** ao editar um funcionário, os
+  campos **CPF** e **Cargo** abriam em branco, porque os inputs dependiam de um estado que
+  não existia; passaram a ser controlados e inicializados com os dados do funcionário
+  (visualização e criação inalteradas). O **CPF** também não era enviado pela Server Action
+  de edição nem gravado pelo DAO — agora é salvo em `pessoa_fisica.cpf` e a alteração
+  registra auditoria `PessoaFisica`/`ALTERAR` com os snapshots antes/depois (`nome`, `cpf`),
+  mantendo a auditoria de `Funcionario`.
 
 ## [2.24.10.2026] - 2026-10-24
 

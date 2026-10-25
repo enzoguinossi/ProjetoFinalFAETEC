@@ -29,6 +29,8 @@ export default function FuncionarioForm({
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
   const [nome, setNome] = useState(initialData?.nome ?? "");
+  const [cpf, setCpf] = useState(initialData?.cpf ?? "");
+  const [cargo, setCargo] = useState(initialData?.cargo ?? "");
   const [condutor, setCondutor] = useState(initialData?.condutor ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
@@ -88,8 +90,8 @@ export default function FuncionarioForm({
           )}
 
           {textField("Nome", "nome", initialData?.nome, nome, setNome, true)}
-          {textField("CPF", "cpf", initialData?.cpf)}
-          {textField("Cargo", "cargo", initialData?.cargo)}
+          {textField("CPF", "cpf", initialData?.cpf, cpf, setCpf)}
+          {textField("Cargo", "cargo", initialData?.cargo, cargo, setCargo)}
 
           {!isView ? (
             <label className="flex items-center gap-2 font-sans text-base text-ink-strong cursor-pointer">
