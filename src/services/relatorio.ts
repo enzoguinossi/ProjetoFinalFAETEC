@@ -541,7 +541,6 @@ export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
   const cabecalho = [
     "Código",
     "Descrição",
-    "Unidade",
     "Quantidade",
     "Qtd. Livre",
     "Situação",
@@ -549,7 +548,6 @@ export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
   const registros = linhas.map((linha) => [
     linha.codigo,
     linha.descricao,
-    linha.unidade,
     formatarQuantidadeCsv(linha.quantidade),
     formatarQuantidadeCsv(linha.livre),
     linha.situacao,
@@ -667,7 +665,6 @@ export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): str
   const cabecalho = [
     "Código",
     "Produto",
-    "Unidade",
     "Quantidade",
     "Validade",
     "Dias restantes",
@@ -676,7 +673,6 @@ export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): str
   const registros = linhas.map((linha) => [
     linha.codigo,
     linha.descricao,
-    linha.unidade,
     formatarQuantidadeCsv(linha.quantidade),
     formatarDataISO(linha.validade),
     String(linha.dias_restantes),

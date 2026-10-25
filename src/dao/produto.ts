@@ -17,7 +17,6 @@ export class ProdutoDAO {
       prisma.produto.findMany({
         skip, take, where,
         include: {
-          conversaoPadrao: true,
           estoques: {
             where: { ativo: true },
             select: { quantidade_atual: true, saldo_reservado: true },
@@ -104,7 +103,6 @@ export class ProdutoDAO {
         select: {
           id_produto: true,
           descricao: true,
-          conversaoPadrao: { select: { nome: true } },
           estoques: {
             where: { ativo: true },
             select: { quantidade_atual: true, saldo_reservado: true },
@@ -121,6 +119,7 @@ export class ProdutoDAO {
       where: { id_produto: id },
       include: {
         conversaoPadrao: true,
+        conversaoSaida: true,
         produtoCodigos: { include: { tipoCodigo: true } },
         estoques: { where: { ativo: true } },
         insumosPai: { include: { produtoFilho: true } },
@@ -131,19 +130,22 @@ export class ProdutoDAO {
   async createCompleto(
     data: {
       descricao: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
-      data_validade?: string; id_conversao_padrao?: number;
+      data_validade?: string; id_conversao_padrao?: number; id_conversao_saida?: number;
       codigos?: { id_tipo_codigo: number; codigo: string }[];
       insumos?: { id_produto_filho: number; quantidade: number }[];
     },
     id_usuario: number,
   ) {
-    // A unidade padrão do produto é obrigatória: quando o formulário não
-    // informa, vale a unidade padrão do sistema (UNIDADE/1).
-    const idConversaoPadrao =
-      data.id_conversao_padrao ?? (await conversaoUnidadeDAO.getPadrao())?.id_conversao;
+    // As duas conversões são obrigatórias. Quando o formulário não informa,
+    // vale a unidade padrão do sistema (UNIDADE/1) — a de saída só é usada em
+    // Remessa; a de entrada é o fator aplicado na entrada do estoque.
+    const unidadePadrao = await conversaoUnidadeDAO.getPadrao();
+    const idConversaoPadrao = data.id_conversao_padrao ?? unidadePadrao?.id_conversao;
     if (!idConversaoPadrao) {
       throw new Error("Nenhuma unidade padrão configurada. Execute o seed do sistema.");
     }
+    const idConversaoSaida =
+      data.id_conversao_saida ?? unidadePadrao?.id_conversao ?? idConversaoPadrao;
 
     return prisma.$transaction(async (tx) => {
       const p = await tx.produto.create({
@@ -154,13 +156,19 @@ export class ProdutoDAO {
           composto: data.composto ?? false,
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
           id_conversao_padrao: idConversaoPadrao,
+          id_conversao_saida: idConversaoSaida,
         },
       });
 
       await registrarAuditoria(
         id_usuario, "CRIAR", "Produto", p.id_produto,
         null,
-        { descricao: data.descricao, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        {
+          descricao: data.descricao,
+          id_conversao_padrao: idConversaoPadrao,
+          id_conversao_saida: idConversaoSaida,
+          codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
+        },
         tx,
       );
 
@@ -180,7 +188,12 @@ export class ProdutoDAO {
 
       return tx.produto.findUniqueOrThrow({
         where: { id_produto: p.id_produto },
-        include: { conversaoPadrao: true, produtoCodigos: { include: { tipoCodigo: true } }, insumosPai: { include: { produtoFilho: true } } },
+        include: {
+          conversaoPadrao: true,
+          conversaoSaida: true,
+          produtoCodigos: { include: { tipoCodigo: true } },
+          insumosPai: { include: { produtoFilho: true } },
+        },
       });
     });
   }
@@ -189,7 +202,8 @@ export class ProdutoDAO {
     id: number,
     data: {
       descricao?: string; foto_url?: string; perecivel?: boolean; composto?: boolean;
-      data_validade?: string; id_conversao_padrao?: number; ativo?: boolean;
+      data_validade?: string; id_conversao_padrao?: number; id_conversao_saida?: number;
+      ativo?: boolean;
       codigos?: { id_tipo_codigo: number; codigo: string }[];
       insumos?: { id_produto_filho: number; quantidade: number }[];
     },
@@ -210,6 +224,7 @@ export class ProdutoDAO {
           composto: data.composto ?? false,
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
           id_conversao_padrao: data.id_conversao_padrao,
+          id_conversao_saida: data.id_conversao_saida,
           ativo: data.ativo ?? true,
         },
       });
@@ -218,8 +233,24 @@ export class ProdutoDAO {
         id_usuario,
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         "Produto", id,
-        { descricao: antes.descricao, perecivel: antes.perecivel, composto: antes.composto, ativo: antes.ativo, codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
-        { descricao: depois.descricao, perecivel: depois.perecivel, composto: depois.composto, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })) },
+        {
+          descricao: antes.descricao,
+          perecivel: antes.perecivel,
+          composto: antes.composto,
+          ativo: antes.ativo,
+          id_conversao_padrao: antes.id_conversao_padrao,
+          id_conversao_saida: antes.id_conversao_saida,
+          codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
+        },
+        {
+          descricao: depois.descricao,
+          perecivel: depois.perecivel,
+          composto: depois.composto,
+          ativo: depois.ativo,
+          id_conversao_padrao: depois.id_conversao_padrao,
+          id_conversao_saida: depois.id_conversao_saida,
+          codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
+        },
         tx,
       );
 
@@ -241,7 +272,12 @@ export class ProdutoDAO {
 
       return tx.produto.findUniqueOrThrow({
         where: { id_produto: id },
-        include: { conversaoPadrao: true, produtoCodigos: { include: { tipoCodigo: true } }, insumosPai: { include: { produtoFilho: true } } },
+        include: {
+          conversaoPadrao: true,
+          conversaoSaida: true,
+          produtoCodigos: { include: { tipoCodigo: true } },
+          insumosPai: { include: { produtoFilho: true } },
+        },
       });
     });
   }

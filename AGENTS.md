@@ -169,7 +169,9 @@ As convenções documentadas são:
   com desativação (`ativo = false`). A unidade **padrão** do sistema (UNIDADE/1) é a
   exceção dentro da exceção: não pode ser excluída nem ter nome ou fator alterados
   — só a descrição é editável. Ao excluir uma unidade que não é a padrão, os produtos
-  que a usavam são revinculados à unidade padrão.
+  que a usavam são revinculados à unidade padrão **nos dois vínculos** — Conversão Padrão
+  de Entrada (`ID_conversao_padrao`) e Unidade Padrão de Saída (`ID_conversao_saida`) —,
+  com auditoria dos totais.
 
 Preserve as convenções existentes do projeto.
 
@@ -195,6 +197,12 @@ A regra é:
 saldo_disponivel = quantidade_atual - saldo_reservado
 ```
 
+Todas as quantidades de estoque — `quantidade_atual`, `saldo_reservado`, movimentação,
+reserva e baixa — estão em **base** (`UNIDADE`, fator 1). A **conversão de unidade é fator
+de entrada**, nunca a unidade do saldo: só a entrada e a quantidade informada na Remessa são
+convertidas. Dashboard, relatórios, listagens e seletores exibem a quantidade base **sem o
+nome da unidade**.
+
 ## 8.1 Entrada
 
 Uma entrada confirmada:
@@ -203,7 +211,9 @@ Uma entrada confirmada:
 quantidade_atual += quantidade_convertida
 ```
 
-e gera registro de movimentação de estoque.
+em que `quantidade_convertida = quantidade × fator`, partindo da Conversão Padrão de Entrada
+do produto (`ID_conversao_padrao`) e com fator editável na nota; gera também o registro de
+movimentação de estoque.
 
 ## 8.2 Reserva (nota de saída Remessa)
 
@@ -216,10 +226,19 @@ saldo_reservado += quantidade
 A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa. Criar a
 nota também não representa baixa física definitiva.
 
+Na Remessa a quantidade é informada na **Unidade Padrão de Saída** do produto
+(`produto.ID_conversao_saida`) e convertida para base no item:
+`qtd_esperada = quantidade_solicitada × fator_conversao`. O item guarda `unidade_saida`,
+`fator_conversao` e `quantidade_solicitada` como **snapshot** (auditoria e telas continuam
+corretos mesmo se a conversão for editada/excluída), e `qtd_esperada`/`qtd_entregue` ficam em
+base. Reserva, baixa, entrega e pendência usam sempre a base.
+
 **Avaria (`AVARIA`) e Consumo Interno (`CONSUMO_INTERNO`)** não são remessa: não têm destinatário,
 **não reservam** e dão **baixa real na criação** (`quantidade_atual -= quantidade`, com movimentação
 negativa e `ID_nota_saida`); a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`. A
-reserva acima vale apenas para Remessa.
+reserva acima vale apenas para Remessa. Avaria/Consumo também **não usam unidade de saída**
+(`unidade_saida = NULL`, `fator_conversao = 1`, quantidade já em base); notas antigas sem
+`quantidade_solicitada` exibem a base com o fallback `quantidade_solicitada ?? qtd_esperada`.
 
 ## 8.3 Cancelamento
 
@@ -409,7 +428,8 @@ Quando a entidade possuir `ativo`, utilize a desativação prevista pelo domíni
 `ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. A unidade
 **padrão** (`padrao = true`, UNIDADE/1) **não pode ser excluída** nem ter nome ou
 fator alterados; ao excluir uma unidade que não é a padrão, os produtos que a usavam são
-**revinculados à unidade padrão**. As demais
+**revinculados à unidade padrão nos dois campos** (`ID_conversao_padrao` e
+`ID_conversao_saida`), com o total na auditoria. As demais
 entidades de cadastro continuam com desativação.
 
 Históricos operacionais e registros de auditoria devem permanecer preservados.
@@ -440,6 +460,11 @@ Uma nota pendente pode ser adicionada posteriormente a outra expedição.
 
 Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante;
 a pendência é a própria nota em `BAIXA_PARCIAL` (sem split e sem remessa).
+
+A Remessa informa a quantidade na **Unidade Padrão de Saída** do produto; a conversão para
+base ocorre no item, que guarda `unidade_saida`, `fator_conversao` e `quantidade_solicitada`
+como snapshot. A expedição, a baixa e a pendência trabalham apenas com `qtd_esperada` e
+`qtd_entregue` em base (UNIDADE). Avaria e Consumo Interno não têm unidade de saída.
 
 Não implemente um novo fluxo de entrega sem verificar:
 

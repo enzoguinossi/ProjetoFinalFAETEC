@@ -40,7 +40,7 @@ describe("produtoDAO", () => {
 
       expect(resultado.data[0]?.estoques).toHaveLength(1);
       expect(resultado.data[0]?.estoques[0]?.quantidade_atual).toBe(10);
-      expect(resultado.data[0]).toHaveProperty("conversaoPadrao");
+      expect(resultado.data[0]).not.toHaveProperty("conversaoPadrao");
     });
 
     it("exclui os ids informados e mantém o total coerente", async () => {
@@ -131,7 +131,7 @@ describe("produtoDAO", () => {
       ]);
     });
 
-    it("devolve a unidade de conversão padrão na busca priorizada (mesma forma do list)", async () => {
+    it("devolve a linha sem unidade, com os saldos do produto", async () => {
       const tipo = await criarTipoCodigo("DIGITACAO");
       const caixa = await criarConversao("CX", 12);
       const comConversao = await criarProduto({
@@ -149,16 +149,9 @@ describe("produtoDAO", () => {
       const resultado = await produtoDAO.searchPriorizadoComEstoque("ABC");
       const linhas = new Map(resultado.map((p) => [p.id_produto, produtoParaLinha(p)]));
 
-      expect(linhas.get(comConversao.id_produto)?.unidade).toBe("CX");
-      expect(linhas.get(semConversao.id_produto)?.unidade).toBe("UNIDADE");
-    });
-    it("produtoParaLinha devolve o nome da unidade padrão do produto", async () => {
-      const caixa = await criarConversao("CX12", 12);
-      const produto = await criarProduto({ idConversaoPadrao: caixa.id_conversao });
-
-      const linha = produtoParaLinha({ ...produto, conversaoPadrao: caixa, estoques: [] });
-
-      expect(linha.unidade).toBe("CX12");
+      expect(linhas.get(comConversao.id_produto)).not.toHaveProperty("unidade");
+      expect(linhas.get(semConversao.id_produto)).not.toHaveProperty("unidade");
+      expect(resultado[0]).not.toHaveProperty("conversaoPadrao");
     });
   });
 
@@ -232,20 +225,29 @@ describe("produtoDAO", () => {
       );
 
       expect(criado.id_conversao_padrao).toBe(padrao.id_conversao);
+      expect(criado.id_conversao_saida).toBe(padrao.id_conversao);
       expect(criado.conversaoPadrao).toMatchObject({ nome: "UNIDADE" });
+      expect(criado.conversaoSaida).toMatchObject({ nome: "UNIDADE" });
     });
 
-    it("respeita a unidade explícita no cadastro do produto", async () => {
+    it("respeita as unidades explícitas de entrada e de saída", async () => {
       const { usuario } = await criarUsuario();
-      const caixa = await criarConversao("CX12", 12);
+      const entrada = await criarConversao("CX12", 12);
+      const saida = await criarConversao("CX50", 50);
 
       const criado = await produtoDAO.createCompleto(
-        { descricao: "Com caixa", id_conversao_padrao: caixa.id_conversao },
+        {
+          descricao: "Com caixas",
+          id_conversao_padrao: entrada.id_conversao,
+          id_conversao_saida: saida.id_conversao,
+        },
         usuario.id_usuario,
       );
 
-      expect(criado.id_conversao_padrao).toBe(caixa.id_conversao);
+      expect(criado.id_conversao_padrao).toBe(entrada.id_conversao);
+      expect(criado.id_conversao_saida).toBe(saida.id_conversao);
       expect(criado.conversaoPadrao).toMatchObject({ nome: "CX12" });
+      expect(criado.conversaoSaida).toMatchObject({ nome: "CX50" });
     });
   });
 
@@ -255,6 +257,7 @@ describe("produtoDAO", () => {
       const tipo = await criarTipoCodigo("DIGITACAO");
       const insumoA = await criarProduto({ descricao: "Insumo A" });
       const insumoB = await criarProduto({ descricao: "Insumo B" });
+      const saida = await criarConversao("CX50", 50);
       const criado = await produtoDAO.createCompleto(
         {
           descricao: "Original",
@@ -269,6 +272,7 @@ describe("produtoDAO", () => {
         {
           descricao: "Atualizado",
           composto: true,
+          id_conversao_saida: saida.id_conversao,
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "NEW" }],
           insumos: [{ id_produto_filho: insumoB.id_produto, quantidade: 5 }],
         },
@@ -276,6 +280,8 @@ describe("produtoDAO", () => {
       );
 
       expect(atualizado.descricao).toBe("Atualizado");
+      expect(atualizado.id_conversao_saida).toBe(saida.id_conversao);
+      expect(atualizado.conversaoSaida).toMatchObject({ nome: "CX50" });
       expect(atualizado.produtoCodigos.map((c) => c.codigo)).toEqual(["NEW"]);
       expect(atualizado.insumosPai.map((i) => i.id_produto_filho)).toEqual([insumoB.id_produto]);
 

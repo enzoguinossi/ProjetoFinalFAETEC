@@ -188,6 +188,7 @@ describe("conversaoUnidadeDAO", () => {
         where: { id_produto: produto.id_produto },
       });
       expect(produtoDepois.id_conversao_padrao).toBe(padrao.id_conversao);
+      expect(produtoDepois.id_conversao_saida).toBe(padrao.id_conversao);
 
       const auditorias = await auditoriasDe("ConversaoUnidade", unidade.id_conversao);
       expect(auditorias).toHaveLength(1);
@@ -196,7 +197,37 @@ describe("conversaoUnidadeDAO", () => {
         nome: "CX20",
         fator: 20,
       });
-      expect(auditorias[0]?.dados_novos).toMatchObject({ produtos_revinculados: 1 });
+      expect(auditorias[0]?.dados_novos).toMatchObject({
+        produtos_revinculados: 1,
+        produtos_revinculados_entrada: 1,
+        produtos_revinculados_saida: 1,
+      });
+    });
+
+    it("revincula produtos que usam a unidade só como saída", async () => {
+      const { usuario } = await criarUsuario();
+      const padrao = await garantirUnidadePadrao();
+      const entrada = await criarConversao("CX12", 12);
+      const saida = await criarConversao("CX50", 50);
+      const produto = await criarProduto({
+        idConversaoPadrao: entrada.id_conversao,
+        idConversaoSaida: saida.id_conversao,
+      });
+
+      await conversaoUnidadeDAO.hardDelete(saida.id_conversao, usuario.id_usuario);
+
+      const produtoDepois = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: produto.id_produto },
+      });
+      expect(produtoDepois.id_conversao_padrao).toBe(entrada.id_conversao);
+      expect(produtoDepois.id_conversao_saida).toBe(padrao.id_conversao);
+
+      const auditorias = await auditoriasDe("ConversaoUnidade", saida.id_conversao);
+      expect(auditorias[0]?.dados_novos).toMatchObject({
+        produtos_revinculados: 1,
+        produtos_revinculados_entrada: 0,
+        produtos_revinculados_saida: 1,
+      });
     });
 
     it("exclui a unidade sem uso e registra auditoria EXCLUIR", async () => {

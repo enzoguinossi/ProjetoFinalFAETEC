@@ -224,7 +224,7 @@ export default function AdicionarNotasModal({
                   </div>
                   <div className="font-sans text-xs text-[#697077]">
                     {formatarItens(nota.itens)} · saldo pendente{" "}
-                    {formatarNumero(nota.saldo_pendente)}
+                    {formatarNumero(nota.saldo_pendente)} base
                   </div>
                 </div>
                 <button
@@ -304,7 +304,7 @@ export default function AdicionarNotasModal({
                       {nota.statusLabel}
                     </span>
                     <span className="font-sans text-sm text-ink">
-                      {formatarNumero(nota.saldo_pendente)}
+                      {formatarNumero(nota.saldo_pendente)} base
                     </span>
                   </div>
                 </div>

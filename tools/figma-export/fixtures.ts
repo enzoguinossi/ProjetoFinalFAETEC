@@ -354,6 +354,7 @@ async function main() {
         foto_url: p.foto,
         perecivel: p.perecivel,
         id_conversao_padrao: porNomeConversao[p.conversao] ?? conversaoPadrao,
+        id_conversao_saida: porNomeConversao[p.conversao] ?? conversaoPadrao,
         data_validade: p.validade ? new Date(p.validade) : null,
       },
     });

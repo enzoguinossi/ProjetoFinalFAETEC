@@ -6,20 +6,17 @@ import "./chart-setup";
 import { CORES_GRAFICO, FONTE_GRAFICO } from "./chart-setup";
 
 type Props = {
-  produtos: { descricao: string; unidade: string; quantidade: number }[];
+  produtos: { descricao: string; quantidade: number }[];
   semPermissao?: boolean;
 };
 
-/** O eixo do gráfico é estreito: encurta a descrição e deixa a unidade na 2ª linha. */
-function rotuloProduto(descricao: string, unidade: string): string {
-  const nome = descricao.length > 16 ? `${descricao.slice(0, 15)}…` : descricao;
-  return `${nome}\n(${unidade})`;
+/** O eixo do gráfico é estreito: encurta a descrição do produto. */
+function rotuloProduto(descricao: string): string {
+  return descricao.length > 24 ? `${descricao.slice(0, 23)}…` : descricao;
 }
 
 export default function StockChart({ produtos, semPermissao }: Props) {
-  const labels = produtos.map((produto) =>
-    rotuloProduto(produto.descricao, produto.unidade),
-  );
+  const labels = produtos.map((produto) => rotuloProduto(produto.descricao));
 
   const data: ChartData<"bar"> = {
     labels,

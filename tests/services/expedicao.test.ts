@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  criarConversao,
   criarDestinatario,
   criarEstoque,
   criarExpedicao,
@@ -14,7 +15,9 @@ import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
 import { expedicaoDAO } from "@/dao/expedicao";
 import { expedicaoService } from "@/services/expedicao";
+import { notaSaidaService } from "@/services/nota-saida";
 import { hojeISO } from "@/lib/formatar";
+import { rotuloEsperadaExpedicao } from "@/lib/expedicao-unidade";
 
 type StatusNotaTeste =
   | "ABERTA"
@@ -1108,5 +1111,81 @@ describe("expedicaoService — execução da entrega", () => {
         where: { id_nota_saida: semReserva.nota.id_nota_saida },
       }),
     ).toBe(0);
+  });
+});
+
+describe("expedição de Remessa com unidade de saída", () => {
+  it("expõe unidade/fator no detalhe e baixa a entrega em base", async () => {
+    const { usuario } = await criarUsuario();
+    const caixa = await criarConversao("CAIXA50", 50);
+    const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 200,
+      saldoReservado: 0,
+    });
+    const { destinatario } = await criarDestinatario();
+
+    const remessa = await notaSaidaService.registrar(
+      {
+        tipo: "SAIDA",
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    if ("error" in remessa) throw new Error(remessa.error);
+
+    const expedicao = await criarExpedicao({ status: "EM_PERCURSO" });
+    await prismaTeste.expedicaoNota.create({
+      data: {
+        id_expedicao: expedicao.id_expedicao,
+        id_nota_saida: remessa.nota.id_nota_saida,
+        ordem_visita: 1,
+        data_adicao: new Date(),
+      },
+    });
+    await prismaTeste.notaSaida.update({
+      where: { id_nota_saida: remessa.nota.id_nota_saida },
+      data: { status: "EM_PERCURSO" },
+    });
+
+    const detalhe = await expedicaoDAO.getById(expedicao.id_expedicao);
+    if (!detalhe) throw new Error("expedição não encontrada");
+    const itemDetalhe = detalhe.notas[0]!.notaSaida.itens[0]!;
+    expect(itemDetalhe).toMatchObject({
+      qtd_esperada: 100,
+      qtd_entregue: 0,
+      unidade_saida: "CAIXA50",
+      fator_conversao: 50,
+      quantidade_solicitada: 2,
+    });
+    expect(rotuloEsperadaExpedicao(itemDetalhe)).toBe("2 CAIXA50 (100 base)");
+
+    const entrega = await expedicaoService.registrarEntrega(
+      expedicao.id_expedicao,
+      remessa.nota.id_nota_saida,
+      {
+        itens: [
+          {
+            id_item_nota_saida: itemDetalhe.id_item_nota_saida,
+            qtd_entregue: 100,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    if ("error" in entrega) throw new Error(entrega.error);
+    expect(entrega.entrega.status).toBe("BAIXA_TOTAL");
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.quantidade_atual).toBe(100);
+    expect(estoqueDepois.saldo_reservado).toBe(0);
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: itemDetalhe.id_item_nota_saida },
+    });
+    expect(itemDepois.qtd_entregue).toBe(100);
   });
 });

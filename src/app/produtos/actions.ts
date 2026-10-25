@@ -21,6 +21,7 @@ export type ProdutoFormData = {
   composto: boolean;
   data_validade: string | null;
   id_conversao_padrao: number;
+  id_conversao_saida: number;
   foto_url: string | null;
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
@@ -107,6 +108,7 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
     composto: p.composto,
     data_validade: p.data_validade ? p.data_validade.toISOString().split("T")[0] : null,
     id_conversao_padrao: p.id_conversao_padrao,
+    id_conversao_saida: p.id_conversao_saida,
     foto_url: p.foto_url,
     ativo: p.ativo,
     codigos: p.produtoCodigos.map((c) => ({
@@ -131,6 +133,9 @@ export async function createProduto(formData: FormData) {
     const foto_url = (formData.get("foto_url") as string) || undefined;
     const id_conversao = formData.get("id_conversao")
       ? Number(formData.get("id_conversao"))
+      : undefined;
+    const id_conversao_saida = formData.get("id_conversao_saida")
+      ? Number(formData.get("id_conversao_saida"))
       : undefined;
     const data_validade = perecivel
       ? (formData.get("data_validade") as string) || undefined
@@ -157,6 +162,7 @@ export async function createProduto(formData: FormData) {
           composto,
           data_validade,
           id_conversao_padrao: id_conversao,
+          id_conversao_saida,
           codigos,
           insumos,
         },
@@ -198,6 +204,9 @@ export async function updateProduto(formData: FormData) {
     const id_conversao = formData.get("id_conversao")
       ? Number(formData.get("id_conversao"))
       : undefined;
+    const id_conversao_saida = formData.get("id_conversao_saida")
+      ? Number(formData.get("id_conversao_saida"))
+      : undefined;
     const data_validade = perecivel
       ? (formData.get("data_validade") as string) || undefined
       : undefined;
@@ -234,6 +243,7 @@ export async function updateProduto(formData: FormData) {
           ativo,
           data_validade,
           id_conversao_padrao: id_conversao,
+          id_conversao_saida,
           codigos,
           insumos,
         },

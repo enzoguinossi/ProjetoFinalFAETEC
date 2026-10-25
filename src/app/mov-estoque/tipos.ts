@@ -23,6 +23,14 @@ export type FornecedorSelecaoRow = {
   cnpj: string | null;
 };
 
+export type ProdutoSaidaDetalhe = {
+  id_produto: number;
+  descricao: string;
+  /** Nome da unidade de saída; null quando a relação não existe (fator 1). */
+  unidade_saida: string | null;
+  fator: number;
+};
+
 export type ProdutoEntradaDetalhe = {
   id_produto: number;
   descricao: string;
@@ -125,9 +133,15 @@ export type NotaSaidaItemDetalhe = {
   id_item_nota_saida: number;
   id_produto: number;
   descricao: string;
-  /** Nome da unidade de conversão padrão do produto (`—` quando não houver). */
-  unidade: string;
+  /** Nome da unidade de saída; null em Avaria/Consumo e notas antigas. */
+  unidade_saida: string | null;
+  /** Fator da unidade de saída (1 em Avaria/Consumo e notas antigas). */
+  fator_conversao: number;
+  /** Quantidade na unidade de saída; fallback `qtd_esperada` nas notas antigas. */
   quantidade_solicitada: number;
+  /** Quantidade em base (UNIDADE), usada por reserva/baixa/entrega. */
+  quantidade_base: number;
+  /** Quantidade entregue em base. */
   quantidade_entregue: number;
 };
 
@@ -138,7 +152,7 @@ export type NotaSaidaListRow = {
   tipoLabel: string;
   destinatario: string;
   itens: NotaSaidaItemDetalhe[];
-  /** Soma de `qtd_esperada` dos itens. */
+  /** Soma de `qtd_esperada` dos itens (base). */
   quantidade: number;
   status: string;
   statusLabel: string;

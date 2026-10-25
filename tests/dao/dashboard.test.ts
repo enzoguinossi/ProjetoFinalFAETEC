@@ -114,7 +114,7 @@ describe("dashboardDAO", () => {
   });
 
   describe("topProdutos", () => {
-    it("traz os 5 maiores saldos com unidade, ignorando zero e inativos", async () => {
+    it("traz os 5 maiores saldos, ignorando zero e inativos", async () => {
       for (let quantidade = 1; quantidade <= 6; quantidade += 1) {
         const produto = await criarProduto({ descricao: `Produto ${quantidade}` });
         await criarEstoque(produto.id_produto, { quantidadeAtual: quantidade * 10 });
@@ -128,7 +128,8 @@ describe("dashboardDAO", () => {
 
       expect(top).toHaveLength(5);
       expect(top.map((item) => item.quantidade)).toEqual([60, 50, 40, 30, 20]);
-      expect(top[0]).toMatchObject({ descricao: "Produto 6", unidade: "UNIDADE" });
+      expect(top[0]).toMatchObject({ descricao: "Produto 6" });
+      expect(top[0]).not.toHaveProperty("unidade");
     });
 
     it("devolve vazio sem produtos com saldo", async () => {

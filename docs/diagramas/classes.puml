@@ -190,6 +190,8 @@ package "Produtos e Estoque" as Produtos {
       + perecivel: Boolean
       + composto: Boolean
       + data_validade: Date
+      + ID_conversao_padrao: Integer
+      + ID_conversao_saida: Integer
       + ativo: Boolean
     }
 
@@ -259,7 +261,8 @@ package "Produtos e Estoque" as Produtos {
 Produto "1" --> "0..*" Estoque : estocado em >
 Produto "1" --> "0..*" ProdutoInsumo : pai de >
 Produto "1" <-- "*" ProdutoInsumo : filho de >
-ConversaoUnidade "1" --> "0..*" Produto : conversão padrão >
+ConversaoUnidade "1" --> "0..*" Produto : conversão de entrada >
+ConversaoUnidade "1" --> "0..*" Produto : unidade de saída >
 Estoque "1" --> "*" MovimentacaoEstoque : movimenta >
 Estoque "1" --> "*" ReservaEstoque : reserva >
 NotaSaida "1" --> "*" ReservaEstoque : origina >
@@ -307,6 +310,9 @@ package "Logística" as Logistica {
           + ID_item_nota_saida: Integer
           + qtd_esperada: Float
           + qtd_entregue: Float
+          + unidade_saida: String
+          + fator_conversao: Float
+          + quantidade_solicitada: Float
         }
 
     class Coleta {

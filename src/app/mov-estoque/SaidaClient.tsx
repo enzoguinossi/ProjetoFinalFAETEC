@@ -111,7 +111,7 @@ export default function SaidaClient({
     { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
     {
       key: "itens",
-      label: "Itens",
+      label: "Itens (base)",
       width: "0.9fr",
       align: "right",
       render: (_value, row) => formatarNumero(row.quantidade),
@@ -161,6 +161,7 @@ export default function SaidaClient({
 
   /** Conteúdo da linha expandida: os itens da nota de saída e o cancelamento. */
   function renderItens(nota: NotaSaidaListRow) {
+    const temUnidadeSaida = nota.itens.some((item) => item.unidade_saida !== null);
     return (
       <div className="flex flex-col gap-3">
         {nota.itens.length === 0 ? (
@@ -169,29 +170,40 @@ export default function SaidaClient({
           <div className="flex flex-col gap-2">
             <div className="grid items-center gap-3 px-4 font-sans text-xs uppercase tracking-[0.02em] text-[#697077] sm:grid-cols-[2.5fr_1fr_1fr]">
               <span>Produto</span>
-              <span>Solicitada</span>
-              <span>Entregue</span>
+              <span>Solicitada{temUnidadeSaida ? "" : " (base)"}</span>
+              <span>Entregue{temUnidadeSaida ? "" : " (base)"}</span>
             </div>
 
-            {nota.itens.map((item) => (
-              <div
-                key={item.id_item_nota_saida}
-                className="grid items-center gap-3 rounded-[1rem] bg-[rgba(0,0,0,0.03)] px-4 py-3 font-sans sm:grid-cols-[2.5fr_1fr_1fr]"
-              >
-                <span className="text-base text-ink-strong">{item.descricao}</span>
-                <span className="text-sm text-ink">
-                  {formatarNumero(item.quantidade_solicitada)}
-                </span>
-                <span className="text-sm text-ink">{formatarNumero(item.quantidade_entregue)}</span>
-              </div>
-            ))}
+            {nota.itens.map((item) => {
+              const entregueNaSaida =
+                item.unidade_saida && item.fator_conversao > 0
+                  ? item.quantidade_entregue / item.fator_conversao
+                  : item.quantidade_entregue;
+              const sufixo = item.unidade_saida ? ` ${item.unidade_saida}` : " base";
+              return (
+                <div
+                  key={item.id_item_nota_saida}
+                  className="grid items-center gap-3 rounded-[1rem] bg-[rgba(0,0,0,0.03)] px-4 py-3 font-sans sm:grid-cols-[2.5fr_1fr_1fr]"
+                >
+                  <span className="text-base text-ink-strong">{item.descricao}</span>
+                  <span className="text-sm text-ink">
+                    {formatarNumero(item.quantidade_solicitada)}
+                    {sufixo}
+                  </span>
+                  <span className="text-sm text-ink">
+                    {formatarNumero(entregueNaSaida)}
+                    {sufixo}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
         <div className="flex items-center justify-between gap-3 px-1">
           <span className="font-sans text-sm text-[#697077]">
             {nota.quantidade > 0
-              ? `Quantidade total: ${formatarNumero(nota.quantidade)}`
+              ? `Quantidade total (base): ${formatarNumero(nota.quantidade)}`
               : "Sem quantidade solicitada."}
           </span>
           {nota.tipo !== "SAIDA" ? (

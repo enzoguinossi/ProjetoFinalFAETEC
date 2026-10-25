@@ -43,6 +43,10 @@ export type ExpedicaoNotaItemRow = {
   descricao: string;
   qtd_esperada: number;
   qtd_entregue: number;
+  /** Snapshot da unidade de saída; null em Avaria/Consumo e notas antigas. */
+  unidade_saida: string | null;
+  fator_conversao: number;
+  quantidade_solicitada: number | null;
 };
 
 export type ExpedicaoNotaRow = {
@@ -133,6 +137,9 @@ type ExpedicaoDetalhe = {
         id_item_nota_saida: number;
         qtd_esperada: number;
         qtd_entregue: number;
+        unidade_saida: string | null;
+        fator_conversao: number;
+        quantidade_solicitada: number | null;
         estoque: { produto: { descricao: string } };
       }[];
     };
@@ -195,6 +202,12 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
         descricao: item.estoque.produto.descricao,
         qtd_esperada: Number(item.qtd_esperada),
         qtd_entregue: Number(item.qtd_entregue),
+        unidade_saida: item.unidade_saida,
+        fator_conversao: Number(item.fator_conversao),
+        quantidade_solicitada:
+          item.quantidade_solicitada === null
+            ? null
+            : Number(item.quantidade_solicitada),
       })),
     })),
   };

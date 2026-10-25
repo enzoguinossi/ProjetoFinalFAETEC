@@ -108,7 +108,7 @@ export default async function DashboardPage() {
           valor={podeVerEstoque ? numero.format(estoque.itens) : "—"}
           detalhe={
             podeVerEstoque
-              ? "soma das quantidades, sem converter unidades"
+              ? "soma das quantidades em estoque"
               : "sem permissão para ver o saldo"
           }
         />

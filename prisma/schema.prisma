@@ -279,7 +279,8 @@ model ConversaoUnidade {
   fator        Float     @map("fator")
   descricao    String?   @map("descricao")
   padrao       Boolean   @default(false) @map("padrao")
-  produtos     Produto[]
+  produtosEntrada Produto[] @relation("produto_conversao_entrada")
+  produtosSaida   Produto[] @relation("produto_conversao_saida")
 
   @@map("conversao_unidade")
 }
@@ -291,17 +292,20 @@ model Produto {
   perecivel           Boolean            @default(false) @map("perecivel")
   composto            Boolean            @default(false) @map("composto")
   data_validade       DateTime?          @map("data_validade") @db.Date
-  id_conversao_padrao Int                @map("ID_conversao_padrao")
+  id_conversao_padrao Int                @default(1) @map("ID_conversao_padrao")
+  id_conversao_saida  Int                @default(1) @map("ID_conversao_saida")
   ativo               Boolean            @default(true) @map("ativo")
   estoques            Estoque[]
   itensNotaEntrada    ItemNotaEntrada[]
   itensPedido         ItemPedidoEscola[]
-  conversaoPadrao     ConversaoUnidade   @relation(fields: [id_conversao_padrao], references: [id_conversao])
+  conversaoPadrao     ConversaoUnidade   @relation("produto_conversao_entrada", fields: [id_conversao_padrao], references: [id_conversao])
+  conversaoSaida      ConversaoUnidade   @relation("produto_conversao_saida", fields: [id_conversao_saida], references: [id_conversao])
   produtoCodigos      ProdutoCodigo[]
   insumosFilho        ProdutoInsumo[]    @relation("produto_filho")
   insumosPai          ProdutoInsumo[]    @relation("produto_pai")
 
   @@index([id_conversao_padrao], map: "produto_ID_conversao_padrao_fkey")
+  @@index([id_conversao_saida], map: "produto_ID_conversao_saida_fkey")
   @@map("produto")
 }
 
@@ -508,6 +512,12 @@ model ItemNotaSaida {
   id_estoque         Int       @map("ID_estoque")
   qtd_esperada       Float     @map("qtd_esperada")
   qtd_entregue       Float     @default(0) @map("qtd_entregue")
+  /** Nome da unidade de saída no momento da nota; null em Avaria/Consumo e notas antigas. */
+  unidade_saida      String?   @map("unidade_saida")
+  /** Fator da unidade de saída aplicado sobre `qtd_esperada` (base). */
+  fator_conversao    Float     @default(1) @map("fator_conversao")
+  /** Quantidade informada na unidade de saída; null nas notas antigas. */
+  quantidade_solicitada Float? @map("quantidade_solicitada")
   observacao         String?   @map("observacao") @db.Text
   estoque            Estoque   @relation(fields: [id_estoque], references: [id_estoque])
   notaSaida          NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])

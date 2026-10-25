@@ -69,13 +69,24 @@ export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: 
           <input className={INPUT_CLASS} value={data.descricao} readOnly tabIndex={-1} />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Entrada</label>
-          <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_padrao} disabled>
-            {conversoes.map((c) => (
-              <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
-            ))}
-          </select>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Conversão Padrão de Entrada</label>
+            <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_padrao} disabled>
+              {conversoes.map((c) => (
+                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Saída</label>
+            <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_saida} disabled>
+              {conversoes.map((c) => (
+                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex items-start justify-between gap-4">

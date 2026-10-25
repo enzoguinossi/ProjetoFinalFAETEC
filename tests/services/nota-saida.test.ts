@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { notaSaidaDAO } from "@/dao/nota-saida";
 import { notaSaidaService } from "@/services/nota-saida";
+import { itemSaidaDetalhe } from "@/app/mov-estoque/nota-saida-linha";
 import {
+  criarConversao,
   criarDestinatario,
   criarEstoque,
+  criarItemNotaSaida,
+  criarNotaSaida,
   criarProduto,
   criarUsuario,
 } from "../helpers/factories";
@@ -308,7 +312,254 @@ describe("notaSaidaService.registrar", () => {
   });
 });
 
+describe("nota de saída com unidade de saída (Remessa)", () => {
+  it("converte a quantidade de CAIXA para base e grava o snapshot no item", async () => {
+    const { usuario } = await criarUsuario();
+    const caixa = await criarConversao("CAIXA50", 50);
+    const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 200,
+      saldoReservado: 0,
+    });
+    const { destinatario } = await criarDestinatario();
+
+    const resultado = await notaSaidaService.registrar(
+      {
+        tipo: "SAIDA",
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+
+    const item = await prismaTeste.itemNotaSaida.findFirstOrThrow({
+      where: { id_nota_saida: resultado.nota.id_nota_saida },
+    });
+    expect(item).toMatchObject({
+      unidade_saida: "CAIXA50",
+      quantidade_solicitada: 2,
+      fator_conversao: 50,
+      qtd_esperada: 100,
+      qtd_entregue: 0,
+    });
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.saldo_reservado).toBe(100);
+    expect(estoqueApos.quantidade_atual).toBe(200);
+  });
+
+  it("aviso RN001 mostra a unidade de saída e a base", async () => {
+    const { usuario } = await criarUsuario();
+    const caixa = await criarConversao("CAIXA50", 50);
+    const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
+    await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
+    const { destinatario } = await criarDestinatario();
+
+    const resultado = await notaSaidaService.registrar(
+      {
+        tipo: "SAIDA",
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+    expect(resultado.aviso).toContain("2 CAIXA50 (100 base)");
+    expect(resultado.aviso).toContain("disponível 10 base");
+  });
+
+  it("edita pela unidade gravada e usa a unidade atual só no item novo", async () => {
+    const { usuario } = await criarUsuario();
+    const caixa = await criarConversao("CAIXA50", 50);
+    const caixaPequena = await criarConversao("CX10", 10);
+    const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
+    const produtoB = await criarProduto({ idConversaoSaida: caixaPequena.id_conversao });
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 200,
+      saldoReservado: 0,
+    });
+    await criarEstoque(produtoB.id_produto, { quantidadeAtual: 50 });
+    const { destinatario } = await criarDestinatario();
+
+    const criada = await notaSaidaService.registrar(
+      {
+        tipo: "SAIDA",
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in criada).toBe(false);
+    if ("error" in criada) return;
+
+    const item = await prismaTeste.itemNotaSaida.findFirstOrThrow({
+      where: { id_nota_saida: criada.nota.id_nota_saida },
+    });
+
+    const editada = await notaSaidaService.atualizar(
+      criada.nota.id_nota_saida,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 3,
+          },
+          { id_produto: produtoB.id_produto, quantidade_solicitada: 4 },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in editada).toBe(false);
+
+    const itens = await prismaTeste.itemNotaSaida.findMany({
+      where: { id_nota_saida: criada.nota.id_nota_saida },
+      orderBy: { id_item_nota_saida: "asc" },
+    });
+    expect(itens[0]).toMatchObject({
+      unidade_saida: "CAIXA50",
+      fator_conversao: 50,
+      quantidade_solicitada: 3,
+      qtd_esperada: 150,
+    });
+    expect(itens[1]).toMatchObject({
+      unidade_saida: "CX10",
+      fator_conversao: 10,
+      quantidade_solicitada: 4,
+      qtd_esperada: 40,
+    });
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.saldo_reservado).toBe(150);
+  });
+
+  it("Avaria/Consumo não usam unidade de saída e operam em base", async () => {
+    const { usuario } = await criarUsuario();
+    const caixa = await criarConversao("CAIXA50", 50);
+    const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
+    const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 20 });
+
+    const resultado = await notaSaidaService.registrar(
+      {
+        tipo: "AVARIA",
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 4 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+
+    const item = await prismaTeste.itemNotaSaida.findFirstOrThrow({
+      where: { id_nota_saida: resultado.nota.id_nota_saida },
+    });
+    expect(item).toMatchObject({
+      unidade_saida: null,
+      fator_conversao: 1,
+      quantidade_solicitada: 4,
+      qtd_esperada: 4,
+      qtd_entregue: 4,
+    });
+
+    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueApos.quantidade_atual).toBe(16);
+  });
+
+  it("nota antiga cai na quantidade base e não exibe unidade", async () => {
+    const produto = await criarProduto();
+    const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
+    const nota = await prismaTeste.notaSaida.create({
+      data: {
+        data_criacao: new Date(),
+        tipo: "SAIDA",
+        status: "BAIXA_TOTAL",
+      },
+    });
+    const item = await prismaTeste.itemNotaSaida.create({
+      data: {
+        id_nota_saida: nota.id_nota_saida,
+        id_estoque: estoque.id_estoque,
+        qtd_esperada: 3,
+        qtd_entregue: 3,
+      },
+    });
+
+    const detalhe = itemSaidaDetalhe({
+      ...item,
+      estoque: { produto: { id_produto: produto.id_produto, descricao: produto.descricao } },
+    });
+
+    expect(detalhe).toMatchObject({
+      unidade_saida: null,
+      fator_conversao: 1,
+      quantidade_solicitada: 3,
+      quantidade_base: 3,
+      quantidade_entregue: 3,
+    });
+    expect(detalhe.quantidade_solicitada).toBe(detalhe.quantidade_base);
+  });
+});
+
 describe("notaSaidaService.atualizar", () => {
+  it("edita nota antiga (sem snapshot) em base e mantém fator 1", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 10,
+      saldoReservado: 3,
+    });
+    const { destinatario } = await criarDestinatario();
+    const nota = await criarNotaSaida({
+      idDestinatario: destinatario.id_destinatario,
+      status: "ABERTA",
+    });
+    const item = await criarItemNotaSaida(
+      nota.id_nota_saida,
+      estoque.id_estoque,
+      3,
+    );
+
+    const resultado = await notaSaidaService.atualizar(
+      nota.id_nota_saida,
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [
+          {
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: produto.id_produto,
+            quantidade_solicitada: 2,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: item.id_item_nota_saida },
+    });
+    expect(itemDepois).toMatchObject({
+      qtd_esperada: 2,
+      quantidade_solicitada: 2,
+      unidade_saida: null,
+      fator_conversao: 1,
+    });
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.saldo_reservado).toBe(2);
+  });
+
   it("aumenta a quantidade e ajusta a reserva pelo delta", async () => {
     const { usuario, produto, estoque, destinatario, notaId, item } = await prepararNota({
       quantidade: 3,

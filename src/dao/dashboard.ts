@@ -36,7 +36,6 @@ export type DashboardMovimentacoes = {
 export type DashboardTopProduto = {
   id_produto: number;
   descricao: string;
-  unidade: string;
   quantidade: number;
 };
 
@@ -83,7 +82,7 @@ const VAZIO: DashboardResumo = {
 };
 
 export class DashboardDAO {
-  /** Soma de `quantidade_atual` (unidades diferentes não são equivalentes). */
+  /** Soma de `quantidade_atual` dos estoques ativos. */
   async resumoEstoque(): Promise<DashboardEstoque> {
     const [soma, porProduto] = await Promise.all([
       prisma.estoque.aggregate({
@@ -169,7 +168,7 @@ export class DashboardDAO {
     };
   }
 
-  /** Top 5 produtos por quantidade atual, com a unidade no rótulo. */
+  /** Top 5 produtos por quantidade atual. */
   async topProdutos(): Promise<DashboardTopProduto[]> {
     const grupos = await prisma.estoque.groupBy({
       by: ["id_produto"],
@@ -189,7 +188,6 @@ export class DashboardDAO {
       select: {
         id_produto: true,
         descricao: true,
-        conversaoPadrao: { select: { nome: true } },
       },
     });
     const porId = new Map(produtos.map((produto) => [produto.id_produto, produto]));
@@ -201,7 +199,6 @@ export class DashboardDAO {
         {
           id_produto: produto.id_produto,
           descricao: produto.descricao,
-          unidade: produto.conversaoPadrao?.nome ?? "-",
           quantidade: arredondar(grupo._sum.quantidade_atual ?? 0),
         },
       ];

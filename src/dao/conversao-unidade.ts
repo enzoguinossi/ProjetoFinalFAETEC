@@ -86,9 +86,24 @@ export class ConversaoUnidadeDAO {
       const padrao = await tx.conversaoUnidade.findFirst({ where: { padrao: true } });
       if (!padrao) throw new Error(ERRO_SEM_PADRAO);
 
-      const revinculados = await tx.produto.updateMany({
+      // Produtos afetados em qualquer um dos dois vínculos (entrada/saída).
+      const afetados = await tx.produto.findMany({
+        where: {
+          OR: [
+            { id_conversao_padrao: id },
+            { id_conversao_saida: id },
+          ],
+        },
+        select: { id_produto: true },
+      });
+
+      const revinculadosEntrada = await tx.produto.updateMany({
         where: { id_conversao_padrao: id },
         data: { id_conversao_padrao: padrao.id_conversao },
+      });
+      const revinculadosSaida = await tx.produto.updateMany({
+        where: { id_conversao_saida: id },
+        data: { id_conversao_saida: padrao.id_conversao },
       });
 
       await tx.conversaoUnidade.delete({ where: { id_conversao: id } });
@@ -96,7 +111,11 @@ export class ConversaoUnidadeDAO {
       await registrarAuditoria(
         id_usuario, "EXCLUIR", AUDIT_ENTIDADE, id,
         { nome: antes.nome, fator: antes.fator, descricao: antes.descricao },
-        { produtos_revinculados: revinculados.count },
+        {
+          produtos_revinculados: afetados.length,
+          produtos_revinculados_entrada: revinculadosEntrada.count,
+          produtos_revinculados_saida: revinculadosSaida.count,
+        },
         tx,
       );
     });

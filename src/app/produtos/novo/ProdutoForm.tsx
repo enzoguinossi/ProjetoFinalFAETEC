@@ -65,6 +65,11 @@ export default function ProdutoForm({
       conversoes.find((c) => c.padrao)?.id_conversao ??
       null,
   );
+  const [idConversaoSaida, setIdConversaoSaida] = useState<number | null>(
+    initialData?.id_conversao_saida ??
+      conversoes.find((c) => c.padrao)?.id_conversao ??
+      null,
+  );
   const [conversoesAtuais, setConversoesAtuais] = useState<Conversao[]>(conversoes);
   const [unidadesModalOpen, setUnidadesModalOpen] = useState(false);
 
@@ -189,31 +194,66 @@ export default function ProdutoForm({
           />
         </div>
 
-        {/* Unidade + Checkboxes */}
-        <div className="flex flex-col gap-2">
-          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Entrada</label>
-          <div className="flex gap-2 items-center">
-            <select
-              className={`${INPUT_CLASS} flex-1`}
-              name="id_conversao"
-              required
-              value={idConversao ?? ""}
-              onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
-            >
-              {conversoesAtuais.map((c) => (
-                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setUnidadesModalOpen(true)}
-              title="Gerenciar unidades de conversão"
-              className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
+        {/* Conversões de entrada e saída */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Conversão Padrão de Entrada</label>
+            <div className="flex gap-2 items-center">
+              <select
+                className={`${INPUT_CLASS} flex-1`}
+                name="id_conversao"
+                required
+                value={idConversao ?? ""}
+                onChange={(e) => setIdConversao(e.target.value ? Number(e.target.value) : null)}
+              >
+                {conversoesAtuais.map((c) => (
+                  <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setUnidadesModalOpen(true)}
+                title="Gerenciar unidades de conversão"
+                className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <span className="font-sans text-xs text-[#697077]">
+              Fator aplicado na entrada do estoque; o saldo fica sempre em base (UNIDADE).
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Saída</label>
+            <div className="flex gap-2 items-center">
+              <select
+                className={`${INPUT_CLASS} flex-1`}
+                name="id_conversao_saida"
+                required
+                value={idConversaoSaida ?? ""}
+                onChange={(e) => setIdConversaoSaida(e.target.value ? Number(e.target.value) : null)}
+              >
+                {conversoesAtuais.map((c) => (
+                  <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setUnidadesModalOpen(true)}
+                title="Gerenciar unidades de conversão"
+                className="flex items-center justify-center w-10 h-10 border border-border-input rounded-lg bg-white cursor-pointer text-brand shrink-0"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M10 4V16M4 10H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <span className="font-sans text-xs text-[#697077]">
+              Usada somente em notas de saída do tipo Remessa.
+            </span>
           </div>
         </div>
 
@@ -320,6 +360,9 @@ export default function ProdutoForm({
           setConversoesAtuais(mapeadas);
           if (idConversao === null) {
             setIdConversao(mapeadas.find((c) => c.padrao)?.id_conversao ?? null);
+          }
+          if (idConversaoSaida === null) {
+            setIdConversaoSaida(mapeadas.find((c) => c.padrao)?.id_conversao ?? null);
           }
         }}
       />

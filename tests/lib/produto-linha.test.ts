@@ -16,21 +16,10 @@ describe("lib/produto-linha", () => {
       id_produto: 42,
       codigo: "000042",
       descricao: "Arroz",
-      unidade: "—",
       qtd: "15",
       livre: "10",
     });
-  });
-
-  it("usa o nome da unidade de conversão padrão do produto", () => {
-    const linha = produtoParaLinha({
-      id_produto: 9,
-      descricao: "Açúcar",
-      conversaoPadrao: { nome: "KG" },
-      estoques: [{ quantidade_atual: 2, saldo_reservado: 0 }],
-    });
-
-    expect(linha.unidade).toBe("KG");
+    expect(linha).not.toHaveProperty("unidade");
   });
 
   it("mantém qtd. livre negativa quando a reserva excede o estoque (RN001)", () => {

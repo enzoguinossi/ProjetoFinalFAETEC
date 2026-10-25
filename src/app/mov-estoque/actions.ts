@@ -12,6 +12,7 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { notaEntradaService } from "@/services/nota-entrada";
 import { notaSaidaService } from "@/services/nota-saida";
+import { itemSaidaDetalhe } from "./nota-saida-linha";
 import {
   buildPagination,
   resultadoVazio,
@@ -31,6 +32,7 @@ import type {
   NovaEntradaPayload,
   NovaSaidaPayload,
   ProdutoEntradaDetalhe,
+  ProdutoSaidaDetalhe,
   SelecaoParams,
   TipoSaidaPayload,
 } from "./tipos";
@@ -138,6 +140,21 @@ export async function getProdutoEntrada(id: number): Promise<ProdutoEntradaDetal
     descricao: produto.descricao,
     id_conversao_padrao: produto.id_conversao_padrao,
     fator_padrao: produto.conversaoPadrao?.fator ?? null,
+  };
+}
+
+/** Unidade padrão de saída do produto, usada apenas em notas de Remessa. */
+export async function getProdutoSaida(id: number): Promise<ProdutoSaidaDetalhe | null> {
+  const user = await requireUser();
+  if (!(await usuarioPodeAlguma(user, PERMISSOES_SELECAO_PRODUTO))) return null;
+
+  const produto = await produtoDAO.getById(id);
+  if (!produto) return null;
+  return {
+    id_produto: produto.id_produto,
+    descricao: produto.descricao,
+    unidade_saida: produto.conversaoSaida?.nome ?? null,
+    fator: Number(produto.conversaoSaida?.fator ?? 1),
   };
 }
 
@@ -265,6 +282,8 @@ const ROTULOS_TIPO_NOTA_SAIDA: Record<string, string> = {
   CONSUMO_INTERNO: "Consumo interno",
 };
 
+/** Item da nota com a quantidade de saída e a base lado a lado. */
+
 const STATUS_NOTA_SAIDA_CANCELAVEL = ["ABERTA"];
 const STATUS_NOTA_SAIDA_EDITAVEL = ["ABERTA"];
 
@@ -279,14 +298,7 @@ export async function listarNotasSaida(
     ...resultado,
     data: resultado.data.map((nota) => {
       const destinatario = nota.destinatario?.pessoaJuridica.razao_social ?? "—";
-      const itens = nota.itens.map((item) => ({
-        id_item_nota_saida: item.id_item_nota_saida,
-        id_produto: item.estoque.produto.id_produto,
-        descricao: item.estoque.produto.descricao,
-        unidade: item.estoque.produto.conversaoPadrao?.nome ?? "—",
-        quantidade_solicitada: Number(item.qtd_esperada),
-        quantidade_entregue: Number(item.qtd_entregue),
-      }));
+      const itens = nota.itens.map(itemSaidaDetalhe);
       return {
         id_nota_saida: nota.id_nota_saida,
         data: formatarData(nota.data_criacao),
@@ -294,7 +306,7 @@ export async function listarNotasSaida(
         tipoLabel: ROTULOS_TIPO_NOTA_SAIDA[nota.tipo] ?? nota.tipo,
         destinatario,
         itens,
-        quantidade: itens.reduce((acc, item) => acc + item.quantidade_solicitada, 0),
+        quantidade: itens.reduce((acc, item) => acc + item.quantidade_base, 0),
         status: nota.status,
         statusLabel: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
         podeCancelar: STATUS_NOTA_SAIDA_CANCELAVEL.includes(nota.status),
@@ -351,14 +363,7 @@ export async function obterNotaSaida(
     destinatario: nota.destinatario?.pessoaJuridica.razao_social ?? null,
     urgente: nota.urgente,
     observacao: nota.observacao,
-    itens: nota.itens.map((item) => ({
-      id_item_nota_saida: item.id_item_nota_saida,
-      id_produto: item.estoque.produto.id_produto,
-      descricao: item.estoque.produto.descricao,
-      unidade: item.estoque.produto.conversaoPadrao?.nome ?? "—",
-      quantidade_solicitada: Number(item.qtd_esperada),
-      quantidade_entregue: Number(item.qtd_entregue),
-    })),
+    itens: nota.itens.map(itemSaidaDetalhe),
   };
 }
 

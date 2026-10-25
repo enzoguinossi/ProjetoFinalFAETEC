@@ -95,6 +95,7 @@ export async function criarProduto(
     perecivel?: boolean;
     composto?: boolean;
     idConversaoPadrao?: number;
+    idConversaoSaida?: number;
     ativo?: boolean;
     dataValidade?: Date;
   } = {},
@@ -108,6 +109,7 @@ export async function criarProduto(
       perecivel: opts.perecivel ?? false,
       composto: opts.composto ?? false,
       id_conversao_padrao: idConversaoPadrao,
+      id_conversao_saida: opts.idConversaoSaida ?? idConversaoPadrao,
       ativo: opts.ativo ?? true,
       data_validade: opts.dataValidade,
     },

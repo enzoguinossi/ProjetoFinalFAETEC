@@ -105,26 +105,23 @@ export default async function RelatorioVencimentoPage({
                   <th style={{ width: "8%" }} className="col-centro">
                     Código
                   </th>
-                  <th style={{ width: "25%" }}>Produto</th>
-                  <th style={{ width: "8%" }} className="col-centro">
-                    Unidade
-                  </th>
-                  <th style={{ width: "10%" }} className="col-direita">
+                  <th style={{ width: "32%" }}>Produto</th>
+                  <th style={{ width: "12%" }} className="col-direita">
                     Quantidade
                   </th>
-                  <th style={{ width: "12%" }} className="col-centro">
+                  <th style={{ width: "14%" }} className="col-centro">
                     Validade
                   </th>
-                  <th style={{ width: "12%" }} className="col-centro">
+                  <th style={{ width: "14%" }} className="col-centro">
                     Dias restantes
                   </th>
-                  <th style={{ width: "25%" }}>Situação</th>
+                  <th style={{ width: "20%" }}>Situação</th>
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="relatorio-vazio">
+                    <td colSpan={6} className="relatorio-vazio">
                       Nenhum produto perecível próximo ao vencimento.
                     </td>
                   </tr>
@@ -133,7 +130,6 @@ export default async function RelatorioVencimentoPage({
                     <tr key={linha.id_produto}>
                       <td className="col-centro">{linha.codigo}</td>
                       <td>{linha.descricao}</td>
-                      <td className="col-centro">{linha.unidade}</td>
                       <td className="col-direita">
                         {formatarQuantidade(linha.quantidade)}
                       </td>

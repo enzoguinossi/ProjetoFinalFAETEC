@@ -48,7 +48,6 @@ const linha: ProdutoRelatorioRow = {
   id_produto: 1,
   codigo: "000001",
   descricao: "Arroz",
-  unidade: "CX",
   quantidade: 10,
   livre: 7.5,
   situacao: "Ativo",
@@ -88,8 +87,8 @@ describe("serviço de relatórios", () => {
 
       expect(csv.startsWith("\uFEFF")).toBe(true);
       expect(csv).toBe(
-        "\uFEFFCódigo;Descrição;Unidade;Quantidade;Qtd. Livre;Situação\r\n" +
-          "000001;Arroz;CX;10;7,5;Ativo\r\n",
+        "\uFEFFCódigo;Descrição;Quantidade;Qtd. Livre;Situação\r\n" +
+          "000001;Arroz;10;7,5;Ativo\r\n",
       );
     });
 
@@ -491,7 +490,6 @@ describe("serviço de relatórios", () => {
         id_produto: 1,
         codigo: "000001",
         descricao: "Leite",
-        unidade: "CX",
         quantidade: 10.5,
         validade: "2026-10-20",
         dias_restantes: -4,
@@ -502,8 +500,8 @@ describe("serviço de relatórios", () => {
 
       expect(csv.startsWith("\uFEFF")).toBe(true);
       expect(csv).toBe(
-        "\uFEFFCódigo;Produto;Unidade;Quantidade;Validade;Dias restantes;Situação\r\n" +
-          "000001;Leite;CX;10,5;20/10/2026;-4;Vencido (4)\r\n",
+        "\uFEFFCódigo;Produto;Quantidade;Validade;Dias restantes;Situação\r\n" +
+          "000001;Leite;10,5;20/10/2026;-4;Vencido (4)\r\n",
       );
     });
 

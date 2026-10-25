@@ -7,6 +7,10 @@ import Modal from "@/components/Modal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
 import { hojeISO } from "@/lib/formatar";
+import {
+  rotuloEntregueExpedicao,
+  rotuloEsperadaExpedicao,
+} from "@/lib/expedicao-unidade";
 import type { PermissoesEntidade } from "@/types";
 import AdicionarNotasModal from "./AdicionarNotasModal";
 import {
@@ -102,8 +106,10 @@ function EntregaForm({
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
       <p className="m-0 font-sans text-sm text-[#697077]">
-        Nota {nota.codigo} — informe a quantidade entregue <strong>total</strong> por
-        item. Sem corte, o restante continua reservado para outra expedição.
+        Nota {nota.codigo} — informe a quantidade entregue <strong>total em base (UNIDADE)</strong>{" "}
+        por item. A coluna Esperada mostra a unidade de saída e a base; a
+        digitação é sempre em base. Sem corte, o restante continua reservado para
+        outra expedição.
       </p>
 
       {nota.itens_detalhe.length === 0 ? (
@@ -113,28 +119,28 @@ function EntregaForm({
       ) : (
         <div className="flex w-full flex-col overflow-x-auto rounded-[1rem] border border-[#e2e8f0]">
           <div
-            className="grid min-w-[520px] bg-brand px-[0.6875rem] py-2 font-display text-sm text-white [font-weight:590]"
-            style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
+            className="grid min-w-[600px] bg-brand px-[0.6875rem] py-2 font-display text-sm text-white [font-weight:590]"
+            style={{ gridTemplateColumns: "2fr 1.5fr 1.1fr 1.2fr" }}
           >
             <div>Item</div>
-            <div className="text-center">Esperada</div>
-            <div className="text-center">Já entregue</div>
-            <div className="text-center">Entrega (total)</div>
+            <div className="text-center">Esperada (saída/base)</div>
+            <div className="text-center">Já entregue (base)</div>
+            <div className="text-center">Entrega (base)</div>
           </div>
           {itens.map((item, indice) => (
             <div
               key={item.id_item_nota_saida}
-              className={`grid min-w-[520px] items-center px-[0.6875rem] py-2 font-sans text-sm text-ink ${
+              className={`grid min-w-[600px] items-center px-[0.6875rem] py-2 font-sans text-sm text-ink ${
                 indice % 2 === 1 ? "bg-table-alt!" : "bg-white"
               }`}
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
+              style={{ gridTemplateColumns: "2fr 1.5fr 1.1fr 1.2fr" }}
             >
               <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-2">
                 {item.descricao}
               </div>
-              <div className="text-center">{formatarNumero(item.qtd_esperada)}</div>
-              <div className="text-center">{formatarNumero(item.qtd_entregue)}</div>
-              <div className="px-1">
+              <div className="text-center">{rotuloEsperadaExpedicao(item)}</div>
+              <div className="text-center">{rotuloEntregueExpedicao(item)}</div>
+              <div className="flex flex-col gap-0.5 px-1">
                 <input
                   type="number"
                   min={item.qtd_entregue}
@@ -148,9 +154,13 @@ function EntregaForm({
                     }))
                   }
                   className={`${ui.input} h-9`}
-                  aria-label={`Quantidade entregue de ${item.descricao}`}
+                  aria-label={`Quantidade entregue em base (UNIDADE) de ${item.descricao}`}
+                  placeholder="base"
                   disabled={processando}
                 />
+                <span className="text-[0.625rem] text-[#697077]">
+                  base — máx. {formatarNumero(item.qtd_esperada)}
+                </span>
               </div>
             </div>
           ))}

@@ -39,7 +39,7 @@ export default async function RelatorioProdutosPage({
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ink m-0">Lista de Produtos</h2>
           <p className="text-sm text-[#697077] m-0">
-            Código, descrição, unidade, quantidade e saldo livre dos produtos.
+            Código, descrição, quantidade e saldo livre dos produtos.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -95,11 +95,8 @@ export default async function RelatorioProdutosPage({
                   <th style={{ width: "8%" }} className="col-centro">
                     Código
                   </th>
-                  <th style={{ width: "34%" }}>Descrição</th>
-                  <th style={{ width: "9%" }} className="col-centro">
-                    Unidade
-                  </th>
-                  <th style={{ width: "17%" }} className="col-direita">
+                  <th style={{ width: "40%" }}>Descrição</th>
+                  <th style={{ width: "20%" }} className="col-direita">
                     Quantidade
                   </th>
                   <th style={{ width: "17%" }} className="col-direita">
@@ -113,7 +110,7 @@ export default async function RelatorioProdutosPage({
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="relatorio-vazio">
+                    <td colSpan={5} className="relatorio-vazio">
                       Nenhum produto encontrado.
                     </td>
                   </tr>
@@ -122,7 +119,6 @@ export default async function RelatorioProdutosPage({
                     <tr key={produto.id_produto}>
                       <td className="col-centro">{produto.codigo}</td>
                       <td>{produto.descricao}</td>
-                      <td className="col-centro">{produto.unidade}</td>
                       <td className="col-direita">
                         {formatarQuantidade(produto.quantidade)}
                       </td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/Button";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
@@ -11,6 +11,7 @@ import { COLUNAS_DESTINATARIO } from "./colunas-selecao";
 import {
   atualizarNotaSaida,
   criarNotaSaida,
+  getProdutoSaida,
   listarDestinatariosSelecao,
   listarProdutosSelecao,
 } from "./actions";
@@ -18,6 +19,7 @@ import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
 import type {
   DestinatarioSelecaoRow,
   NotaSaidaFormData,
+  ProdutoSaidaDetalhe,
   TipoSaidaPayload,
 } from "./tipos";
 
@@ -37,7 +39,10 @@ type ItemForm = {
   id_produto: number;
   codigo: string;
   descricao: string;
-  unidade: string;
+  /** Unidade de saída do snapshot; null em Avaria/Consumo e notas antigas. */
+  unidade_saida: string | null;
+  fator_conversao: number;
+  /** Quantidade na unidade de saída (Remessa) ou em base (Avaria/Consumo). */
   quantidade: string;
 };
 
@@ -82,25 +87,41 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       id_produto: item.id_produto,
       codigo: formatarCodigo(item.id_produto),
       descricao: item.descricao,
-      unidade: item.unidade,
+      unidade_saida: item.unidade_saida,
+      fator_conversao: item.fator_conversao,
       quantidade: String(item.quantidade_solicitada),
     })),
   );
   const [buscaProduto, setBuscaProduto] = useState("");
   const [produtoPendente, setProdutoPendente] = useState<ProdutoListRow | null>(null);
+  const [produtoSaidaDetalhe, setProdutoSaidaDetalhe] =
+    useState<ProdutoSaidaDetalhe | null>(null);
   const [quantidadePendente, setQuantidadePendente] = useState("1");
   const [salvando, setSalvando] = useState(false);
   const [buscandoDestinatario, setBuscandoDestinatario] = useState(false);
   const [buscandoProduto, setBuscandoProduto] = useState(false);
   const [buscaInicialProduto, setBuscaInicialProduto] = useState("");
   const [sessaoBuscaProduto, setSessaoBuscaProduto] = useState(0);
+  /** Última requisição de unidade de saída: evita que uma resposta antiga sobrescreva a nova. */
+  const requisicaoProduto = useRef(0);
 
   const ehRemessa = tipo === "SAIDA";
+  const gridItens = ehRemessa
+    ? "sm:grid-cols-[0.7fr_1.8fr_0.8fr_0.5fr_0.8fr_0.8fr_7rem]"
+    : "sm:grid-cols-[0.8fr_2fr_0.9fr_7.5rem]";
 
   function alterarTipo(valor: TipoSaidaPayload) {
+    requisicaoProduto.current += 1;
     setTipo(valor);
+    setProdutoPendente(null);
+    setProdutoSaidaDetalhe(null);
+    if (mode === "create") {
+      // A unidade/fator dos itens depende do tipo: recomeça a lista para não
+      // reinterpretar uma quantidade de Remessa como base (ou vice-versa).
+      setItens([]);
+    }
     if (valor !== "SAIDA") {
-      // Avaria/Consumo Interno não têm destinatário nem urgência.
+      // Avaria/Consumo Interno não têm destinatário nem urgência nem unidade de saída.
       setDestinatario(null);
       setUrgente(false);
       setBuscandoDestinatario(false);
@@ -127,9 +148,21 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
     setBuscandoProduto(true);
   }
 
-  function selecionarProduto(produto: ProdutoListRow) {
+  async function selecionarProduto(produto: ProdutoListRow) {
+    const requisicao = ++requisicaoProduto.current;
     setProdutoPendente(produto);
     setQuantidadePendente("1");
+    setProdutoSaidaDetalhe(null);
+    if (tipo === "SAIDA") {
+      const detalhe = await getProdutoSaida(produto.id_produto);
+      if (requisicao !== requisicaoProduto.current) return;
+      if (!detalhe) {
+        mostrarAviso("Não foi possível carregar a unidade de saída do produto.", "erro");
+        setProdutoPendente(null);
+        return;
+      }
+      setProdutoSaidaDetalhe(detalhe);
+    }
   }
 
   function adicionarItemPendente() {
@@ -152,6 +185,11 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       return;
     }
 
+    if (ehRemessa && !produtoSaidaDetalhe) {
+      mostrarAviso("Aguarde o carregamento da unidade de saída do produto.", "erro");
+      return;
+    }
+
     setItens((atuais) => [
       ...atuais,
       {
@@ -160,11 +198,13 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         id_produto: produtoPendente.id_produto,
         codigo: produtoPendente.codigo,
         descricao: produtoPendente.descricao,
-        unidade: produtoPendente.unidade,
+        unidade_saida: ehRemessa ? (produtoSaidaDetalhe?.unidade_saida ?? null) : null,
+        fator_conversao: ehRemessa ? (produtoSaidaDetalhe?.fator ?? 1) : 1,
         quantidade: String(quantidade),
       },
     ]);
     setProdutoPendente(null);
+    setProdutoSaidaDetalhe(null);
     setBuscaProduto("");
     setQuantidadePendente("1");
   }
@@ -245,6 +285,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         setItens([]);
         setBuscaProduto("");
         setProdutoPendente(null);
+        setProdutoSaidaDetalhe(null);
         setQuantidadePendente("1");
       }
       await onSaved();
@@ -375,7 +416,13 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
               nota preserva a rastreabilidade.
             </p>
 
-            <div className="grid items-end gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1.3fr_1.5fr_0.6fr_0.7fr_auto]">
+            <div
+              className={`grid items-end gap-3 rounded-lg border border-border p-3 ${
+                ehRemessa
+                  ? "sm:grid-cols-[1.2fr_1.2fr_0.65fr_0.5fr_0.55fr_0.55fr_auto]"
+                  : "sm:grid-cols-[1.3fr_1.5fr_0.7fr_auto]"
+              }`}
+            >
               <div className="flex flex-col gap-1">
                 <span className="font-sans text-xs text-[#697077]">Código ou Descrição</span>
                 <div className="flex items-center gap-2">
@@ -416,18 +463,34 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <span className="font-sans text-xs text-[#697077]">Unidade</span>
-                <input
-                  readOnly
-                  value={produtoPendente?.unidade ?? ""}
-                  placeholder="—"
-                  className={INPUT_CLASS}
-                />
-              </div>
+              {ehRemessa && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-sans text-xs text-[#697077]">Unidade de saída</span>
+                    <input
+                      readOnly
+                      value={produtoSaidaDetalhe?.unidade_saida ?? ""}
+                      placeholder="—"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="font-sans text-xs text-[#697077]">Fator</span>
+                    <input
+                      readOnly
+                      value={produtoSaidaDetalhe?.fator ?? ""}
+                      placeholder="—"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex flex-col gap-1">
-                <span className="font-sans text-xs text-[#697077]">Quantidade</span>
+                <span className="font-sans text-xs text-[#697077]">
+                  Quantidade{ehRemessa && produtoSaidaDetalhe?.unidade_saida ? ` (${produtoSaidaDetalhe.unidade_saida})` : ""}
+                </span>
                 <input
                   type="number"
                   min="0"
@@ -437,6 +500,21 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                   className={INPUT_CLASS}
                 />
               </div>
+
+              {ehRemessa && (
+                <div className="flex flex-col gap-1">
+                  <span className="font-sans text-xs text-[#697077]">Base</span>
+                  <input
+                    readOnly
+                    value={new Intl.NumberFormat("pt-BR", {
+                      maximumFractionDigits: 6,
+                    }).format(
+                      Number(quantidadePendente) * (produtoSaidaDetalhe?.fator ?? 1),
+                    )}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+              )}
 
               <Button
                 label="Adicionar"
@@ -454,24 +532,41 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
           </p>
         ) : (
           <div className="overflow-hidden rounded-lg border border-border">
-            <div className="grid gap-3 bg-[#f2f4f8] px-3 py-2 font-sans text-xs uppercase tracking-[0.02em] text-[#697077] sm:grid-cols-[0.8fr_2fr_0.7fr_0.9fr_7.5rem]">
+            <div className={`grid gap-3 bg-[#f2f4f8] px-3 py-2 font-sans text-xs uppercase tracking-[0.02em] text-[#697077] ${gridItens}`}>
               <span>Código</span>
               <span>Descrição</span>
-              <span>Unidade</span>
+              {ehRemessa && (
+                <>
+                  <span>Unidade de saída</span>
+                  <span>Fator</span>
+                </>
+              )}
               <span>Quantidade</span>
+              {ehRemessa && <span>Base</span>}
               <span className="text-center">Ações</span>
             </div>
 
             {itens.map((item) => (
               <div
                 key={item.uid}
-                className="grid items-center gap-3 border-t border-border px-3 py-2 font-sans sm:grid-cols-[0.8fr_2fr_0.7fr_0.9fr_7.5rem]"
+                className={`grid items-center gap-3 border-t border-border px-3 py-2 font-sans ${gridItens}`}
               >
                 <span className="text-sm text-ink-strong">{item.codigo}</span>
                 <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-ink-strong">
                   {item.descricao}
                 </span>
-                <span className="text-sm text-ink">{item.unidade}</span>
+                {ehRemessa && (
+                  <>
+                    <span className="text-sm text-ink">
+                      {item.unidade_saida ?? "—"}
+                    </span>
+                    <span className="text-sm text-ink">
+                      {new Intl.NumberFormat("pt-BR", {
+                        maximumFractionDigits: 6,
+                      }).format(item.fator_conversao)}
+                    </span>
+                  </>
+                )}
                 <span>
                   {podeEditar ? (
                     <input
@@ -491,6 +586,13 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                     </span>
                   )}
                 </span>
+                {ehRemessa && (
+                  <span className="text-sm text-ink">
+                    {new Intl.NumberFormat("pt-BR", {
+                      maximumFractionDigits: 6,
+                    }).format(Number(item.quantidade) * item.fator_conversao)}
+                  </span>
+                )}
                 <div className="flex items-center justify-center">
                   {podeEditar && item.id_item_nota_saida === null ? (
                     <button

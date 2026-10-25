@@ -253,6 +253,7 @@ entity "produto" as produto {
   * composto : BOOLEAN
   data_validade : DATE
   ID_conversao_padrao : INT <<FK>>
+  ID_conversao_saida : INT <<FK>>
   * ativo : BOOLEAN
 }
 
@@ -408,6 +409,9 @@ entity "item_nota_saida" as item_nota {
   * ID_estoque : INT <<FK>>
   * qtd_esperada : FLOAT
   * qtd_entregue : FLOAT
+  unidade_saida : VARCHAR
+  * fator_conversao : FLOAT
+  quantidade_solicitada : FLOAT
   observacao : TEXT
 }
 
@@ -625,7 +629,8 @@ fornecedor ||--o{ forn_tel
 fornecedor ||--o{ forn_email
 
 ' Produto / Estoque
-conv ||--o{ produto
+conv ||--o{ produto : "entrada"
+conv ||--o{ produto : "saída"
 produto ||--o{ estoque
 produto ||--o{ insumo
 produto ||--o{ item_nota_entrada

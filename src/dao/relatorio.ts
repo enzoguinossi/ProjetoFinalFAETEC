@@ -10,8 +10,6 @@ export type ProdutoRelatorioRow = {
   /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
   codigo: string;
   descricao: string;
-  /** Nome da unidade de conversão padrão do produto. */
-  unidade: string;
   /** Soma de `quantidade_atual` dos estoques ativos. */
   quantidade: number;
   /** Soma de `quantidade_atual − saldo_reservado` dos estoques ativos. */
@@ -236,8 +234,6 @@ export type ProdutoVencimentoRelatorioRow = {
   /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
   codigo: string;
   descricao: string;
-  /** Nome da unidade de conversão padrão do produto. */
-  unidade: string;
   /** Soma de `quantidade_atual` dos estoques ativos. */
   quantidade: number;
   /** `YYYY-MM-DD`: `data_validade` é DATE, sem hora. */
@@ -416,7 +412,7 @@ function formatarEndereco(
 export class RelatorioDAO {
   /**
    * Listagem simples de produtos para o relatório impresso/CSV.
-   * Não carrega composição (insumos) — apenas identificação, unidade e saldos.
+   * Não carrega composição (insumos) - apenas identificação e saldos.
    */
   async listarProdutosRelatorio(
     filtros: ProdutosRelatorioFiltros = {},
@@ -432,7 +428,6 @@ export class RelatorioDAO {
         id_produto: true,
         descricao: true,
         ativo: true,
-        conversaoPadrao: { select: { nome: true } },
         estoques: {
           where: { ativo: true },
           select: { quantidade_atual: true, saldo_reservado: true },
@@ -454,7 +449,6 @@ export class RelatorioDAO {
         id_produto: p.id_produto,
         codigo: formatarCodigo(p.id_produto),
         descricao: p.descricao,
-        unidade: p.conversaoPadrao?.nome ?? "—",
         quantidade: arredondar(quantidade),
         livre: arredondar(quantidade - reservado),
         situacao: p.ativo ? "Ativo" : "Inativo",
@@ -502,7 +496,6 @@ export class RelatorioDAO {
         id_produto: true,
         descricao: true,
         data_validade: true,
-        conversaoPadrao: { select: { nome: true } },
         estoques: { where: { ativo: true }, select: { quantidade_atual: true } },
       },
       orderBy: [{ data_validade: "asc" }, { descricao: "asc" }],
@@ -520,7 +513,6 @@ export class RelatorioDAO {
         id_produto: produto.id_produto,
         codigo: formatarCodigo(produto.id_produto),
         descricao: produto.descricao,
-        unidade: produto.conversaoPadrao?.nome ?? "—",
         quantidade: arredondar(quantidade),
         validade: validade.toISOString().slice(0, 10),
         dias_restantes: diasRestantes,

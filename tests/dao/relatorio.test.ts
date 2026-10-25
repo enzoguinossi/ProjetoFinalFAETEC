@@ -55,16 +55,15 @@ describe("relatorioDAO", () => {
       expect(data[0]).toMatchObject({
         id_produto: arroz.id_produto,
         codigo: String(arroz.id_produto).padStart(6, "0"),
-        unidade: "CX",
         quantidade: 15,
         livre: 10,
         situacao: "Ativo",
       });
       expect(data[1]).toMatchObject({
-        unidade: "UNIDADE",
         quantidade: 2.5,
         livre: 2.5,
       });
+      expect(data[0]).not.toHaveProperty("unidade");
       expect(totais).toEqual({ quantidade: 17.5, livre: 12.5 });
     });
 
@@ -875,12 +874,12 @@ describe("relatorioDAO", () => {
       expect(resultado.data[0]).toMatchObject({
         id_produto: vencido.id_produto,
         codigo: String(vencido.id_produto).padStart(6, "0"),
-        unidade: "CX",
         quantidade: 5.5,
         validade: "2026-10-20",
         dias_restantes: -4,
         situacao: "Vencido (4)",
       });
+      expect(resultado.data[0]).not.toHaveProperty("unidade");
       expect(resultado.data[1]).toMatchObject({
         dias_restantes: 0,
         situacao: "Vence hoje",
