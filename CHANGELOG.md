@@ -8,13 +8,24 @@ sequência da release no mesmo dia.
 
 A convenção completa — como numerar releases do mesmo dia, como escrever uma entrada e a
 rastreabilidade versão ↔ issues ↔ commit — está em
-[`docs/VERSIONAMENTO.md`](docs/VERSIONAMENTO.md). O checklist de release está em
+[`docs/processo/VERSIONAMENTO.md`](docs/processo/VERSIONAMENTO.md). O checklist de release está em
 `.opencode/skills/release/SKILL.md`.
 
 ## [Unreleased]
 
+## [2.24.10.2026] - 2026-10-24
+
+Esta seção consolida os relatórios complementares (KAN-143, KAN-159–KAN-163), o shell
+em grid e os ajustes da saída e da expedição (KAN-140).
+
 ### Added
 
+- **Adicionar notas à expedição em duas colunas (KAN-140):** o seletor de notas da
+  expedição passou a mostrar as **remessas elegíveis** à esquerda — tipo Remessa, fora
+  de expedições ativas e não baixadas/canceladas (a baixa parcial com saldo pendente
+  continua elegível, RN003) — e as **notas já na expedição** à direita, com busca por
+  código/destinatário, paginação e adição sem fechar o modal; a ordem segue ajustável na
+  lista da expedição.
 - **Relatório de Auditoria (RF023/RF024):** `/relatorios/auditoria` lista a trilha de auditoria (`registro_auditoria`) com **Data/hora**, **Usuário**, **Ação**, **Entidade** e **Registro** afetado, em ordem decrescente de data e com o total de registros. Os filtros são **Usuário** (somente ativos), **Entidade** e **Ação** em multi-seleção — as duas últimas com as opções distintas da própria trilha — além do **Período** com De/Até e atalhos; sem busca livre. Layout A4 para impressão/PDF, permissão `relatorio.gerar` e exportação CSV (BOM, `;`, decimal com vírgula) com os mesmos filtros e colunas; o hub `/relatorios` ganhou o card.
 - **Relatórios de Funcionários, Destinatários e Fornecedores (KAN-160, KAN-162, KAN-163, RF023/RF024):** `/relatorios/funcionarios` lista os funcionários com código, nome, CPF, cargo, condutor, situação e e-mail/telefone principais, com filtro de **Situação** em multi-seleção. `/relatorios/destinatarios` lista escolas e creches com código, razão social, CNPJ, tipo, situação, endereço e contato principal, filtrando por **Situação** e **Tipo**. `/relatorios/fornecedores` lista os fornecedores com código, razão social, CNPJ, situação, endereço e contato principal, com filtro de **Situação**. Os três usam a barra de filtros com chips, layout A4 para impressão/PDF e exportação CSV (BOM, `;`, decimal com vírgula); o hub `/relatorios` ganhou os respectivos cards.
 - **Relatório de Produtos Próximos ao Vencimento (RF023/RF024):** `/relatorios/vencimento` lista somente produtos perecíveis com `data_validade` preenchida, ordenados pela validade, com código, produto, unidade, quantidade, validade, dias restantes e situação (`Vencido (N)`, `Vence hoje`, `Vence em N` ou `OK`), além dos totais de itens e vencidos. O filtro **Dias para vencer** (30/60/90/120/Todos) limita pela data de validade e inclui os já vencidos. Layout A4 para impressão/PDF e CSV com os mesmos filtros e colunas; o hub `/relatorios` ganhou o card.
@@ -23,9 +34,23 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Shell em grid com sidebar rail e logo fixa (KAN-140):** o shell passou para o layout
+  raiz e foi reorganizado em grid — sidebar com ícones lucide, rail de 72px, grupos
+  recolhíveis com estado persistido e botão de recolher dentro dela; header em largura
+  total com a logo horizontal (`logo_horizontal.svg`), que mantém a largura da sidebar
+  aberta enquanto o conteúdo anima entre 256px e 72px.
+- **Título da página saiu do cabeçalho (KAN-140):** o título agora é renderizado no
+  topo-esquerdo de cada página (`PageTitle`), mantendo o título próprio das telas de
+  relatórios; o header ficou só com as ações (configurações, notificações e usuário).
 - **Filtros dos relatórios em barra de chips com múltipla seleção (RF023):** `/relatorios/movimentacao`, `/relatorios/expedicoes` e `/relatorios/entregas` deixaram os selects soltos e passaram a usar uma barra de filtros com chips (ícone, rótulo, valor e X para remover), botão tracejado **Adicionar filtro** e painel de checkboxes para selecionar mais de uma entidade. O período tem De/Até com os atalhos **Mês atual** e **Semestre atual** (fuso `America/Sao_Paulo`); **Aplicar filtros** leva a seleção para a URL e **Limpar** volta ao padrão do relatório. Os filtros multivalor viajam como lista separada por vírgula (`produto=1,2`) e o CSV carrega exatamente os filtros ativos. No domínio, os filtros passaram a ser arrays (`id_produtos`, `id_destinatarios`, `id_fornecedores`, `tipos`, `id_expedicoes`, `id_condutores`, `status`) aplicados com `in` no Prisma; lista vazia não filtra. Sem busca livre e sem dependência nova. O modo **Extrato de Produto** (`?produto=<id>`) continua valendo quando há exatamente um produto selecionado.
 - **Relatório de Movimentação único, com os filtros do usuário (RF023):** não há mais relatórios separados de movimentação/consolidado. `/relatorios/movimentacao` passou a ter também os filtros **destinatário** e **fornecedor** (selects, sem busca livre), ao lado de período, produto e tipo, e a coluna **Destinatário / Fornecedor** — o destinatário da saída ou o fornecedor da entrada, com `—` quando não houver. O semestre é só um recorte de período: atalhos **Mês atual** e **Semestre atual** preenchem `de`/`até` preservando os demais filtros. O CSV/exportação leva os mesmos filtros e colunas.
 - **Lista de Produtos filtra apenas por situação:** o relatório de produtos (`/relatorios/produtos` e o CSV) deixou de ter busca por código/descrição; o filtro no servidor é só por situação (ativas/inativas/todas).
+
+### Fixed
+
+- **Coluna Itens da listagem de saída (KAN-140):** passou a mostrar a soma das
+  quantidades da nota (ex.: itens de 10 e 5 → 15) em vez da representação da lista de
+  itens; o total usa a soma de `qtd_esperada` já calculada em `listarNotasSaida`.
 
 ## [1.24.10.2026] - 2026-10-24
 
