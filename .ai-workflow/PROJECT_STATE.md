@@ -11,7 +11,7 @@
 correção de unidades e a unidade padrão de saída na Remessa. O servidor de produção está
 **parado** (3001) e o `nexus_prod` ainda precisa do `db push` e da release.
 
-## Entregue nesta rodada (working tree; commit pendente)
+## Entregue nesta rodada (commit 30ba95a)
 
 1. **Semântica de unidades corrigida (KAN-140):** a conversão é **fator de entrada**
    (`quantidade_convertida = quantidade × fator`); estoque, reserva, baixa e movimentação
