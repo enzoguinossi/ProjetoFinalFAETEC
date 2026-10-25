@@ -13,6 +13,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Fixed
+
+- **Impressão dos relatórios (KAN-143):** no `@media print`, o grid do shell perdia as
+  colunas apenas na aparência — com a sidebar oculta, o `main` caía na primeira coluna
+  (largura da sidebar) e o relatório saía espremido à esquerda. A impressão agora
+  transforma o grid em bloco, zera padding/overflow do `main` e o relatório ocupa a
+  largura útil do A4, fluindo entre páginas.
+
 ## [2.24.10.2026] - 2026-10-24
 
 Esta seção consolida os relatórios complementares (KAN-143, KAN-159–KAN-163), o shell

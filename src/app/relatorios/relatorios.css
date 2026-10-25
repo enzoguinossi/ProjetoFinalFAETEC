@@ -148,14 +148,31 @@
   /* O shell do dashboard vira a própria folha. */
   [data-figma="AppShell"] {
     display: block !important;
+    height: auto !important;
     min-height: 0 !important;
+    overflow: visible !important;
     background: #ffffff !important;
   }
 
-  [data-figma="AppShell"] > div {
+  /*
+   * A faixa superior e o grid de conteúdo deixam de ser flex/grid. O grid mantinha
+   * `var(--sidebar-width) minmax(0,1fr)` e, sem a sidebar (oculta), o `main` caía na
+   * primeira coluna — o relatório saía espremido à esquerda da folha.
+   * `:not([data-print-hide])` preserva o `display:none` da faixa superior e da sidebar.
+   */
+  [data-figma="AppShell"] > div:not([data-print-hide]) {
+    display: block !important;
     min-height: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
+  }
+
+  [data-figma="AppShell"] main {
+    display: block !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    gap: 0 !important;
   }
 
   .relatorio-scroll {
