@@ -13,6 +13,12 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [4.24.10.2026] - 2026-10-24
+
+Esta seção consolida o CNPJ de pessoa jurídica: `VARCHAR(14)` com validação e máscara,
+a consulta na BrasilAPI para preencher fornecedor/destinatário e o novo campo
+`nome_fantasia`.
+
 ### Added
 
 - **Lib e campo compartilhado de CNPJ (KAN-138, KAN-154):** `src/lib/cnpj.ts` centraliza
