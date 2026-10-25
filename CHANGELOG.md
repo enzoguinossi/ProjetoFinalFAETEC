@@ -38,6 +38,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Fixed
 
+- **Imagens de produtos em produção (KAN-139):** o upload gravava a imagem em
+  `public/uploads/produtos/{id}/...` e atualizava `produto.foto_url`, mas a URL respondia
+  **404** no `next start`: o Next serve o `public` existente no build e não enxerga
+  arquivos adicionados em runtime (no `next dev` funcionava). Uma rota runtime
+  `GET /uploads/[...path]` passou a ler o arquivo do disco a cada requisição, com
+  `Content-Type` por extensão, cache imutável e `404` para caminho inválido ou inexistente;
+  o `proxy.ts` continua exigindo sessão para `/uploads`. O armazenamento dos uploads e o
+  banco não mudaram.
 - **Impressão dos relatórios (KAN-143):** no `@media print`, o grid do shell perdia as
   colunas apenas na aparência — com a sidebar oculta, o `main` caía na primeira coluna
   (largura da sidebar) e o relatório saía espremido à esquerda. A impressão agora
