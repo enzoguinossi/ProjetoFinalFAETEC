@@ -6,7 +6,9 @@ import type { DestinatarioFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import EnderecoFields from "@/components/EnderecoFields";
+import CnpjField from "@/components/CnpjField";
 import { normalizaTelefones } from "@/lib/contatos";
+import { formatarCnpj } from "@/lib/cnpj";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
 import { useAviso } from "@/components/AvisoProvider";
@@ -30,6 +32,7 @@ export default function DestinatarioForm({
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
   const [razaoSocial, setRazaoSocial] = useState(initialData?.razao_social ?? "");
+  const [cnpj, setCnpj] = useState(formatarCnpj(initialData?.cnpj ?? ""));
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
   const [emails, setEmails] = useState<EmailEntry[]>(initialData?.emails ?? []);
@@ -80,14 +83,7 @@ export default function DestinatarioForm({
             />
           </div>
 
-          <div className={ui.field}>
-            <label className={ui.label}>CNPJ</label>
-            {isView ? (
-              <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.cnpj ?? "—"}</p>
-            ) : (
-              <input name="cnpj" defaultValue={initialData?.cnpj ?? undefined} className={ui.input} />
-            )}
-          </div>
+          <CnpjField value={cnpj} onChange={setCnpj} readOnly={isView} />
 
           <div className={ui.field}>
             <label className={ui.label}>Tipo</label>

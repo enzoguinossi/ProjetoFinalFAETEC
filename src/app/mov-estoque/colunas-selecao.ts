@@ -1,4 +1,5 @@
 import type { Column } from "@/components/DataTable";
+import { formatarCnpj } from "@/lib/cnpj";
 import type { DestinatarioSelecaoRow, FornecedorSelecaoRow } from "./tipos";
 
 export const COLUNAS_FORNECEDOR: Column<FornecedorSelecaoRow>[] = [
@@ -7,7 +8,7 @@ export const COLUNAS_FORNECEDOR: Column<FornecedorSelecaoRow>[] = [
     key: "cnpj",
     label: "CNPJ",
     width: "1.2fr",
-    render: (value) => (value ? String(value) : "—"),
+    render: (value) => (value ? formatarCnpj(String(value)) : "—"),
   },
 ];
 

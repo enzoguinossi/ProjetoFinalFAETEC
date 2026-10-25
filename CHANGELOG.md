@@ -13,6 +13,28 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Added
+
+- **Lib e campo compartilhado de CNPJ (KAN-138, KAN-154):** `src/lib/cnpj.ts` centraliza
+  `apenasDigitosCnpj`, a formatação progressiva `00.000.000/0000-00` e a validação (14 dígitos,
+  sequências repetidas e dígitos verificadores), e `src/components/CnpjField.tsx` é usado pelos
+  formulários de fornecedor e de destinatário. Cobertura em `tests/lib/cnpj.test.ts`.
+  (KAN-138, KAN-154)
+
+### Changed
+
+- **CNPJ de fornecedores e destinatários em `VARCHAR(14)`, só dígitos, com validação e máscara
+  (KAN-138, KAN-154):** a coluna `pessoa_juridica.cnpj` passou de `VARCHAR(191)` para
+  `VARCHAR(14)` e grava apenas os dígitos. O cadastro e a edição aplicam a máscara
+  `00.000.000/0000-00` ao digitar, a visualização (modal, relatórios de fornecedores e de
+  destinatários e seletor de fornecedor da entrada) exibe o CNPJ formatado e as Server Actions
+  recusam CNPJ com quantidade diferente de 14 dígitos, sequência repetida ou dígitos
+  verificadores inválidos; vazio continua permitido e a duplicidade mantém a mensagem de
+  unicidade. O CSV dos relatórios segue com os dígitos puros. Antes do `db push` no banco de
+  desenvolvimento (`nexus`) os dados foram normalizados: 3 registros de pessoa jurídica, 1 com
+  CNPJ preenchido — inválido, zerado —, 0 duplicados; nenhum CNPJ válido permaneceu e os 3
+  registros ficaram sem CNPJ. (KAN-138, KAN-154)
+
 ## [3.24.10.2026] - 2026-10-24
 
 Esta seção consolida as correções desde `2.24.10.2026`: CPF do funcionário

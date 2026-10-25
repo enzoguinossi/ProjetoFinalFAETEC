@@ -10,6 +10,7 @@ import {
   rotuloSituacaoCadastro,
 } from "@/services/relatorio";
 import ImprimirButton from "../produtos/ImprimirButton";
+import { formatarCnpj } from "@/lib/cnpj";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export default async function RelatorioFornecedoresPage({
                     <tr key={linha.id_fornecedor}>
                       <td className="col-centro">{linha.codigo}</td>
                       <td>{linha.razao_social}</td>
-                      <td className="col-centro">{linha.cnpj ?? "—"}</td>
+                      <td className="col-centro">{linha.cnpj ? formatarCnpj(linha.cnpj) : "—"}</td>
                       <td className="col-centro">{linha.situacao}</td>
                       <td title={linha.endereco}>{linha.endereco}</td>
                       <td title={linha.email ?? undefined}>{linha.email ?? "—"}</td>

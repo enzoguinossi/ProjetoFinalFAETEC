@@ -6,7 +6,9 @@ import type { FornecedorFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import EnderecoFields from "@/components/EnderecoFields";
+import CnpjField from "@/components/CnpjField";
 import { normalizaTelefones } from "@/lib/contatos";
+import { formatarCnpj } from "@/lib/cnpj";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
 import { useAviso } from "@/components/AvisoProvider";
@@ -31,6 +33,7 @@ export default function FornecedorForm({
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
+  const [cnpj, setCnpj] = useState(formatarCnpj(initialData?.cnpj ?? ""));
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
   const [emails, setEmails] = useState<EmailEntry[]>(initialData?.emails ?? []);
   const [telefones, setTelefones] = useState<TelefoneEntry[]>(normalizaTelefones(initialData?.telefones));
@@ -87,7 +90,7 @@ export default function FornecedorForm({
           )}
 
           {textField("Razão Social", "razao_social", initialData?.razao_social)}
-          {textField("CNPJ", "cnpj", initialData?.cnpj)}
+          <CnpjField value={cnpj} onChange={setCnpj} readOnly={isView} />
 
           <hr className="border-0 border-t border-[#e0e0e0] my-1" />
           <p className="font-sans text-sm text-[#616161] m-0">Endereço (opcional)</p>

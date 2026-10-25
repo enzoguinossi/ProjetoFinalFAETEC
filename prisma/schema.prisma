@@ -98,7 +98,7 @@ model PessoaFisica {
 model PessoaJuridica {
   id_pessoa_juridica Int           @id @default(autoincrement()) @map("ID_pessoa_juridica")
   razao_social       String        @map("razao_social")
-  cnpj               String?       @unique @map("cnpj")
+  cnpj               String?       @unique @map("cnpj") @db.VarChar(14)
   ativo              Boolean       @default(true) @map("ativo")
   destinatario       Destinatario?
   fornecedor         Fornecedor?

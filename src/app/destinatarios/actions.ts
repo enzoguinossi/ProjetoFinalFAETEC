@@ -9,6 +9,7 @@ import { comPermissao, comPermissaoAlguma, usuarioPode, usuarioPodeAlguma } from
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-data";
 import { formatarCodigo } from "@/lib/formatar";
+import { validarCnpj } from "@/lib/cnpj";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type DestinatarioListRow = {
@@ -38,6 +39,18 @@ export type DestinatarioFormData = {
   emails: { endereco: string; principal: boolean }[];
   telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
 };
+
+/**
+ * Lê o CNPJ do formulário: vazio → sem CNPJ; preenchido → precisa ser válido e
+ * é gravado só com os dígitos.
+ */
+function lerCnpj(formData: FormData): { cnpj?: string } | { error: string } {
+  const bruto = String(formData.get("cnpj") ?? "").trim();
+  if (!bruto) return {};
+  const resultado = validarCnpj(bruto);
+  if (!resultado.ok) return { error: resultado.erro };
+  return { cnpj: resultado.cnpj };
+}
 
 export async function listarDestinatarios(
   params: ListParams = {},
@@ -96,6 +109,9 @@ export async function createDestinatario(formData: FormData) {
     const razao_social = formData.get("razao_social") as string;
     if (!razao_social?.trim()) return { error: "Razão social é obrigatória" };
 
+    const cnpjResult = lerCnpj(formData);
+    if ("error" in cnpjResult) return { error: cnpjResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -105,7 +121,7 @@ export async function createDestinatario(formData: FormData) {
     try {
       await destinatarioDAO.create({
         razao_social: razao_social.trim(),
-        cnpj: (formData.get("cnpj") as string) || undefined,
+        cnpj: cnpjResult.cnpj,
         tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,
@@ -129,6 +145,9 @@ export async function updateDestinatario(formData: FormData) {
       return { error: "Sem permissão para desativar." };
     }
 
+    const cnpjResult = lerCnpj(formData);
+    if ("error" in cnpjResult) return { error: cnpjResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -138,7 +157,7 @@ export async function updateDestinatario(formData: FormData) {
     try {
       await destinatarioDAO.update(id, {
         razao_social: (formData.get("razao_social") as string)?.trim(),
-        cnpj: (formData.get("cnpj") as string) || undefined,
+        cnpj: cnpjResult.cnpj,
         tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
         ativo,
         codigos: codigoResult.codigos,
