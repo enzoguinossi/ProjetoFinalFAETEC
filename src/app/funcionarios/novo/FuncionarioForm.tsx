@@ -6,6 +6,7 @@ import type { FuncionarioFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
 import { normalizaTelefones } from "@/lib/contatos";
+import { CPF_MAX_CARACTERES, formatarCpf } from "@/lib/cpf";
 import Button from "@/components/Button";
 import { ui } from "@/lib/ui";
 import { useAviso } from "@/components/AvisoProvider";
@@ -29,7 +30,7 @@ export default function FuncionarioForm({
   const [saving, setSaving] = useState(false);
   const mostrarAviso = useAviso();
   const [nome, setNome] = useState(initialData?.nome ?? "");
-  const [cpf, setCpf] = useState(initialData?.cpf ?? "");
+  const [cpf, setCpf] = useState(formatarCpf(initialData?.cpf ?? ""));
   const [cargo, setCargo] = useState(initialData?.cargo ?? "");
   const [condutor, setCondutor] = useState(initialData?.condutor ?? false);
   const [ativo, setAtivo] = useState(initialData?.ativo ?? true);
@@ -90,7 +91,22 @@ export default function FuncionarioForm({
           )}
 
           {textField("Nome", "nome", initialData?.nome, nome, setNome, true)}
-          {textField("CPF", "cpf", initialData?.cpf, cpf, setCpf)}
+          <div className={ui.field}>
+            <label className={ui.label}>CPF</label>
+            {isView ? (
+              <p className={`${ui.input} leading-[2.5] m-0`}>{cpf || "—"}</p>
+            ) : (
+              <input
+                name="cpf"
+                value={cpf}
+                onChange={(e) => setCpf(formatarCpf(e.target.value))}
+                inputMode="numeric"
+                maxLength={CPF_MAX_CARACTERES}
+                placeholder="000.000.000-00"
+                className={ui.input}
+              />
+            )}
+          </div>
           {textField("Cargo", "cargo", initialData?.cargo, cargo, setCargo)}
 
           {!isView ? (

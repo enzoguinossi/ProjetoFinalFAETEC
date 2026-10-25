@@ -88,7 +88,7 @@ model VeiculoCodigo {
 model PessoaFisica {
   id_pessoa_fisica Int          @id @default(autoincrement()) @map("ID_pessoa_fisica")
   nome             String       @map("nome")
-  cpf              String?      @unique @map("cpf")
+  cpf              String?      @unique @map("cpf") @db.VarChar(11)
   ativo            Boolean      @default(true) @map("ativo")
   funcionario      Funcionario?
 

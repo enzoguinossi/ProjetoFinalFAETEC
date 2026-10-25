@@ -10,6 +10,7 @@ import {
   rotuloSituacaoCadastro,
 } from "@/services/relatorio";
 import ImprimirButton from "../produtos/ImprimirButton";
+import { formatarCpf } from "@/lib/cpf";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,7 @@ export default async function RelatorioFuncionariosPage({
                     <tr key={linha.id_funcionario}>
                       <td className="col-centro">{linha.codigo}</td>
                       <td>{linha.nome}</td>
-                      <td className="col-centro">{linha.cpf ?? "—"}</td>
+                      <td className="col-centro">{linha.cpf ? formatarCpf(linha.cpf) : "—"}</td>
                       <td>{linha.cargo ?? "—"}</td>
                       <td className="col-centro">{linha.condutor ? "Sim" : "Não"}</td>
                       <td className="col-centro">{linha.situacao}</td>

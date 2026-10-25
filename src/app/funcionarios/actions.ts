@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
+import { validarCpf } from "@/lib/cpf";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type FuncionarioListRow = {
@@ -28,6 +29,18 @@ export type FuncionarioFormData = {
   emails: { endereco: string; principal: boolean }[];
   telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
 };
+
+/**
+ * Lê o CPF do formulário: vazio → sem CPF; preenchido → precisa ser válido e
+ * é gravado só com os dígitos.
+ */
+function lerCpf(formData: FormData): { cpf?: string } | { error: string } {
+  const bruto = String(formData.get("cpf") ?? "").trim();
+  if (!bruto) return {};
+  const resultado = validarCpf(bruto);
+  if (!resultado.ok) return { error: resultado.erro };
+  return { cpf: resultado.cpf };
+}
 
 export async function listarFuncionarios(
   params: ListParams = {},
@@ -72,6 +85,9 @@ export async function createFuncionario(formData: FormData) {
     const nome = formData.get("nome") as string;
     if (!nome?.trim()) return { error: "Nome é obrigatório" };
 
+    const cpfResult = lerCpf(formData);
+    if ("error" in cpfResult) return { error: cpfResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -82,7 +98,7 @@ export async function createFuncionario(formData: FormData) {
       await funcionarioDAO.create(
         {
           nome: nome.trim(),
-          cpf: (formData.get("cpf") as string) || undefined,
+          cpf: cpfResult.cpf,
           cargo: (formData.get("cargo") as string) || undefined,
           condutor: formData.get("condutor") === "on",
           codigos: codigoResult.codigos,
@@ -111,6 +127,9 @@ export async function updateFuncionario(formData: FormData) {
       return { error: "Sem permissão para desativar." };
     }
 
+    const cpfResult = lerCpf(formData);
+    if ("error" in cpfResult) return { error: cpfResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -122,7 +141,7 @@ export async function updateFuncionario(formData: FormData) {
         id,
         {
           nome: nome.trim(),
-          cpf: (formData.get("cpf") as string) || undefined,
+          cpf: cpfResult.cpf,
           cargo: (formData.get("cargo") as string) || undefined,
           condutor: formData.get("condutor") === "on",
           ativo,

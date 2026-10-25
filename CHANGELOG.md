@@ -13,6 +13,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Changed
+
+- **CPF do funcionário em `VARCHAR(11)`, só dígitos, com validação e máscara (KAN-153):** a
+  coluna `pessoa_fisica.cpf` passou de `VARCHAR(191)` para `VARCHAR(11)` e grava apenas os
+  dígitos. O cadastro e a edição aplicam a máscara `000.000.000-00` ao digitar, a visualização
+  (modal e relatório de funcionários) exibe o CPF formatado e as Server Actions recusam CPF
+  com quantidade diferente de 11 dígitos, sequência repetida ou dígitos verificadores
+  inválidos; vazio continua permitido e a duplicidade mantém a mensagem de unicidade. O CSV
+  do relatório segue com os dígitos puros. Os CPFs do banco de desenvolvimento foram
+  normalizados antes do `db push`: 2 registros, ambos já corretos — nenhum inválido ou
+  duplicado zerado. (KAN-153)
+
 ### Removed
 
 - **Campo `fornecedor.contato` (texto livre) removido do banco e do cadastro:** a coluna
