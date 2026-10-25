@@ -13,6 +13,12 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [3.24.10.2026] - 2026-10-24
+
+Esta seção consolida as correções desde `2.24.10.2026`: CPF do funcionário
+(`VARCHAR(11)`, validação e máscara), remoção de `fornecedor.contato`, impressão dos
+relatórios e imagens de produtos em produção (rota runtime).
+
 ### Changed
 
 - **CPF do funcionário em `VARCHAR(11)`, só dígitos, com validação e máscara (KAN-153):** a
