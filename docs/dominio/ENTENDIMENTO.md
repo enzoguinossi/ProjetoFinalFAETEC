@@ -214,7 +214,6 @@ Regras:
 fornecedor
 ├── ID_fornecedor          INT PK auto_increment
 ├── ID_pessoa_juridica     INT FK UNIQUE NOT NULL
-├── contato                VARCHAR
 ├── ID_endereco            INT FK → endereco NULL  ← opcional
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```

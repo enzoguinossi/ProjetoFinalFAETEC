@@ -88,7 +88,6 @@ export default function FornecedorForm({
 
           {textField("Razão Social", "razao_social", initialData?.razao_social)}
           {textField("CNPJ", "cnpj", initialData?.cnpj)}
-          {textField("Contato", "contato", initialData?.contato)}
 
           <hr className="border-0 border-t border-[#e0e0e0] my-1" />
           <p className="font-sans text-sm text-[#616161] m-0">Endereço (opcional)</p>

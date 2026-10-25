@@ -60,7 +60,6 @@ describe("fornecedorDAO", () => {
         {
           razao_social: "Fornecedor Novo",
           cnpj: "99888777000166",
-          contato: "Fulano",
           endereco: { logradouro: "Av Central", cidade: "Duque de Caxias", uf: "RJ" },
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "FOR-2" }],
           emails: [{ endereco: "novo@for.com", principal: true }],
@@ -76,7 +75,9 @@ describe("fornecedorDAO", () => {
       const auditoriasForn = await auditoriasDe("Fornecedor", criado.id_fornecedor);
       expect(auditoriasPj.map((a) => a.acao)).toEqual(["CRIAR"]);
       expect(auditoriasForn.map((a) => a.acao)).toEqual(["CRIAR"]);
-      expect(auditoriasForn[0]?.dados_novos).toMatchObject({ contato: "Fulano" });
+      expect(auditoriasForn[0]?.dados_novos).toMatchObject({
+        emails: [{ endereco: "novo@for.com", principal: true }],
+      });
     });
 
     it("cria fornecedor sem endereço", async () => {
@@ -101,7 +102,6 @@ describe("fornecedorDAO", () => {
         fornecedor.id_fornecedor,
         {
           razao_social: "Novo",
-          contato: "Beltrano",
           ativo: true,
           emails: [{ endereco: "novo@for.com", principal: true }],
         },
@@ -110,7 +110,7 @@ describe("fornecedorDAO", () => {
 
       const noBanco = await fornecedorDAO.getById(fornecedor.id_fornecedor);
       expect(noBanco?.pessoaJuridica.razao_social).toBe("Novo");
-      expect(noBanco?.contato).toBe("Beltrano");
+      expect(noBanco?.ativo).toBe(true);
       expect(noBanco?.emails.map((e) => e.endereco)).toEqual(["novo@for.com"]);
 
       const auditorias = await auditoriasDe("Fornecedor", fornecedor.id_fornecedor);

@@ -143,7 +143,6 @@ entity "fornecedor" as fornecedor {
   * ID_fornecedor : INT <<PK>>
   --
   * ID_pessoa_juridica : INT <<FK, UK>>
-  contato : VARCHAR
   ID_endereco : INT <<FK>>
   * ativo : BOOLEAN
 }

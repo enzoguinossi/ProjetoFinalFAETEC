@@ -148,7 +148,6 @@ model Usuario {
 model Fornecedor {
   id_fornecedor      Int                  @id @default(autoincrement()) @map("ID_fornecedor")
   id_pessoa_juridica Int                  @unique @map("ID_pessoa_juridica")
-  contato            String?              @map("contato")
   id_endereco        Int?                 @map("ID_endereco")
   ativo              Boolean              @default(true) @map("ativo")
   endereco           Endereco?            @relation(fields: [id_endereco], references: [id_endereco])

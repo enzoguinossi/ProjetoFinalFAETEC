@@ -40,7 +40,7 @@ export class FornecedorDAO {
 
   async create(
     data: {
-      razao_social: string; cnpj?: string; contato?: string;
+      razao_social: string; cnpj?: string;
       endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
@@ -62,12 +62,12 @@ export class FornecedorDAO {
       }
 
       const forn = await tx.fornecedor.create({
-        data: { id_pessoa_juridica: pj.id_pessoa_juridica, contato: data.contato, id_endereco },
+        data: { id_pessoa_juridica: pj.id_pessoa_juridica, id_endereco },
       });
       await registrarAuditoria(
         id_usuario, "CRIAR", "Fornecedor", forn.id_fornecedor,
         null,
-        { contato: data.contato ?? null, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 
@@ -98,7 +98,7 @@ export class FornecedorDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; cnpj?: string; contato?: string; ativo?: boolean;
+      razao_social?: string; cnpj?: string; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
@@ -132,7 +132,7 @@ export class FornecedorDAO {
 
       const depois = await tx.fornecedor.update({
         where: { id_fornecedor: id },
-        data: { contato: data.contato ?? antes.contato, ativo: data.ativo ?? antes.ativo },
+        data: { ativo: data.ativo ?? antes.ativo },
       });
 
       if (data.codigos !== undefined) {
@@ -166,8 +166,8 @@ export class FornecedorDAO {
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         "Fornecedor",
         id,
-        { razao_social: antes.pessoaJuridica.razao_social, contato: antes.contato, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, contato: depois.contato, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { razao_social: antes.pessoaJuridica.razao_social, ativo: antes.ativo, codigos: antes.fornecedorCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 

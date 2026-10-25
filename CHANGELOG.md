@@ -13,6 +13,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Removed
+
+- **Campo `fornecedor.contato` (texto livre) removido do banco e do cadastro:** a coluna
+  `contato` foi retirada de `fornecedor` no `prisma/schema.prisma` e do banco de
+  desenvolvimento (`prisma db push`). O campo **Contato** saiu do modal de fornecedor
+  (novo/editar/visualizar), das Server Actions (`FornecedorFormData`, criação e edição),
+  do DAO e dos snapshots de auditoria (`dados_anteriores`/`dados_novos`); diagramas e
+  entendimento atualizados. Os contatos estruturados `fornecedor_email` e
+  `fornecedor_telefone` (seção **Contatos** do modal) permanecem inalterados. (Decisão do
+  usuário, 2026-10-24 — sem chave de issue.)
+
 ### Fixed
 
 - **Impressão dos relatórios (KAN-143):** no `@media print`, o grid do shell perdia as

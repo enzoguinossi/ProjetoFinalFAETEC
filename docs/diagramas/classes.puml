@@ -97,7 +97,6 @@ package "Funcionários" as Funcionarios {
 package "Cadastros" as Cadastros {
   class Fornecedor {
     + ID_fornecedor: Integer
-    + contato: String
     + ativo: Boolean
   }
 

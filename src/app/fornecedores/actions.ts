@@ -21,7 +21,6 @@ export type FornecedorFormData = {
   id_fornecedor: number;
   razao_social: string;
   cnpj: string | null;
-  contato: string | null;
   ativo: boolean;
   endereco: {
     logradouro: string;
@@ -72,7 +71,6 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
     id_fornecedor: f.id_fornecedor,
     razao_social: f.pessoaJuridica.razao_social,
     cnpj: f.pessoaJuridica.cnpj,
-    contato: f.contato,
     ativo: f.ativo,
     endereco: f.endereco ? {
       logradouro: f.endereco.logradouro,
@@ -109,7 +107,6 @@ export async function createFornecedor(formData: FormData) {
       const criado = await fornecedorDAO.create({
         razao_social: razao_social.trim(),
         cnpj: (formData.get("cnpj") as string) || undefined,
-        contato: (formData.get("contato") as string) || undefined,
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,
         endereco: endereco.logradouro ? endereco : undefined,
@@ -143,7 +140,6 @@ export async function updateFornecedor(formData: FormData) {
       await fornecedorDAO.update(id, {
         razao_social: (formData.get("razao_social") as string)?.trim(),
         cnpj: (formData.get("cnpj") as string) || undefined,
-        contato: (formData.get("contato") as string) || undefined,
         ativo,
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,
