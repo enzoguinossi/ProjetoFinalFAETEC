@@ -43,17 +43,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `estoque.ver_saldo`, `nota_saida.consultar` e as permissões de expedição e mostram estado
   vazio quando não há dados ou permissão.
 - **Conversão Padrão de Entrada e Unidade Padrão de Saída no produto (RF010, RF013):**
-  `produto.ID_conversao_padrao` (conversão aplicada na entrada) e o novo
-  `produto.ID_conversao_saida` (unidade usada **somente** em notas de saída do tipo Remessa)
-  são `NOT NULL DEFAULT 1`; o cadastro e a visualização mostram os dois campos, com o botão
-  **+** abrindo o mesmo `UnidadesModal`. A entrada continua gravando
-  `quantidade_convertida = quantidade × fator` em base.
-- **Remessa com unidade de saída e snapshot no item (RF017b):** a quantidade da Remessa é
-  informada na Unidade Padrão de Saída e convertida para base; `item_nota_saida` ganhou
-  `unidade_saida` (nome no momento da nota), `fator_conversao` e `quantidade_solicitada`,
-  mantendo `qtd_esperada`/`qtd_entregue` em base. Avaria e Consumo Interno gravam
-  `unidade_saida = NULL`, fator 1 e quantidade base; notas antigas usam o fallback
-  `quantidade_solicitada ?? qtd_esperada` e não exibem unidade.
+  `produto.ID_conversao_padrao` (auxílio do lançamento de entrada) e o novo
+  `produto.ID_conversao_saida` (auxílio **somente** em notas de saída do tipo Remessa) são
+  `NOT NULL DEFAULT 1`; cadastro e visualização mostram os dois campos, com o botão **+**
+  abrindo o mesmo `UnidadesModal`. As conversões são auxílio de lançamento e não são copiadas
+  para as notas.
+- **Nota guarda só totais; conversão é auxílio de lançamento (RF017a, RF017b):**
+  `item_nota_entrada` ficou só com `quantidade` (o total que entra no estoque) e
+  `item_nota_saida` com `qtd_esperada`/`qtd_entregue` — sem unidade, fator ou quantidade “na
+  unidade”. Na Remessa, a Unidade Padrão de Saída aparece apenas no item novo para calcular o
+  total; o item existente é editado pelo total guardado. Avaria e Consumo Interno digitam o
+  total. As telas de entrada, saída e expedição mostram apenas quantidades/totais.
 
 ### Changed
 
@@ -67,23 +67,27 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `tests/services/mural.test.ts` e `tests/services/alerta-validade.test.ts` cobrem
   ativas/histórico, imutabilidade, permissões de leitura, sino, faixas 90/60/45/30,
   idempotência, troca de faixa, produto vencido/inativo e as agregações do dashboard.
-- **Semântica das unidades corrigida (RF010–RF013, RF017b):** a conversão passou a ser
-  tratada como **fator de entrada** (nunca a unidade do produto ou do saldo); estoque,
-  reserva, baixa e movimentação ficam em base (`UNIDADE`, fator 1). Dashboard, relatórios,
-  CSV, listagens e seletores perderam a coluna/rótulo **Unidade** — o top 5 do dashboard
-  mostra só o produto e os KPI não citam unidade.
+- **Semântica das unidades corrigida (RF010–RF017b):** a conversão é **auxílio de lançamento**
+  (não a unidade do produto, do saldo ou da nota); estoque, reserva, baixa e movimentação ficam
+  em base (`UNIDADE`, fator 1). Dashboard, relatórios, CSV, listagens e seletores perderam a
+  coluna/rótulo **Unidade**; entrada, saída e expedição não exibem unidade, fator, “base” ou
+  “convertida”.
 - **Exclusão de unidade:** revincula à unidade padrão os produtos pelos **dois** vínculos
   (`ID_conversao_padrao` e `ID_conversao_saida`) e registra na auditoria
   `produtos_revinculados`, `produtos_revinculados_entrada` e `produtos_revinculados_saida`.
-- **Banco de dados (unidades):** `produto.ID_conversao_saida` (`NOT NULL DEFAULT 1`),
-  `item_nota_saida.unidade_saida` (NULL), `fator_conversao` (`NOT NULL DEFAULT 1`) e
-  `quantidade_solicitada` (NULL), além do default 1 em `produto.ID_conversao_padrao`.
-  Aplicados no banco de desenvolvimento com `prisma db push`; a produção depende da próxima
-  release.
-- **Cobertura (unidades):** `tests/services/nota-saida.test.ts` cobre conversão e snapshot da
-  Remessa, edição pelo fator gravado, Avaria/Consumo e nota antiga; `tests/dao/produto.test.ts`
-  e `tests/dao/conversao-unidade.test.ts` cobrem os dois vínculos e a revinculação na
-  exclusão; `tests/dao/dashboard.test.ts`, `tests/dao/relatorio.test.ts`,
+- **Banco de dados (unidades):** `produto.ID_conversao_saida` (`NOT NULL DEFAULT 1`) e default 1
+  em `produto.ID_conversao_padrao`; as notas **não guardam conversão** — `item_nota_entrada`
+  ficou só com `quantidade` e `item_nota_saida` com `qtd_esperada`/`qtd_entregue`, e as colunas
+  de conversão que chegaram a existir no ciclo (`item_nota_entrada.fator_conversao`/
+  `quantidade_convertida`, `item_nota_saida.unidade_saida`/`fator_conversao`/
+  `quantidade_solicitada`) foram removidas. O backfill
+  (`item_nota_entrada.quantidade = quantidade_convertida`) foi feito no desenvolvimento antes
+  do drop, aplicado com `prisma db push`; a produção depende da próxima release.
+- **Cobertura (unidades):** `tests/services/nota-saida.test.ts` cobre o total na Remessa, o
+  auxílio no item novo, Avaria/Consumo e nota antiga; `tests/services/nota-entrada.test.ts`
+  cobre o total na criação e a edição de item existente e de nota antiga (pós-backfill);
+  `tests/dao/produto.test.ts` e `tests/dao/conversao-unidade.test.ts` cobrem os dois vínculos e
+  a revinculação na exclusão; `tests/dao/dashboard.test.ts`, `tests/dao/relatorio.test.ts`,
   `tests/services/relatorio.test.ts` e `tests/lib/produto-linha.test.ts` cobrem a ausência da
   unidade nas telas e nos CSV.
 

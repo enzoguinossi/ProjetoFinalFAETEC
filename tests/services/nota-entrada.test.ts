@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { estoqueDAO } from "@/dao/estoque";
 import { notaEntradaDAO } from "@/dao/nota-entrada";
 import { notaEntradaService } from "@/services/nota-entrada";
-import { criarConversao, criarEstoque, criarProduto, criarUsuario } from "../helpers/factories";
+import { criarConversao, criarEstoque, criarNotaEntrada, criarProduto, criarUsuario } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
 
@@ -46,9 +46,7 @@ describe("notaEntradaService.registrar", () => {
       (i) => i.id_produto === produtoComConversao.id_produto,
     );
     expect(itemComConversao).toMatchObject({
-      fator_conversao: 12,
-      quantidade: 2,
-      quantidade_convertida: 24,
+      quantidade: 24,
     });
 
     const estoqueComConversao = await prismaTeste.estoque.findMany({
@@ -279,6 +277,57 @@ describe("notaEntradaService.registrar", () => {
 });
 
 describe("notaEntradaService.atualizar", () => {
+  it("edita nota antiga usando o total já guardado (pós-backfill)", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const estoque = await criarEstoque(produto.id_produto, {
+      quantidadeAtual: 24,
+    });
+    const nota = await criarNotaEntrada();
+    const item = await prismaTeste.itemNotaEntrada.create({
+      data: {
+        id_nota_entrada: nota.id_nota_entrada,
+        id_produto: produto.id_produto,
+        quantidade: 24,
+      },
+    });
+
+    const resultado = await notaEntradaService.atualizar(
+      nota.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: item.id_item_nota_entrada,
+            id_produto: produto.id_produto,
+            quantidade: 30,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+
+    const itemDepois = await prismaTeste.itemNotaEntrada.findUniqueOrThrow({
+      where: { id_item_nota_entrada: item.id_item_nota_entrada },
+    });
+    expect(itemDepois.quantidade).toBe(30);
+
+    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
+      where: { id_estoque: estoque.id_estoque },
+    });
+    expect(estoqueDepois.quantidade_atual).toBe(30);
+
+    const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+      where: { id_nota_entrada: nota.id_nota_entrada },
+      orderBy: { id_movimentacao: "desc" },
+    });
+    expect(movimentacao).toMatchObject({
+      quantidade: 6,
+      saldo_anterior: 24,
+      saldo_posterior: 30,
+    });
+  });
+
   /** Cria uma nota com um item e devolve os ids úteis ao teste. */
   async function prepararNota(
     idUsuario: number,
@@ -338,7 +387,7 @@ describe("notaEntradaService.atualizar", () => {
     const itemAtualizado = await prismaTeste.itemNotaEntrada.findUniqueOrThrow({
       where: { id_item_nota_entrada: item.id_item_nota_entrada },
     });
-    expect(itemAtualizado).toMatchObject({ quantidade: 8, quantidade_convertida: 8 });
+    expect(itemAtualizado).toMatchObject({ quantidade: 8 });
 
     const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
       where: { id_nota_entrada: nota.id_nota_entrada },
@@ -356,10 +405,10 @@ describe("notaEntradaService.atualizar", () => {
     expect(auditorias[1]?.acao).toBe("ALTERAR");
     expect(auditorias[1]?.id_usuario).toBe(usuario.id_usuario);
     expect(auditorias[1]?.dados_anteriores).toMatchObject({
-      itens: [{ quantidade: 5, quantidade_convertida: 5 }],
+      itens: [{ quantidade: 5 }],
     });
     expect(auditorias[1]?.dados_novos).toMatchObject({
-      itens: [{ quantidade: 8, quantidade_convertida: 8 }],
+      itens: [{ quantidade: 8 }],
     });
   });
 
@@ -402,7 +451,7 @@ describe("notaEntradaService.atualizar", () => {
     });
   });
 
-  it("acrescenta item novo e soma a quantidade convertida ao estoque", async () => {
+  it("acrescenta item novo e soma o total ao estoque", async () => {
     const { usuario } = await criarUsuario();
     const produtoA = await criarProduto();
     const produtoB = await criarProduto();

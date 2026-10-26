@@ -42,7 +42,7 @@ type ItemForm = {
   /** Unidade de saída do snapshot; null em Avaria/Consumo e notas antigas. */
   unidade_saida: string | null;
   fator_conversao: number;
-  /** Quantidade na unidade de saída (Remessa) ou em base (Avaria/Consumo). */
+  /** Quantidade auxiliar; em Remessa é a quantidade na unidade de saída. */
   quantidade: string;
 };
 
@@ -87,8 +87,8 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       id_produto: item.id_produto,
       codigo: formatarCodigo(item.id_produto),
       descricao: item.descricao,
-      unidade_saida: item.unidade_saida,
-      fator_conversao: item.fator_conversao,
+      unidade_saida: null,
+      fator_conversao: 1,
       quantidade: String(item.quantidade_solicitada),
     })),
   );
@@ -106,9 +106,15 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
   const requisicaoProduto = useRef(0);
 
   const ehRemessa = tipo === "SAIDA";
-  const gridItens = ehRemessa
-    ? "sm:grid-cols-[0.7fr_1.8fr_0.8fr_0.5fr_0.8fr_0.8fr_7rem]"
-    : "sm:grid-cols-[0.8fr_2fr_0.9fr_7.5rem]";
+
+  function totalItem(item: ItemForm): number {
+    const quantidade = Number(item.quantidade);
+    if (item.id_item_nota_saida !== null) return quantidade;
+    const fator = ehRemessa ? item.fator_conversao : 1;
+    return Number.isFinite(quantidade) && Number.isFinite(fator)
+      ? quantidade * fator
+      : 0;
+  }
 
   function alterarTipo(valor: TipoSaidaPayload) {
     requisicaoProduto.current += 1;
@@ -117,7 +123,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
     setProdutoSaidaDetalhe(null);
     if (mode === "create") {
       // A unidade/fator dos itens depende do tipo: recomeça a lista para não
-      // reinterpretar uma quantidade de Remessa como base (ou vice-versa).
+      // reinterpretar uma quantidade de Remessa como outra grandeza.
       setItens([]);
     }
     if (valor !== "SAIDA") {
@@ -503,7 +509,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
 
               {ehRemessa && (
                 <div className="flex flex-col gap-1">
-                  <span className="font-sans text-xs text-[#697077]">Base</span>
+                  <span className="font-sans text-xs text-[#697077]">Total</span>
                   <input
                     readOnly
                     value={new Intl.NumberFormat("pt-BR", {
@@ -531,83 +537,92 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
             Nenhum item adicionado.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
-            <div className={`grid gap-3 bg-[#f2f4f8] px-3 py-2 font-sans text-xs uppercase tracking-[0.02em] text-[#697077] ${gridItens}`}>
-              <span>Código</span>
-              <span>Descrição</span>
-              {ehRemessa && (
-                <>
-                  <span>Unidade de saída</span>
-                  <span>Fator</span>
-                </>
-              )}
-              <span>Quantidade</span>
-              {ehRemessa && <span>Base</span>}
-              <span className="text-center">Ações</span>
-            </div>
-
-            {itens.map((item) => (
-              <div
-                key={item.uid}
-                className={`grid items-center gap-3 border-t border-border px-3 py-2 font-sans ${gridItens}`}
-              >
-                <span className="text-sm text-ink-strong">{item.codigo}</span>
-                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-ink-strong">
-                  {item.descricao}
-                </span>
-                {ehRemessa && (
-                  <>
-                    <span className="text-sm text-ink">
-                      {item.unidade_saida ?? "—"}
-                    </span>
-                    <span className="text-sm text-ink">
-                      {new Intl.NumberFormat("pt-BR", {
-                        maximumFractionDigits: 6,
-                      }).format(item.fator_conversao)}
-                    </span>
-                  </>
-                )}
-                <span>
-                  {podeEditar ? (
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={item.quantidade}
-                      onChange={(e) => alterarItem(item.uid, e.target.value)}
-                      aria-label={`Quantidade de ${item.descricao}`}
-                      className={INPUT_CLASS}
-                    />
-                  ) : (
-                    <span className="text-sm text-ink">
-                      {new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 6 }).format(
-                        Number(item.quantidade),
-                      )}
-                    </span>
-                  )}
-                </span>
-                {ehRemessa && (
-                  <span className="text-sm text-ink">
-                    {new Intl.NumberFormat("pt-BR", {
-                      maximumFractionDigits: 6,
-                    }).format(Number(item.quantidade) * item.fator_conversao)}
+          <div className="flex flex-col gap-2">
+            {itens.map((item) => {
+              const existente = item.id_item_nota_saida !== null;
+              const total = totalItem(item);
+              const colunas = existente
+                ? "sm:grid-cols-[0.8fr_2fr_1fr]"
+                : ehRemessa
+                  ? "sm:grid-cols-[0.7fr_1.6fr_0.8fr_0.5fr_0.8fr_0.8fr_auto]"
+                  : "sm:grid-cols-[0.8fr_2fr_1fr_auto]";
+              return (
+                <div
+                  key={item.uid}
+                  className={`grid gap-3 rounded-lg border border-border p-3 font-sans ${colunas}`}
+                >
+                  <span className="text-sm text-ink-strong">{item.codigo}</span>
+                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-ink-strong">
+                    {item.descricao}
                   </span>
-                )}
-                <div className="flex items-center justify-center">
-                  {podeEditar && item.id_item_nota_saida === null ? (
-                    <button
-                      type="button"
-                      onClick={() => removerItem(item.uid)}
-                      className="cursor-pointer rounded-md border-none bg-transparent px-2 py-1 font-sans text-sm text-[#b42318] transition-[background-color] duration-100 hover:bg-[rgba(180,35,24,0.08)]"
-                    >
-                      Remover
-                    </button>
-                  ) : (
-                    <span className="text-sm text-[#697077]">—</span>
+
+                  {!existente && ehRemessa && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-[#697077]">Unidade de saída</span>
+                        <span className="text-sm text-ink">{item.unidade_saida ?? "—"}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-[#697077]">Fator</span>
+                        <span className="text-sm text-ink">
+                          {new Intl.NumberFormat("pt-BR", {
+                            maximumFractionDigits: 6,
+                          }).format(item.fator_conversao)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-[#697077]">
+                      {existente ? "Total" : "Quantidade"}
+                    </span>
+                    {podeEditar ? (
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.quantidade}
+                        onChange={(e) => alterarItem(item.uid, e.target.value)}
+                        aria-label={`Quantidade de ${item.descricao}`}
+                        className={INPUT_CLASS}
+                      />
+                    ) : (
+                      <span className="text-sm text-ink">
+                        {new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 6 }).format(
+                          Number(item.quantidade),
+                        )}
+                      </span>
+                    )}
+                  </div>
+
+                  {!existente && ehRemessa && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-[#697077]">Total</span>
+                      <span className="flex h-10 items-center text-sm text-ink-strong">
+                        {new Intl.NumberFormat("pt-BR", {
+                          maximumFractionDigits: 6,
+                        }).format(total)}
+                      </span>
+                    </div>
+                  )}
+
+                  {!existente && (
+                    <div className="flex items-end justify-center">
+                      {podeEditar && (
+                        <button
+                          type="button"
+                          onClick={() => removerItem(item.uid)}
+                          className="cursor-pointer rounded-md border-none bg-transparent px-2 py-1 font-sans text-sm text-[#b42318] transition-[background-color] duration-100 hover:bg-[rgba(180,35,24,0.08)]"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -409,9 +409,6 @@ entity "item_nota_saida" as item_nota {
   * ID_estoque : INT <<FK>>
   * qtd_esperada : FLOAT
   * qtd_entregue : FLOAT
-  unidade_saida : VARCHAR
-  * fator_conversao : FLOAT
-  quantidade_solicitada : FLOAT
   observacao : TEXT
 }
 
@@ -509,9 +506,7 @@ entity "item_nota_entrada" as item_nota_entrada {
   --
   * ID_nota_entrada : INT <<FK>>
   * ID_produto : INT <<FK>>
-  * fator_conversao : FLOAT
   * quantidade : FLOAT
-  * quantidade_convertida : FLOAT
   observacao : TEXT
 }
 

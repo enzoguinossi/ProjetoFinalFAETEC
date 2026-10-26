@@ -2,7 +2,9 @@ import { notaEntradaDAO } from "@/dao/nota-entrada";
 
 export type EntradaItemInput = {
   id_produto: number;
-  fator_conversao: number;
+  /** Fator auxiliar do lançamento; ignorado em item já gravado (usa o total). */
+  fator_conversao?: number;
+  /** Total para item existente; quantidade digitada para item novo. */
   quantidade: number;
   observacao?: string | null;
 };
@@ -32,9 +34,8 @@ export type ResultadoEntrada =
 type ItemValidado = {
   id_item_nota_entrada: number | null;
   id_produto: number;
-  fator_conversao: number;
+  /** Total já convertido do item. */
   quantidade: number;
-  quantidade_convertida: number;
   observacao: string | null;
 };
 
@@ -69,7 +70,7 @@ function validarItens(
   const validados: ItemValidado[] = [];
   for (const item of itens) {
     const id = Number(item.id_produto);
-    const fator = Number(item.fator_conversao);
+    const fator = Number(item.fator_conversao ?? 1);
     const quantidade = Number(item.quantidade);
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -84,19 +85,20 @@ function validarItens(
       return { error: "Item inválido na nota de entrada." };
     }
 
-    if (!Number.isFinite(fator) || fator <= 0) {
-      return { error: "O fator de conversão deve ser maior que zero." };
-    }
     if (!Number.isFinite(quantidade) || quantidade <= 0) {
       return { error: "A quantidade deve ser maior que zero." };
     }
 
+    // Item já gravado já tem o total; o fator só auxilia no lançamento novo.
+    if (idItem === null && (!Number.isFinite(fator) || fator <= 0)) {
+      return { error: "O fator de conversão deve ser maior que zero." };
+    }
+    const total = idItem === null ? quantidade * fator : quantidade;
+
     validados.push({
       id_item_nota_entrada: idItem,
       id_produto: id,
-      fator_conversao: fator,
-      quantidade,
-      quantidade_convertida: quantidade * fator,
+      quantidade: total,
       observacao: item.observacao?.trim() || null,
     });
   }
@@ -178,9 +180,7 @@ export class NotaEntradaService {
         ...cabecalho,
         itens: itens.itens.map((item) => ({
           id_produto: item.id_produto,
-          fator_conversao: item.fator_conversao,
           quantidade: item.quantidade,
-          quantidade_convertida: item.quantidade_convertida,
           observacao: item.observacao,
         })),
       },

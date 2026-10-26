@@ -310,9 +310,6 @@ package "Logística" as Logistica {
           + ID_item_nota_saida: Integer
           + qtd_esperada: Float
           + qtd_entregue: Float
-          + unidade_saida: String
-          + fator_conversao: Float
-          + quantidade_solicitada: Float
         }
 
     class Coleta {
@@ -402,9 +399,7 @@ package "Nota de Entrada" as NotaEntrada {
 
   class ItemNotaEntrada {
     + ID_item_nota_entrada: Integer
-    + fator_conversao: Float
     + quantidade: Float
-    + quantidade_convertida: Float
   }
 }
 

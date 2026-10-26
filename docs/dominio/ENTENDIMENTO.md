@@ -292,7 +292,7 @@ produto
 ├── perecivel             BOOLEAN DEFAULT FALSE
 ├── composto              BOOLEAN DEFAULT FALSE
 ├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
-├── ID_conversao_padrao   INT FK NOT NULL DEFAULT 1 ← Conversão Padrão de Entrada (fator da entrada)
+├── ID_conversao_padrao   INT FK NOT NULL DEFAULT 1 ← Conversão Padrão de Entrada (auxílio da entrada)
 ├── ID_conversao_saida    INT FK NOT NULL DEFAULT 1 ← Unidade Padrão de Saída (usada só em Remessa)
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
@@ -316,19 +316,23 @@ conversao_unidade
 
 Regras:
 - O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
-- A conversão é **fator de entrada**, nunca a unidade do saldo: o fator multiplica a
-  quantidade informada (`quantidade_convertida = quantidade × fator`) e o estoque, a reserva,
-  a baixa e a movimentação ficam em **base** — `UNIDADE`, fator 1
+- A conversão é **auxílio de lançamento**, nunca a unidade do produto ou do saldo: o fator
+  multiplica a quantidade digitada para obter o **total** que entra no estoque (ex.: 10 × 20
+  = 200), e o estoque, a reserva, a baixa e a movimentação ficam em **base** — `UNIDADE`, fator 1
+- **A nota não guarda conversão:** `item_nota_entrada.quantidade` é o total que entra no
+  estoque e `item_nota_saida` guarda só `qtd_esperada`/`qtd_entregue`; nome e fator existem
+  apenas na tabela `conversao_unidade` e nos vínculos do produto
 - O produto tem **dois** vínculos obrigatórios com `conversao_unidade`:
-  - `ID_conversao_padrao` — **Conversão Padrão de Entrada**, aplicada na entrada; quando o
-    formulário não informa, o cadastro grava a unidade padrão do sistema (UNIDADE/1,
-    economiza cliques)
-  - `ID_conversao_saida` — **Unidade Padrão de Saída**, usada **somente** em notas de saída
+  - `ID_conversao_padrao` — **Conversão Padrão de Entrada**, auxílio do lançamento de
+    entrada; quando o formulário não informa, o cadastro grava a unidade padrão do sistema
+    (UNIDADE/1, economiza cliques)
+  - `ID_conversao_saida` — **Unidade Padrão de Saída**, auxílio **somente** em notas de saída
     do tipo Remessa (`SAIDA`), para a transferência às escolas; quando não informada, também
     assume a unidade padrão (UNIDADE/1)
-- Ao criar um documento de entrada, o item já vem com a Conversão Padrão de Entrada do
-  produto; o usuário pode trocar a conversão/fator na própria nota
-- O fator pode ser editado manualmente no momento da entrada **sem alterar o template**
+- Ao lançar uma entrada ou uma Remessa, o item novo já vem com a conversão do produto
+  (entrada ou saída) como auxílio; o usuário pode trocar a conversão/fator na tela e o
+  sistema grava o total
+- O fator pode ser editado manualmente no lançamento **sem alterar o template**
 - Unidades **não são desativadas**: podem ser criadas, editadas e excluídas fisicamente
 - Existe **exatamente uma** unidade com `padrao = TRUE` — a `UNIDADE` (fator 1). Ela não
   pode ser excluída nem ter nome ou fator alterados; somente a descrição é editável
@@ -336,7 +340,6 @@ Regras:
   unidade padrão nos dois campos** (`ID_conversao_padrao` e `ID_conversao_saida`) — as FKs
   são obrigatórias, então não há desvinculação e a exclusão não é recusada por uso; a
   auditoria registra o total de produtos afetados e a quebra por entrada/saída
-- Na **nota de entrada** não se guarda a unidade, apenas o **fator de conversão** aplicado (`fator_conversao`)
 - Dashboard, relatórios, listagens e seletores **não exibem unidade**: os saldos são base e
   aparecem como número, sem o nome da conversão padrão
 
@@ -381,8 +384,8 @@ saldo_disponivel = quantidade_atual - saldo_reservado
 
 `quantidade_atual` e `saldo_reservado` convivem no mesmo registro: a baixa física mexe no
 primeiro, a reserva mexe no segundo (vide §3.8.1). As duas colunas estão sempre em **base**
-(`UNIDADE`, fator 1) — a conversão de unidade atua só na entrada e na quantidade informada
-da Remessa (vide §3.6.1).
+(`UNIDADE`, fator 1) — a conversão de unidade atua só como auxílio no lançamento (entrada e
+Remessa, vide §3.6.1).
 
 Regras:
 - Produtos perecíveis possuem `data_validade` no cadastro do produto (menor validade disponível)
@@ -394,7 +397,7 @@ Regras:
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
-| Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += quantidade_convertida` (base) |
+| Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += total da entrada` |
 | Criar Nota de Saída com itens | Cria `reserva_estoque` | `saldo_reservado += X` |
 | Cancelamento de Nota de Saída | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
 | Nota baixada (total/parcial/corte) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
@@ -683,28 +686,22 @@ item_nota_saida
 ├── ID_item_nota_saida      INT PK auto_increment
 ├── ID_nota_saida           INT FK NOT NULL
 ├── ID_estoque              INT FK NOT NULL
-├── qtd_esperada            FLOAT NOT NULL              ← base (UNIDADE)
-├── qtd_entregue            FLOAT NOT NULL DEFAULT 0    ← base (UNIDADE)
-├── unidade_saida           VARCHAR NULL                 ← snapshot do nome; só Remessa
-├── fator_conversao         FLOAT NOT NULL DEFAULT 1     ← fator da unidade de saída
-├── quantidade_solicitada   FLOAT NULL                   ← na unidade de saída; NULL em nota antiga
+├── qtd_esperada            FLOAT NOT NULL              ← total solicitado
+├── qtd_entregue            FLOAT NOT NULL DEFAULT 0    ← total entregue
 └── observacao              TEXT
 ```
 
 Regras:
-- A **quantidade da Remessa é informada na Unidade Padrão de Saída do produto**
-  (`ID_conversao_saida`) e convertida para base no item: `qtd_esperada =
-  quantidade_solicitada × fator_conversao`. `unidade_saida` e `fator_conversao` ficam no
-  item como **snapshot** — auditoria e telas continuam mostrando o que foi combinado mesmo
-  que a conversão seja editada ou excluída depois
-- `qtd_esperada` e `qtd_entregue` estão sempre em base; reserva, baixa, entrega e
-  pendência usam esses valores e não mudam com a unidade de saída
-- **Avaria e Consumo Interno não usam unidade de saída**: gravam `unidade_saida = NULL`,
-  `fator_conversao = 1` e a quantidade já em base
-- Notas anteriores a essa mudança não têm `quantidade_solicitada`/`unidade_saida`: a
-  exibição usa o fallback `quantidade_solicitada ?? qtd_esperada` e não mostra unidade
-- Criar uma nota `SAIDA` (Remessa) com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`,
-  em base) e grava `item_nota_saida` e `reserva_estoque` na mesma transação (decisão do usuário, 2026-10-23)
+- A nota guarda **só totais**: `qtd_esperada` é o total solicitado e `qtd_entregue` o total
+  entregue, em base (UNIDADE). Não há nome de unidade, fator nem quantidade “na unidade”
+  gravados no item
+- Na Remessa, a **Unidade Padrão de Saída do produto** (`ID_conversao_saida`) é **auxílio de
+  lançamento**: a tela mostra unidade e fator e grava `qtd_esperada = quantidade × fator`;
+  o que fica na nota é apenas o total. Avaria e Consumo Interno digitam o total direto
+- Reserva, baixa, entrega e pendência usam `qtd_esperada`/`qtd_entregue`; alterar o cadastro
+  ou excluir a conversão depois não muda a nota já lançada
+- Criar uma nota `SAIDA` (Remessa) com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`)
+  e grava `item_nota_saida` e `reserva_estoque` na mesma transação (decisão do usuário, 2026-10-23)
 - Criar uma nota `AVARIA` ou `CONSUMO_INTERNO` **não reserva**: dá baixa real na criação
   (`quantidade_atual -= quantidade`), grava a `movimentacao_estoque` com quantidade negativa e
   `ID_nota_saida`, e a nota nasce `BAIXA_TOTAL` com `qtd_entregue = qtd_esperada`
@@ -712,8 +709,8 @@ Regras:
   disponível (`quantidade_atual − saldo_reservado`); na baixa direta, a `quantidade_atual` (que pode
   ficar negativa)
 - Só a nota `SAIDA` `ABERTA` é editável: a edição corrige a reserva **pelo delta** e pode acrescentar
-  item; remover item é recusado (RN004). O item existente mantém o fator gravado (a quantidade
-  digitada é convertida por ele); um item novo usa a Unidade Padrão de Saída atual do produto.
+  item; remover item é recusado (RN004). O item existente usa o **total já guardado**; um item
+  novo pode usar a Unidade Padrão de Saída como auxílio para calcular o total.
   Avaria e Consumo Interno são histórico e não são editáveis
 - Cancelar só é permitido em `SAIDA` `ABERTA`: libera `saldo_reservado -= qtd_esperada` em cada item e
   muda para `CANCELADA`; a segunda tentativa é recusada sem debitar de novo. Avaria/Consumo Interno
@@ -728,7 +725,8 @@ Regras:
 
 A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
 `quantidade_atual -= qtd_entregue` e `saldo_reservado -= qtd_entregue`, com a
-`movimentacao_estoque` correspondente.
+`movimentacao_estoque` correspondente. As telas de entrada, saída e expedição mostram
+**apenas quantidades/totais** — sem unidade, fator, “base” ou “convertida”.
 
 - **`BAIXA_TOTAL`**: todos os itens foram entregues.
 - **`BAIXA_PARCIAL`**: parte dos itens foi entregue e o restante continua reservado. A
@@ -843,9 +841,7 @@ item_nota_entrada
 ├── ID_item_nota_entrada  INT PK auto_increment
 ├── ID_nota_entrada       INT FK NOT NULL
 ├── ID_produto            INT FK NOT NULL
-├── fator_conversao       FLOAT NOT NULL DEFAULT 1  ← fator de entrada (a unidade não é guardada)
-├── quantidade            FLOAT NOT NULL         ← qtd recebida na conversão (ex: 10 caixas)
-├── quantidade_convertida FLOAT NOT NULL         ← qtd * fator, em base (ex: 10 * 20 = 200)
+├── quantidade            FLOAT NOT NULL         ← total que entra no estoque (ex: 10 × 20 = 200)
 └── observacao            TEXT
 ```
 
@@ -855,12 +851,12 @@ Regras:
 - A nota tem **no máximo uma** chave de acesso: ela é a coluna `nota_entrada.chave_acesso`
   (nullable e única) — não existe mais a tabela `nota_entrada_chave_acesso`
 - A unicidade da coluna impede a mesma chave em duas notas
-- A conversão de unidade é aplicada **na entrada**, como fator: o item parte da
-  **Conversão Padrão de Entrada** do produto e o fator pode ser editado na nota; o estoque
-  recebe `quantidade_convertida`, sempre em base (UNIDADE)
+- A conversão é **auxílio de lançamento**: o item novo parte da **Conversão Padrão de
+  Entrada** do produto, o fator pode ser editado na tela e o sistema grava em `quantidade`
+  apenas o **total** (quantidade × fator); a nota não guarda conversão
 - Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:
-  1. Cria/atualiza `estoque` com `quantidade_atual += quantidade_convertida`
+  1. Cria/atualiza `estoque` com `quantidade_atual += quantidade`
   2. Cria `movimentacao_estoque` vinculada à nota (`ID_nota_entrada`) — a movimentação **não
      tem coluna de tipo**; a natureza de entrada é inferida pela FK e por `nota_entrada.tipo`
 - `data_validade` (quando aplicável) é atualizada manualmente no cadastro do produto pelo Jonathan

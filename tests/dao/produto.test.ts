@@ -322,7 +322,6 @@ describe("produtoDAO", () => {
           id_nota_entrada: nota.id_nota_entrada,
           id_produto: produto.id_produto,
           quantidade: 1,
-          quantidade_convertida: 1,
         },
       });
       const composto = await criarProduto({ composto: true });

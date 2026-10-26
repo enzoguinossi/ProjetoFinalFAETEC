@@ -41,8 +41,9 @@ type ItemForm = {
   quantidade: string;
 };
 
-function quantidadeConvertida(item: ItemForm): number {
+function totalItem(item: ItemForm): number {
   const quantidade = Number(item.quantidade);
+  if (item.id_item_nota_entrada !== null) return quantidade;
   const fator = Number(item.fator);
   if (!Number.isFinite(quantidade) || !Number.isFinite(fator)) return 0;
   return quantidade * fator;
@@ -85,10 +86,8 @@ export default function EntradaForm({
       id_item_nota_entrada: item.id_item_nota_entrada,
       id_produto: item.id_produto,
       descricao: item.descricao,
-      id_conversao:
-        conversoes.find((c) => Number(c.fator) === Number(item.fator_conversao))
-          ?.id_conversao ?? null,
-      fator: String(item.fator_conversao),
+      id_conversao: null,
+      fator: "1",
       quantidade: String(item.quantidade),
     })),
   );
@@ -166,7 +165,7 @@ export default function EntradaForm({
       return;
     }
     for (const item of itens) {
-      if (!(Number(item.fator) > 0)) {
+      if (item.id_item_nota_entrada === null && !(Number(item.fator) > 0)) {
         mostrarAviso("O fator de conversão deve ser maior que zero.", "erro");
         return;
       }
@@ -180,10 +179,13 @@ export default function EntradaForm({
 
     setSalvando(true);
     try {
-      const itensBase = itens.map((item) => ({
+      const itensPayload = itens.map((item) => ({
+        id_item_nota_entrada: item.id_item_nota_entrada,
         id_produto: item.id_produto,
-        fator_conversao: Number(item.fator),
         quantidade: Number(item.quantidade),
+        ...(item.id_item_nota_entrada === null
+          ? { fator_conversao: Number(item.fator) }
+          : {}),
       }));
 
       const resultado =
@@ -193,17 +195,14 @@ export default function EntradaForm({
               data_recebimento: dataRecebimento || null,
               observacao: observacao.trim() || null,
               chave_acesso: chave || null,
-              itens: itens.map((item, indice) => ({
-                ...itensBase[indice],
-                id_item_nota_entrada: item.id_item_nota_entrada,
-              })),
+              itens: itensPayload,
             })
           : await criarNotaEntrada({
               id_fornecedor: fornecedor?.id_fornecedor ?? null,
               data_recebimento: dataRecebimento || null,
               observacao: observacao.trim() || null,
               chave_acesso: chave || null,
-              itens: itensBase,
+              itens: itensPayload,
             });
 
       if ("error" in resultado) {
@@ -336,8 +335,8 @@ export default function EntradaForm({
 
         {isEdit && (
           <p className="m-0 font-sans text-sm text-[#697077]">
-            Itens já registrados podem ter fator e quantidade corrigidos, mas não podem ser
-            removidos — a nota preserva a rastreabilidade.
+            Itens já registrados podem ter o total corrigido, mas não podem ser removidos — a
+            nota preserva a rastreabilidade.
           </p>
         )}
 
@@ -348,69 +347,96 @@ export default function EntradaForm({
         ) : (
           <div className="flex flex-col gap-3">
             {itens.map((item) => {
-              const convertida = quantidadeConvertida(item);
+              const existente = item.id_item_nota_entrada !== null;
+              const total = totalItem(item);
               return (
                 <div
                   key={item.uid}
-                  className="grid gap-3 rounded-[20px] border border-border p-3 sm:grid-cols-[2fr_1.4fr_0.8fr_0.8fr_auto]"
+                  className={`grid gap-3 rounded-[20px] border border-border p-3 ${
+                    existente
+                      ? "sm:grid-cols-[2fr_0.8fr]"
+                      : "sm:grid-cols-[2fr_1.4fr_0.8fr_0.8fr_0.8fr_auto]"
+                  }`}
                 >
                   <div className="flex flex-col gap-1">
                     <span className="font-sans text-xs text-[#697077]">Produto</span>
                     <span className="font-sans text-base text-ink-strong">{item.descricao}</span>
                   </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="font-sans text-xs text-[#697077]">Conversão</span>
-                    <select
-                      value={item.id_conversao ?? ""}
-                      onChange={(e) => escolherConversao(item, e.target.value)}
-                      disabled={isView}
-                      className={INPUT_CLASS}
-                    >
-                      <option value="">—</option>
-                      {conversoes.map((c) => (
-                        <option key={c.id_conversao} value={c.id_conversao}>
-                          {c.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {!existente && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-sans text-xs text-[#697077]">Conversão</span>
+                        <select
+                          value={item.id_conversao ?? ""}
+                          onChange={(e) => escolherConversao(item, e.target.value)}
+                          disabled={isView}
+                          className={INPUT_CLASS}
+                        >
+                          <option value="">—</option>
+                          {conversoes.map((c) => (
+                            <option key={c.id_conversao} value={c.id_conversao}>
+                              {c.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="font-sans text-xs text-[#697077]">Fator</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={item.fator}
-                      onChange={(e) => alterarItem(item.uid, { fator: e.target.value })}
-                      readOnly={isView}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-sans text-xs text-[#697077]">Fator</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.fator}
+                          onChange={(e) => alterarItem(item.uid, { fator: e.target.value })}
+                          readOnly={isView}
+                          className={INPUT_CLASS}
+                        />
+                      </div>
 
-                  <div className="flex flex-col gap-1">
-                    <span className="font-sans text-xs text-[#697077]">Quantidade</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      value={item.quantidade}
-                      onChange={(e) => alterarItem(item.uid, { quantidade: e.target.value })}
-                      readOnly={isView}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-sans text-xs text-[#697077]">Quantidade</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={item.quantidade}
+                          onChange={(e) => alterarItem(item.uid, { quantidade: e.target.value })}
+                          readOnly={isView}
+                          className={INPUT_CLASS}
+                        />
+                      </div>
 
-                  <div className="flex flex-col items-start justify-end gap-1">
-                    <span className="font-sans text-xs text-[#697077]">Convertida</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-sans text-base text-ink-strong">{formatarNumero(convertida)}</span>
-                      {!isView && item.id_item_nota_entrada === null && (
-                        <Button label="Remover" variant="cancel" onClick={() => removerItem(item.uid)} />
+                      <div className="flex flex-col gap-1">
+                        <span className="font-sans text-xs text-[#697077]">Total</span>
+                        <span className="flex h-10 items-center font-sans text-base text-ink-strong">
+                          {formatarNumero(total)}
+                        </span>
+                      </div>
+
+                      {!isView && (
+                        <div className="flex items-end justify-end">
+                          <Button label="Remover" variant="cancel" onClick={() => removerItem(item.uid)} />
+                        </div>
                       )}
+                    </>
+                  )}
+
+                  {existente && (
+                    <div className="flex flex-col gap-1">
+                      <span className="font-sans text-xs text-[#697077]">Total</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={item.quantidade}
+                        onChange={(e) => alterarItem(item.uid, { quantidade: e.target.value })}
+                        readOnly={isView}
+                        className={INPUT_CLASS}
+                      />
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

@@ -338,9 +338,6 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       where: { id_nota_saida: resultado.nota.id_nota_saida },
     });
     expect(item).toMatchObject({
-      unidade_saida: "CAIXA50",
-      quantidade_solicitada: 2,
-      fator_conversao: 50,
       qtd_esperada: 100,
       qtd_entregue: 0,
     });
@@ -352,7 +349,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     expect(estoqueApos.quantidade_atual).toBe(200);
   });
 
-  it("aviso RN001 mostra a unidade de saída e a base", async () => {
+  it("aviso RN001 mostra o total e o fator auxiliar", async () => {
     const { usuario } = await criarUsuario();
     const caixa = await criarConversao("CAIXA50", 50);
     const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
@@ -369,8 +366,8 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     );
     expect("error" in resultado).toBe(false);
     if ("error" in resultado) return;
-    expect(resultado.aviso).toContain("2 CAIXA50 (100 base)");
-    expect(resultado.aviso).toContain("disponível 10 base");
+    expect(resultado.aviso).toContain("2 × 50 = 100");
+    expect(resultado.aviso).toContain("disponível 10");
   });
 
   it("edita pela unidade gravada e usa a unidade atual só no item novo", async () => {
@@ -409,7 +406,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
           {
             id_item_nota_saida: item.id_item_nota_saida,
             id_produto: produto.id_produto,
-            quantidade_solicitada: 3,
+            quantidade_solicitada: 150,
           },
           { id_produto: produtoB.id_produto, quantidade_solicitada: 4 },
         ],
@@ -423,15 +420,9 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       orderBy: { id_item_nota_saida: "asc" },
     });
     expect(itens[0]).toMatchObject({
-      unidade_saida: "CAIXA50",
-      fator_conversao: 50,
-      quantidade_solicitada: 3,
       qtd_esperada: 150,
     });
     expect(itens[1]).toMatchObject({
-      unidade_saida: "CX10",
-      fator_conversao: 10,
-      quantidade_solicitada: 4,
       qtd_esperada: 40,
     });
 
@@ -441,7 +432,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     expect(estoqueApos.saldo_reservado).toBe(150);
   });
 
-  it("Avaria/Consumo não usam unidade de saída e operam em base", async () => {
+  it("Avaria/Consumo usam apenas o total", async () => {
     const { usuario } = await criarUsuario();
     const caixa = await criarConversao("CAIXA50", 50);
     const produto = await criarProduto({ idConversaoSaida: caixa.id_conversao });
@@ -461,9 +452,6 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       where: { id_nota_saida: resultado.nota.id_nota_saida },
     });
     expect(item).toMatchObject({
-      unidade_saida: null,
-      fator_conversao: 1,
-      quantidade_solicitada: 4,
       qtd_esperada: 4,
       qtd_entregue: 4,
     });
@@ -474,7 +462,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     expect(estoqueApos.quantidade_atual).toBe(16);
   });
 
-  it("nota antiga cai na quantidade base e não exibe unidade", async () => {
+  it("nota antiga cai no total guardado e não exibe unidade", async () => {
     const produto = await criarProduto();
     const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
     const nota = await prismaTeste.notaSaida.create({
@@ -499,18 +487,14 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     });
 
     expect(detalhe).toMatchObject({
-      unidade_saida: null,
-      fator_conversao: 1,
       quantidade_solicitada: 3,
-      quantidade_base: 3,
       quantidade_entregue: 3,
     });
-    expect(detalhe.quantidade_solicitada).toBe(detalhe.quantidade_base);
   });
 });
 
 describe("notaSaidaService.atualizar", () => {
-  it("edita nota antiga (sem snapshot) em base e mantém fator 1", async () => {
+  it("edita nota antiga usando o total guardado", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const estoque = await criarEstoque(produto.id_produto, {
@@ -549,9 +533,6 @@ describe("notaSaidaService.atualizar", () => {
     });
     expect(itemDepois).toMatchObject({
       qtd_esperada: 2,
-      quantidade_solicitada: 2,
-      unidade_saida: null,
-      fator_conversao: 1,
     });
 
     const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({

@@ -241,9 +241,7 @@ export async function obterNotaEntrada(
       id_item_nota_entrada: item.id_item_nota_entrada,
       id_produto: item.id_produto,
       descricao: item.produto.descricao,
-      fator_conversao: Number(item.fator_conversao),
       quantidade: Number(item.quantidade),
-      quantidade_convertida: Number(item.quantidade_convertida),
     })),
   };
 }
@@ -306,7 +304,7 @@ export async function listarNotasSaida(
         tipoLabel: ROTULOS_TIPO_NOTA_SAIDA[nota.tipo] ?? nota.tipo,
         destinatario,
         itens,
-        quantidade: itens.reduce((acc, item) => acc + item.quantidade_base, 0),
+        quantidade: itens.reduce((acc, item) => acc + item.quantidade_solicitada, 0),
         status: nota.status,
         statusLabel: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
         podeCancelar: STATUS_NOTA_SAIDA_CANCELAVEL.includes(nota.status),

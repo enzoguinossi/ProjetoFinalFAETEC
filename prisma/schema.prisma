@@ -512,12 +512,6 @@ model ItemNotaSaida {
   id_estoque         Int       @map("ID_estoque")
   qtd_esperada       Float     @map("qtd_esperada")
   qtd_entregue       Float     @default(0) @map("qtd_entregue")
-  /** Nome da unidade de saída no momento da nota; null em Avaria/Consumo e notas antigas. */
-  unidade_saida      String?   @map("unidade_saida")
-  /** Fator da unidade de saída aplicado sobre `qtd_esperada` (base). */
-  fator_conversao    Float     @default(1) @map("fator_conversao")
-  /** Quantidade informada na unidade de saída; null nas notas antigas. */
-  quantidade_solicitada Float? @map("quantidade_solicitada")
   observacao         String?   @map("observacao") @db.Text
   estoque            Estoque   @relation(fields: [id_estoque], references: [id_estoque])
   notaSaida          NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
@@ -641,9 +635,8 @@ model ItemNotaEntrada {
   id_item_nota_entrada  Int         @id @default(autoincrement()) @map("ID_item_nota_entrada")
   id_nota_entrada       Int         @map("ID_nota_entrada")
   id_produto            Int         @map("ID_produto")
-  fator_conversao       Float       @default(1) @map("fator_conversao")
+  /** Total que entra no estoque (já convertido no lançamento). */
   quantidade            Float       @map("quantidade")
-  quantidade_convertida Float       @map("quantidade_convertida")
   observacao            String?     @map("observacao") @db.Text
   notaEntrada           NotaEntrada @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
   produto               Produto     @relation(fields: [id_produto], references: [id_produto])

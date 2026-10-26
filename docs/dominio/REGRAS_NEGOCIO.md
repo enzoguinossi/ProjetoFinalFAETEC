@@ -1,12 +1,13 @@
 # Regras de Negócio — Projeto Nexus
 
-**Semântica das quantidades (transversal às RNs):** a conversão de unidade é **fator de
-entrada** (`quantidade_convertida = quantidade × fator`), não a unidade do produto; estoque,
-reserva e baixa ficam em **base** (`UNIDADE`, fator 1), e dashboard, relatórios e CSV exibem a
-quantidade base sem unidade. A **Unidade Padrão de Saída** do produto é usada **somente** em
-notas de saída do tipo Remessa (`SAIDA`), com nome e fator gravados no item como snapshot;
-`qtd_esperada` e `qtd_entregue` seguem em base (ver [`ENTENDIMENTO.md`](./ENTENDIMENTO.md)
-§3.6.1 e §3.11.1).
+**Semântica das quantidades (transversal às RNs):** a conversão de unidade é **apenas auxílio
+de lançamento** — multiplica a quantidade digitada para calcular o total na hora, sem ser
+copiada para a nota. O estoque, a reserva, a baixa e a movimentação ficam em **base**
+(`UNIDADE`, fator 1), e dashboard, relatórios e CSV exibem a quantidade base sem unidade.
+`item_nota_entrada.quantidade` é o total que entra no estoque; `item_nota_saida` guarda só
+`qtd_esperada` (total solicitado) e `qtd_entregue` (total entregue). A **Unidade Padrão de
+Saída** do produto só auxilia o lançamento de notas de Remessa (`SAIDA`) — ver
+[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.6.1, §3.11.1 e §3.12.
 
 ## RN001 — Alerta de Saldo Insuficiente
 **Prioridade:** Essencial

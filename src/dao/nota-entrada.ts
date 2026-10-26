@@ -5,9 +5,8 @@ import { estoqueDAO } from "./estoque";
 
 export type NotaEntradaItemCriacao = {
   id_produto: number;
-  fator_conversao: number;
+  /** Total já convertido que entra no estoque. */
   quantidade: number;
-  quantidade_convertida: number;
   observacao?: string | null;
 };
 
@@ -23,9 +22,8 @@ export type NotaEntradaItemAtualizacao = {
   /** `null`/ausente = item novo (acrescentado na edição). */
   id_item_nota_entrada: number | null;
   id_produto: number;
-  fator_conversao: number;
+  /** Total já convertido que entra no estoque. */
   quantidade: number;
-  quantidade_convertida: number;
   observacao?: string | null;
 };
 
@@ -50,9 +48,7 @@ function snapshotNota(
   itens: {
     id_item_nota_entrada?: number | null;
     id_produto: number;
-    fator_conversao: number;
     quantidade: number;
-    quantidade_convertida: number;
   }[],
 ) {
   return {
@@ -63,9 +59,7 @@ function snapshotNota(
     itens: itens.map((item) => ({
       id_item_nota_entrada: item.id_item_nota_entrada,
       id_produto: item.id_produto,
-      fator_conversao: item.fator_conversao,
       quantidade: item.quantidade,
-      quantidade_convertida: item.quantidade_convertida,
     })),
   };
 }
@@ -122,11 +116,11 @@ export class NotaEntradaDAO {
 
   /**
    * Atualiza o cabeçalho da nota e seus itens em uma única transação. Para cada
-   * item alterado, a diferença de `quantidade_convertida` vira uma movimentação
-   * de estoque corretiva (`saldo_anterior`/`saldo_posterior`), podendo ser
-   * negativa; itens novos entram como entrada cheia. Remover item é recusado —
-   * não há estado de "item excluído" e apagar perderia a rastreabilidade
-   * (RN004). Qualquer falha desfaz tudo.
+   * item alterado, a diferença do total vira uma movimentação de estoque
+   * corretiva (`saldo_anterior`/`saldo_posterior`), podendo ser negativa; itens
+   * novos entram como entrada cheia. Remover item é recusado — não há estado de
+   * "item excluído" e apagar perderia a rastreabilidade (RN004). Qualquer falha
+   * desfaz tudo.
    */
   async update(id: number, data: NotaEntradaAtualizacao, id_usuario: number) {
     return prisma.$transaction(async (tx) => {
@@ -176,9 +170,7 @@ export class NotaEntradaDAO {
           await tx.itemNotaEntrada.update({
             where: { id_item_nota_entrada: anterior.id_item_nota_entrada },
             data: {
-              fator_conversao: item.fator_conversao,
               quantidade: item.quantidade,
-              quantidade_convertida: item.quantidade_convertida,
               observacao: item.observacao ?? null,
             },
           });
@@ -187,21 +179,16 @@ export class NotaEntradaDAO {
             data: {
               id_nota_entrada: id,
               id_produto: item.id_produto,
-              fator_conversao: item.fator_conversao,
               quantidade: item.quantidade,
-              quantidade_convertida: item.quantidade_convertida,
               observacao: item.observacao ?? null,
             },
           });
           item.id_item_nota_entrada = criado.id_item_nota_entrada;
         }
 
-        const convertidaAnterior = anterior
-          ? Number(anterior.quantidade_convertida)
-          : 0;
-        const delta = item.quantidade_convertida - convertidaAnterior;
-        // Item existente mantém o produto gravado: a edição só corrige fator e
-        // quantidade.
+        const quantidadeAnterior = anterior ? Number(anterior.quantidade) : 0;
+        const delta = item.quantidade - quantidadeAnterior;
+        // Item existente mantém o produto gravado: a edição só corrige o total.
         const idProduto = anterior?.id_produto ?? item.id_produto;
 
         if (delta !== 0) {
@@ -222,9 +209,7 @@ export class NotaEntradaDAO {
           id_item_nota_entrada:
             anterior?.id_item_nota_entrada ?? item.id_item_nota_entrada,
           id_produto: idProduto,
-          fator_conversao: item.fator_conversao,
           quantidade: item.quantidade,
-          quantidade_convertida: item.quantidade_convertida,
         });
       }
 
@@ -261,9 +246,7 @@ export class NotaEntradaDAO {
 
       const itensGravados: {
         id_produto: number;
-        fator_conversao: number;
         quantidade: number;
-        quantidade_convertida: number;
       }[] = [];
 
       for (const item of data.itens) {
@@ -271,9 +254,7 @@ export class NotaEntradaDAO {
           data: {
             id_nota_entrada: nota.id_nota_entrada,
             id_produto: item.id_produto,
-            fator_conversao: item.fator_conversao,
             quantidade: item.quantidade,
-            quantidade_convertida: item.quantidade_convertida,
             observacao: item.observacao ?? null,
           },
         });
@@ -283,7 +264,7 @@ export class NotaEntradaDAO {
             id_produto: item.id_produto,
             id_usuario,
             id_nota_entrada: nota.id_nota_entrada,
-            quantidade: item.quantidade_convertida,
+            quantidade: item.quantidade,
             data_entrada: data.data_recebimento ?? new Date(),
             observacao: data.observacao,
           },
@@ -292,9 +273,7 @@ export class NotaEntradaDAO {
 
         itensGravados.push({
           id_produto: item.id_produto,
-          fator_conversao: item.fator_conversao,
           quantidade: item.quantidade,
-          quantidade_convertida: item.quantidade_convertida,
         });
       }
 
