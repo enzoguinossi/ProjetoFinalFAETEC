@@ -24,6 +24,8 @@ export const ORIGEM: Record<string, string> = {
   TablePagination: "src/components/TablePagination.tsx",
   Modal: "src/components/Modal.tsx",
   ConfirmDialog: "src/components/ConfirmDialog.tsx",
+  Switch: "src/components/Switch.tsx",
+  PermissoesPanel: "src/components/PermissoesPanel.tsx",
   Aviso: "src/components/Aviso.tsx",
   Sidebar: "src/components/Sidebar.tsx",
   SidebarItem: "src/components/Sidebar.tsx",

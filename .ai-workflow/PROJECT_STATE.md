@@ -1,15 +1,16 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-10-25 (as notas guardam apenas os totais; conversão é auxílio
-> de lançamento).
+> Última consolidação: 2026-10-26 (revamp da tela de permissões; notas guardam apenas os
+> totais; conversão é auxílio de lançamento).
 
 ## Objetivo atual
 
 **Concluir a entrega final do Nexus para a FAETEC 2026.** A `main` local está à frente de
 `origin/main` (`fff7076`) com o mural/validades/gráficos (`dc24eca`), os ajustes de
-unidades (`30ba95a`) e, nesta rodada, a remoção da conversão das notas. A produção está
-**parada** (3001) e o `nexus_prod` ainda precisa da release, do backfill e do `db push`.
+unidades (`30ba95a`), a remoção da conversão das notas (`3b1a767`) e, nesta rodada, o
+revamp da tela de permissões. A produção está **parada** (3001) e o `nexus_prod` ainda
+precisa da release, do backfill e do `db push`.
 
 ## Entregue nesta rodada (working tree; commit pendente)
 
@@ -33,11 +34,17 @@ unidades (`30ba95a`) e, nesta rodada, a remoção da conversão das notas. A pro
 6. **Testes:** **422/422**; lint, build e `figma:check` verdes (developer); revisão
    independente confirmou criação/edição/estoque/reserva/baixa e apontou o gate de
    migração de produção.
+7. **Revamp da tela de permissões (working tree):** `PermissoesPanel` virou lista única
+   de grupos com toggles, busca, contagem e expansão; `Switch` acessível; `PerfilForm`
+   com Nome/Descrição acima e permissões em largura total; título do modal por modo;
+   `UsuarioForm` com o novo painel e “Aplicar perfil”; `data-figma`/`origem.ts`;
+   `CHANGELOG`. Sem mudança de backend/permissões. Perfil/usuário, Super Admin, busca,
+   grupo parcial e salvamento conferidos; gates verdes.
 
 ## Estado verificado
 
-- **Git:** `main` em `3e02b50` + working tree desta rodada; `origin/main` em `fff7076`;
-  tags `v3.24.10.2026` e `v4.24.10.2026`; nada empurrado.
+- **Git:** `main` em `3b1a767` (notas) + working tree do revamp de permissões;
+  `origin/main` em `fff7076`; tags `v3.24.10.2026` e `v4.24.10.2026`; nada empurrado.
 - **Banco dev (`nexus`):** `db push` aplicado após backfill das 2 linhas de entrada; a
   `UNIDADE` padrão está em `id_conversao = 1`. `nexus_test` sincronizado; 422 testes.
 - **Produção:** worktree em `c1d2f8c` (3.24.10.2026), servidor 3001 parado; `nexus_prod`
@@ -57,8 +64,8 @@ unidades (`30ba95a`) e, nesta rodada, a remoção da conversão das notas. A pro
 
 ## Pendências reais
 
-1. **Commit e release** — a próxima release no dia 25/10 seria `1.25.10.2026`
-   (tag `v1.25.10.2026`); exige aprovação do usuário.
+1. **Commit e release** — commitar o revamp de permissões e publicar a próxima release
+   no dia 26/10, `1.26.10.2026` (tag `v1.26.10.2026`); exige aprovação do usuário.
 2. **Produção** — backup, os dois gates acima, `db push`, atualizar a worktree, build/start
    e smoke. Servidor 3001 parado.
 3. **Escopo restante para 100%** — RF015 (inventário), RF020 (fotos), RF024/XLSX e partes
@@ -68,13 +75,15 @@ unidades (`30ba95a`) e, nesta rodada, a remoção da conversão das notas. A pro
 
 ## Próximas ações
 
-1. Commitar o diff desta rodada (KAN-140).
-2. Aprovar a release `1.25.10.2026` + push.
+1. Commitar o revamp de permissões (KAN-137, módulo de usuários/perfis).
+2. Aprovar a release `1.26.10.2026` + push.
 3. Preparar a produção com os dois gates e o `db push`.
 4. Decidir o escopo restante e atualizar manual/apresentação/Jira.
 
 ## Histórico recente
 
+- **2026-10-26** — revamp da tela de permissões: toggles em lista, busca, grupos
+  expansíveis, `Switch` acessível, títulos por modo no perfil e novo painel no usuário.
 - **2026-10-25** — notas guardam apenas os totais; conversão é auxílio de lançamento;
   422 testes; docs; gate de backfill de produção.
 - **2026-10-25** — ajustes de unidades, unidade de saída na Remessa e dashboard sem

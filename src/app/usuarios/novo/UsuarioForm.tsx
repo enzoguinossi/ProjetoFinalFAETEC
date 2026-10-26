@@ -108,7 +108,7 @@ export default function UsuarioForm({
       data-figma="FormularioUsuario"
       data-figma-hug="vertical"
     >
-      <div className="grid grid-cols-[360px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr] items-start">
         {/* Coluna esquerda — dados */}
         <div className="flex flex-col gap-4">
           {isEdit && (

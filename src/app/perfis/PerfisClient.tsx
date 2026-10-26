@@ -78,17 +78,17 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
 
       <DataTable columns={columns} data={initialRows} idField="id_perfil" actions={actions} />
 
-      <Modal open={modalMode === "create"} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "create"} onClose={closeModal} width="min(860px, calc(100vw - 32px))" title="Novo Perfil">
         <PerfilForm grupos={grupos} mode="create" onSuccess={handleSuccess} onCancel={closeModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={closeModal} width="min(860px, calc(100vw - 32px))" title="Editar perfil">
         {formData && (
           <PerfilForm grupos={grupos} mode="edit" initialData={formData} onSuccess={handleSuccess} onCancel={closeModal} />
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="1000px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={closeModal} width="min(860px, calc(100vw - 32px))" title="Visualizar perfil">
         {formData && (
           <PerfilForm grupos={grupos} mode="view" initialData={formData} onCancel={closeModal} />
         )}

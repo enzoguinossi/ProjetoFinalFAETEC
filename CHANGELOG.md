@@ -57,6 +57,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Tela de permissões (KAN-140):** o painel de perfis/usuários deixou a transfer-list de
+  duas colunas e passou a usar uma lista única de grupos com busca, chevron, switches por
+  grupo e por ação e contador de selecionadas. O modal de perfil ganhou título por modo,
+  Nome/Descrição acima e permissões em largura total; o formulário de usuário mantém o
+  layout de duas colunas e o “Aplicar perfil”. Sem mudança de backend ou regra.
 - **Dashboard:** os valores estáticos de KPI e de pendências foram substituídos por dados
   reais; a ordem da tela passou a ser título → KPI → mural → gráficos → pendências.
 - **Banco de dados:** `mensagem_mural.chave` (única, usada pela mensagem automática ativa;

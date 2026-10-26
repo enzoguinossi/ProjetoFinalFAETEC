@@ -48,38 +48,36 @@ export default function PerfilForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={ui.form} data-figma="FormularioPerfil" data-figma-hug="vertical">
-      <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
-        <div className="flex flex-col gap-4">
-          <div className={ui.field}>
-            <label className={ui.label}>Nome</label>
-            <input name="nome" required={!isView} value={isView || isEdit ? nome : undefined}
-              onChange={isEdit ? (e) => setNome(e.target.value) : undefined} readOnly={isView} className={ui.input} />
-          </div>
-          <div className={ui.field}>
-            <label className={ui.label}>Descrição</label>
-            {isView ? (
-              <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.descricao ?? "—"}</p>
-            ) : (
-              <input
-                name="descricao"
-                value={isEdit ? descricao : undefined}
-                defaultValue={isEdit ? undefined : (initialData?.descricao ?? undefined)}
-                onChange={isEdit ? (e) => setDescricao(e.target.value) : undefined}
-                className={ui.input}
-              />
-            )}
-          </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" data-figma="FormularioPerfil" data-figma-hug="vertical">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div className={ui.field}>
+          <label className={ui.label}>Nome</label>
+          <input name="nome" required={!isView} value={isView || isEdit ? nome : undefined}
+            onChange={isEdit ? (e) => setNome(e.target.value) : undefined} readOnly={isView} className={ui.input} />
         </div>
-
-        <PermissoesPanel
-          grupos={grupos}
-          selecionadas={selecionadas}
-          onChange={setSelecionadas}
-          disabled={isView}
-          tituloSelecionadas="Do perfil"
-        />
+        <div className={ui.field}>
+          <label className={ui.label}>Descrição</label>
+          {isView ? (
+            <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.descricao ?? "—"}</p>
+          ) : (
+            <input
+              name="descricao"
+              value={isEdit ? descricao : undefined}
+              defaultValue={isEdit ? undefined : (initialData?.descricao ?? undefined)}
+              onChange={isEdit ? (e) => setDescricao(e.target.value) : undefined}
+              className={ui.input}
+            />
+          )}
+        </div>
       </div>
+
+      <PermissoesPanel
+        grupos={grupos}
+        selecionadas={selecionadas}
+        onChange={setSelecionadas}
+        disabled={isView}
+        tituloSelecionadas="Do perfil"
+      />
 
       <div className={ui.rowActions}>
         {isView ? (

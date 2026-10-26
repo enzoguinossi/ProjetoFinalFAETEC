@@ -82,7 +82,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         carregando={carregando}
       />
 
-      <Modal open={modalMode === "create"} onClose={fecharModal} width="1000px">
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="min(1000px, calc(100vw - 32px))">
         <UsuarioForm
           funcionarios={funcionarios}
           grupos={grupos}
@@ -94,7 +94,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="1000px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="min(1000px, calc(100vw - 32px))">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
@@ -110,7 +110,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="1000px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="min(1000px, calc(100vw - 32px))">
         {formData && (
           <UsuarioForm
             funcionarios={funcionarios}
