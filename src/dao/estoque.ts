@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { assertProdutoSemInventario } from "./inventario";
 
 /**
  * Operações de saldo do produto.
@@ -36,6 +37,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findUniqueOrThrow({
       where: { id_produto: dados.id_produto },
       select: { saldo: true },
@@ -74,6 +76,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findUniqueOrThrow({
       where: { id_produto: dados.id_produto },
       select: { saldo_reservado: true },
@@ -112,6 +115,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findUniqueOrThrow({
       where: { id_produto: dados.id_produto },
       select: { saldo_reservado: true },
@@ -150,6 +154,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findUniqueOrThrow({
       where: { id_produto: dados.id_produto },
       select: { saldo_reservado: true },
@@ -192,6 +197,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findUniqueOrThrow({
       where: { id_produto: dados.id_produto },
       select: { saldo: true, saldo_reservado: true },
@@ -250,6 +256,7 @@ export class SaldoDAO {
     },
     client: Prisma.TransactionClient = prisma,
   ) {
+    await assertProdutoSemInventario(dados.id_produto, client);
     const existente = await client.produto.findFirst({
       where: { id_produto: dados.id_produto, ativo: true },
       select: { saldo: true, descricao: true },
@@ -296,6 +303,7 @@ export class SaldoDAO {
     observacao?: string,
   ) {
     return prisma.$transaction(async (tx) => {
+      await assertProdutoSemInventario(id_produto, tx);
       const existente = await tx.produto.findUniqueOrThrow({
         where: { id_produto },
         select: { saldo: true },

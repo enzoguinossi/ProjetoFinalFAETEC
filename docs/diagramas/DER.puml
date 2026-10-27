@@ -289,6 +289,7 @@ entity "movimentacao_estoque" as mov {
   saldo_posterior : FLOAT
   ID_nota_saida : INT <<FK>>
   ID_nota_entrada : INT <<FK>>
+  ID_ajuste_inventario : INT <<FK>>
   * data_hora : TIMESTAMP
   observacao : TEXT
 }
@@ -320,7 +321,7 @@ entity "inventario" as inventario {
   * data_inicio : DATE
   data_fim : DATE
   * contagem_cega : BOOLEAN <<DEF FALSE>>
-  * status : ENUM(ABERTO, EM_CONTAGEM, AGUARDANDO_APROVACAO, FINALIZADO)
+  * status : ENUM(ABERTO, EM_CONTAGEM, AGUARDANDO_APROVACAO, FINALIZADO, CANCELADO)
   * ID_usuario_abertura : INT <<FK>>
   ID_usuario_aprovacao : INT <<FK>>
   observacao : TEXT
@@ -332,6 +333,11 @@ entity "item_inventario" as item_inv {
   * ID_inventario : INT <<FK>>
   * ID_produto : INT <<FK>>
   * quantidade_sistema : FLOAT
+  quantidade_final : FLOAT
+  origem : ENUM(MEDIA, CONTAGEM)
+  ID_contagem_inventario : INT <<FK>>
+  decidido_em : TIMESTAMP
+  ID_usuario_decisao : INT <<FK>>
   observacao : TEXT
 }
 
@@ -350,7 +356,9 @@ entity "ajuste_inventario" as ajuste_inv {
   --
   * ID_inventario : INT <<FK>>
   * ID_produto : INT <<FK>>
-  * diferenca : FLOAT
+  * quantidade_contada : FLOAT
+  * origem : ENUM(MEDIA, CONTAGEM)
+  ID_contagem_inventario : INT <<FK>>
   * status : ENUM(PENDENTE, APROVADO, REJEITADO)
   ID_usuario_aprovacao : INT <<FK>>
   data_aprovacao : TIMESTAMP
@@ -631,6 +639,9 @@ produto ||--o{ ajuste_inv
 produto ||--o{ item_coleta
 inventario ||--|{ item_inv
 inventario ||--o{ ajuste_inv
+ajuste_inv ||--o{ mov
+contagem ||--o{ ajuste_inv
+item_inv ||--o| contagem : "decisão"
 usuario ||--o{ inventario
 inventario ||--o| usuario
 item_inv ||--o{ contagem

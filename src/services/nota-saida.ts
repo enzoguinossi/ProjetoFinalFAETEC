@@ -113,7 +113,7 @@ export class NotaSaidaService {
    * Valida a nota de saída e grava nota, itens, reservas/baixas e auditoria em
    * uma única transação (via `notaSaidaDAO.create`). Em `SAIDA` (Remessa) a
    * reserva usa a `quantidade_solicitada`; `AVARIA` e `CONSUMO_INTERNO` não
-   * reservam: dão baixa real em `quantidade_atual` na criação. Saldo
+   * reservam: dão baixa real em `produto.saldo` na criação. Saldo
    * insuficiente apenas avisa (RN001), nunca bloqueia.
    */
   async registrar(input: SaidaInput, id_usuario: number): Promise<ResultadoSaida> {

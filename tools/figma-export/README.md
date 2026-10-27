@@ -134,7 +134,7 @@ FIGMA_EXPORT_DATABASE_URL="mysql://usuario:senha@host:3306/outro_banco"
 
 ## Escopo dos cenários
 
-`tools/figma-export/scenarios.ts` é a única fonte do escopo. Hoje são 48 telas:
+`tools/figma-export/scenarios.ts` é a única fonte do escopo. Hoje são 53 telas:
 telas públicas (login, primeiro acesso, definir senha), dashboard, e para cada cadastro
 (usuários, funcionários, destinatários, fornecedores, veículos, produtos, perfis)
 a listagem, a busca sem resultados e os quatro modais (novo, visualizar, editar, excluir).

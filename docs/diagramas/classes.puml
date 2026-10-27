@@ -216,6 +216,11 @@ package "Produtos e Estoque" as Produtos {
     class ItemInventario {
       + ID_item_inventario: Integer
       + quantidade_sistema: Float
+      + quantidade_final: Float
+      + origem: Enum
+      + ID_contagem_inventario: Integer
+      + decidido_em: Timestamp
+      + ID_usuario_decisao: Integer
     }
 
     class ContagemInventario {
@@ -226,7 +231,9 @@ package "Produtos e Estoque" as Produtos {
 
     class AjusteInventario {
       + ID_ajuste_inventario: Integer
-      + diferenca: Float
+      + quantidade_contada: Float
+      + origem: Enum
+      + ID_contagem_inventario: Integer
       + status: Enum
     }
 
@@ -237,6 +244,7 @@ package "Produtos e Estoque" as Produtos {
       + saldo_posterior: Float
       + ID_nota_entrada: Integer
       + ID_nota_saida: Integer
+      + ID_ajuste_inventario: Integer
       + data_hora: Timestamp
       + observacao: Text
     }
@@ -267,6 +275,9 @@ Funcionario "1" --> "*" ContagemInventario : realiza >
 Inventario "1" --> "*" AjusteInventario : gera >
 Produto "1" --> "*" AjusteInventario : ajustado em >
 Produto "1" --> "*" ItemInventario : contado em >
+AjusteInventario "1" --> "*" MovimentacaoEstoque : gera >
+ItemInventario "0..1" --> "1" ContagemInventario : decidida em >
+AjusteInventario "0..1" --> "1" ContagemInventario : origem >
 
 ' Códigos dos produtos
 Produto "1" --> "*" ProdutoCodigo : possui >

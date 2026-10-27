@@ -234,7 +234,7 @@ export type ProdutoVencimentoRelatorioRow = {
   /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
   codigo: string;
   descricao: string;
-  /** Soma de `quantidade_atual` dos estoques ativos. */
+  /** Soma de `produto.saldo` dos estoques ativos. */
   quantidade: number;
   /** `YYYY-MM-DD`: `data_validade` é DATE, sem hora. */
   validade: string;

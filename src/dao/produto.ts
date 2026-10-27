@@ -90,7 +90,7 @@ export class ProdutoDAO {
     );
   }
 
-  async searchPriorizadoComEstoque(query: string, take = 50) {
+  async searchPriorizadoComSaldo(query: string, take = 50) {
     return this.buscarPriorizado(query, take, (where) =>
       prisma.produto.findMany({
         where,
@@ -274,7 +274,7 @@ export class ProdutoDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [produto, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
+    const [produto, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho, itensInventario, ajustesInventario] = await Promise.all([
       client.produto.findUnique({
         where: { id_produto: id },
         select: { saldo: true, saldo_reservado: true },
@@ -285,6 +285,8 @@ export class ProdutoDAO {
       client.itemColeta.count({ where: { id_produto: id } }),
       client.movimentacaoEstoque.count({ where: { id_produto: id } }),
       client.produtoInsumo.count({ where: { id_produto_filho: id } }),
+      client.itemInventario.count({ where: { id_produto: id } }),
+      client.ajusteInventario.count({ where: { id_produto: id } }),
     ]);
 
     const vinculos: string[] = [];
@@ -297,6 +299,8 @@ export class ProdutoDAO {
     if (itensColeta > 0) vinculos.push(`${itensColeta} item(ns) de coleta`);
     if (movimentacoes > 0) vinculos.push(`${movimentacoes} movimentação(ões) de estoque`);
     if (insumosFilho > 0) vinculos.push(`${insumosFilho} produto(s) composto(s) que o utilizam como insumo`);
+    if (itensInventario > 0) vinculos.push(`${itensInventario} item(ns) de inventário`);
+    if (ajustesInventario > 0) vinculos.push(`${ajustesInventario} ajuste(s) de inventário`);
 
     return { podeExcluir: vinculos.length === 0, vinculos };
   }

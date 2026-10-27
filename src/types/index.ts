@@ -30,9 +30,12 @@ export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_EXPEDICAO"] as 
 export type StatusVeiculo = (typeof STATUS_VEICULO)[number];
 
 export const STATUS_INVENTARIO = [
-  "ABERTO", "EM_CONTAGEM", "AGUARDANDO_APROVACAO", "FINALIZADO",
+  "ABERTO", "EM_CONTAGEM", "AGUARDANDO_APROVACAO", "FINALIZADO", "CANCELADO",
 ] as const;
 export type StatusInventario = (typeof STATUS_INVENTARIO)[number];
+
+export const ORIGEM_AJUSTE = ["MEDIA", "CONTAGEM"] as const;
+export type OrigemAjuste = (typeof ORIGEM_AJUSTE)[number];
 
 export const STATUS_AJUSTE = ["PENDENTE", "APROVADO", "REJEITADO"] as const;
 export type StatusAjuste = (typeof STATUS_AJUSTE)[number];

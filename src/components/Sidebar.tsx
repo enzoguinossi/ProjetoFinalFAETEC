@@ -56,20 +56,29 @@ export default function Sidebar({ collapsed, onToggle, onExpand, user }: Sidebar
 
   const isActive = (path: string) => pathname === path;
   const isCadastroItemActive = cadastroItems.some((i) => pathname === i.path);
-  const isMovEstoqueItemActive = movEstoqueItems.some((i) => pathname === i.path);
+  const isMovEstoqueItemActive = movEstoqueItems.some(
+    (i) => pathname === i.path || pathname.startsWith(`${i.path}/`),
+  );
   const isExpedicaoItemActive = expedicaoItems.some((i) => pathname === i.path);
+
+  const temPermissao = (
+    item: { permissao: string; permissoes?: string[] },
+  ) =>
+    (item.permissoes ?? [item.permissao]).some((permissao) =>
+      user?.permissoes?.includes(permissao),
+    );
 
   const visibleCadastroItems = user?.super_admin
     ? cadastroItems
-    : cadastroItems.filter((i) => user?.permissoes?.includes(i.permissao));
+    : cadastroItems.filter(temPermissao);
 
   const visibleMovEstoqueItems = user?.super_admin
     ? movEstoqueItems
-    : movEstoqueItems.filter((i) => user?.permissoes?.includes(i.permissao));
+    : movEstoqueItems.filter(temPermissao);
 
   const visibleExpedicaoItems = user?.super_admin
     ? expedicaoItems
-    : expedicaoItems.filter((i) => user?.permissoes?.includes(i.permissao));
+    : expedicaoItems.filter(temPermissao);
 
   // Atualizações funcionais: cliques rápidos nunca dependem do estado do closure.
   // No rail o grupo não abre in-place: expande a sidebar e já deixa o grupo aberto.
@@ -169,7 +178,9 @@ export default function Sidebar({ collapsed, onToggle, onExpand, user }: Sidebar
               <div className={subItemsCls}>
                 {visibleMovEstoqueItems.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.path);
+                  const active =
+                    isActive(item.path) ||
+                    (item.path === "/inventario" && pathname.startsWith("/inventario"));
                   return (
                     <button
                       key={item.path}

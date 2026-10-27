@@ -35,7 +35,7 @@ async function vincularNota(
 
 describe("relatorioDAO", () => {
   describe("listarProdutosRelatorio", () => {
-    it("lista ativas por padrão, ordena por descrição e soma os estoques ativos", async () => {
+    it("lista ativas por padrão, ordena por descrição e soma os saldos dos produtos", async () => {
       const caixa = await criarConversao("CX");
       const arroz = await criarProduto({
         descricao: "Arroz",
@@ -46,7 +46,6 @@ describe("relatorioDAO", () => {
 
       await criarEstoque(arroz.id_produto, { quantidadeAtual: 10, saldoReservado: 3 });
       await criarEstoque(arroz.id_produto, { quantidadeAtual: 5, saldoReservado: 2 });
-      await criarEstoque(arroz.id_produto, { quantidadeAtual: 99, ativo: false });
       await criarEstoque(feijao.id_produto, { quantidadeAtual: 2.5 });
 
       const { data, totais } = await relatorioDAO.listarProdutosRelatorio();
@@ -857,7 +856,6 @@ describe("relatorioDAO", () => {
 
       await criarEstoque(vencido.id_produto, { quantidadeAtual: 3 });
       await criarEstoque(vencido.id_produto, { quantidadeAtual: 2.5 });
-      await criarEstoque(vencido.id_produto, { quantidadeAtual: 99, ativo: false });
       await criarEstoque(venceHoje.id_produto, { quantidadeAtual: 1 });
       await criarEstoque(aVencer.id_produto, { quantidadeAtual: 4 });
 

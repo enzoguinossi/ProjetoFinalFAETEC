@@ -187,6 +187,45 @@ export const SCENARIOS: Scenario[] = [
 
   /* ── Cadastros ── */
   ...TELAS.flatMap(cenariosCadastro),
+
+  /* ── Inventário ── */
+  {
+    id: "inventario/lista",
+    group: "Mov. Estoque",
+    title: "Inventário — Listagem",
+    route: "/inventario",
+  },
+  {
+    id: "inventario/novo",
+    group: "Mov. Estoque",
+    title: "Inventário — Novo",
+    route: "/inventario",
+    steps: [{ click: "Novo inventário", waitFor: MODAL, waitMs: 700 }],
+  },
+  {
+    id: "inventario/detalhe",
+    group: "Mov. Estoque",
+    title: "Inventário — Detalhe e contagem",
+    route: "/inventario/1",
+  },
+  {
+    id: "inventario/aprovacao",
+    group: "Mov. Estoque",
+    title: "Inventário — Aprovação",
+    route: "/inventario/2/aprovar",
+  },
+  {
+    id: "inventario/lista-contagem",
+    group: "Mov. Estoque",
+    title: "Inventário — Lista de contagem",
+    route: "/inventario/1/lista",
+  },
+  {
+    id: "inventario/relatorio",
+    group: "Mov. Estoque",
+    title: "Inventário — Relatório",
+    route: "/inventario/3/relatorio",
+  },
 ];
 
 export function selecionar(apenas: string[] | undefined): Scenario[] {

@@ -14,7 +14,31 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Added
-
+- **Inventário/contagem (RUN-20261026-81/82 e RUN-20261027-83, RF015/RN005):** abertura por
+  produto sobre o estoque achatado em `produto` (`quantidade_sistema = produto.saldo`), com
+  bloqueio por produto enquanto `ABERTO`/`EM_CONTAGEM`/`AGUARDANDO_APROVACAO` (exceto a
+  movimentação de ajuste do próprio inventário) e recusa de produto já presente em outro
+  inventário ativo. Abertura/edição travam os produtos (`SELECT ... FOR UPDATE`) antes da
+  checagem; decisão, finalização e cancelamento são transacionais, travam o inventário e não
+  ajustam em `CANCELADO`/`FINALIZADO`. Uma contagem por funcionário/item; item sem contagem
+  bloqueia o fechamento. A decisão fica em `ItemInventario` (`quantidade_final`, `origem`,
+  `id_contagem_inventario`, `decidido_em`, `id_usuario_decisao`): média ou qualquer contagem
+  individual, inclusive sem diferença; sem ajuste/movimento quando o valor escolhido é igual ao
+  sistema, mas o item fica decidido e o inventário pode finalizar. `AjusteInventario` trocou
+  `diferenca` por `quantidade_contada`, `origem` (`MEDIA`/`CONTAGEM`) e
+  `id_contagem_inventario`, só existe com diferença e é único por inventário/produto. Aprovação
+  altera `produto.saldo` e grava `movimentacao_estoque` com `id_ajuste_inventario`;
+  rejeição/cancelamento não alteram saldo nem reserva. Status ganhou `CANCELADO` (com
+  `data_fim`), `FINALIZADO` não volta e o fechado continua consultável. Contagem cega é
+  funcional: com `Inventario.contagem_cega = true`, só `estoque.ver_saldo` vê sistema/saldos;
+  desligada, todos veem (a permissão `inventario.ver_contagem_cega` saiu do seed/UI). Na cega,
+  tela, lista, relatório e CSV não revelam sistema, saldos, `quantidade_final` nem a inferência
+  de “sem ajuste/igual” sem `estoque.ver_saldo` (lista/CSV seguem com/sem sistema conforme a
+  permissão); lista/relatório exigem `relatorio.gerar`. Edição só em `ABERTO` sem contagens;
+  exclusão sem contagens/ajustes; depois só cancelar. Edição/exclusão auditam
+  produto/quantidade/saldo e produto com item/ajuste de inventário não pode ser excluído.
+  Lista impressa sem assinatura, com emitente/data. No dev, o inventário 1 foi backfillado
+  (correção local, não é regra de produção).
 - **Mural de mensagens no dashboard (KAN-156, RF009):** card próprio no dashboard, antes
   dos gráficos e sem página `/mural`. Qualquer usuário autenticado vê as mensagens ativas
   (manuais e automáticas); quem possui `mural.criar`/`mural.alterar`/`mural.excluir`

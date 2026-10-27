@@ -56,7 +56,7 @@ async function main() {
     "nota_saida.alterar_status", "nota_saida.finalizar",
     "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
     "expedicao.listar", "expedicao.criar", "expedicao.alterar", "expedicao.consultar", "expedicao.desativar",
-    "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste", "inventario.ver_contagem_cega",
+    "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",
   ];

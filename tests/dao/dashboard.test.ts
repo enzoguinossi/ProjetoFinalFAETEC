@@ -25,7 +25,6 @@ describe("dashboardDAO", () => {
       const c = await criarProduto();
       await criarEstoque(a.id_produto, { quantidadeAtual: 10 });
       await criarEstoque(a.id_produto, { quantidadeAtual: 5 });
-      await criarEstoque(a.id_produto, { quantidadeAtual: 100, ativo: false });
       await criarEstoque(b.id_produto, { quantidadeAtual: 0 });
       await criarEstoque(c.id_produto, { quantidadeAtual: -2 });
 
@@ -114,15 +113,13 @@ describe("dashboardDAO", () => {
   });
 
   describe("topProdutos", () => {
-    it("traz os 5 maiores saldos, ignorando zero e inativos", async () => {
+    it("traz os 5 maiores saldos, ignorando zero", async () => {
       for (let quantidade = 1; quantidade <= 6; quantidade += 1) {
         const produto = await criarProduto({ descricao: `Produto ${quantidade}` });
         await criarEstoque(produto.id_produto, { quantidadeAtual: quantidade * 10 });
       }
       const zerado = await criarProduto({ descricao: "Zerado" });
       await criarEstoque(zerado.id_produto, { quantidadeAtual: 0 });
-      const inativo = await criarProduto({ descricao: "Inativo" });
-      await criarEstoque(inativo.id_produto, { quantidadeAtual: 500, ativo: false });
 
       const top = await dashboardDAO.topProdutos();
 

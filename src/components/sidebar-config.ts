@@ -3,6 +3,7 @@ import {
   Building2,
   Car,
   ChartColumn,
+  ClipboardCheck,
   ClipboardList,
   Database,
   IdCard,
@@ -34,6 +35,8 @@ export type SidebarNavItem = {
 
 export type SidebarNavItemWithPermission = SidebarNavItem & {
   permissao: string;
+  /** Quando informado, basta o usuário ter uma destas permissões. */
+  permissoes?: string[];
 };
 
 export const cadastroItems: SidebarNavItemWithPermission[] = [
@@ -48,6 +51,13 @@ export const cadastroItems: SidebarNavItemWithPermission[] = [
 export const movEstoqueItems: SidebarNavItemWithPermission[] = [
   { label: "Entrada", path: "/mov-estoque/entrada", icon: PackagePlus, permissao: "estoque.entrada" },
   { label: "Saída", path: "/mov-estoque/saida", icon: PackageMinus, permissao: "estoque.saida" },
+  {
+    label: "Inventário",
+    path: "/inventario",
+    icon: ClipboardCheck,
+    permissao: "inventario.contar",
+    permissoes: ["inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste"],
+  },
 ];
 
 export const expedicaoItems: SidebarNavItemWithPermission[] = [

@@ -60,7 +60,6 @@ const ROTULOS_ACAO: Record<string, string> = {
   abrir: "Abrir",
   contar: "Contar",
   aprovar_ajuste: "Aprovar ajuste",
-  ver_contagem_cega: "Ver contagem cega",
   gerar: "Gerar",
 };
 

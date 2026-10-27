@@ -112,7 +112,7 @@ export async function listarProdutosSelecao(
   if (search) {
     // Mesma busca priorizada da listagem de produtos (código → descrição),
     // paginada aqui porque a busca priorizada devolve um único lote.
-    const linhas = (await produtoDAO.searchPriorizadoComEstoque(search))
+    const linhas = (await produtoDAO.searchPriorizadoComSaldo(search))
       .map(produtoParaLinha)
       .filter((linha) => !excluidos.has(linha.id_produto));
     const { skip, take } = buildPagination({ page, limit });

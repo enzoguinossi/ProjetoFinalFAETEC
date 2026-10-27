@@ -14,8 +14,10 @@ Saída** do produto só auxilia o lançamento de notas de Remessa (`SAIDA`) — 
 `saldo_disponivel = saldo − saldo_reservado`. Toda operação (entrada, reserva, liberação, baixa
 e movimentação) atualiza essas duas colunas e registra o histórico com `ID_produto` em
 `movimentacao_estoque`/`reserva_estoque` (`saldo_anterior`/`saldo_posterior`). `data_entrada` e
-`ativo` de estoque não existem: a data fica no histórico e a atividade é `produto.ativo`. Ver
-[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.7.
+`ativo` de estoque não existem: a data fica no histórico e a atividade é `produto.ativo`. O
+inventário não cria uma segunda linha/coluna de saldo: ele congela um snapshot de
+`produto.saldo` e, na aprovação, ajusta o próprio produto. Ver
+[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.7 e §3.9.
 
 ## RN001 — Alerta de Saldo Insuficiente
 **Prioridade:** Essencial
@@ -58,8 +60,26 @@ preserva antes/depois.
 
 Diferenças detectadas em inventário não geram ajuste automático — toda alteração no saldo precisa de aprovação manual de usuário com permissão `inventario.aprovar_ajuste`.
 
-A diferença é calculada contra o saldo do produto congelado no `item_inventario`
-(`quantidade_sistema`, snapshot de `produto.saldo`); somente a aprovação altera
-`produto.saldo` e gera a `movimentacao_estoque` correspondente. Rejeitar mantém o saldo como
-está. **Estado atual:** o inventário ainda não foi implementado (RF015) — as tabelas já
-referenciam `ID_produto`, e `ajuste_inventario.diferenca` será revista no run do inventário.
+A diferença é calculada contra o snapshot do `item_inventario` (`quantidade_sistema`, que é
+`produto.saldo` na abertura). O aprovador pode escolher a **média** das contagens
+(`origem = MEDIA`) ou **qualquer contagem individual** (`origem = CONTAGEM`, com
+`id_contagem_inventario`), independentemente da média. A decisão fica no `ItemInventario`
+(`quantidade_final`, `origem`, `id_contagem_inventario`, `decidido_em`,
+`id_usuario_decisao`) mesmo quando não há diferença; o `AjusteInventario` (`quantidade_contada`,
+sem coluna `diferenca`) só é criado quando `quantidade_final != quantidade_sistema` e é
+**único por inventário/produto**. Um produto não pode estar em dois inventários ativos.
+
+**Aprovado:** `produto.saldo` muda pelo delta e grava `movimentacao_estoque` com
+`ID_ajuste_inventario`, `saldo_anterior` e `saldo_posterior`; `saldo_reservado` não é
+alterado. **Rejeitado:** o saldo não muda e a justificativa fica registrada. **Sem
+diferença:** não há ajuste nem movimento, mas o item fica decidido e o inventário pode
+finalizar. **Cancelado:** não altera o saldo, preserva contagens/ajustes e grava `data_fim`.
+
+A decisão, a finalização e o cancelamento são transacionais: travam a linha do inventário e
+só avançam de status válido. Não há ajuste/movimento em inventário `CANCELADO` ou
+`FINALIZADO`.
+
+Enquanto o inventário está `ABERTO`, `EM_CONTAGEM` ou `AGUARDANDO_APROVACAO`, as movimentações
+dos produtos inventariados ficam **bloqueadas** — entrada, saída (reserva, liberação, baixa e
+baixa direta), desmontagem e coleta. A exceção é a movimentação de ajuste do próprio
+inventário. Uma contagem por funcionário/item; item sem contagem impede o fechamento.

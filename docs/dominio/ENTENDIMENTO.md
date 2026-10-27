@@ -401,6 +401,11 @@ A migração do modelo antigo consolidou as linhas **ativas** de `estoque` por p
 linha ficaram com zero e os registros históricos (itens, reservas, movimentações, coleta e
 inventário) passaram a apontar para `ID_produto`.
 
+Enquanto um inventário está em andamento (`ABERTO`, `EM_CONTAGEM` ou
+`AGUARDANDO_APROVACAO`), as operações de saldo dos produtos inventariados ficam bloqueadas —
+entrada, saída (reserva, liberação, baixa e baixa direta), desmontagem e coleta. A exceção é a
+movimentação de ajuste do próprio inventário (ver §3.9).
+
 Regras:
 - Produtos perecíveis possuem `data_validade` no cadastro do produto (menor validade disponível)
 - Quando faltam 90, 60, 45 e 30 dias para o vencimento, o sistema cria automaticamente uma `mensagem_mural` de alerta
@@ -434,6 +439,7 @@ movimentacao_estoque
 ├── saldo_posterior       FLOAT                  ← snapshot do `produto.saldo` depois
 ├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
 ├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída (apenas baixas reais)
+├── ID_ajuste_inventario  INT FK NULL              ← veio de um ajuste de inventário aprovado
 ├── data_hora             TIMESTAMP NOT NULL
 └── observacao            TEXT
 ```
@@ -448,7 +454,7 @@ movimentacao_estoque
 | `ID_nota_saida` + nota_saida.tipo = 'CONSUMO_INTERNO' | Baixa por consumo |
 | `ID_nota_saida` + nota_saida.tipo = 'AVARIA' | Baixa por avaria |
 | `ID_nota_saida` + nota_saida.tipo = 'DESMONTAGEM' | Baixa do produto composto |
-| Nenhuma (apenas dados anteriores/posteriores diferentes) | Ajuste de inventário |
+| `ID_ajuste_inventario` | Ajuste de inventário aprovado |
 
 #### 3.8.1 Reserva de Estoque (Auditoria Contábil)
 
@@ -523,61 +529,97 @@ inventario
 ├── ID_inventario           INT PK auto_increment
 ├── data_inicio             DATE NOT NULL
 ├── data_fim                DATE
-├── contagem_cega           BOOLEAN DEFAULT FALSE
-├── status                  ENUM('ABERTO','EM_CONTAGEM','AGUARDANDO_APROVACAO','FINALIZADO')
+├── contagem_cega           BOOLEAN DEFAULT FALSE  (true: sistema/saldos só com estoque.ver_saldo; false: todos veem)
+├── status                  ENUM('ABERTO','EM_CONTAGEM','AGUARDANDO_APROVACAO','FINALIZADO','CANCELADO')
 ├── ID_usuario_abertura     INT FK NOT NULL
 ├── ID_usuario_aprovacao    INT FK NULL
-└── observacao              TEXT
+└── observacao              TEXT  (nome do inventário)
 
-item_inventario
+item_inventario              uma linha por produto/inventário; guarda a decisão
 ├── ID_item_inventario      INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
 ├── ID_produto              INT FK NOT NULL
-├── quantidade_sistema      FLOAT NOT NULL   ← snapshot congelado de `produto.saldo` na abertura
+├── quantidade_sistema      FLOAT NOT NULL   (snapshot de produto.saldo na abertura)
+├── quantidade_final        FLOAT NULL       (média ou contagem escolhida)
+├── origem                  ENUM('MEDIA','CONTAGEM') NULL
+├── ID_contagem_inventario  INT FK NULL
+├── decidido_em             TIMESTAMP NULL
+├── ID_usuario_decisao      INT FK NULL
 └── observacao              TEXT
+    UNIQUE(ID_inventario, ID_produto)
 
-contagem_inventario         ← cada funcionário conta
+contagem_inventario          uma contagem por funcionário/item
 ├── ID_contagem_inventario  INT PK auto_increment
 ├── ID_item_inventario      INT FK NOT NULL
-├── ID_funcionario          INT FK → funcionario NOT NULL  ← quem contou
+├── ID_funcionario          INT FK NOT NULL
 ├── quantidade_contada      FLOAT NOT NULL
 ├── data_contagem           TIMESTAMP
 └── observacao              TEXT
+    UNIQUE(ID_item_inventario, ID_funcionario)
 
-ajuste_inventario           ← aprovação manual das diferenças
+ajuste_inventario            só existe quando há diferença
 ├── ID_ajuste_inventario    INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
 ├── ID_produto              INT FK NOT NULL
-├── diferenca               FLOAT NOT NULL
+├── quantidade_contada      FLOAT NOT NULL  (valor escolhido)
+├── origem                  ENUM('MEDIA','CONTAGEM')
+├── ID_contagem_inventario  INT FK NULL
 ├── status                  ENUM('PENDENTE','APROVADO','REJEITADO')
-├── ID_usuario_aprovacao    INT FK → usuario NULL
+├── ID_usuario_aprovacao    INT FK NULL
 ├── data_aprovacao          TIMESTAMP NULL
 └── justificativa           TEXT
+    UNIQUE(ID_inventario, ID_produto)
 ```
 
-> **Estado do código (2026-10-26):** o inventário ainda **não foi implementado** (RF015); as
-> tabelas já referenciam `ID_produto` desde o achatamento do estoque. `ajuste_inventario` ainda
-> mantém a coluna `diferenca`, que será revista no run de implementação do inventário.
+> **Implementado nos RUN-20261026-81/82 e RUN-20261027-83.** O nome do inventário é a `observacao` (não existe
+> coluna `nome`). O item é único por inventário/produto e não há lote. A **decisão do item**
+> fica em `item_inventario` (`quantidade_final`, `origem`, `ID_contagem_inventario`,
+> `decidido_em`, `ID_usuario_decisao`), mesmo quando não há diferença; o `ajuste_inventario`
+> só é criado quando `quantidade_final != quantidade_sistema` e é único por
+> inventário/produto. Um produto **não pode estar em dois inventários ativos**
+> (`ABERTO`/`EM_CONTAGEM`/`AGUARDANDO_APROVACAO`). O cancelamento grava `data_fim`.
+
+Fluxo de status:
+
+```text
+ABERTO → EM_CONTAGEM → AGUARDANDO_APROVACAO → FINALIZADO
+   │           │                    │
+   └───────────┴────────────────────┴──→ CANCELADO
+```
 
 #### 3.9.1 Fluxo do Inventário
 
 | Etapa | Ação no sistema | Impacto |
 |-------|----------------|---------|
-| **Abertura** | Usuário com permissão `inventario.abrir` cria inventário | status = EM_CONTAGEM. Snapshot de `quantidade_sistema` congelado. Movimentações dos produtos BLOQUEADAS |
-| **Contagem cega** | Se marcado no início, usuários SEM permissão `estoque.ver_saldo` não enxergam `quantidade_sistema` | Influencia a contagem física sem viés |
-| **Múltiplas contagens** | Vários funcionários contam o mesmo item | Cada contagem vira um registro em `contagem_inventario`. |
-| **Finalizar contagem** | Usuário encerra a contagem | status = AGUARDANDO_APROVACAO. Sistema calcula média das contagens e dispara pendências de ajuste |
-| **Revisão** | Aprovador vê planilha comparativa: `quantidade_sistema` + contagens individuais + média | Pode escolher uma contagem específica ou usar a média |
-| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada` nem `ID_nota_saida` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém o saldo do produto, registro preservado |
-| **Finalização** | Inventário é encerrado | status = FINALIZADO. Movimentações dos produtos DESBLOQUEADAS |
+| **Abertura** | Usuário com `inventario.abrir` seleciona produtos (todos ou seleção) | status = ABERTO. Cria `item_inventario` com `quantidade_sistema = produto.saldo` (snapshot). Recusa produto que já esteja em outro inventário ativo. Movimentações dos produtos ficam BLOQUEADAS |
+| **Contagem cega** | Com `contagem_cega` ligada, só quem tem `estoque.ver_saldo` vê `quantidade_sistema`/saldo; desligada, todos veem | A permissão antiga `inventario.ver_contagem_cega` não existe |
+| **Contagem** | Funcionário do usuário logado registra uma contagem por item | Primeira contagem muda para EM_CONTAGEM; a mesma pessoa edita a sua contagem, outra pessoa cria outra contagem |
+| **Fechar contagem** | Usuário encerra a contagem | Exige todos os itens contados; status = AGUARDANDO_APROVACAO. As contagens ficam disponíveis para a revisão, que calcula a média |
+| **Revisão/decisão** | Aprovador vê sistema (conforme a cega/permissão), contagens individuais e média | Pode escolher a **média** ou **qualquer contagem individual**, independentemente da média; a escolha fica registrada em `item_inventario`, com aprovar/rejeitar e justificativa |
+| **Ajuste** | Só é criado quando `quantidade_final` difere do snapshot | Aprovado: `produto.saldo` muda pelo delta e cria `movimentacao_estoque` com `ID_ajuste_inventario` (`saldo_anterior`/`saldo_posterior`); rejeitado: saldo e reserva não mudam. Valor igual ao sistema: decisão sem ajuste, mas o item fica decidido |
+| **Finalização** | Todos os itens precisam estar decididos | Exige `quantidade_final` em todos os itens e ajuste para cada diferença; status = FINALIZADO, `data_fim` e aprovador; libera o bloqueio. `FINALIZADO` não volta |
+| **Cancelamento** | Permitido em ABERTO/EM_CONTAGEM/AGUARDANDO_APROVACAO enquanto não houver ajuste aprovado/movimento | status = CANCELADO e `data_fim` gravada; itens/contagens/ajustes preservados; libera o bloqueio |
+| **Lista/relatório** | Lista de contagem impressa e relatório CSV/PDF do fechado/cancelado | Exigem `relatorio.gerar`; na cega, sem `estoque.ver_saldo` não revelam sistema, saldos, `quantidade_final` nem “sem ajuste/igual”: tela, lista e CSV mascaram/omitem esses valores (a lista/CSV seguem com/sem sistema conforme a permissão) |
+
+**Lista de contagem:** todos os produtos do inventário, com campos em branco para preencher à
+mão; o cabeçalho mostra o nome (`observacao`), a data, o emitente e a data/hora de geração —
+**sem assinatura**. A exibição das quantidades do sistema é opcional e segue a cega/permissão.
 
 #### 3.9.2 Regras do Inventário
 
-- **Bloqueio é por produto**, não geral — apenas os produtos associados aos `item_inventario` ficam congelados
-- **Permissões granulares**: `inventario.abrir`, `inventario.aprovar_ajuste`, `estoque.ver_saldo` (controla contagem cega)
-- **Jonathan e Felipe** têm permissões absolutas (podem abrir, contar, aprovar)
-- **Diferença não gera ajuste automático** — toda diferença precisa de aprovação manual (RN005)
-- **Média vs. escolha manual**: o sistema exibe média, mas o aprovador pode selecionar qualquer contagem individual como valor final
+- **Bloqueio é por produto**, não geral: enquanto o inventário está `ABERTO`, `EM_CONTAGEM` ou `AGUARDANDO_APROVACAO`, ficam bloqueados entrada, saída (reserva, liberação, ajuste de reserva, baixa e baixa direta), desmontagem e coleta dos produtos do inventário. A **movimentação de ajuste do próprio inventário** é a exceção
+- **Um inventário ativo por produto**: a abertura/edição recusa produto presente em outro inventário `ABERTO`/`EM_CONTAGEM`/`AGUARDANDO_APROVACAO`
+- **Concorrência**: abertura/edição travam as linhas dos produtos (`SELECT ... FOR UPDATE`) antes da checagem de sobreposição; decisão, finalização e cancelamento são transacionais e travam a linha do inventário. Não há ajuste/movimento em inventário `CANCELADO` ou `FINALIZADO`
+- **Uma contagem por funcionário/item**: a chave única `(ID_item_inventario, ID_funcionario)` impede duplicidade; o mesmo funcionário pode corrigir a sua contagem enquanto `EM_CONTAGEM`. Item sem contagem impede fechar a contagem
+- **Decisão por item**: `quantidade_final`/`origem`/`ID_contagem_inventario`/`decidido_em`/`ID_usuario_decisao` registram a escolha; a média e qualquer contagem individual são sempre elegíveis. **Só há `ajuste_inventario` quando há diferença**, e ele é único por inventário/produto
+- **Contagem cega**: com `Inventario.contagem_cega = true`, só `estoque.ver_saldo` vê sistema/saldos; com `false`, todos veem. Não existe `inventario.ver_contagem_cega`
+- **Permissões**: `inventario.abrir`, `inventario.contar`, `inventario.aprovar_ajuste`; `estoque.ver_saldo` para a cega/saldos; `relatorio.gerar` para lista impressa e relatório. `relatorio.gerar` sozinho **não** libera sistema, saldos, `quantidade_final` nem a inferência de “sem ajuste/igual”
+- **Diferença não gera ajuste automático** — a decisão é manual e o ajuste só nasce da diferença (RN005)
+- **Rejeição/cancelamento não alteram o saldo**; a aprovação mexe só em `produto.saldo`, não em `saldo_reservado`
+- **Edição/exclusão**: só antes da primeira contagem — edição em `ABERTO` sem contagens; exclusão sem contagens/ajustes. Depois, apenas cancelar, preservando contagens, ajustes e auditoria
+- **Produto com histórico de inventário não é excluído**: `ItemInventario`/`AjusteInventario` contam como vínculo no hard delete do produto
+- **Histórico preservado**: finalizado/cancelado continua consultável; contagens, ajustes e auditoria não são apagados
+- **Auditoria**: abertura, contagem, decisão, finalização, cancelamento, edição e exclusão geram `registro_auditoria`; os snapshots de edição/exclusão trazem produto, quantidade e saldo, não só IDs
 
 ---
 
@@ -927,7 +969,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**77** no total):
+Permissões criadas por `prisma/seed.ts` (**76** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -943,7 +985,7 @@ Permissões criadas por `prisma/seed.ts` (**77** no total):
 | `nota_saida` | criar, alterar, consultar, cancelar, alterar_status, finalizar |
 | `percurso` | listar, criar, alterar, consultar, excluir |
 | `expedicao` | listar, criar, alterar, consultar, desativar |
-| `inventario` | abrir, contar, aprovar_ajuste, ver_contagem_cega |
+| `inventario` | abrir, contar, aprovar_ajuste |
 | `relatorio` | gerar |
 | `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
 | `mural` | criar, alterar, excluir |
@@ -952,6 +994,8 @@ Permissões criadas por `prisma/seed.ts` (**77** no total):
 > O seed remove a permissão obsoleta `perfil.desativar` caso ela exista no banco.
 > Percurso **não é desativado**: `percurso.excluir` é exclusão física. O seed remove a
 > permissão obsoleta `percurso.desativar` caso ela exista no banco.
+> A permissão obsoleta `inventario.ver_contagem_cega` não faz parte do seed nem da UI; em
+> banco antigo ela pode continuar existindo e deve ser removida manualmente.
 
 #### 3.15.2 Perfil (Template)
 

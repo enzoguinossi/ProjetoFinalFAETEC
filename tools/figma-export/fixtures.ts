@@ -55,6 +55,11 @@ function exigirBancoIsolado() {
 async function limpar() {
   // ordem inversa das dependências
   await prisma.registroAuditoria.deleteMany();
+  await prisma.movimentacaoEstoque.deleteMany();
+  await prisma.ajusteInventario.deleteMany();
+  await prisma.contagemInventario.deleteMany();
+  await prisma.itemInventario.deleteMany();
+  await prisma.inventario.deleteMany();
   await prisma.usuarioPermissao.deleteMany();
   await prisma.usuario.deleteMany();
 
@@ -66,6 +71,16 @@ async function limpar() {
 
   await prisma.produtoInsumo.deleteMany();
   await prisma.produtoCodigo.deleteMany();
+  await prisma.itemColeta.deleteMany();
+  await prisma.itemNotaSaida.deleteMany();
+  await prisma.itemPedidoEscola.deleteMany();
+  await prisma.itemNotaEntrada.deleteMany();
+  await prisma.anexo.deleteMany();
+  await prisma.expedicaoNota.deleteMany();
+  await prisma.notaSaida.deleteMany();
+  await prisma.pedidoEscola.deleteMany();
+  await prisma.coleta.deleteMany();
+  await prisma.notaEntrada.deleteMany();
   await prisma.produto.deleteMany();
 
   await prisma.destinatarioCodigo.deleteMany();
@@ -291,7 +306,6 @@ async function main() {
       data: {
         id_pessoa_juridica: pj.id_pessoa_juridica,
         id_endereco: endereco.id_endereco,
-        contato: f.contato,
       },
     });
     await prisma.fornecedorEmail.create({
@@ -363,6 +377,153 @@ async function main() {
       data: { id_produto: produto.id_produto, id_tipo_codigo: tipos.EAN13, codigo: p.codigo },
     });
   }
+﻿  /* ── Inventários ── */
+  const produtosCriados = await prisma.produto.findMany({
+    orderBy: { id_produto: "asc" },
+    take: 6,
+  });
+  const funcionariosInventario = await prisma.funcionario.findMany({
+    orderBy: { id_funcionario: "asc" },
+    take: 2,
+  });
+  if (produtosCriados.length < 6 || funcionariosInventario.length < 2) {
+    throw new Error("Fixtures de inventário exigem 6 produtos e 2 funcionários.");
+  }
+
+  const aberto = await prisma.inventario.create({
+    data: {
+      id_inventario: 1,
+      data_inicio: new Date("2026-10-20"),
+      contagem_cega: true,
+      status: "ABERTO",
+      id_usuario_abertura: admin.id_usuario,
+      observacao: "Inventário geral do galpão",
+    },
+  });
+  await prisma.itemInventario.createMany({
+    data: [0, 1, 2].map((indice) => ({
+      id_inventario: aberto.id_inventario,
+      id_produto: produtosCriados[indice]!.id_produto,
+      quantidade_sistema: Number(produtosCriados[indice]!.saldo),
+    })),
+  });
+
+  const aguardando = await prisma.inventario.create({
+    data: {
+      id_inventario: 2,
+      data_inicio: new Date("2026-10-18"),
+      contagem_cega: true,
+      status: "AGUARDANDO_APROVACAO",
+      id_usuario_abertura: admin.id_usuario,
+      observacao: "Contagem cega — setor de alimentos",
+    },
+  });
+  const itensAguardando = [];
+  for (const [indice, quantidadeSistema] of [
+    [3, 210],
+    [4, 980],
+  ] as const) {
+    itensAguardando.push(
+      await prisma.itemInventario.create({
+        data: {
+          id_inventario: aguardando.id_inventario,
+          id_produto: produtosCriados[indice]!.id_produto,
+          quantidade_sistema: quantidadeSistema,
+        },
+      }),
+    );
+  }
+  await prisma.contagemInventario.createMany({
+    data: itensAguardando.flatMap((item) => {
+      const primeira = item.id_produto === produtosCriados[3]!.id_produto ? 200 : 970;
+      const segunda = item.id_produto === produtosCriados[3]!.id_produto ? 205 : 975;
+      return [
+        {
+          id_item_inventario: item.id_item_inventario,
+          id_funcionario: funcionariosInventario[0]!.id_funcionario,
+          quantidade_contada: primeira,
+          data_contagem: new Date("2026-10-18T10:00:00"),
+          observacao: "Primeira contagem",
+        },
+        {
+          id_item_inventario: item.id_item_inventario,
+          id_funcionario: funcionariosInventario[1]!.id_funcionario,
+          quantidade_contada: segunda,
+          data_contagem: new Date("2026-10-18T11:00:00"),
+          observacao: "Segunda contagem",
+        },
+      ];
+    }),
+  });
+
+  const finalizado = await prisma.inventario.create({
+    data: {
+      id_inventario: 3,
+      data_inicio: new Date("2026-10-10"),
+      data_fim: new Date("2026-10-12"),
+      contagem_cega: false,
+      status: "FINALIZADO",
+      id_usuario_abertura: admin.id_usuario,
+      id_usuario_aprovacao: admin.id_usuario,
+      observacao: "Inventário de embalagens — fechado",
+    },
+  });
+  const itemFinalizado = await prisma.itemInventario.create({
+    data: {
+      id_inventario: finalizado.id_inventario,
+      id_produto: produtosCriados[5]!.id_produto,
+      quantidade_sistema: Number(produtosCriados[5]!.saldo),
+    },
+  });
+  const contagemFinal = await prisma.contagemInventario.create({
+    data: {
+      id_item_inventario: itemFinalizado.id_item_inventario,
+      id_funcionario: funcionariosInventario[0]!.id_funcionario,
+      quantidade_contada: Number(produtosCriados[5]!.saldo) - 2,
+      data_contagem: new Date("2026-10-10T09:30:00"),
+    },
+  });
+  await prisma.itemInventario.update({
+    where: { id_item_inventario: itemFinalizado.id_item_inventario },
+    data: {
+      quantidade_final: Number(produtosCriados[5]!.saldo) - 2,
+      origem: "CONTAGEM",
+      id_contagem_inventario: contagemFinal.id_contagem_inventario,
+      decidido_em: new Date("2026-10-12"),
+      id_usuario_decisao: admin.id_usuario,
+    },
+  });
+  const ajusteFinal = await prisma.ajusteInventario.create({
+    data: {
+      id_inventario: finalizado.id_inventario,
+      id_produto: produtosCriados[5]!.id_produto,
+      quantidade_contada: Number(produtosCriados[5]!.saldo) - 2,
+      origem: "CONTAGEM",
+      id_contagem_inventario: contagemFinal.id_contagem_inventario,
+      status: "APROVADO",
+      id_usuario_aprovacao: admin.id_usuario,
+      data_aprovacao: new Date("2026-10-12"),
+      justificativa: "Ajuste aprovado pelo conferente.",
+    },
+  });
+  await prisma.movimentacaoEstoque.create({
+    data: {
+      id_produto: produtosCriados[5]!.id_produto,
+      id_usuario: admin.id_usuario,
+      id_ajuste_inventario: ajusteFinal.id_ajuste_inventario,
+      quantidade: -2,
+      saldo_anterior: Number(produtosCriados[5]!.saldo),
+      saldo_posterior: Number(produtosCriados[5]!.saldo) - 2,
+      data_hora: new Date("2026-10-12T14:00:00"),
+      observacao: `Ajuste do inventário #${finalizado.id_inventario}`,
+    },
+  });
+  await prisma.produto.update({
+    where: { id_produto: produtosCriados[5]!.id_produto },
+    data: { saldo: Number(produtosCriados[5]!.saldo) - 2 },
+  });
+  console.log("  ✓ 3 inventários (aberto, aguardando aprovação e finalizado)");
+
   console.log(`  ✅ ${produtos.length} produtos com estoque`);
 
   console.log(

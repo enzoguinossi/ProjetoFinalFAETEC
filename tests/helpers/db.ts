@@ -6,10 +6,10 @@ import { prismaTeste } from "./prisma";
  */
 export async function resetarBanco() {
   await prismaTeste.$transaction([
+    prismaTeste.movimentacaoEstoque.deleteMany(),
+    prismaTeste.ajusteInventario.deleteMany(),
     prismaTeste.contagemInventario.deleteMany(),
     prismaTeste.itemInventario.deleteMany(),
-    prismaTeste.ajusteInventario.deleteMany(),
-    prismaTeste.movimentacaoEstoque.deleteMany(),
     prismaTeste.reservaEstoque.deleteMany(),
     prismaTeste.itemColeta.deleteMany(),
     prismaTeste.itemNotaSaida.deleteMany(),

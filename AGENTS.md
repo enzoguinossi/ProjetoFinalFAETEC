@@ -361,19 +361,45 @@ EM_CONTAGEM
 AGUARDANDO_APROVACAO
   ↓
 FINALIZADO
+
+ABERTO / EM_CONTAGEM / AGUARDANDO_APROVACAO → CANCELADO
 ```
 
 Regras importantes:
 
-* o snapshot de `quantidade_sistema` deve ser preservado;
-* o bloqueio é por produto/item em inventário, não necessariamente global;
-* podem existir múltiplas contagens;
-* contagem cega depende de permissão;
-* o sistema apresenta média das contagens;
-* o aprovador pode escolher uma contagem individual;
-* diferenças exigem aprovação;
-* rejeição não altera o estoque;
-* aprovação gera o ajuste e a movimentação correspondente.
+* o snapshot de `quantidade_sistema` é `produto.saldo` na abertura e deve ser preservado;
+* um produto não pode estar em dois inventários ativos (ABERTO/EM_CONTAGEM/
+  AGUARDANDO_APROVACAO); abertura/edição travam os produtos (`SELECT ... FOR UPDATE`) antes
+  da checagem;
+* decisão, finalização e cancelamento são transacionais, travam a linha do inventário e não
+  ajustam em CANCELADO/FINALIZADO;
+* o bloqueio é **por produto** enquanto o inventário está ABERTO, EM_CONTAGEM ou
+  AGUARDANDO_APROVACAO — entrada, saída, reserva, liberação, baixa, baixa direta,
+  desmontagem e coleta;
+* a exceção é a movimentação de ajuste do próprio inventário;
+* uma contagem por funcionário/item; item sem contagem bloqueia o fechamento;
+* contagem cega é funcional: com `Inventario.contagem_cega = true`, só `estoque.ver_saldo`
+  vê sistema/saldos; com `false`, todos veem. Não existe `inventario.ver_contagem_cega`;
+* a decisão fica em `ItemInventario` (`quantidade_final`, `origem` MEDIA/CONTAGEM,
+  `id_contagem_inventario`, `decidido_em`, `id_usuario_decisao`); o aprovador pode escolher a
+  média ou qualquer contagem individual, mesmo sem diferença;
+* `AjusteInventario` (`quantidade_contada`, sem `diferenca`) só é criado quando o valor
+  escolhido difere do sistema e é único por inventário/produto; sem diferença, o item fica
+  decidido e o inventário pode finalizar;
+* aprovação altera `produto.saldo` e gera `movimentacao_estoque` com
+  `id_ajuste_inventario`; rejeição não altera o saldo; o ajuste não mexe em
+  `saldo_reservado`;
+* cancelamento só é permitido em ABERTO/EM_CONTAGEM/AGUARDANDO_APROVACAO e enquanto não
+  houver ajuste aprovado/movimento; grava `data_fim`;
+* edição só em ABERTO e sem contagens; exclusão só sem contagens/ajustes; com contagem ou
+  ajuste, só cancelar (preservando contagens, ajustes e auditoria);
+* finalizado/cancelado continua consultável; `FINALIZADO` não volta;
+* edição/exclusão registram auditoria com produto, quantidade e saldo (não só IDs);
+* permissões: `inventario.abrir`, `inventario.contar`, `inventario.aprovar_ajuste`; lista
+  impressa e relatório CSV/PDF exigem `relatorio.gerar`; na cega, sistema/saldos,
+  `quantidade_final` e a inferência de “sem ajuste/igual” exigem também `estoque.ver_saldo`
+  (tela, lista e CSV mascaram/omitem);
+* produto com item/ajuste de inventário não pode ser excluído (hard delete protegido).
 
 Não implemente ajuste automático simplesmente porque existe uma diferença entre estoque físico e sistema.
 

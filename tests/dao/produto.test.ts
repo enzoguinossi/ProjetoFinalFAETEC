@@ -34,7 +34,6 @@ describe("produtoDAO", () => {
     it("inclui conversão padrão e o saldo do produto", async () => {
       const produto = await criarProduto();
       await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
-      await criarEstoque(produto.id_produto, { quantidadeAtual: 99, ativo: false });
 
       const resultado = await produtoDAO.list({});
 
@@ -112,17 +111,16 @@ describe("produtoDAO", () => {
     });
   });
 
-  describe("searchPriorizadoComEstoque", () => {
-    it("inclui os estoques ativos no resultado priorizado", async () => {
+  describe("searchPriorizadoComSaldo", () => {
+    it("inclui o saldo do produto no resultado priorizado", async () => {
       const tipo = await criarTipoCodigo("DIGITACAO");
       const produto = await criarProduto();
       await prismaTeste.produtoCodigo.create({
         data: { id_produto: produto.id_produto, id_tipo_codigo: tipo.id_tipo_codigo, codigo: "ABC" },
       });
       await criarEstoque(produto.id_produto, { quantidadeAtual: 8, saldoReservado: 2 });
-      await criarEstoque(produto.id_produto, { quantidadeAtual: 50, ativo: false });
 
-      const resultado = await produtoDAO.searchPriorizadoComEstoque("ABC");
+      const resultado = await produtoDAO.searchPriorizadoComSaldo("ABC");
 
       expect(resultado).toHaveLength(1);
       expect(resultado[0]?.saldo).toBe(8);
@@ -144,7 +142,7 @@ describe("produtoDAO", () => {
         ],
       });
 
-      const resultado = await produtoDAO.searchPriorizadoComEstoque("ABC");
+      const resultado = await produtoDAO.searchPriorizadoComSaldo("ABC");
       const linhas = new Map(resultado.map((p) => [p.id_produto, produtoParaLinha(p)]));
 
       expect(linhas.get(comConversao.id_produto)).not.toHaveProperty("unidade");
@@ -165,7 +163,6 @@ describe("produtoDAO", () => {
         data: { id_produto_pai: pai.id_produto, id_produto_filho: filho.id_produto, quantidade: 3 },
       });
       await criarEstoque(pai.id_produto, { quantidadeAtual: 1 });
-      await criarEstoque(pai.id_produto, { quantidadeAtual: 9, ativo: false });
 
       const encontrado = await produtoDAO.getById(pai.id_produto);
 

@@ -182,7 +182,7 @@ export class NotaSaidaDAO {
    * - `SAIDA` (Remessa): destinatário, reserva (`saldo_reservado += qtd`) e
    *   status `ABERTA` — a baixa acontece na execução da entrega.
    * - `AVARIA`/`CONSUMO_INTERNO`: sem destinatário e sem reserva; cada item
-   *   baixa `quantidade_atual` na hora (`baixarDireto` + movimentação negativa)
+   *   baixa `produto.saldo` na hora (`baixarDireto` + movimentação negativa)
    *   e a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`.
    *
    * Saldo insuficiente apenas avisa (RN001), nunca bloqueia; o aviso volta para

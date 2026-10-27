@@ -136,6 +136,7 @@ model Usuario {
   mural_visto_em       DateTime?             @map("mural_visto_em") @db.Timestamp(0)
   ativo                Boolean               @default(true) @map("ativo")
   ajustesAprovados     AjusteInventario[]    @relation("ajuste_usuario_aprovacao")
+  itensInventarioDecididos ItemInventario[]  @relation("item_inventario_usuario_decisao")
   inventariosAbertos   Inventario[]          @relation("usuario_abertura")
   inventariosAprovados Inventario[]          @relation("usuario_aprovacao")
   mensagensMural       MensagemMural[]
@@ -339,16 +340,19 @@ model MovimentacaoEstoque {
   saldo_posterior Float?       @map("saldo_posterior")
   id_nota_saida   Int?         @map("ID_nota_saida")
   id_nota_entrada Int?         @map("ID_nota_entrada")
+  id_ajuste_inventario Int?    @map("ID_ajuste_inventario")
   data_hora       DateTime     @map("data_hora") @db.Timestamp(0)
   observacao      String?      @map("observacao") @db.Text
   produto         Produto      @relation(fields: [id_produto], references: [id_produto])
   notaEntrada     NotaEntrada? @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
   notaSaida       NotaSaida?   @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  ajusteInventario AjusteInventario? @relation(fields: [id_ajuste_inventario], references: [id_ajuste_inventario])
   usuario         Usuario      @relation(fields: [id_usuario], references: [id_usuario])
 
   @@index([id_produto], map: "movimentacao_estoque_ID_produto_fkey")
   @@index([id_nota_entrada], map: "movimentacao_estoque_ID_nota_entrada_fkey")
   @@index([id_nota_saida], map: "movimentacao_estoque_ID_nota_saida_fkey")
+  @@index([id_ajuste_inventario], map: "movimentacao_estoque_ID_ajuste_inventario_fkey")
   @@index([id_usuario], map: "movimentacao_estoque_ID_usuario_fkey")
   @@map("movimentacao_estoque")
 }
@@ -398,12 +402,20 @@ model ItemInventario {
   id_produto         Int                  @map("ID_produto")
   quantidade_sistema Float                @map("quantidade_sistema")
   observacao         String?              @map("observacao") @db.Text
+  quantidade_final   Float?               @map("quantidade_final")
+  origem             OrigemAjuste?        @map("origem")
+  id_contagem_inventario Int?             @map("ID_contagem_inventario")
+  decidido_em        DateTime?            @map("decidido_em") @db.Timestamp(0)
+  id_usuario_decisao Int?                 @map("ID_usuario_decisao")
   contagens          ContagemInventario[]
+  contagemDecidida   ContagemInventario?  @relation("item_inventario_contagem_decidida", fields: [id_contagem_inventario], references: [id_contagem_inventario])
+  usuarioDecisao     Usuario?             @relation("item_inventario_usuario_decisao", fields: [id_usuario_decisao], references: [id_usuario])
   produto            Produto              @relation(fields: [id_produto], references: [id_produto])
   inventario         Inventario           @relation(fields: [id_inventario], references: [id_inventario])
 
   @@index([id_produto], map: "item_inventario_ID_produto_fkey")
   @@index([id_inventario], map: "item_inventario_ID_inventario_fkey")
+  @@unique([id_inventario, id_produto], map: "item_inventario_ID_inventario_ID_produto_key")
   @@map("item_inventario")
 }
 
@@ -416,9 +428,12 @@ model ContagemInventario {
   observacao             String?        @map("observacao") @db.Text
   funcionario            Funcionario    @relation(fields: [id_funcionario], references: [id_funcionario])
   itemInventario         ItemInventario @relation(fields: [id_item_inventario], references: [id_item_inventario])
+  ajustes                AjusteInventario[]
+  itensDecididos         ItemInventario[] @relation("item_inventario_contagem_decidida")
 
   @@index([id_funcionario], map: "contagem_inventario_ID_funcionario_fkey")
   @@index([id_item_inventario], map: "contagem_inventario_ID_item_inventario_fkey")
+  @@unique([id_item_inventario, id_funcionario], map: "contagem_inventario_ID_item_ID_funcionario_key")
   @@map("contagem_inventario")
 }
 
@@ -426,18 +441,24 @@ model AjusteInventario {
   id_ajuste_inventario Int          @id @default(autoincrement()) @map("ID_ajuste_inventario")
   id_inventario        Int          @map("ID_inventario")
   id_produto           Int          @map("ID_produto")
-  diferenca            Float        @map("diferenca")
+  quantidade_contada   Float        @map("quantidade_contada")
+  origem               OrigemAjuste @map("origem")
+  id_contagem_inventario Int?       @map("ID_contagem_inventario")
   status               StatusAjuste @map("status")
   id_usuario_aprovacao Int?         @map("ID_usuario_aprovacao")
   data_aprovacao       DateTime?    @map("data_aprovacao") @db.Timestamp(0)
   justificativa        String?      @map("justificativa") @db.Text
   produto              Produto      @relation(fields: [id_produto], references: [id_produto])
   inventario           Inventario   @relation(fields: [id_inventario], references: [id_inventario])
+  contagemInventario   ContagemInventario? @relation(fields: [id_contagem_inventario], references: [id_contagem_inventario])
   usuarioAprovacao     Usuario?     @relation("ajuste_usuario_aprovacao", fields: [id_usuario_aprovacao], references: [id_usuario])
+  movimentacoes        MovimentacaoEstoque[]
 
   @@index([id_produto], map: "ajuste_inventario_ID_produto_fkey")
   @@index([id_inventario], map: "ajuste_inventario_ID_inventario_fkey")
+  @@index([id_contagem_inventario], map: "ajuste_inventario_ID_contagem_inventario_fkey")
   @@index([id_usuario_aprovacao], map: "ajuste_inventario_ID_usuario_aprovacao_fkey")
+  @@unique([id_inventario, id_produto], map: "ajuste_inventario_ID_inventario_ID_produto_key")
   @@map("ajuste_inventario")
 }
 
@@ -781,6 +802,12 @@ enum StatusInventario {
   EM_CONTAGEM
   AGUARDANDO_APROVACAO
   FINALIZADO
+  CANCELADO
+}
+
+enum OrigemAjuste {
+  MEDIA
+  CONTAGEM
 }
 
 enum StatusAjuste {

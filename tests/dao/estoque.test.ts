@@ -5,11 +5,10 @@ import { prismaTeste } from "../helpers/prisma";
 
 describe("saldoDAO", () => {
   describe("getSaldoDisponivel", () => {
-    it("soma quantidade e reserva dos estoques ativos", async () => {
+    it("soma saldo e reserva do produto", async () => {
       const produto = await criarProduto();
       await criarEstoque(produto.id_produto, { quantidadeAtual: 10, saldoReservado: 3 });
       await criarEstoque(produto.id_produto, { quantidadeAtual: 5, saldoReservado: 2 });
-      await criarEstoque(produto.id_produto, { quantidadeAtual: 100, ativo: false });
 
       const saldo = await saldoDAO.getSaldoDisponivel(produto.id_produto);
 

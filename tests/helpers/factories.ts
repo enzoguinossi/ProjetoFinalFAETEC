@@ -121,21 +121,15 @@ export async function criarEstoque(
   opts: {
     quantidadeAtual?: number;
     saldoReservado?: number;
-    dataEntrada?: Date;
-    ativo?: boolean;
   } = {},
 ) {
-  const produto = await prismaTeste.produto.update({
+  return prismaTeste.produto.update({
     where: { id_produto: idProduto },
-    data:
-      opts.ativo === false
-        ? {}
-        : {
-            saldo: { increment: opts.quantidadeAtual ?? 0 },
-            saldo_reservado: { increment: opts.saldoReservado ?? 0 },
-          },
+    data: {
+      saldo: { increment: opts.quantidadeAtual ?? 0 },
+      saldo_reservado: { increment: opts.saldoReservado ?? 0 },
+    },
   });
-  return produto;
 }
 
 export async function criarDestinatario(
@@ -311,6 +305,7 @@ export async function criarInventarioComItem(
     data: {
       data_inicio: new Date(),
       status: "ABERTO",
+      contagem_cega: true,
       id_usuario_abertura: idUsuarioAbertura,
     },
   });
@@ -394,13 +389,21 @@ export async function criarAjuste(
   idProduto: number,
   idInventario: number,
   idUsuarioAprovacao?: number,
+  opts: {
+    quantidadeContada?: number;
+    origem?: "MEDIA" | "CONTAGEM";
+    idContagemInventario?: number;
+    status?: "PENDENTE" | "APROVADO" | "REJEITADO";
+  } = {},
 ) {
   return prismaTeste.ajusteInventario.create({
     data: {
       id_produto: idProduto,
       id_inventario: idInventario,
-      diferenca: 1,
-      status: "PENDENTE",
+      quantidade_contada: opts.quantidadeContada ?? 1,
+      origem: opts.origem ?? "MEDIA",
+      id_contagem_inventario: opts.idContagemInventario,
+      status: opts.status ?? "PENDENTE",
       id_usuario_aprovacao: idUsuarioAprovacao,
     },
   });

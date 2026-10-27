@@ -36,7 +36,7 @@ export async function listarProdutos(
 
   if (params.search) {
     const excluidos = new Set(params.excludeIds ?? []);
-    const data = (await produtoDAO.searchPriorizadoComEstoque(params.search))
+    const data = (await produtoDAO.searchPriorizadoComSaldo(params.search))
       .map(produtoParaLinha)
       .filter((linha) => !excluidos.has(linha.id_produto));
     return {

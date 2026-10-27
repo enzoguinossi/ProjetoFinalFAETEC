@@ -49,4 +49,8 @@ export const ORIGEM: Record<string, string> = {
   FormularioVeiculo: "src/app/veiculos/novo/VeiculoForm.tsx",
   FormularioProduto: "src/app/produtos/novo/ProdutoForm.tsx",
   FormularioPerfil: "src/app/perfis/novo/PerfilForm.tsx",
+  InventarioLista: "src/app/inventario/InventarioClient.tsx",
+  InventarioForm: "src/app/inventario/InventarioForm.tsx",
+  InventarioDetalhe: "src/app/inventario/[id]/InventarioDetalheClient.tsx",
+  InventarioAprovacao: "src/app/inventario/[id]/aprovar/AprovacaoClient.tsx",
 };
