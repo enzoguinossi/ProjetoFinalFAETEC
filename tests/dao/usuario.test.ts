@@ -237,7 +237,7 @@ describe("usuarioDAO", () => {
       const { usuario } = await criarUsuario();
       const produto = await criarProduto();
       const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 1 });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 1);
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 1);
       await criarMensagemMural(usuario.id_usuario);
 
       const resultado = await usuarioDAO.verificarRelacionamentos(usuario.id_usuario);

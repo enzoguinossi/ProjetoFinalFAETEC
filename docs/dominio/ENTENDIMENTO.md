@@ -25,7 +25,7 @@ Atualmente, o fluxo é manual:
 Um sistema web que centraliza:
 
 - **Controle de Estoque** — substitui a contagem manual e planilhas Excel
-- **Cadastro de Produtos** — com fotos, lotes, validade, composição
+- **Cadastro de Produtos** — com fotos, validade e composição
 - **Gestão de Pedidos (Notas de Saída)** — transcrição dos pedidos em papel para o sistema
 - **Reserva de Estoque** — ao criar uma nota de saída com itens, o sistema reserva os produtos no estoque
 - **Entregas** — notas de saída com destinatário, itens e status de entrega
@@ -294,8 +294,14 @@ produto
 ├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
 ├── ID_conversao_padrao   INT FK NOT NULL DEFAULT 1 ← Conversão Padrão de Entrada (auxílio da entrada)
 ├── ID_conversao_saida    INT FK NOT NULL DEFAULT 1 ← Unidade Padrão de Saída (usada só em Remessa)
+├── saldo                 FLOAT NOT NULL DEFAULT 0  ← saldo real do produto
+├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída com saldo a entregar
 └── ativo                 BOOLEAN DEFAULT TRUE
 ```
+
+O **produto é dono do saldo**: não existe tabela/linha de estoque nem lote. Todo produto tem
+`saldo`/`saldo_reservado` desde a criação (zero) e `saldo_disponivel = saldo − saldo_reservado`
+(vide §3.7).
 
 **Flags removidas:** fracionado, porGrade, localizacao_fisica, gtin (gtin agora é código personalizado)
 
@@ -318,9 +324,9 @@ Regras:
 - O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
 - A conversão é **auxílio de lançamento**, nunca a unidade do produto ou do saldo: o fator
   multiplica a quantidade digitada para obter o **total** que entra no estoque (ex.: 10 × 20
-  = 200), e o estoque, a reserva, a baixa e a movimentação ficam em **base** — `UNIDADE`, fator 1
+  = 200), e o saldo do produto, a reserva, a baixa e a movimentação ficam em **base** — `UNIDADE`, fator 1
 - **A nota não guarda conversão:** `item_nota_entrada.quantidade` é o total que entra no
-  estoque e `item_nota_saida` guarda só `qtd_esperada`/`qtd_entregue`; nome e fator existem
+  saldo e `item_nota_saida` guarda só `qtd_esperada`/`qtd_entregue`; nome e fator existem
   apenas na tabela `conversao_unidade` e nos vínculos do produto
 - O produto tem **dois** vínculos obrigatórios com `conversao_unidade`:
   - `ID_conversao_padrao` — **Conversão Padrão de Entrada**, auxílio do lançamento de
@@ -360,32 +366,40 @@ Regras:
 - Um produto filho pode estar em **vários produtos pai**
 - A flag `composto` só é marcada se houver necessidade real de desmontar aquele produto
 - **Fluxo de desmontagem:** ao selecionar "desmontar" no sistema:
-  1. Dá baixa no estoque do produto pai (`quantidade_atual -= X`)
-  2. Gera entrada no estoque de cada filho (`quantidade_atual += X * quantidade_insumo`)
+  1. Dá baixa no saldo do produto pai (`produto.saldo -= X`)
+  2. Gera entrada no saldo de cada filho (`produto.saldo += X * quantidade_insumo`)
   3. Registra as movimentações correspondentes (baixa do pai e entrada dos filhos) — sem
      coluna de tipo: a natureza é inferida pelas notas (`tipo = 'DESMONTAGEM'`)
 
 ---
 
-### 3.7 Bloco: Estoque
+### 3.7 Bloco: Saldo do Produto (estoque achatado)
+
+**Não existe tabela `estoque` nem linha de estoque/lote.** O saldo mora em duas colunas do
+próprio produto (vide §3.6):
 
 ```
-estoque (saldo real — controle de quantidade)
-├── ID_estoque            INT PK auto_increment
-├── ID_produto            INT FK NOT NULL
-├── quantidade_atual      FLOAT NOT NULL          ← saldo físico real no galpão
-├── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída abertas
-├── data_entrada          DATE NOT NULL
-└── ativo                 BOOLEAN DEFAULT TRUE
+produto
+├── saldo                 FLOAT NOT NULL DEFAULT 0  ← saldo real no galpão
+└── saldo_reservado       FLOAT NOT NULL DEFAULT 0  ← comprometido por notas de saída com saldo a entregar
 
 *Cálculo do saldo disponível:*
-saldo_disponivel = quantidade_atual - saldo_reservado
+saldo_disponivel = saldo - saldo_reservado
 ```
 
-`quantidade_atual` e `saldo_reservado` convivem no mesmo registro: a baixa física mexe no
-primeiro, a reserva mexe no segundo (vide §3.8.1). As duas colunas estão sempre em **base**
-(`UNIDADE`, fator 1) — a conversão de unidade atua só como auxílio no lançamento (entrada e
-Remessa, vide §3.6.1).
+Todo produto tem saldo desde a criação (zero) — não há produto sem saldo, `data_entrada`
+nem `ativo` de estoque. `produto.ativo` é a única referência de atividade. A data de entrada
+não é guardada no saldo: ela é o histórico de `nota_entrada`/`movimentacao_estoque`.
+
+`saldo` e `saldo_reservado` convivem no mesmo registro: a baixa física mexe no primeiro, a
+reserva mexe no segundo (vide §3.8.1). As duas colunas estão sempre em **base** (`UNIDADE`,
+fator 1) — a conversão de unidade atua só como auxílio no lançamento (entrada e Remessa, vide
+§3.6.1).
+
+A migração do modelo antigo consolidou as linhas **ativas** de `estoque` por produto
+(`saldo = SUM(quantidade_atual)` e `saldo_reservado = SUM(saldo_reservado)`); produtos sem
+linha ficaram com zero e os registros históricos (itens, reservas, movimentações, coleta e
+inventário) passaram a apontar para `ID_produto`.
 
 Regras:
 - Produtos perecíveis possuem `data_validade` no cadastro do produto (menor validade disponível)
@@ -393,31 +407,31 @@ Regras:
 - A data de validade é controlada manualmente pelo Jonathan — ele atualiza conforme necessário
 - Produtos não perecíveis têm o campo desabilitado
 
-#### 3.7.1 Fluxo de Estoque
+#### 3.7.1 Fluxo de Saldo
 
 | Momento | Ação | Impacto |
 |---------|------|---------|
-| Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `quantidade_atual += total da entrada` |
-| Criar Nota de Saída com itens | Cria `reserva_estoque` | `saldo_reservado += X` |
-| Cancelamento de Nota de Saída | Cria `reserva_estoque` negativa | `saldo_reservado -= X` |
-| Nota baixada (total/parcial/corte) | Baixa definitiva + libera reserva | `quantidade_atual -= X` E `saldo_reservado -= X` |
+| Entrada de mercadoria | Cria `movimentacao_estoque` ligada à nota de entrada (`ID_nota_entrada`) | `produto.saldo += total da entrada` |
+| Criar Nota de Saída com itens | Cria `reserva_estoque` | `produto.saldo_reservado += X` |
+| Cancelamento de Nota de Saída | Cria `reserva_estoque` negativa | `produto.saldo_reservado -= X` |
+| Nota baixada (total/parcial/corte) | Baixa definitiva + libera reserva | `produto.saldo -= X` E `produto.saldo_reservado -= X` |
 | Desmontagem de composto | Baixa pai + entrada filhos | Vide 3.6.2 |
-| Ajuste de inventário | Acerto manual | `quantidade_atual = novo_valor` |
+| Ajuste de inventário | Acerto manual aprovado | `produto.saldo = novo_valor` |
 
 ---
 
 ### 3.8 Bloco: Movimentação de Estoque
 
-Registro de auditoria de toda alteração no saldo do estoque. **Não possui tipo próprio** — o tipo é inferido pelas FKs e pelo tipo da nota origem.
+Registro de auditoria de toda alteração no saldo do produto. **Não possui tipo próprio** — o tipo é inferido pelas FKs e pelo tipo da nota origem.
 
 ```
 movimentacao_estoque
 ├── ID_movimentacao       INT PK auto_increment
-├── ID_estoque            INT FK NOT NULL
+├── ID_produto            INT FK NOT NULL
 ├── ID_usuario            INT FK NOT NULL
 ├── quantidade            FLOAT NOT NULL         ← positivo = entrada, negativo = saída
-├── saldo_anterior        FLOAT                  ← snapshot do quantidade_atual antes
-├── saldo_posterior       FLOAT                  ← snapshot do quantidade_atual depois
+├── saldo_anterior        FLOAT                  ← snapshot do `produto.saldo` antes
+├── saldo_posterior       FLOAT                  ← snapshot do `produto.saldo` depois
 ├── ID_nota_entrada       INT FK NULL              ← veio de uma nota de entrada
 ├── ID_nota_saida         INT FK NULL              ← veio de uma nota de saída (apenas baixas reais)
 ├── data_hora             TIMESTAMP NOT NULL
@@ -438,26 +452,26 @@ movimentacao_estoque
 
 #### 3.8.1 Reserva de Estoque (Auditoria Contábil)
 
-Registra cada alteração no `saldo_reservado` do estoque — reservas e liberações.
+Registra cada alteração no `produto.saldo_reservado` — reservas e liberações.
 
 ```
 reserva_estoque
 ├── ID_reserva_estoque     INT PK auto_increment
-├── ID_estoque             INT FK NOT NULL
+├── ID_produto             INT FK NOT NULL
 ├── ID_nota_saida          INT FK NOT NULL
 ├── ID_usuario             INT FK NOT NULL
 ├── quantidade             FLOAT NOT NULL         ← positiva = reservou, negativa = liberou
-├── saldo_anterior         FLOAT                  ← snapshot do saldo_reservado antes
-├── saldo_posterior        FLOAT                  ← snapshot do saldo_reservado depois
+├── saldo_anterior         FLOAT                  ← snapshot do `saldo_reservado` antes
+├── saldo_posterior        FLOAT                  ← snapshot do `saldo_reservado` depois
 ├── data_hora              TIMESTAMP NOT NULL
 └── observacao             TEXT
 ```
 
 Regras:
-- **Reservar:** criar a **nota de saída** com destinatário e itens (`item_nota_saida`) → insere `reserva_estoque` com `quantidade > 0` → `estoque.saldo_reservado += X`
-- **Liberar:** cancelar a nota → insere `reserva_estoque` com `quantidade < 0` → `estoque.saldo_reservado -= X`; na baixa (total/parcial/corte) a reserva dos itens entregues também é liberada
+- **Reservar:** criar a **nota de saída** com destinatário e itens (`item_nota_saida`) → insere `reserva_estoque` com `quantidade > 0` → `produto.saldo_reservado += X`
+- **Liberar:** cancelar a nota → insere `reserva_estoque` com `quantidade < 0` → `produto.saldo_reservado -= X`; na baixa (total/parcial/corte) a reserva dos itens entregues também é liberada
 - A reserva pertence **à própria nota de saída**, que carrega os itens e o destinatário — não existe mais um nível intermediário de remessa
-- A consulta de saldo disponível usa `saldo_disponivel = quantidade_atual - saldo_reservado` (`saldo_reservado` está no `estoque`, atualizado em tempo real)
+- A consulta de saldo disponível usa `saldo_disponivel = saldo - saldo_reservado` (`saldo_reservado` está no `produto`, atualizado em tempo real)
 - A `reserva_estoque` é a trilha de auditoria para conferência posterior
 
 #### 3.8.2 Correção de Notas (Regra de Editabilidade)
@@ -472,11 +486,11 @@ Usuário edita item_nota_entrada.quantidade de 10 para 15
      dados_novos: {quantidade: 15} }
   ↓
 2. movimentacao_estoque: {
-     ID_nota_entrada, ID_estoque,
+     ID_nota_entrada, ID_produto,
      quantidade: +5,
      saldo_anterior: 10, saldo_posterior: 15 }
   ↓
-3. estoque.quantidade_atual += 5
+3. produto.saldo += 5
 ```
 
 **Fluxo de correção da Nota de Saída (itens ainda não entregues):**
@@ -486,18 +500,18 @@ Usuário edita item_nota_saida.qtd_esperada de 20 para 15
 1. registro_auditoria captura antes/depois
   ↓
 2. reserva_estoque: {
-     ID_nota_saida, ID_estoque,
+     ID_nota_saida, ID_produto,
      quantidade: -5,
      saldo_anterior: 20, saldo_posterior: 15 }
   ↓
-3. estoque.saldo_reservado -= 5
+3. produto.saldo_reservado -= 5
 ```
 
 Regras:
 - `registro_auditoria` sempre captura snapshots antes/depois em JSON
-- Correção em nota de entrada: gera `movimentacao_estoque` (altera `quantidade_atual`)
-- Correção em nota de saída aberta: gera `reserva_estoque` (altera `saldo_reservado`), pelo delta
-- Correção em `item_nota_saida` de baixa interna (`CONSUMO_INTERNO`, `AVARIA`, `DESMONTAGEM`): gera `movimentacao_estoque` (altera `quantidade_atual`)
+- Correção em nota de entrada: gera `movimentacao_estoque` (altera `produto.saldo`)
+- Correção em nota de saída aberta: gera `reserva_estoque` (altera `produto.saldo_reservado`), pelo delta
+- Correção em `item_nota_saida` de baixa interna (`CONSUMO_INTERNO`, `AVARIA`, `DESMONTAGEM`): gera `movimentacao_estoque` (altera `produto.saldo`)
 - Se o item já teve parte entregue, a correção só afeta o saldo disponível (`qtd_esperada - qtd_entregue`)
 
 ---
@@ -518,8 +532,8 @@ inventario
 item_inventario
 ├── ID_item_inventario      INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
-├── ID_estoque            INT FK NOT NULL
-├── quantidade_sistema      FLOAT NOT NULL   ← snapshot congelado na abertura
+├── ID_produto              INT FK NOT NULL
+├── quantidade_sistema      FLOAT NOT NULL   ← snapshot congelado de `produto.saldo` na abertura
 └── observacao              TEXT
 
 contagem_inventario         ← cada funcionário conta
@@ -533,13 +547,17 @@ contagem_inventario         ← cada funcionário conta
 ajuste_inventario           ← aprovação manual das diferenças
 ├── ID_ajuste_inventario    INT PK auto_increment
 ├── ID_inventario           INT FK NOT NULL
-├── ID_estoque            INT FK NOT NULL
+├── ID_produto              INT FK NOT NULL
 ├── diferenca               FLOAT NOT NULL
 ├── status                  ENUM('PENDENTE','APROVADO','REJEITADO')
 ├── ID_usuario_aprovacao    INT FK → usuario NULL
 ├── data_aprovacao          TIMESTAMP NULL
 └── justificativa           TEXT
 ```
+
+> **Estado do código (2026-10-26):** o inventário ainda **não foi implementado** (RF015); as
+> tabelas já referenciam `ID_produto` desde o achatamento do estoque. `ajuste_inventario` ainda
+> mantém a coluna `diferenca`, que será revista no run de implementação do inventário.
 
 #### 3.9.1 Fluxo do Inventário
 
@@ -550,12 +568,12 @@ ajuste_inventario           ← aprovação manual das diferenças
 | **Múltiplas contagens** | Vários funcionários contam o mesmo item | Cada contagem vira um registro em `contagem_inventario`. |
 | **Finalizar contagem** | Usuário encerra a contagem | status = AGUARDANDO_APROVACAO. Sistema calcula média das contagens e dispara pendências de ajuste |
 | **Revisão** | Aprovador vê planilha comparativa: `quantidade_sistema` + contagens individuais + média | Pode escolher uma contagem específica ou usar a média |
-| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada` nem `ID_nota_saida` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém estoque, registro preservado |
+| **Aprovação** | Aprovador aprova ou rejeita cada diferença | Se aprovado: gera `movimentacao_estoque` de ajuste — **sem coluna de tipo**, reconhecida por não ter `ID_nota_entrada` nem `ID_nota_saida` — com snapshot `saldo_anterior/posterior`. Se rejeitado: mantém o saldo do produto, registro preservado |
 | **Finalização** | Inventário é encerrado | status = FINALIZADO. Movimentações dos produtos DESBLOQUEADAS |
 
 #### 3.9.2 Regras do Inventário
 
-- **Bloqueio é por produto**, não geral — apenas os lotes associados aos `item_inventario` ficam congelados
+- **Bloqueio é por produto**, não geral — apenas os produtos associados aos `item_inventario` ficam congelados
 - **Permissões granulares**: `inventario.abrir`, `inventario.aprovar_ajuste`, `estoque.ver_saldo` (controla contagem cega)
 - **Jonathan e Felipe** têm permissões absolutas (podem abrir, contar, aprovar)
 - **Diferença não gera ajuste automático** — toda diferença precisa de aprovação manual (RN005)
@@ -685,7 +703,7 @@ nota_saida
 item_nota_saida
 ├── ID_item_nota_saida      INT PK auto_increment
 ├── ID_nota_saida           INT FK NOT NULL
-├── ID_estoque              INT FK NOT NULL
+├── ID_produto              INT FK NOT NULL
 ├── qtd_esperada            FLOAT NOT NULL              ← total solicitado
 ├── qtd_entregue            FLOAT NOT NULL DEFAULT 0    ← total entregue
 └── observacao              TEXT
@@ -700,14 +718,14 @@ Regras:
   o que fica na nota é apenas o total. Avaria e Consumo Interno digitam o total direto
 - Reserva, baixa, entrega e pendência usam `qtd_esperada`/`qtd_entregue`; alterar o cadastro
   ou excluir a conversão depois não muda a nota já lançada
-- Criar uma nota `SAIDA` (Remessa) com itens **reserva o estoque** (`saldo_reservado += qtd_esperada`)
+- Criar uma nota `SAIDA` (Remessa) com itens **reserva o saldo do produto** (`produto.saldo_reservado += qtd_esperada`)
   e grava `item_nota_saida` e `reserva_estoque` na mesma transação (decisão do usuário, 2026-10-23)
 - Criar uma nota `AVARIA` ou `CONSUMO_INTERNO` **não reserva**: dá baixa real na criação
-  (`quantidade_atual -= quantidade`), grava a `movimentacao_estoque` com quantidade negativa e
+  (`produto.saldo -= quantidade`), grava a `movimentacao_estoque` com quantidade negativa e
   `ID_nota_saida`, e a nota nasce `BAIXA_TOTAL` com `qtd_entregue = qtd_esperada`
 - Saldo insuficiente apenas **avisa** (RN001), nunca bloqueia — na Remessa o aviso considera o
-  disponível (`quantidade_atual − saldo_reservado`); na baixa direta, a `quantidade_atual` (que pode
-  ficar negativa)
+  disponível (`saldo − saldo_reservado`); na baixa direta, o `saldo` (que pode
+  ficar negativo)
 - Só a nota `SAIDA` `ABERTA` é editável: a edição corrige a reserva **pelo delta** e pode acrescentar
   item; remover item é recusado (RN004). O item existente usa o **total já guardado**; um item
   novo pode usar a Unidade Padrão de Saída como auxílio para calcular o total.
@@ -724,7 +742,7 @@ Regras:
 #### 3.11.2 Baixa da Nota e Pendência (RN003)
 
 A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
-`quantidade_atual -= qtd_entregue` e `saldo_reservado -= qtd_entregue`, com a
+`produto.saldo -= qtd_entregue` e `produto.saldo_reservado -= qtd_entregue`, com a
 `movimentacao_estoque` correspondente. As telas de entrada, saída e expedição mostram
 **apenas quantidades/totais** — sem unidade, fator, “base” ou “convertida”.
 
@@ -741,7 +759,7 @@ A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
 A execução acontece **dentro da expedição em `EM_PERCURSO`**, por nota e por item: a quantidade
 informada é o **total entregue** (o sistema aplica o delta sobre `qtd_entregue`), o **corte** libera
 a reserva do restante e o atalho **não entregue** mantém tudo reservado. A baixa física não é
-bloqueada por `quantidade_atual` insuficiente — divergência de inventário não impede registrar uma
+bloqueada por `saldo` insuficiente — divergência de inventário não impede registrar uma
 entrega que aconteceu (RN001) —, mas nunca deixa `saldo_reservado` negativo. A segunda tentativa
 numa nota já finalizada é recusada sem debitar de novo. Ao **concluir** a expedição, as notas ainda
 em percurso passam a `PENDENTE`, a expedição vai para `CONCLUIDA` e o veículo volta a `DISPONIVEL`
@@ -762,13 +780,13 @@ coleta
 item_coleta
 ├── ID_item_coleta          INT PK auto_increment
 ├── ID_coleta               INT FK NOT NULL
-├── ID_estoque              INT FK NOT NULL
+├── ID_produto              INT FK NOT NULL
 ├── quantidade              FLOAT NOT NULL
 ```
 
 Regras:
 - Chegou e pegou — sem agendamento, sem status
-- Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o estoque dá baixa
+- Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o saldo do produto dá baixa
 
 #### 3.11.4 Expedição × Nota (N:N com ordem)
 
@@ -856,9 +874,10 @@ Regras:
   apenas o **total** (quantidade × fator); a nota não guarda conversão
 - Fornecedor é opcional — produtos de limpeza que chegam sem documento podem ter entrada sem fornecedor
 - Ao confirmar a entrada, o sistema:
-  1. Cria/atualiza `estoque` com `quantidade_atual += quantidade`
+  1. Atualiza o saldo do produto (`produto.saldo += quantidade`)
   2. Cria `movimentacao_estoque` vinculada à nota (`ID_nota_entrada`) — a movimentação **não
      tem coluna de tipo**; a natureza de entrada é inferida pela FK e por `nota_entrada.tipo`
+- Não há lote: o saldo é único por produto e a data de entrada fica no histórico de movimentações
 - `data_validade` (quando aplicável) é atualizada manualmente no cadastro do produto pelo Jonathan
 
 ---

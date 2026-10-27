@@ -125,15 +125,17 @@ export async function criarEstoque(
     ativo?: boolean;
   } = {},
 ) {
-  return prismaTeste.estoque.create({
-    data: {
-      id_produto: idProduto,
-      quantidade_atual: opts.quantidadeAtual ?? 0,
-      saldo_reservado: opts.saldoReservado ?? 0,
-      data_entrada: opts.dataEntrada ?? new Date(),
-      ativo: opts.ativo ?? true,
-    },
+  const produto = await prismaTeste.produto.update({
+    where: { id_produto: idProduto },
+    data:
+      opts.ativo === false
+        ? {}
+        : {
+            saldo: { increment: opts.quantidadeAtual ?? 0 },
+            saldo_reservado: { increment: opts.saldoReservado ?? 0 },
+          },
   });
+  return produto;
 }
 
 export async function criarDestinatario(
@@ -233,11 +235,11 @@ export async function criarNotaSaida(
 
 export async function criarItemNotaSaida(
   idNotaSaida: number,
-  idEstoque: number,
+  idProduto: number,
   qtdEsperada = 1,
 ) {
   return prismaTeste.itemNotaSaida.create({
-    data: { id_nota_saida: idNotaSaida, id_estoque: idEstoque, qtd_esperada: qtdEsperada },
+    data: { id_nota_saida: idNotaSaida, id_produto: idProduto, qtd_esperada: qtdEsperada },
   });
 }
 
@@ -301,7 +303,7 @@ export async function criarPercursoComDestinatario(idDestinatario: number) {
 }
 
 export async function criarInventarioComItem(
-  idEstoque: number,
+  idProduto: number,
   idUsuarioAbertura: number,
   opts: { quantidadeSistema?: number } = {},
 ) {
@@ -315,7 +317,7 @@ export async function criarInventarioComItem(
   const item = await prismaTeste.itemInventario.create({
     data: {
       id_inventario: inventario.id_inventario,
-      id_estoque: idEstoque,
+      id_produto: idProduto,
       quantidade_sistema: opts.quantidadeSistema ?? 0,
     },
   });
@@ -338,7 +340,7 @@ export async function criarContagem(
 }
 
 export async function criarMovimentacao(
-  idEstoque: number,
+  idProduto: number,
   idUsuario: number,
   quantidade = 1,
   opts: {
@@ -352,7 +354,7 @@ export async function criarMovimentacao(
 ) {
   return prismaTeste.movimentacaoEstoque.create({
     data: {
-      id_estoque: idEstoque,
+      id_produto: idProduto,
       id_usuario: idUsuario,
       quantidade,
       data_hora: opts.dataHora ?? new Date(),
@@ -366,14 +368,14 @@ export async function criarMovimentacao(
 }
 
 export async function criarReserva(
-  idEstoque: number,
+  idProduto: number,
   idNotaSaida: number,
   idUsuario: number,
   quantidade = 1,
 ) {
   return prismaTeste.reservaEstoque.create({
     data: {
-      id_estoque: idEstoque,
+      id_produto: idProduto,
       id_nota_saida: idNotaSaida,
       id_usuario: idUsuario,
       quantidade,
@@ -389,13 +391,13 @@ export async function criarMensagemMural(idUsuario: number) {
 }
 
 export async function criarAjuste(
-  idEstoque: number,
+  idProduto: number,
   idInventario: number,
   idUsuarioAprovacao?: number,
 ) {
   return prismaTeste.ajusteInventario.create({
     data: {
-      id_estoque: idEstoque,
+      id_produto: idProduto,
       id_inventario: idInventario,
       diferenca: 1,
       status: "PENDENTE",

@@ -10,9 +10,9 @@ export type ProdutoRelatorioRow = {
   /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
   codigo: string;
   descricao: string;
-  /** Soma de `quantidade_atual` dos estoques ativos. */
+  /** Saldo atual do produto. */
   quantidade: number;
-  /** Soma de `quantidade_atual − saldo_reservado` dos estoques ativos. */
+  /** `saldo − saldo_reservado`. */
   livre: number;
   situacao: "Ativo" | "Inativo";
 };
@@ -428,23 +428,15 @@ export class RelatorioDAO {
         id_produto: true,
         descricao: true,
         ativo: true,
-        estoques: {
-          where: { ativo: true },
-          select: { quantidade_atual: true, saldo_reservado: true },
-        },
+        saldo: true,
+        saldo_reservado: true,
       },
       orderBy: { descricao: "asc" },
     });
 
     const data: ProdutoRelatorioRow[] = produtos.map((p) => {
-      const quantidade = p.estoques.reduce(
-        (soma, e) => soma + Number(e.quantidade_atual),
-        0,
-      );
-      const reservado = p.estoques.reduce(
-        (soma, e) => soma + Number(e.saldo_reservado),
-        0,
-      );
+      const quantidade = Number(p.saldo);
+      const reservado = Number(p.saldo_reservado);
       return {
         id_produto: p.id_produto,
         codigo: formatarCodigo(p.id_produto),
@@ -496,7 +488,7 @@ export class RelatorioDAO {
         id_produto: true,
         descricao: true,
         data_validade: true,
-        estoques: { where: { ativo: true }, select: { quantidade_atual: true } },
+        saldo: true,
       },
       orderBy: [{ data_validade: "asc" }, { descricao: "asc" }],
     });
@@ -504,10 +496,7 @@ export class RelatorioDAO {
     const data: ProdutoVencimentoRelatorioRow[] = produtos.map((produto) => {
       const validade = diaUtc(produto.data_validade as Date);
       const diasRestantes = diferencaEmDias(validade, hoje);
-      const quantidade = produto.estoques.reduce(
-        (soma, estoque) => soma + Number(estoque.quantidade_atual),
-        0,
-      );
+      const quantidade = Number(produto.saldo);
 
       return {
         id_produto: produto.id_produto,
@@ -672,7 +661,7 @@ export class RelatorioDAO {
       if (filtros.ate) where.data_hora.lte = filtros.ate;
     }
     if (filtros.id_produtos?.length) {
-      where.estoque = { id_produto: { in: filtros.id_produtos } };
+      where.id_produto = { in: filtros.id_produtos };
     }
     if (filtros.id_destinatarios?.length) {
       where.notaSaida = { id_destinatario: { in: filtros.id_destinatarios } };
@@ -700,7 +689,8 @@ export class RelatorioDAO {
         observacao: true,
         id_nota_entrada: true,
         id_nota_saida: true,
-        estoque: { select: { id_produto: true, produto: { select: { descricao: true } } } },
+        id_produto: true,
+        produto: { select: { descricao: true } },
         notaEntrada: {
           select: {
             fornecedor: {
@@ -726,7 +716,7 @@ export class RelatorioDAO {
     });
 
     const data: MovimentacaoRelatorioRow[] = movimentacoes.map((m) => {
-      const id_produto = m.estoque.id_produto;
+      const id_produto = m.id_produto;
       const tipo: TipoMovimentacaoExibicao =
         m.id_nota_entrada !== null
           ? "Entrada"
@@ -745,7 +735,7 @@ export class RelatorioDAO {
         data_hora: m.data_hora,
         id_produto,
         codigo: formatarCodigo(id_produto),
-        produto: m.estoque.produto.descricao,
+        produto: m.produto.descricao,
         tipo,
         documento,
         destinatario_fornecedor:

@@ -18,25 +18,26 @@ export const COLUNAS_PRODUTO: Column<ProdutoListRow>[] = [
   { key: "livre", label: "Qtd. Livre", width: "1fr", align: "right" },
 ];
 
-type ProdutoComEstoque = {
+type ProdutoComSaldo = {
   id_produto: number;
   descricao: string;
-  estoques: { quantidade_atual: number; saldo_reservado: number }[];
+  saldo: number;
+  saldo_reservado: number;
 };
 
 /**
- * Único lugar que calcula o saldo livre (`quantidade − reservado`).
+ * Único lugar que calcula o saldo livre (`saldo − reservado`).
  * Usado pela listagem de produtos e pelo seletor de produto da movimentação.
  * O saldo é sempre em base (UNIDADE), sem rótulo de unidade nas telas.
  */
-export function produtoParaLinha(p: ProdutoComEstoque): ProdutoListRow {
-  const qtd = p.estoques.reduce((s, e) => s + Number(e.quantidade_atual), 0);
-  const reservado = p.estoques.reduce((s, e) => s + Number(e.saldo_reservado), 0);
+export function produtoParaLinha(p: ProdutoComSaldo): ProdutoListRow {
+  const saldo = Number(p.saldo);
+  const reservado = Number(p.saldo_reservado);
   return {
     id_produto: p.id_produto,
     codigo: formatarCodigo(p.id_produto),
     descricao: p.descricao,
-    qtd: String(qtd),
-    livre: String(qtd - reservado),
+    qtd: String(saldo),
+    livre: String(saldo - reservado),
   };
 }

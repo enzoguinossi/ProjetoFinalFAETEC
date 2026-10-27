@@ -192,6 +192,8 @@ package "Produtos e Estoque" as Produtos {
       + data_validade: Date
       + ID_conversao_padrao: Integer
       + ID_conversao_saida: Integer
+      + saldo: Float
+      + saldo_reservado: Float
       + ativo: Boolean
     }
 
@@ -200,14 +202,6 @@ package "Produtos e Estoque" as Produtos {
     + quantidade: Float
     + ativo: Boolean
   }
-
-  class Estoque {
-      + ID_estoque: Integer
-      + quantidade_atual: Float
-      + saldo_reservado: Float
-      + data_entrada: Date
-      + ativo: Boolean
-    }
 
   class Inventario {
       + ID_inventario: Integer
@@ -258,13 +252,12 @@ package "Produtos e Estoque" as Produtos {
     }
 }
 
-Produto "1" --> "0..*" Estoque : estocado em >
 Produto "1" --> "0..*" ProdutoInsumo : pai de >
 Produto "1" <-- "*" ProdutoInsumo : filho de >
 ConversaoUnidade "1" --> "0..*" Produto : conversão de entrada >
 ConversaoUnidade "1" --> "0..*" Produto : unidade de saída >
-Estoque "1" --> "*" MovimentacaoEstoque : movimenta >
-Estoque "1" --> "*" ReservaEstoque : reserva >
+Produto "1" --> "*" MovimentacaoEstoque : movimenta >
+Produto "1" --> "*" ReservaEstoque : reserva >
 NotaSaida "1" --> "*" ReservaEstoque : origina >
 Usuario "1" --> "*" MovimentacaoEstoque : registra >
 Usuario "1" --> "*" ReservaEstoque : registra >
@@ -272,8 +265,8 @@ Inventario "1" --> "*" ItemInventario : contém >
 ItemInventario "1" --> "*" ContagemInventario : contada em >
 Funcionario "1" --> "*" ContagemInventario : realiza >
 Inventario "1" --> "*" AjusteInventario : gera >
-Estoque "1" --> "*" AjusteInventario : ajustado em >
-Estoque "1" --> "*" ItemInventario : contado em >
+Produto "1" --> "*" AjusteInventario : ajustado em >
+Produto "1" --> "*" ItemInventario : contado em >
 
 ' Códigos dos produtos
 Produto "1" --> "*" ProdutoCodigo : possui >
@@ -374,7 +367,8 @@ NotaSaida "1" --> "*" ItemNotaSaida : contém >
 NotaSaida "1" --> "*" Coleta : gera >
 Coleta "1" --> "*" ItemColeta : contém >
 NotaSaida "1" --> "*" Anexo : anexa >
-Estoque "1" --> "*" ItemNotaSaida : reservado em >
+Produto "1" --> "*" ItemNotaSaida : reservado em >
+Produto "1" --> "*" ItemColeta : coletado em >
 Funcionario "0..1" --> "0..*" Expedicao : conduz >
 Veiculo "0..1" --> "0..*" Expedicao : vincula >
 Expedicao "1" --> "*" ExpedicaoNota : agrupa >

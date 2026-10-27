@@ -205,10 +205,7 @@ describe("funcionarioDAO", () => {
     it("bloqueia quando há usuário, contagem ou expedição como condutor", async () => {
       const { usuario, funcionario } = await criarUsuario();
       const produto = await criarProduto({ descricao: "P" });
-      const estoque = await prismaTeste.estoque.create({
-        data: { id_produto: produto.id_produto, quantidade_atual: 0, data_entrada: new Date() },
-      });
-      const { item } = await criarInventarioComItem(estoque.id_estoque, usuario.id_usuario);
+      const { item } = await criarInventarioComItem(produto.id_produto, usuario.id_usuario);
       await criarContagem(item.id_item_inventario, funcionario.id_funcionario, 0);
       await criarExpedicao({ idCondutor: funcionario.id_funcionario });
 

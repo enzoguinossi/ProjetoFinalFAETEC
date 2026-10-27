@@ -218,7 +218,7 @@ export class NotaSaidaService {
     const normalizados = itens.itens.map((item) => {
       if (item.id_item_nota_saida === null) return item;
       const atual = itensExistentes.get(item.id_item_nota_saida)!;
-      return { ...item, id_produto: atual.estoque.produto.id_produto };
+      return { ...item, id_produto: atual.id_produto };
     });
 
     const repetidoNormalizado = produtosUnicos(normalizados);

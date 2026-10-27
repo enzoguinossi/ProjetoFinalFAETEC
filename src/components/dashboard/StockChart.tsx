@@ -22,7 +22,7 @@ export default function StockChart({ produtos, semPermissao }: Props) {
     labels,
     datasets: [
       {
-        label: "Quantidade atual",
+        label: "Saldo",
         data: produtos.map((produto) => produto.quantidade),
         backgroundColor: CORES_GRAFICO.brandClaro,
         borderRadius: 4,

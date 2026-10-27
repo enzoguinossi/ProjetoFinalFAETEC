@@ -254,6 +254,8 @@ entity "produto" as produto {
   data_validade : DATE
   ID_conversao_padrao : INT <<FK>>
   ID_conversao_saida : INT <<FK>>
+  * saldo : FLOAT
+  * saldo_reservado : FLOAT
   * ativo : BOOLEAN
 }
 
@@ -267,18 +269,11 @@ entity "produto_insumo" as insumo {
 }
 
 ' =========================================================
-' ESTOQUE
+' SALDO DO PRODUTO (sem tabela estoque)
 ' =========================================================
 
-entity "estoque" as estoque {
-  * ID_estoque : INT <<PK>>
-  --
-  * ID_produto : INT <<FK>>
-    * quantidade_atual : FLOAT
-    * saldo_reservado : FLOAT
-    * data_entrada : DATE
-    * ativo : BOOLEAN
-  }
+' O saldo vive em produto.saldo e produto.saldo_reservado;
+' não há entidade/linha de estoque nem lote.
 
 ' =========================================================
 ' MOVIMENTACAO DE ESTOQUE
@@ -287,7 +282,7 @@ entity "estoque" as estoque {
 entity "movimentacao_estoque" as mov {
   * ID_movimentacao : INT <<PK>>
   --
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * ID_usuario : INT <<FK>>
   * quantidade : FLOAT
   saldo_anterior : FLOAT
@@ -305,7 +300,7 @@ entity "movimentacao_estoque" as mov {
 entity "reserva_estoque" as reserva {
   * ID_reserva_estoque : INT <<PK>>
   --
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * ID_nota_saida : INT <<FK>>
   * ID_usuario : INT <<FK>>
   * quantidade : FLOAT
@@ -335,7 +330,7 @@ entity "item_inventario" as item_inv {
   * ID_item_inventario : INT <<PK>>
   --
   * ID_inventario : INT <<FK>>
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * quantidade_sistema : FLOAT
   observacao : TEXT
 }
@@ -354,7 +349,7 @@ entity "ajuste_inventario" as ajuste_inv {
   * ID_ajuste_inventario : INT <<PK>>
   --
   * ID_inventario : INT <<FK>>
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * diferenca : FLOAT
   * status : ENUM(PENDENTE, APROVADO, REJEITADO)
   ID_usuario_aprovacao : INT <<FK>>
@@ -406,7 +401,7 @@ entity "item_nota_saida" as item_nota {
   * ID_item_nota_saida : INT <<PK>>
   --
   * ID_nota_saida : INT <<FK>>
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * qtd_esperada : FLOAT
   * qtd_entregue : FLOAT
   observacao : TEXT
@@ -429,7 +424,7 @@ entity "item_coleta" as item_coleta {
   * ID_item_coleta : INT <<PK>>
   --
   * ID_coleta : INT <<FK>>
-  * ID_estoque : INT <<FK>>
+  * ID_produto : INT <<FK>>
   * quantidade : FLOAT
 }
 
@@ -623,17 +618,17 @@ destinatario ||--o{ dest_email
 fornecedor ||--o{ forn_tel
 fornecedor ||--o{ forn_email
 
-' Produto / Estoque
+' Produto / Saldo
 conv ||--o{ produto : "entrada"
 conv ||--o{ produto : "saída"
-produto ||--o{ estoque
 produto ||--o{ insumo
 produto ||--o{ item_nota_entrada
-estoque ||--o{ item_nota
-estoque ||--o{ mov
-estoque ||--o{ reserva
-estoque ||--o{ item_inv
-estoque ||--o{ ajuste_inv
+produto ||--o{ item_nota
+produto ||--o{ mov
+produto ||--o{ reserva
+produto ||--o{ item_inv
+produto ||--o{ ajuste_inv
+produto ||--o{ item_coleta
 inventario ||--|{ item_inv
 inventario ||--o{ ajuste_inv
 usuario ||--o{ inventario

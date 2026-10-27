@@ -16,12 +16,6 @@ export class ProdutoDAO {
     const [data, total] = await Promise.all([
       prisma.produto.findMany({
         skip, take, where,
-        include: {
-          estoques: {
-            where: { ativo: true },
-            select: { quantidade_atual: true, saldo_reservado: true },
-          },
-        },
         orderBy: { descricao: "asc" },
       }),
       prisma.produto.count({ where }),
@@ -103,10 +97,8 @@ export class ProdutoDAO {
         select: {
           id_produto: true,
           descricao: true,
-          estoques: {
-            where: { ativo: true },
-            select: { quantidade_atual: true, saldo_reservado: true },
-          },
+          saldo: true,
+          saldo_reservado: true,
         },
         take,
         orderBy: { descricao: "asc" },
@@ -121,7 +113,6 @@ export class ProdutoDAO {
         conversaoPadrao: true,
         conversaoSaida: true,
         produtoCodigos: { include: { tipoCodigo: true } },
-        estoques: { where: { ativo: true } },
         insumosPai: { include: { produtoFilho: true } },
       },
     });
@@ -283,18 +274,23 @@ export class ProdutoDAO {
   }
 
   async verificarRelacionamentos(id: number, client: Db = prisma) {
-    const [estoque, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
-      client.estoque.count({ where: { id_produto: id } }),
-      client.itemNotaSaida.count({ where: { estoque: { id_produto: id } } }),
+    const [produto, itensNotaSaida, itensNotaEntrada, itensPedido, itensColeta, movimentacoes, insumosFilho] = await Promise.all([
+      client.produto.findUnique({
+        where: { id_produto: id },
+        select: { saldo: true, saldo_reservado: true },
+      }),
+      client.itemNotaSaida.count({ where: { id_produto: id } }),
       client.itemNotaEntrada.count({ where: { id_produto: id } }),
       client.itemPedidoEscola.count({ where: { id_produto: id } }),
-      client.itemColeta.count({ where: { estoque: { id_produto: id } } }),
-      client.movimentacaoEstoque.count({ where: { estoque: { id_produto: id } } }),
+      client.itemColeta.count({ where: { id_produto: id } }),
+      client.movimentacaoEstoque.count({ where: { id_produto: id } }),
       client.produtoInsumo.count({ where: { id_produto_filho: id } }),
     ]);
 
     const vinculos: string[] = [];
-    if (estoque > 0) vinculos.push(`${estoque} registro(s) de estoque`);
+    if (Number(produto?.saldo ?? 0) !== 0 || Number(produto?.saldo_reservado ?? 0) !== 0) {
+      vinculos.push("saldo de estoque");
+    }
     if (itensNotaSaida > 0) vinculos.push(`${itensNotaSaida} item(ns) de nota de saída`);
     if (itensNotaEntrada > 0) vinculos.push(`${itensNotaEntrada} item(ns) de nota de entrada`);
     if (itensPedido > 0) vinculos.push(`${itensPedido} pedido(s) de escola`);

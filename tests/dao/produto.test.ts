@@ -31,15 +31,14 @@ describe("produtoDAO", () => {
       expect(busca.data[0]?.descricao).toBe("Feijão");
     });
 
-    it("inclui conversão padrão e apenas estoques ativos", async () => {
+    it("inclui conversão padrão e o saldo do produto", async () => {
       const produto = await criarProduto();
       await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
       await criarEstoque(produto.id_produto, { quantidadeAtual: 99, ativo: false });
 
       const resultado = await produtoDAO.list({});
 
-      expect(resultado.data[0]?.estoques).toHaveLength(1);
-      expect(resultado.data[0]?.estoques[0]?.quantidade_atual).toBe(10);
+      expect(resultado.data[0]?.saldo).toBe(10);
       expect(resultado.data[0]).not.toHaveProperty("conversaoPadrao");
     });
 
@@ -126,9 +125,8 @@ describe("produtoDAO", () => {
       const resultado = await produtoDAO.searchPriorizadoComEstoque("ABC");
 
       expect(resultado).toHaveLength(1);
-      expect(resultado[0]?.estoques).toEqual([
-        { quantidade_atual: 8, saldo_reservado: 2 },
-      ]);
+      expect(resultado[0]?.saldo).toBe(8);
+      expect(resultado[0]?.saldo_reservado).toBe(2);
     });
 
     it("devolve a linha sem unidade, com os saldos do produto", async () => {
@@ -156,7 +154,7 @@ describe("produtoDAO", () => {
   });
 
   describe("getById", () => {
-    it("inclui conversão, códigos com tipo, estoques ativos e insumos", async () => {
+    it("inclui conversão, códigos com tipo, saldo e insumos", async () => {
       const tipo = await criarTipoCodigo("DIGITACAO");
       const pai = await criarProduto({ descricao: "Composto", composto: true });
       const filho = await criarProduto({ descricao: "Insumo" });
@@ -172,7 +170,7 @@ describe("produtoDAO", () => {
       const encontrado = await produtoDAO.getById(pai.id_produto);
 
       expect(encontrado?.produtoCodigos[0]?.tipoCodigo.nome).toBe("DIGITACAO");
-      expect(encontrado?.estoques).toHaveLength(1);
+      expect(encontrado?.saldo).toBe(1);
       expect(encontrado?.insumosPai).toHaveLength(1);
       expect(encontrado?.insumosPai[0]?.produtoFilho.descricao).toBe("Insumo");
     });
@@ -332,7 +330,7 @@ describe("produtoDAO", () => {
       const resultado = await produtoDAO.verificarRelacionamentos(produto.id_produto);
 
       expect(resultado.podeExcluir).toBe(false);
-      expect(resultado.vinculos.join(" | ")).toContain("registro(s) de estoque");
+      expect(resultado.vinculos.join(" | ")).toContain("saldo de estoque");
       expect(resultado.vinculos.join(" | ")).toContain("item(ns) de nota de entrada");
       expect(resultado.vinculos.join(" | ")).toContain("insumo");
     });

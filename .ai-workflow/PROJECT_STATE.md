@@ -1,93 +1,71 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-10-26 (revamp da tela de permissões; notas guardam apenas os
-> totais; conversão é auxílio de lançamento).
+> Última consolidação: 2026-10-26 (estoque achatado no produto; inventário na sequência).
 
 ## Objetivo atual
 
 **Concluir a entrega final do Nexus para a FAETEC 2026.** A `main` local está à frente de
-`origin/main` (`fff7076`) com o mural/validades/gráficos (`dc24eca`), os ajustes de
-unidades (`30ba95a`), a remoção da conversão das notas (`3b1a767`) e, nesta rodada, o
-revamp da tela de permissões. A produção está **parada** (3001) e o `nexus_prod` ainda
-precisa da release, do backfill e do `db push`.
+`origin/main` (`fff7076`) com mural/validades/gráficos (`dc24eca`), ajustes de unidades
+(`30ba95a`), notas só com totais (`3b1a767`), revamp de permissões (`be58c0c`) e, nesta
+rodada, o achatamento do estoque em `produto`. A produção está **parada** (3001); falta a
+release, o backfill de produção e o inventário (RF015).
 
 ## Entregue nesta rodada (working tree; commit pendente)
 
-1. **Nota de entrada sem conversão:** `item_nota_entrada` não tem mais
-   `fator_conversao`/`quantidade_convertida`; `quantidade` é o **total** que entra no
-   estoque. A criação usa a conversão padrão/fator só como auxílio para calcular o total;
-   a edição usa o total guardado. Backfill `quantidade = quantidade_convertida` feito no
-   dev antes do drop.
-2. **Nota de saída sem conversão:** `item_nota_saida` não tem mais `unidade_saida`,
-   `fator_conversao` nem `quantidade_solicitada`; guarda só `qtd_esperada` (solicitado) e
-   `qtd_entregue` (entregue). A criação da Remessa usa a unidade de saída/fator do produto
-   só para calcular o total; a edição usa o total.
-3. **Visualizações limpas:** entrada, saída e expedição mostram apenas quantidades/totais;
-   sem unidade, fator, “base” ou “convertida”. `src/lib/expedicao-unidade.ts` removido.
-4. **Produto/tabela de conversão:** `id_conversao_padrao`/`id_conversao_saida` e
-   `conversao_unidade` continuam como padrões auxiliares de lançamento; nada é copiado
-   para a nota.
-5. **Docs:** `ENTENDIMENTO`, `REQUISITOS_FUNCIONAIS`, `IMPLEMENTACAO`, `REGRAS_NEGOCIO`,
-   `AGENTS.md`, diagramas e `CHANGELOG` (`[Unreleased]`) atualizados para “nota só totais;
-   conversão é auxílio”; o backfill está registrado no CHANGELOG.
-6. **Testes:** **422/422**; lint, build e `figma:check` verdes (developer); revisão
-   independente confirmou criação/edição/estoque/reserva/baixa e apontou o gate de
-   migração de produção.
-7. **Revamp da tela de permissões (working tree):** `PermissoesPanel` virou lista única
-   de grupos com toggles, busca, contagem e expansão; `Switch` acessível; `PerfilForm`
-   com Nome/Descrição acima e permissões em largura total; título do modal por modo;
-   `UsuarioForm` com o novo painel e “Aplicar perfil”; `data-figma`/`origem.ts`;
-   `CHANGELOG`. Sem mudança de backend/permissões. Perfil/usuário, Super Admin, busca,
-   grupo parcial e salvamento conferidos; gates verdes.
-
-## Estado verificado
-
-- **Git:** `main` em `3b1a767` (notas) + working tree do revamp de permissões;
-  `origin/main` em `fff7076`; tags `v3.24.10.2026` e `v4.24.10.2026`; nada empurrado.
-- **Banco dev (`nexus`):** `db push` aplicado após backfill das 2 linhas de entrada; a
-  `UNIDADE` padrão está em `id_conversao = 1`. `nexus_test` sincronizado; 422 testes.
-- **Produção:** worktree em `c1d2f8c` (3.24.10.2026), servidor 3001 parado; `nexus_prod`
-  sem as colunas novas e sem backfill.
-
-## Gates de produção (antes do deploy)
-
-1. **Backfill da entrada:** antes do `db push` que remove
-   `fator_conversao`/`quantidade_convertida`, rodar
-   `UPDATE item_nota_entrada SET quantidade = quantidade_convertida WHERE quantidade <> quantidade_convertida;`
-   e conferir a contagem. Sem isso, notas antigas passam a exibir/editar a quantidade
-   digitada como total e o delta corrompe o estoque.
-2. **UNIDADE padrão:** conferir que `conversao_unidade` tem a UNIDADE (`padrao = true`) e
-   que os defaults `1` de `id_conversao_padrao`/`id_conversao_saida` apontam para ela;
-   se necessário, fazer o backfill para o id correto (no dev era 4 e foi renumerado para 1).
-3. O `db push` de produção é destrutivo; exige backup e consentimento explícito.
+1. **Estoque achatado em `produto`:** `Produto.saldo` e `Produto.saldo_reservado`
+   (`FLOAT NOT NULL DEFAULT 0`); model/tabela `Estoque` eliminados.
+2. **FKs por produto:** `item_nota_saida`, `reserva_estoque`, `movimentacao_estoque`,
+   `item_coleta`, `item_inventario` e `ajuste_inventario` referenciam `ID_produto`; nenhum
+   `ID_estoque`/`data_entrada`/`estoque.ativo` restante.
+3. **Operações:** `SaldoDAO`/`saldoDAO` no produto; entrada, reserva, liberação, ajuste,
+   baixa, baixa direta e movimentação com transação, `saldo_anterior`/`saldo_posterior` e
+   RN001 preservada. Produto, dashboard, relatórios, saída, expedição e coleta leem o
+   produto, sem unidade.
+4. **Migração dev:** 7 linhas antigas (5 ativas) consolidadas; 9 produtos preservados,
+   4 zerados; 12 movimentações, 11 reservas e 12 itens remapeados sem divergência. Backup
+   em `%TEMP%/opencode/nexus-backup-run80.json`. Saldo do dev: −18 (já existente) e
+   reservado 514.
+5. **Docs:** `ENTENDIMENTO`, `REGRAS_NEGOCIO`, `REQUISITOS_FUNCIONAIS`, `IMPLEMENTACAO`,
+   `AGENTS.md`, diagramas e `CHANGELOG` atualizados; `docs/README` com 48 entidades.
+6. **Testes/validação:** 422/422; lint, build e `figma:check` verdes; QA aprovou com
+   ressalvas não bloqueantes; reviewer sem bloqueante no código.
 
 ## Pendências reais
 
-1. **Commit e release** — commitar o revamp de permissões e publicar a próxima release
-   no dia 26/10, `1.26.10.2026` (tag `v1.26.10.2026`); exige aprovação do usuário.
-2. **Produção** — backup, os dois gates acima, `db push`, atualizar a worktree, build/start
-   e smoke. Servidor 3001 parado.
-3. **Escopo restante para 100%** — RF015 (inventário), RF020 (fotos), RF024/XLSX e partes
-   de RF019/RF021; sem decisão do usuário.
-4. **Jira** — KAN-140/KAN-156/KAN-157/KAN-144 e worklogs, com texto aprovado.
-5. **Manual/apresentação** — KAN-149/150/151/152.
+1. **Commit e release** — commitar o achatamento e publicar a próxima release no dia
+   26/10, `1.26.10.2026` (tag `v1.26.10.2026`); exige aprovação do usuário.
+2. **Script/backfill de produção** — versionar o backfill (somas das linhas ativas,
+   remapeamento `ID_estoque`→`ID_produto`, detecção de produto ativo só com linha inativa
+   e nota ativa em linha inativa, dump/backup) antes do `db push` no `nexus_prod`.
+3. **Inventário (RF015)** — próximo run, com as decisões do usuário:
+   - por produto, sem lote; `ItemInventario`/`AjusteInventario` por `ID_produto`;
+   - `ABERTO → EM_CONTAGEM → AGUARDANDO_APROVACAO → FINALIZADO` + `CANCELADO`;
+   - editável/excluível até a primeira contagem; depois só cancelar (sem hard delete);
+   - uma contagem por funcionário/item; item não contado bloqueia a finalização;
+   - contagem cega unificada com `estoque.ver_saldo`; `inventario.ver_contagem_cega` sai;
+   - `AjusteInventario` sem `diferenca`, com `quantidade_contada`, `origem`
+     (`MEDIA`/`CONTAGEM`) e `id_contagem_inventario`; ajuste só com diferença;
+   - `MovimentacaoEstoque.id_ajuste_inventario`; bloqueio por produto;
+   - lista de contagem impressa (campos em branco; quantidades do sistema opcionais;
+     emissor/data; sem assinatura); nome = observação;
+   - relatório CSV+PDF do inventário fechado; auditoria rica; consulta após fechado;
+     sem exclusão após contagem.
+4. **Escopo restante para 100%** — RF020 (fotos), RF024/XLSX e partes de RF019/RF021.
+5. **Jira/manual** — KAN-140/156/157/144, worklogs e KAN-149/150/151/152.
 
 ## Próximas ações
 
-1. Commitar o revamp de permissões (KAN-137, módulo de usuários/perfis).
-2. Aprovar a release `1.26.10.2026` + push.
-3. Preparar a produção com os dois gates e o `db push`.
-4. Decidir o escopo restante e atualizar manual/apresentação/Jira.
+1. Commitar o achatamento e o script de backfill de produção.
+2. Implementar o inventário (`RUN-20261026-81`).
+3. Aprovar a release `1.26.10.2026` + push e preparar a produção.
+4. Fechar o escopo restante/manual/Jira.
 
 ## Histórico recente
 
-- **2026-10-26** — revamp da tela de permissões: toggles em lista, busca, grupos
-  expansíveis, `Switch` acessível, títulos por modo no perfil e novo painel no usuário.
-- **2026-10-25** — notas guardam apenas os totais; conversão é auxílio de lançamento;
-  422 testes; docs; gate de backfill de produção.
-- **2026-10-25** — ajustes de unidades, unidade de saída na Remessa e dashboard sem
-  unidade (`30ba95a`); 422 testes.
-- **2026-10-25** — mural, validades, sino e gráficos (`dc24eca`); 416 testes.
-- **2026-10-24** — releases `3.24.10.2026` e `4.24.10.2026`.
-- Runs: `.ai-workflow/runs/` (01–78).
+- **2026-10-26** — estoque achatado em `produto` (`saldo`/`saldo_reservado`), FKs por
+  produto, migração dev; 422 testes; docs.
+- **2026-10-26** — revamp da tela de permissões (`be58c0c`).
+- **2026-10-25** — notas guardam apenas os totais (`3b1a767`); unidades e unidade de saída
+  (`30ba95a`); mural/validades/gráficos (`dc24eca`).
+- Runs: `.ai-workflow/runs/` (01–80).

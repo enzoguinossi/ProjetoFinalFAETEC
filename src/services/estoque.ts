@@ -1,11 +1,11 @@
-import { estoqueDAO } from "@/dao";
+import { saldoDAO } from "@/dao";
 
 export class EstoqueService {
   /**
    * RN001 — Alerta de saldo insuficiente (não bloqueia)
    */
   async verificarDisponibilidade(id_produto: number, quantidade: number) {
-    const saldo = await estoqueDAO.getSaldoDisponivel(id_produto);
+    const saldo = await saldoDAO.getSaldoDisponivel(id_produto);
     return {
       suficiente: saldo.saldo_disponivel >= quantidade,
       saldo_disponivel: saldo.saldo_disponivel,

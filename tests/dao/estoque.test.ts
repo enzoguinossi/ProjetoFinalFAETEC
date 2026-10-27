@@ -1,28 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { estoqueDAO } from "@/dao/estoque";
+import { saldoDAO } from "@/dao/estoque";
 import { criarEstoque, criarProduto, criarUsuario } from "../helpers/factories";
 import { prismaTeste } from "../helpers/prisma";
 
-describe("estoqueDAO", () => {
-  describe("list", () => {
-    it("pagina, filtra por produto e ignora estoques inativos", async () => {
-      const produtoA = await criarProduto();
-      const produtoB = await criarProduto();
-      await criarEstoque(produtoA.id_produto, { quantidadeAtual: 10 });
-      await criarEstoque(produtoA.id_produto, { quantidadeAtual: 5, ativo: false });
-      await criarEstoque(produtoB.id_produto, { quantidadeAtual: 7 });
-
-      const doA = await estoqueDAO.list({ id_produto: produtoA.id_produto });
-      expect(doA.total).toBe(1);
-      expect(doA.data[0]?.quantidade_atual).toBe(10);
-
-      const todos = await estoqueDAO.list({ page: 1, limit: 2 });
-      expect(todos.total).toBe(2);
-      expect(todos.totalPages).toBe(1);
-      expect(todos.data[0]?.produto.descricao).toBeDefined();
-    });
-  });
-
+describe("saldoDAO", () => {
   describe("getSaldoDisponivel", () => {
     it("soma quantidade e reserva dos estoques ativos", async () => {
       const produto = await criarProduto();
@@ -30,13 +11,49 @@ describe("estoqueDAO", () => {
       await criarEstoque(produto.id_produto, { quantidadeAtual: 5, saldoReservado: 2 });
       await criarEstoque(produto.id_produto, { quantidadeAtual: 100, ativo: false });
 
-      const saldo = await estoqueDAO.getSaldoDisponivel(produto.id_produto);
+      const saldo = await saldoDAO.getSaldoDisponivel(produto.id_produto);
 
       expect(saldo).toEqual({
-        quantidade_atual: 15,
+        saldo: 15,
         saldo_reservado: 5,
         saldo_disponivel: 10,
       });
+    });
+  });
+
+  describe("produto consolidado (backfill)", () => {
+    it("mantém saldo somado, reserva e movimentações ligadas ao produto", async () => {
+      const { usuario } = await criarUsuario();
+      const produto = await criarProduto({ descricao: "Consolidado" });
+      await prismaTeste.produto.update({
+        where: { id_produto: produto.id_produto },
+        data: { saldo: 15, saldo_reservado: 5 },
+      });
+      await prismaTeste.movimentacaoEstoque.create({
+        data: {
+          id_produto: produto.id_produto,
+          id_usuario: usuario.id_usuario,
+          quantidade: 15,
+          saldo_anterior: 0,
+          saldo_posterior: 15,
+          data_hora: new Date(),
+        },
+      });
+
+      const saldo = await saldoDAO.getSaldoDisponivel(produto.id_produto);
+      expect(saldo).toEqual({ saldo: 15, saldo_reservado: 5, saldo_disponivel: 10 });
+
+      const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
+        where: { id_produto: produto.id_produto },
+      });
+      expect(movimentacao.id_produto).toBe(produto.id_produto);
+
+      const semLinha = await criarProduto({ descricao: "Sem histórico" });
+      const produtoSemLinha = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: semLinha.id_produto },
+      });
+      expect(produtoSemLinha.saldo).toBe(0);
+      expect(produtoSemLinha.saldo_reservado).toBe(0);
     });
   });
 
@@ -46,15 +63,15 @@ describe("estoqueDAO", () => {
       const produto = await criarProduto();
       const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
 
-      await estoqueDAO.movimentar(estoque.id_estoque, usuario.id_usuario, 5, "Entrada teste");
+      await saldoDAO.movimentar(estoque.id_produto, usuario.id_usuario, 5, "Entrada teste");
 
-      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-        where: { id_estoque: estoque.id_estoque },
+      const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
       });
-      expect(estoqueApos.quantidade_atual).toBe(15);
+      expect(estoqueApos.saldo).toBe(15);
 
       const movimentacoes = await prismaTeste.movimentacaoEstoque.findMany({
-        where: { id_estoque: estoque.id_estoque },
+        where: { id_produto: estoque.id_produto },
       });
       expect(movimentacoes).toHaveLength(1);
       expect(movimentacoes[0]).toMatchObject({
@@ -71,12 +88,12 @@ describe("estoqueDAO", () => {
       const produto = await criarProduto();
       const estoque = await criarEstoque(produto.id_produto, { quantidadeAtual: 10 });
 
-      await estoqueDAO.movimentar(estoque.id_estoque, usuario.id_usuario, -4);
+      await saldoDAO.movimentar(estoque.id_produto, usuario.id_usuario, -4);
 
-      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-        where: { id_estoque: estoque.id_estoque },
+      const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
       });
-      expect(estoqueApos.quantidade_atual).toBe(6);
+      expect(estoqueApos.saldo).toBe(6);
     });
   });
 });

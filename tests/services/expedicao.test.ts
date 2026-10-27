@@ -47,7 +47,7 @@ async function criarNota(
 
   await criarItemNotaSaida(
     nota.id_nota_saida,
-    estoque.id_estoque,
+    estoque.id_produto,
     opts.esperada ?? 10,
   );
 
@@ -131,7 +131,7 @@ async function montarEntregaEmPercurso(
     });
     const item = await criarItemNotaSaida(
       nota.id_nota_saida,
-      estoque.id_estoque,
+      estoque.id_produto,
       quantidade,
     );
 
@@ -796,7 +796,7 @@ describe("expedicaoService", () => {
 });
 
 describe("expedicaoService — execução da entrega", () => {
-  it("entrega total dá baixa em quantidade_atual e saldo_reservado, com movimentação negativa", async () => {
+  it("entrega total dá baixa em saldo e saldo_reservado, com movimentação negativa", async () => {
     const ctx = await montarEntregaEmPercurso([10]);
 
     const resultado = await expedicaoService.registrarEntrega(
@@ -809,10 +809,10 @@ describe("expedicaoService — execução da entrega", () => {
 
     expect(resultado.entrega.status).toBe("BAIXA_TOTAL");
 
-    const estoque = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[0]!.id_estoque },
+    const estoque = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(90);
+    expect(estoque.saldo).toBe(90);
     expect(estoque.saldo_reservado).toBe(0);
 
     const movimentacoes = await prismaTeste.movimentacaoEstoque.findMany({
@@ -858,10 +858,10 @@ describe("expedicaoService — execução da entrega", () => {
 
     expect(resultado.entrega.status).toBe("BAIXA_PARCIAL");
 
-    const estoque = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[0]!.id_estoque },
+    const estoque = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(94);
+    expect(estoque.saldo).toBe(94);
     expect(estoque.saldo_reservado).toBe(4);
 
     const item = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
@@ -895,20 +895,20 @@ describe("expedicaoService — execução da entrega", () => {
 
     expect(resultado.entrega.status).toBe("BAIXA_COM_CORTE");
 
-    const primeiro = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[0]!.id_estoque },
+    const primeiro = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
     });
-    expect(primeiro.quantidade_atual).toBe(94);
+    expect(primeiro.saldo).toBe(94);
     expect(primeiro.saldo_reservado).toBe(0);
 
-    const segundo = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[1]!.id_estoque },
+    const segundo = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[1]!.id_produto },
     });
-    expect(segundo.quantidade_atual).toBe(80);
+    expect(segundo.saldo).toBe(80);
     expect(segundo.saldo_reservado).toBe(0);
 
     // O corte do restante do primeiro item gera reserva negativa, sem baixa de
-    // quantidade_atual.
+    // saldo.
     const liberacoes = await prismaTeste.reservaEstoque.findMany({
       where: { id_nota_saida: ctx.nota.id_nota_saida },
     });
@@ -940,10 +940,10 @@ describe("expedicaoService — execução da entrega", () => {
     });
     expect(nota.status).toBe("PENDENTE");
 
-    const estoque = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[0]!.id_estoque },
+    const estoque = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(100);
+    expect(estoque.saldo).toBe(100);
     expect(estoque.saldo_reservado).toBe(10);
 
     expect(
@@ -963,7 +963,7 @@ describe("expedicaoService — execução da entrega", () => {
       saldoReservado: 5,
     });
     const notaLivre = await criarNotaSaida();
-    await criarItemNotaSaida(notaLivre.id_nota_saida, estoque.id_estoque, 5);
+    await criarItemNotaSaida(notaLivre.id_nota_saida, estoque.id_produto, 5);
     await prismaTeste.expedicaoNota.create({
       data: {
         id_expedicao: ctx.expedicao.id_expedicao,
@@ -1045,10 +1045,10 @@ describe("expedicaoService — execução da entrega", () => {
     );
     expect("error" in segunda).toBe(true);
 
-    const estoque = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: ctx.estoques[0]!.id_estoque },
+    const estoque = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(90);
+    expect(estoque.saldo).toBe(90);
     expect(estoque.saldo_reservado).toBe(0);
     expect(
       await prismaTeste.movimentacaoEstoque.count({
@@ -1057,7 +1057,7 @@ describe("expedicaoService — execução da entrega", () => {
     ).toBe(1);
   });
 
-  it("não bloqueia por quantidade_atual insuficiente, mas aborta se a reserva não cobre", async () => {
+  it("não bloqueia por saldo insuficiente, mas aborta se a reserva não cobre", async () => {
     // RN001: divergência de inventário não impede registrar uma entrega real.
     const divergente = await montarEntregaEmPercurso([10], {
       quantidadeAtual: 2,
@@ -1071,10 +1071,10 @@ describe("expedicaoService — execução da entrega", () => {
     );
     if ("error" in entrega) throw new Error(entrega.error);
 
-    const estoqueDivergente = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: divergente.estoques[0]!.id_estoque },
+    const estoqueDivergente = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: divergente.estoques[0]!.id_produto },
     });
-    expect(estoqueDivergente.quantidade_atual).toBe(-8);
+    expect(estoqueDivergente.saldo).toBe(-8);
     expect(estoqueDivergente.saldo_reservado).toBe(0);
 
     // Reserva menor que o entregue: transação abortada, nada muda.
@@ -1093,10 +1093,10 @@ describe("expedicaoService — execução da entrega", () => {
       expect(recusada.error).toContain("Saldo reservado insuficiente");
     }
 
-    const estoqueSemReserva = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: semReserva.estoques[0]!.id_estoque },
+    const estoqueSemReserva = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: semReserva.estoques[0]!.id_produto },
     });
-    expect(estoqueSemReserva.quantidade_atual).toBe(100);
+    expect(estoqueSemReserva.saldo).toBe(100);
     expect(estoqueSemReserva.saldo_reservado).toBe(4);
 
     const nota = await prismaTeste.notaSaida.findUniqueOrThrow({

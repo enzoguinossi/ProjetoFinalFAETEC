@@ -5,7 +5,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
-import { estoqueDAO } from "./estoque";
+import { saldoDAO } from "./estoque";
 import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
@@ -58,9 +58,7 @@ const includeNotas = {
           itens: {
             orderBy: { id_item_nota_saida: "asc" as const },
             include: {
-              estoque: {
-                select: { produto: { select: { descricao: true } } },
-              },
+              produto: { select: { descricao: true } },
             },
           },
         },
@@ -280,18 +278,18 @@ async function finalizarNota(
   // Aborta antes de mexer em qualquer saldo se a reserva não cobre o que será
   // entregue/cortado — `saldo_reservado` nunca pode ficar negativo.
   const saldosAnteriores: {
-    id_estoque: number;
-    quantidade_atual: number;
+    id_produto: number;
+    saldo: number;
     saldo_reservado: number;
   }[] = [];
 
   for (const item of plano) {
-    const estoque = await tx.estoque.findUnique({
-      where: { id_estoque: item.item.id_estoque },
+    const produto = await tx.produto.findUnique({
+      where: { id_produto: item.item.id_produto },
     });
-    if (!estoque) throw new Error("Estoque do item não encontrado.");
+    if (!produto) throw new Error("Produto do item não encontrado.");
 
-    const saldoReservado = Number(estoque.saldo_reservado);
+    const saldoReservado = Number(produto.saldo_reservado);
     if (saldoReservado < item.delta + item.restante) {
       throw new Error(
         "Saldo reservado insuficiente para registrar a entrega.",
@@ -299,8 +297,8 @@ async function finalizarNota(
     }
 
     saldosAnteriores.push({
-      id_estoque: item.item.id_estoque,
-      quantidade_atual: Number(estoque.quantidade_atual),
+      id_produto: item.item.id_produto,
+      saldo: Number(produto.saldo),
       saldo_reservado: saldoReservado,
     });
   }
@@ -317,14 +315,14 @@ async function finalizarNota(
 
   const movimentacoes: {
     id_movimentacao: number;
-    id_estoque: number;
+    id_produto: number;
     quantidade: number;
     saldo_anterior: number;
     saldo_posterior: number;
   }[] = [];
   const reservasLiberadas: {
     id_reserva_estoque: number;
-    id_estoque: number;
+    id_produto: number;
     quantidade: number;
     saldo_anterior: number;
     saldo_posterior: number;
@@ -332,9 +330,9 @@ async function finalizarNota(
 
   for (const item of plano) {
     if (item.delta > 0) {
-      const baixa = await estoqueDAO.baixar(
+      const baixa = await saldoDAO.baixar(
         {
-          id_estoque: item.item.id_estoque,
+          id_produto: item.item.id_produto,
           id_nota_saida,
           id_usuario,
           quantidade: item.delta,
@@ -344,7 +342,7 @@ async function finalizarNota(
       );
       movimentacoes.push({
         id_movimentacao: baixa.movimentacao.id_movimentacao,
-        id_estoque: item.item.id_estoque,
+        id_produto: item.item.id_produto,
         quantidade: Number(baixa.movimentacao.quantidade),
         saldo_anterior: baixa.saldo_anterior,
         saldo_posterior: baixa.saldo_posterior,
@@ -352,9 +350,9 @@ async function finalizarNota(
     }
 
     if (item.restante > 0) {
-      const liberacao = await estoqueDAO.liberarReserva(
+      const liberacao = await saldoDAO.liberarReserva(
         {
-          id_estoque: item.item.id_estoque,
+          id_produto: item.item.id_produto,
           id_nota_saida,
           id_usuario,
           quantidade: item.restante,
@@ -364,7 +362,7 @@ async function finalizarNota(
       );
       reservasLiberadas.push({
         id_reserva_estoque: liberacao.reserva.id_reserva_estoque,
-        id_estoque: item.item.id_estoque,
+        id_produto: item.item.id_produto,
         quantidade: Number(liberacao.reserva.quantidade),
         saldo_anterior: liberacao.saldo_anterior,
         saldo_posterior: liberacao.saldo_posterior,
@@ -380,18 +378,18 @@ async function finalizarNota(
   }
 
   const saldosPosteriores: {
-    id_estoque: number;
-    quantidade_atual: number;
+    id_produto: number;
+    saldo: number;
     saldo_reservado: number;
   }[] = [];
   for (const item of plano) {
-    const estoque = await tx.estoque.findUniqueOrThrow({
-      where: { id_estoque: item.item.id_estoque },
+    const produto = await tx.produto.findUniqueOrThrow({
+      where: { id_produto: item.item.id_produto },
     });
     saldosPosteriores.push({
-      id_estoque: item.item.id_estoque,
-      quantidade_atual: Number(estoque.quantidade_atual),
-      saldo_reservado: Number(estoque.saldo_reservado),
+      id_produto: item.item.id_produto,
+      saldo: Number(produto.saldo),
+      saldo_reservado: Number(produto.saldo_reservado),
     });
   }
 
@@ -407,7 +405,7 @@ async function finalizarNota(
       cortar_restante,
       itens: plano.map((item) => ({
         id_item_nota_saida: item.item.id_item_nota_saida,
-        id_estoque: item.item.id_estoque,
+        id_produto: item.item.id_produto,
         qtd_esperada: item.esperada,
         qtd_entregue: item.atual,
       })),
@@ -420,7 +418,7 @@ async function finalizarNota(
       cortar_restante,
       itens: plano.map((item) => ({
         id_item_nota_saida: item.item.id_item_nota_saida,
-        id_estoque: item.item.id_estoque,
+        id_produto: item.item.id_produto,
         qtd_esperada: item.esperada,
         qtd_entregue: item.nova,
       })),
@@ -1051,7 +1049,7 @@ export class ExpedicaoDAO {
 
   /**
    * Registra a entrega de uma nota em `EM_PERCURSO`: dá baixa do entregue
-   * (`quantidade_atual` e `saldo_reservado` pelo delta), libera a reserva do
+   * (`saldo` e `saldo_reservado` pelo delta), libera a reserva do
    * restante no corte, atualiza `qtd_entregue` e o status da nota, com
    * auditoria `NotaSaida`/`ALTERAR`. Tudo em transação única.
    */

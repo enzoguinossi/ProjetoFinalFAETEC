@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { buildPagination, type PaginationParams } from "@/types";
-import { estoqueDAO } from "./estoque";
+import { saldoDAO } from "./estoque";
 
 export type NotaSaidaItemCriacao = {
   id_produto: number;
@@ -71,7 +71,6 @@ function snapshotNotaSaida(
   },
   itens: {
     id_item_nota_saida?: number | null;
-    id_estoque: number;
     id_produto: number;
     quantidade_solicitada: number;
     quantidade_entregue?: number;
@@ -86,7 +85,6 @@ function snapshotNotaSaida(
     status: nota.status,
     itens: itens.map((item) => ({
       id_item_nota_saida: item.id_item_nota_saida,
-      id_estoque: item.id_estoque,
       id_produto: item.id_produto,
       quantidade_solicitada: item.quantidade_solicitada,
       quantidade_entregue: item.quantidade_entregue ?? null,
@@ -123,15 +121,14 @@ async function saldoDisponivelNoCliente(
   client: Prisma.TransactionClient,
   id_produto: number,
 ) {
-  const linha = await client.estoque.findFirst({
-    where: { id_produto, ativo: true },
-    orderBy: { id_estoque: "asc" },
-    include: { produto: { select: { descricao: true } } },
+  const produto = await client.produto.findUnique({
+    where: { id_produto },
+    select: { saldo: true, saldo_reservado: true, descricao: true },
   });
-  if (!linha) return { disponivel: 0, descricao: null as string | null };
+  if (!produto) return { disponivel: 0, descricao: null as string | null };
   return {
-    disponivel: Number(linha.quantidade_atual) - Number(linha.saldo_reservado),
-    descricao: linha.produto.descricao,
+    disponivel: Number(produto.saldo) - Number(produto.saldo_reservado),
+    descricao: produto.descricao,
   };
 }
 
@@ -155,14 +152,10 @@ export class NotaSaidaDAO {
           },
           itens: {
             include: {
-              estoque: {
-                include: {
-                  produto: {
-                    select: {
-                      id_produto: true,
-                      descricao: true,
-                    },
-                  },
+              produto: {
+                select: {
+                  id_produto: true,
+                  descricao: true,
                 },
               },
             },
@@ -215,21 +208,20 @@ export class NotaSaidaDAO {
 
       const itensGravados: {
         id_item_nota_saida: number;
-        id_estoque: number;
         id_produto: number;
         quantidade_solicitada: number;
         quantidade_entregue: number;
       }[] = [];
       const reservasGravadas: {
         id_reserva_estoque: number;
-        id_estoque: number;
+        id_produto: number;
         quantidade: number;
         saldo_anterior: number;
         saldo_posterior: number;
       }[] = [];
       const movimentacoesGravadas: {
         id_movimentacao: number;
-        id_estoque: number;
+        id_produto: number;
         quantidade: number;
         saldo_anterior: number;
         saldo_posterior: number;
@@ -250,7 +242,7 @@ export class NotaSaidaDAO {
             );
           }
 
-          const reserva = await estoqueDAO.reservar(
+          const reserva = await saldoDAO.reservar(
             {
               id_produto: item.id_produto,
               id_nota_saida: nota.id_nota_saida,
@@ -264,27 +256,26 @@ export class NotaSaidaDAO {
           const itemCriado = await tx.itemNotaSaida.create({
             data: {
               id_nota_saida: nota.id_nota_saida,
-              id_estoque: reserva.estoque.id_estoque,
+              id_produto: item.id_produto,
               qtd_esperada: quantidadeBase,
             },
           });
 
           itensGravados.push({
             id_item_nota_saida: itemCriado.id_item_nota_saida,
-            id_estoque: reserva.estoque.id_estoque,
             id_produto: item.id_produto,
             quantidade_solicitada: quantidadeBase,
             quantidade_entregue: Number(itemCriado.qtd_entregue),
           });
           reservasGravadas.push({
             id_reserva_estoque: reserva.reserva.id_reserva_estoque,
-            id_estoque: reserva.estoque.id_estoque,
+            id_produto: item.id_produto,
             quantidade: quantidadeBase,
             saldo_anterior: reserva.saldo_anterior,
             saldo_posterior: reserva.saldo_posterior,
           });
         } else {
-          const baixa = await estoqueDAO.baixarDireto(
+          const baixa = await saldoDAO.baixarDireto(
             {
               id_produto: item.id_produto,
               id_nota_saida: nota.id_nota_saida,
@@ -306,7 +297,7 @@ export class NotaSaidaDAO {
           const itemCriado = await tx.itemNotaSaida.create({
             data: {
               id_nota_saida: nota.id_nota_saida,
-              id_estoque: baixa.estoque.id_estoque,
+              id_produto: item.id_produto,
               qtd_esperada: item.quantidade_solicitada,
               qtd_entregue: item.quantidade_solicitada,
             },
@@ -314,14 +305,13 @@ export class NotaSaidaDAO {
 
           itensGravados.push({
             id_item_nota_saida: itemCriado.id_item_nota_saida,
-            id_estoque: baixa.estoque.id_estoque,
             id_produto: item.id_produto,
             quantidade_solicitada: item.quantidade_solicitada,
             quantidade_entregue: item.quantidade_solicitada,
           });
           movimentacoesGravadas.push({
             id_movimentacao: baixa.movimentacao.id_movimentacao,
-            id_estoque: baixa.estoque.id_estoque,
+            id_produto: item.id_produto,
             quantidade: Number(baixa.movimentacao.quantidade),
             saldo_anterior: baixa.saldo_anterior,
             saldo_posterior: baixa.saldo_posterior,
@@ -369,14 +359,10 @@ export class NotaSaidaDAO {
         },
         itens: {
           include: {
-            estoque: {
-              include: {
-                produto: {
-                  select: {
-                    id_produto: true,
-                    descricao: true,
-                  },
-                },
+            produto: {
+              select: {
+                id_produto: true,
+                descricao: true,
               },
             },
           },
@@ -403,8 +389,8 @@ export class NotaSaidaDAO {
         include: {
           itens: {
             include: {
-              estoque: {
-                select: { id_estoque: true, id_produto: true, saldo_reservado: true },
+              produto: {
+                select: { id_produto: true, saldo_reservado: true },
               },
             },
             orderBy: { id_item_nota_saida: "asc" },
@@ -453,13 +439,12 @@ export class NotaSaidaDAO {
 
       const itensGravados: {
         id_item_nota_saida: number;
-        id_estoque: number;
         id_produto: number;
         quantidade_solicitada: number;
       }[] = [];
       const ajustesReserva: {
         id_item_nota_saida: number | null;
-        id_estoque: number;
+        id_produto: number;
         delta: number;
         saldo_anterior: number;
         saldo_posterior: number;
@@ -476,9 +461,9 @@ export class NotaSaidaDAO {
           const quantidadeBase = item.quantidade_solicitada;
           const delta = quantidadeBase - Number(anterior.qtd_esperada);
           if (delta !== 0) {
-            const ajuste = await estoqueDAO.ajustarReserva(
+            const ajuste = await saldoDAO.ajustarReserva(
               {
-                id_estoque: anterior.id_estoque,
+                id_produto: anterior.produto.id_produto,
                 id_nota_saida: id,
                 id_usuario,
                 quantidade: delta,
@@ -488,7 +473,7 @@ export class NotaSaidaDAO {
             );
             ajustesReserva.push({
               id_item_nota_saida: anterior.id_item_nota_saida,
-              id_estoque: anterior.id_estoque,
+              id_produto: anterior.produto.id_produto,
               delta,
               saldo_anterior: ajuste.saldo_anterior,
               saldo_posterior: ajuste.saldo_posterior,
@@ -502,15 +487,14 @@ export class NotaSaidaDAO {
 
           itensGravados.push({
             id_item_nota_saida: anterior.id_item_nota_saida,
-            id_estoque: anterior.id_estoque,
-            id_produto: anterior.estoque.id_produto,
+            id_produto: anterior.produto.id_produto,
             quantidade_solicitada: quantidadeBase,
           });
         } else {
           const fator = await fatorSaidaDoProduto(tx, item.id_produto);
           const quantidadeBase = item.quantidade_solicitada * fator;
 
-          const reserva = await estoqueDAO.reservar(
+          const reserva = await saldoDAO.reservar(
             {
               id_produto: item.id_produto,
               id_nota_saida: id,
@@ -524,20 +508,19 @@ export class NotaSaidaDAO {
           const criado = await tx.itemNotaSaida.create({
             data: {
               id_nota_saida: id,
-              id_estoque: reserva.estoque.id_estoque,
+              id_produto: item.id_produto,
               qtd_esperada: quantidadeBase,
             },
           });
 
           itensGravados.push({
             id_item_nota_saida: criado.id_item_nota_saida,
-            id_estoque: reserva.estoque.id_estoque,
             id_produto: item.id_produto,
             quantidade_solicitada: quantidadeBase,
           });
           ajustesReserva.push({
             id_item_nota_saida: criado.id_item_nota_saida,
-            id_estoque: reserva.estoque.id_estoque,
+            id_produto: item.id_produto,
             delta: quantidadeBase,
             saldo_anterior: reserva.saldo_anterior,
             saldo_posterior: reserva.saldo_posterior,
@@ -554,8 +537,7 @@ export class NotaSaidaDAO {
           atual,
           atual.itens.map((item) => ({
             id_item_nota_saida: item.id_item_nota_saida,
-            id_estoque: item.id_estoque,
-            id_produto: item.estoque.id_produto,
+            id_produto: item.produto.id_produto,
             quantidade_solicitada: Number(item.qtd_esperada),
             quantidade_entregue: Number(item.qtd_entregue),
           })),
@@ -621,16 +603,16 @@ export class NotaSaidaDAO {
       const reservasLiberadas: {
         id_reserva_estoque: number;
         id_item_nota_saida: number;
-        id_estoque: number;
+        id_produto: number;
         quantidade: number;
         saldo_anterior: number;
         saldo_posterior: number;
       }[] = [];
 
       for (const item of nota.itens) {
-        const liberacao = await estoqueDAO.liberarReserva(
+        const liberacao = await saldoDAO.liberarReserva(
           {
-            id_estoque: item.id_estoque,
+            id_produto: item.id_produto,
             id_nota_saida,
             id_usuario,
             quantidade: Number(item.qtd_esperada),
@@ -642,7 +624,7 @@ export class NotaSaidaDAO {
         reservasLiberadas.push({
           id_reserva_estoque: liberacao.reserva.id_reserva_estoque,
           id_item_nota_saida: item.id_item_nota_saida,
-          id_estoque: item.id_estoque,
+          id_produto: item.id_produto,
           quantidade: Number(liberacao.reserva.quantidade),
           saldo_anterior: liberacao.saldo_anterior,
           saldo_posterior: liberacao.saldo_posterior,
@@ -659,7 +641,7 @@ export class NotaSaidaDAO {
           status: nota.status,
           itens: nota.itens.map((item) => ({
             id_item_nota_saida: item.id_item_nota_saida,
-            id_estoque: item.id_estoque,
+            id_produto: item.id_produto,
             qtd_esperada: Number(item.qtd_esperada),
           })),
         },

@@ -94,29 +94,29 @@ describe("relatorioDAO", () => {
       const entrada = await criarNotaEntrada();
       const saida = await criarNotaSaida();
 
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 10, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 10, {
         dataHora: new Date("2026-10-01T12:00:00.000Z"),
         saldoAnterior: 0,
         saldoPosterior: 10,
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -4, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -4, {
         dataHora: new Date("2026-10-15T12:00:00.000Z"),
         saldoAnterior: 10,
         saldoPosterior: 6,
         idNotaSaida: saida.id_nota_saida,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 2, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 2, {
         dataHora: new Date("2026-10-20T12:00:00.000Z"),
         saldoAnterior: 6,
         saldoPosterior: 8,
         observacao: "Ajuste de inventário",
       });
       // Fora do período: um segundo antes do início e um segundo depois do fim.
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 99, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 99, {
         dataHora: new Date("2026-09-30T23:59:59.000Z"),
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 99, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 99, {
         dataHora: new Date("2026-11-01T00:00:00.000Z"),
       });
 
@@ -160,11 +160,11 @@ describe("relatorioDAO", () => {
       const entrada = await criarNotaEntrada(fornecedor.id_fornecedor);
       const saida = await criarNotaSaida({ idDestinatario: destinatario.id_destinatario });
 
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 10, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 10, {
         dataHora: new Date("2026-10-01T12:00:00.000Z"),
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -4, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -4, {
         dataHora: new Date("2026-10-02T12:00:00.000Z"),
         idNotaSaida: saida.id_nota_saida,
       });
@@ -193,19 +193,19 @@ describe("relatorioDAO", () => {
         idDestinatario: escolaB.destinatario.id_destinatario,
       });
 
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 10, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 10, {
         dataHora: new Date("2026-10-01T12:00:00.000Z"),
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -4, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -4, {
         dataHora: new Date("2026-10-02T12:00:00.000Z"),
         idNotaSaida: saidaA.id_nota_saida,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -2, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -2, {
         dataHora: new Date("2026-10-03T12:00:00.000Z"),
         idNotaSaida: saidaB.id_nota_saida,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 1, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 1, {
         dataHora: new Date("2026-10-04T12:00:00.000Z"),
       });
 
@@ -272,10 +272,10 @@ describe("relatorioDAO", () => {
       const estoqueArroz = await criarEstoque(arroz.id_produto);
       const estoqueFeijao = await criarEstoque(feijao.id_produto);
 
-      await criarMovimentacao(estoqueArroz.id_estoque, usuario.id_usuario, 5, {
+      await criarMovimentacao(estoqueArroz.id_produto, usuario.id_usuario, 5, {
         dataHora: new Date("2026-10-02T12:00:00.000Z"),
       });
-      await criarMovimentacao(estoqueFeijao.id_estoque, usuario.id_usuario, 7, {
+      await criarMovimentacao(estoqueFeijao.id_produto, usuario.id_usuario, 7, {
         dataHora: new Date("2026-10-03T12:00:00.000Z"),
       });
 
@@ -309,15 +309,15 @@ describe("relatorioDAO", () => {
         idDestinatario: escolaB.destinatario.id_destinatario,
       });
 
-      await criarMovimentacao(estoqueArroz.id_estoque, usuario.id_usuario, -2, {
+      await criarMovimentacao(estoqueArroz.id_produto, usuario.id_usuario, -2, {
         dataHora: new Date("2026-10-02T12:00:00.000Z"),
         idNotaSaida: saidaA.id_nota_saida,
       });
-      await criarMovimentacao(estoqueFeijao.id_estoque, usuario.id_usuario, -3, {
+      await criarMovimentacao(estoqueFeijao.id_produto, usuario.id_usuario, -3, {
         dataHora: new Date("2026-10-03T12:00:00.000Z"),
         idNotaSaida: saidaB.id_nota_saida,
       });
-      await criarMovimentacao(estoqueAcucar.id_estoque, usuario.id_usuario, -5, {
+      await criarMovimentacao(estoqueAcucar.id_produto, usuario.id_usuario, -5, {
         dataHora: new Date("2026-10-04T12:00:00.000Z"),
         idNotaSaida: saidaA.id_nota_saida,
       });
@@ -349,15 +349,15 @@ describe("relatorioDAO", () => {
       const entrada = await criarNotaEntrada();
       const saida = await criarNotaSaida();
 
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 10, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 10, {
         dataHora: new Date("2026-10-01T12:00:00.000Z"),
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -3, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -3, {
         dataHora: new Date("2026-10-02T12:00:00.000Z"),
         idNotaSaida: saida.id_nota_saida,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 1, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 1, {
         dataHora: new Date("2026-10-03T12:00:00.000Z"),
       });
 
@@ -413,7 +413,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaA.id_nota_saida,
-          id_estoque: estoque.id_estoque,
+          id_produto: estoque.id_produto,
           qtd_esperada: 10,
           qtd_entregue: 8,
         },
@@ -421,7 +421,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaB.id_nota_saida,
-          id_estoque: estoque.id_estoque,
+          id_produto: estoque.id_produto,
           qtd_esperada: 5,
           qtd_entregue: 2,
         },
@@ -653,7 +653,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaA.id_nota_saida,
-          id_estoque: estoque.id_estoque,
+          id_produto: estoque.id_produto,
           qtd_esperada: 10,
           qtd_entregue: 6,
         },
@@ -661,7 +661,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaA.id_nota_saida,
-          id_estoque: estoque.id_estoque,
+          id_produto: estoque.id_produto,
           qtd_esperada: 5,
           qtd_entregue: 0,
         },
@@ -669,7 +669,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaB.id_nota_saida,
-          id_estoque: estoque.id_estoque,
+          id_produto: estoque.id_produto,
           qtd_esperada: 4,
           qtd_entregue: 4,
         },

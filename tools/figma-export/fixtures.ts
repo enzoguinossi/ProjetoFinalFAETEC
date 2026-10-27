@@ -64,7 +64,6 @@ async function limpar() {
   await prisma.funcionario.deleteMany();
   await prisma.pessoaFisica.deleteMany();
 
-  await prisma.estoque.deleteMany();
   await prisma.produtoInsumo.deleteMany();
   await prisma.produtoCodigo.deleteMany();
   await prisma.produto.deleteMany();
@@ -355,19 +354,13 @@ async function main() {
         perecivel: p.perecivel,
         id_conversao_padrao: porNomeConversao[p.conversao] ?? conversaoPadrao,
         id_conversao_saida: porNomeConversao[p.conversao] ?? conversaoPadrao,
+        saldo: p.quantidade,
+        saldo_reservado: p.reservado,
         data_validade: p.validade ? new Date(p.validade) : null,
       },
     });
     await prisma.produtoCodigo.create({
       data: { id_produto: produto.id_produto, id_tipo_codigo: tipos.EAN13, codigo: p.codigo },
-    });
-    await prisma.estoque.create({
-      data: {
-        id_produto: produto.id_produto,
-        quantidade_atual: p.quantidade,
-        saldo_reservado: p.reservado,
-        data_entrada: new Date("2026-02-10"),
-      },
     });
   }
   console.log(`  ✅ ${produtos.length} produtos com estoque`);

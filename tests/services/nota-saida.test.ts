@@ -132,13 +132,13 @@ describe("notaSaidaService.registrar", () => {
     });
     expect(nota.itens).toHaveLength(1);
     expect(nota.itens[0]).toMatchObject({
-      id_estoque: estoque.id_estoque,
+      id_produto: estoque.id_produto,
       qtd_esperada: 3,
     });
 
     expect(nota.reservas).toHaveLength(1);
     expect(nota.reservas[0]).toMatchObject({
-      id_estoque: estoque.id_estoque,
+      id_produto: estoque.id_produto,
       id_nota_saida: nota.id_nota_saida,
       id_usuario: usuario.id_usuario,
       quantidade: 3,
@@ -146,11 +146,11 @@ describe("notaSaidaService.registrar", () => {
       saldo_posterior: 5,
     });
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(5);
-    expect(estoqueApos.quantidade_atual).toBe(10);
+    expect(estoqueApos.saldo).toBe(10);
   });
 
   it("RN001: grava mesmo acima do saldo disponível e devolve o aviso", async () => {
@@ -173,14 +173,14 @@ describe("notaSaidaService.registrar", () => {
     expect(resultado.aviso).toContain("Saldo insuficiente");
     expect(await prismaTeste.notaSaida.count()).toBe(1);
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(5);
-    expect(Number(estoqueApos.quantidade_atual) - Number(estoqueApos.saldo_reservado)).toBe(-3);
+    expect(Number(estoqueApos.saldo) - Number(estoqueApos.saldo_reservado)).toBe(-3);
   });
 
-  it("cria a linha de estoque com quantidade_atual 0 quando o produto não tem estoque", async () => {
+  it("cria a linha de estoque com saldo 0 quando o produto não tem estoque", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const { destinatario } = await criarDestinatario();
@@ -195,20 +195,16 @@ describe("notaSaidaService.registrar", () => {
     );
     expect("error" in resultado).toBe(false);
 
-    const linhas = await prismaTeste.estoque.findMany({
+    const linhas = await prismaTeste.produto.findMany({
       where: { id_produto: produto.id_produto },
     });
     expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toMatchObject({ quantidade_atual: 0, saldo_reservado: 4, ativo: true });
+    expect(linhas[0]).toMatchObject({ saldo: 0, saldo_reservado: 4, ativo: true });
   });
 
-  it("reativa a linha inativa do produto em vez de criar outra", async () => {
+  it("reserva no produto mesmo sem saldo prévio", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
-    const inativa = await criarEstoque(produto.id_produto, {
-      quantidadeAtual: 8,
-      ativo: false,
-    });
     const { destinatario } = await criarDestinatario();
 
     const resultado = await notaSaidaService.registrar(
@@ -221,14 +217,13 @@ describe("notaSaidaService.registrar", () => {
     );
     expect("error" in resultado).toBe(false);
 
-    const linhas = await prismaTeste.estoque.findMany({
+    const linha = await prismaTeste.produto.findUniqueOrThrow({
       where: { id_produto: produto.id_produto },
     });
-    expect(linhas).toHaveLength(1);
-    expect(linhas[0]).toMatchObject({
-      id_estoque: inativa.id_estoque,
+    expect(linha).toMatchObject({
+      id_produto: produto.id_produto,
       ativo: true,
-      quantidade_atual: 8,
+      saldo: 0,
       saldo_reservado: 2,
     });
   });
@@ -307,7 +302,6 @@ describe("notaSaidaService.registrar", () => {
     expect(await prismaTeste.notaSaida.count()).toBe(0);
     expect(await prismaTeste.itemNotaSaida.count()).toBe(0);
     expect(await prismaTeste.reservaEstoque.count()).toBe(0);
-    expect(await prismaTeste.estoque.count()).toBe(0);
     expect(await prismaTeste.registroAuditoria.count({ where: { entidade: "NotaSaida" } })).toBe(0);
   });
 });
@@ -342,11 +336,11 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       qtd_entregue: 0,
     });
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(100);
-    expect(estoqueApos.quantidade_atual).toBe(200);
+    expect(estoqueApos.saldo).toBe(200);
   });
 
   it("aviso RN001 mostra o total e o fator auxiliar", async () => {
@@ -426,8 +420,8 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       qtd_esperada: 40,
     });
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(150);
   });
@@ -456,10 +450,10 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
       qtd_entregue: 4,
     });
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
-    expect(estoqueApos.quantidade_atual).toBe(16);
+    expect(estoqueApos.saldo).toBe(16);
   });
 
   it("nota antiga cai no total guardado e não exibe unidade", async () => {
@@ -475,7 +469,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
     const item = await prismaTeste.itemNotaSaida.create({
       data: {
         id_nota_saida: nota.id_nota_saida,
-        id_estoque: estoque.id_estoque,
+        id_produto: estoque.id_produto,
         qtd_esperada: 3,
         qtd_entregue: 3,
       },
@@ -483,7 +477,7 @@ describe("nota de saída com unidade de saída (Remessa)", () => {
 
     const detalhe = itemSaidaDetalhe({
       ...item,
-      estoque: { produto: { id_produto: produto.id_produto, descricao: produto.descricao } },
+      produto: { id_produto: produto.id_produto, descricao: produto.descricao },
     });
 
     expect(detalhe).toMatchObject({
@@ -508,7 +502,7 @@ describe("notaSaidaService.atualizar", () => {
     });
     const item = await criarItemNotaSaida(
       nota.id_nota_saida,
-      estoque.id_estoque,
+      estoque.id_produto,
       3,
     );
 
@@ -535,8 +529,8 @@ describe("notaSaidaService.atualizar", () => {
       qtd_esperada: 2,
     });
 
-    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueDepois.saldo_reservado).toBe(2);
   });
@@ -565,8 +559,8 @@ describe("notaSaidaService.atualizar", () => {
 
     expect("error" in resultado).toBe(false);
 
-    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueDepois.saldo_reservado).toBe(10);
 
@@ -581,7 +575,7 @@ describe("notaSaidaService.atualizar", () => {
     });
     expect(reservas).toHaveLength(2);
     expect(reservas[1]).toMatchObject({
-      id_estoque: estoque.id_estoque,
+      id_produto: estoque.id_produto,
       id_nota_saida: notaId,
       id_usuario: usuario.id_usuario,
       quantidade: 5,
@@ -628,8 +622,8 @@ describe("notaSaidaService.atualizar", () => {
 
     expect("error" in resultado).toBe(false);
 
-    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueDepois.saldo_reservado).toBe(3);
 
@@ -680,14 +674,14 @@ describe("notaSaidaService.atualizar", () => {
     });
     expect(itens).toHaveLength(2);
 
-    const estoqueB = await prismaTeste.estoque.findFirstOrThrow({
+    const estoqueB = await prismaTeste.produto.findFirstOrThrow({
       where: { id_produto: produtoB.id_produto },
     });
     expect(estoqueB.saldo_reservado).toBe(4);
-    expect(itens[1]?.id_estoque).toBe(estoqueB.id_estoque);
+    expect(itens[1]?.id_produto).toBe(estoqueB.id_produto);
 
     const reservaB = await prismaTeste.reservaEstoque.findFirstOrThrow({
-      where: { id_estoque: estoqueB.id_estoque },
+      where: { id_produto: estoqueB.id_produto },
     });
     expect(reservaB).toMatchObject({
       id_nota_saida: notaId,
@@ -699,7 +693,7 @@ describe("notaSaidaService.atualizar", () => {
 
     // O item original não foi tocado: nenhuma reserva de ajuste para ele.
     const reservasA = await prismaTeste.reservaEstoque.findMany({
-      where: { id_estoque: estoque.id_estoque },
+      where: { id_produto: estoque.id_produto },
     });
     expect(reservasA).toHaveLength(1);
   });
@@ -733,8 +727,8 @@ describe("notaSaidaService.atualizar", () => {
       expect("error" in resultado).toBe(true);
       if ("error" in resultado) expect(resultado.error).toContain("não pode ser editada");
 
-      const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
-        where: { id_estoque: estoque.id_estoque },
+      const estoqueDepois = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
       });
       expect(estoqueDepois.saldo_reservado).toBe(5);
 
@@ -845,8 +839,8 @@ describe("notaSaidaService.atualizar", () => {
       ),
     ).rejects.toThrow();
 
-    const estoqueDepois = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueDepois.saldo_reservado).toBe(5);
 
@@ -869,11 +863,11 @@ describe("notaSaidaService.cancelar", () => {
 
     expect("error" in cancelamento).toBe(false);
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(2);
-    expect(estoqueApos.quantidade_atual).toBe(10);
+    expect(estoqueApos.saldo).toBe(10);
 
     const reservas = await prismaTeste.reservaEstoque.findMany({
       where: { id_nota_saida: notaId },
@@ -881,7 +875,7 @@ describe("notaSaidaService.cancelar", () => {
     });
     expect(reservas).toHaveLength(2);
     expect(reservas[1]).toMatchObject({
-      id_estoque: estoque.id_estoque,
+      id_produto: estoque.id_produto,
       id_nota_saida: notaId,
       id_usuario: usuario.id_usuario,
       quantidade: -3,
@@ -919,8 +913,8 @@ describe("notaSaidaService.cancelar", () => {
     expect("error" in segundo).toBe(true);
     if ("error" in segundo) expect(segundo.error).toContain("já está cancelada");
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
     expect(estoqueApos.saldo_reservado).toBe(2);
 
@@ -949,8 +943,8 @@ describe("notaSaidaService.cancelar", () => {
       });
       expect(notaApos.status).toBe(status);
 
-      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-        where: { id_estoque: estoque.id_estoque },
+      const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
       });
       expect(estoqueApos.saldo_reservado).toBe(5);
 
@@ -1031,23 +1025,23 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
       expect(nota.reservas).toHaveLength(0);
       expect(nota.itens).toHaveLength(1);
       expect(nota.itens[0]).toMatchObject({
-        id_estoque: estoque.id_estoque,
+        id_produto: estoque.id_produto,
         qtd_esperada: 4,
         qtd_entregue: 4,
       });
       expect(nota.movimentacoes).toHaveLength(1);
       expect(nota.movimentacoes[0]).toMatchObject({
-        id_estoque: estoque.id_estoque,
+        id_produto: estoque.id_produto,
         id_nota_saida: nota.id_nota_saida,
         quantidade: -4,
         saldo_anterior: 10,
         saldo_posterior: 6,
       });
 
-      const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-        where: { id_estoque: estoque.id_estoque },
+      const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
       });
-      expect(estoqueApos.quantidade_atual).toBe(6);
+      expect(estoqueApos.saldo).toBe(6);
       expect(estoqueApos.saldo_reservado).toBe(2);
 
       const auditorias = await auditoriasDe("NotaSaida", nota.id_nota_saida);
@@ -1059,7 +1053,6 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
         id_destinatario: null,
         itens: [
           {
-            id_estoque: estoque.id_estoque,
             id_produto: produto.id_produto,
             quantidade_solicitada: 4,
             quantidade_entregue: 4,
@@ -1067,7 +1060,7 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
         ],
         movimentacoes: [
           {
-            id_estoque: estoque.id_estoque,
+            id_produto: estoque.id_produto,
             quantidade: -4,
             saldo_anterior: 10,
             saldo_posterior: 6,
@@ -1077,7 +1070,7 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
     },
   );
 
-  it("RN001: avaria acima do saldo avisa e grava com quantidade_atual negativa", async () => {
+  it("RN001: avaria acima do saldo avisa e grava com saldo negativa", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
     const estoque = await criarEstoque(produto.id_produto, {
@@ -1097,10 +1090,10 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
     if ("error" in resultado) return;
     expect(resultado.aviso).toContain("Saldo insuficiente");
 
-    const estoqueApos = await prismaTeste.estoque.findUniqueOrThrow({
-      where: { id_estoque: estoque.id_estoque },
+    const estoqueApos = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
     });
-    expect(estoqueApos.quantidade_atual).toBe(-3);
+    expect(estoqueApos.saldo).toBe(-3);
     expect(estoqueApos.saldo_reservado).toBe(1);
 
     const movimentacao = await prismaTeste.movimentacaoEstoque.findFirstOrThrow({
@@ -1138,23 +1131,28 @@ describe("saída sem remessa (avaria e consumo interno)", () => {
     expect(await prismaTeste.notaSaida.count()).toBe(0);
   });
 
-  it("desfaz tudo quando o produto não tem estoque ativo", async () => {
+  it("RN001: Avaria sem saldo avisa e grava com saldo negativo", async () => {
     const { usuario } = await criarUsuario();
     const produto = await criarProduto();
 
-    await expect(
-      notaSaidaService.registrar(
-        {
-          tipo: "CONSUMO_INTERNO",
-          itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
-        },
-        usuario.id_usuario,
-      ),
-    ).rejects.toThrow(/estoque ativo/);
+    const resultado = await notaSaidaService.registrar(
+      {
+        tipo: "CONSUMO_INTERNO",
+        itens: [{ id_produto: produto.id_produto, quantidade_solicitada: 2 }],
+      },
+      usuario.id_usuario,
+    );
+    expect("error" in resultado).toBe(false);
+    if ("error" in resultado) return;
+    expect(resultado.aviso).toContain("Saldo insuficiente");
 
-    expect(await prismaTeste.notaSaida.count()).toBe(0);
-    expect(await prismaTeste.itemNotaSaida.count()).toBe(0);
-    expect(await prismaTeste.movimentacaoEstoque.count()).toBe(0);
+    const produtoDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: produto.id_produto },
+    });
+    expect(produtoDepois.saldo).toBe(-2);
+    expect(await prismaTeste.notaSaida.count()).toBe(1);
+    expect(await prismaTeste.itemNotaSaida.count()).toBe(1);
+    expect(await prismaTeste.movimentacaoEstoque.count()).toBe(1);
   });
 
   it("lista todos os tipos ativos com o tipo no retorno", async () => {

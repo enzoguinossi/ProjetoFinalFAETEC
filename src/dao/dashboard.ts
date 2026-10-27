@@ -82,25 +82,19 @@ const VAZIO: DashboardResumo = {
 };
 
 export class DashboardDAO {
-  /** Soma de `quantidade_atual` dos estoques ativos. */
+  /** Soma de `saldo` e contagem de produtos ativos com saldo. */
   async resumoEstoque(): Promise<DashboardEstoque> {
-    const [soma, porProduto] = await Promise.all([
-      prisma.estoque.aggregate({
+    const [soma, comSaldo] = await Promise.all([
+      prisma.produto.aggregate({
         where: { ativo: true },
-        _sum: { quantidade_atual: true },
+        _sum: { saldo: true },
       }),
-      prisma.estoque.groupBy({
-        by: ["id_produto"],
-        where: { ativo: true },
-        _sum: { quantidade_atual: true },
-      }),
+      prisma.produto.count({ where: { ativo: true, saldo: { gt: 0 } } }),
     ]);
 
     return {
-      itens: arredondar(soma._sum.quantidade_atual ?? 0),
-      produtosComSaldo: porProduto.filter(
-        (linha) => (linha._sum.quantidade_atual ?? 0) > 0,
-      ).length,
+      itens: arredondar(soma._sum.saldo ?? 0),
+      produtosComSaldo: comSaldo,
     };
   }
 
@@ -168,41 +162,20 @@ export class DashboardDAO {
     };
   }
 
-  /** Top 5 produtos por quantidade atual. */
+  /** Top 5 produtos por saldo atual. */
   async topProdutos(): Promise<DashboardTopProduto[]> {
-    const grupos = await prisma.estoque.groupBy({
-      by: ["id_produto"],
-      where: { ativo: true },
-      _sum: { quantidade_atual: true },
-      orderBy: { _sum: { quantidade_atual: "desc" } },
+    const produtos = await prisma.produto.findMany({
+      where: { ativo: true, saldo: { gt: 0 } },
+      select: { id_produto: true, descricao: true, saldo: true },
+      orderBy: [{ saldo: "desc" }, { descricao: "asc" }],
       take: 5,
     });
 
-    const comSaldo = grupos.filter(
-      (grupo) => (grupo._sum.quantidade_atual ?? 0) > 0,
-    );
-    if (comSaldo.length === 0) return [];
-
-    const produtos = await prisma.produto.findMany({
-      where: { id_produto: { in: comSaldo.map((grupo) => grupo.id_produto) } },
-      select: {
-        id_produto: true,
-        descricao: true,
-      },
-    });
-    const porId = new Map(produtos.map((produto) => [produto.id_produto, produto]));
-
-    return comSaldo.flatMap((grupo) => {
-      const produto = porId.get(grupo.id_produto);
-      if (!produto) return [];
-      return [
-        {
-          id_produto: produto.id_produto,
-          descricao: produto.descricao,
-          quantidade: arredondar(grupo._sum.quantidade_atual ?? 0),
-        },
-      ];
-    });
+    return produtos.map((produto) => ({
+      id_produto: produto.id_produto,
+      descricao: produto.descricao,
+      quantidade: arredondar(Number(produto.saldo)),
+    }));
   }
 
   /** Notas de saída por status, com os rótulos legíveis e a ordem do domínio. */

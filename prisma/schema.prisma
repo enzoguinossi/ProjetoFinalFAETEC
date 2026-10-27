@@ -294,10 +294,17 @@ model Produto {
   data_validade       DateTime?          @map("data_validade") @db.Date
   id_conversao_padrao Int                @default(1) @map("ID_conversao_padrao")
   id_conversao_saida  Int                @default(1) @map("ID_conversao_saida")
+  saldo               Float              @default(0) @map("saldo")
+  saldo_reservado     Float              @default(0) @map("saldo_reservado")
   ativo               Boolean            @default(true) @map("ativo")
-  estoques            Estoque[]
   itensNotaEntrada    ItemNotaEntrada[]
+  itensNotaSaida      ItemNotaSaida[]
   itensPedido         ItemPedidoEscola[]
+  reservas            ReservaEstoque[]
+  movimentacoes       MovimentacaoEstoque[]
+  itensColeta         ItemColeta[]
+  itensInventario     ItemInventario[]
+  ajustesInventario   AjusteInventario[]
   conversaoPadrao     ConversaoUnidade   @relation("produto_conversao_entrada", fields: [id_conversao_padrao], references: [id_conversao])
   conversaoSaida      ConversaoUnidade   @relation("produto_conversao_saida", fields: [id_conversao_saida], references: [id_conversao])
   produtoCodigos      ProdutoCodigo[]
@@ -323,28 +330,9 @@ model ProdutoInsumo {
   @@map("produto_insumo")
 }
 
-model Estoque {
-  id_estoque        Int                   @id @default(autoincrement()) @map("ID_estoque")
-  id_produto        Int                   @map("ID_produto")
-  quantidade_atual  Float                 @map("quantidade_atual")
-  saldo_reservado   Float                 @default(0) @map("saldo_reservado")
-  data_entrada      DateTime              @map("data_entrada") @db.Date
-  ativo             Boolean               @default(true) @map("ativo")
-  ajustesInventario AjusteInventario[]
-  produto           Produto               @relation(fields: [id_produto], references: [id_produto])
-  itensColeta       ItemColeta[]
-  itensInventario   ItemInventario[]
-  itensNotaSaida    ItemNotaSaida[]
-  movimentacoes     MovimentacaoEstoque[]
-  reservas          ReservaEstoque[]
-
-  @@index([id_produto], map: "estoque_ID_produto_fkey")
-  @@map("estoque")
-}
-
 model MovimentacaoEstoque {
   id_movimentacao Int          @id @default(autoincrement()) @map("ID_movimentacao")
-  id_estoque      Int          @map("ID_estoque")
+  id_produto      Int          @map("ID_produto")
   id_usuario      Int          @map("ID_usuario")
   quantidade      Float        @map("quantidade")
   saldo_anterior  Float?       @map("saldo_anterior")
@@ -353,12 +341,12 @@ model MovimentacaoEstoque {
   id_nota_entrada Int?         @map("ID_nota_entrada")
   data_hora       DateTime     @map("data_hora") @db.Timestamp(0)
   observacao      String?      @map("observacao") @db.Text
-  estoque         Estoque      @relation(fields: [id_estoque], references: [id_estoque])
+  produto         Produto      @relation(fields: [id_produto], references: [id_produto])
   notaEntrada     NotaEntrada? @relation(fields: [id_nota_entrada], references: [id_nota_entrada])
   notaSaida       NotaSaida?   @relation(fields: [id_nota_saida], references: [id_nota_saida])
   usuario         Usuario      @relation(fields: [id_usuario], references: [id_usuario])
 
-  @@index([id_estoque], map: "movimentacao_estoque_ID_estoque_fkey")
+  @@index([id_produto], map: "movimentacao_estoque_ID_produto_fkey")
   @@index([id_nota_entrada], map: "movimentacao_estoque_ID_nota_entrada_fkey")
   @@index([id_nota_saida], map: "movimentacao_estoque_ID_nota_saida_fkey")
   @@index([id_usuario], map: "movimentacao_estoque_ID_usuario_fkey")
@@ -367,7 +355,7 @@ model MovimentacaoEstoque {
 
 model ReservaEstoque {
   id_reserva_estoque Int       @id @default(autoincrement()) @map("ID_reserva_estoque")
-  id_estoque         Int       @map("ID_estoque")
+  id_produto         Int       @map("ID_produto")
   id_nota_saida      Int       @map("ID_nota_saida")
   id_usuario         Int       @map("ID_usuario")
   quantidade         Float     @map("quantidade")
@@ -375,11 +363,11 @@ model ReservaEstoque {
   saldo_posterior    Float?    @map("saldo_posterior")
   data_hora          DateTime  @map("data_hora") @db.Timestamp(0)
   observacao         String?   @map("observacao") @db.Text
-  estoque            Estoque   @relation(fields: [id_estoque], references: [id_estoque])
+  produto            Produto   @relation(fields: [id_produto], references: [id_produto])
   notaSaida          NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
   usuario            Usuario   @relation(fields: [id_usuario], references: [id_usuario])
 
-  @@index([id_estoque], map: "reserva_estoque_ID_estoque_fkey")
+  @@index([id_produto], map: "reserva_estoque_ID_produto_fkey")
   @@index([id_nota_saida], map: "reserva_estoque_ID_nota_saida_fkey")
   @@index([id_usuario], map: "reserva_estoque_ID_usuario_fkey")
   @@map("reserva_estoque")
@@ -407,14 +395,14 @@ model Inventario {
 model ItemInventario {
   id_item_inventario Int                  @id @default(autoincrement()) @map("ID_item_inventario")
   id_inventario      Int                  @map("ID_inventario")
-  id_estoque         Int                  @map("ID_estoque")
+  id_produto         Int                  @map("ID_produto")
   quantidade_sistema Float                @map("quantidade_sistema")
   observacao         String?              @map("observacao") @db.Text
   contagens          ContagemInventario[]
-  estoque            Estoque              @relation(fields: [id_estoque], references: [id_estoque])
+  produto            Produto              @relation(fields: [id_produto], references: [id_produto])
   inventario         Inventario           @relation(fields: [id_inventario], references: [id_inventario])
 
-  @@index([id_estoque], map: "item_inventario_ID_estoque_fkey")
+  @@index([id_produto], map: "item_inventario_ID_produto_fkey")
   @@index([id_inventario], map: "item_inventario_ID_inventario_fkey")
   @@map("item_inventario")
 }
@@ -437,17 +425,17 @@ model ContagemInventario {
 model AjusteInventario {
   id_ajuste_inventario Int          @id @default(autoincrement()) @map("ID_ajuste_inventario")
   id_inventario        Int          @map("ID_inventario")
-  id_estoque           Int          @map("ID_estoque")
+  id_produto           Int          @map("ID_produto")
   diferenca            Float        @map("diferenca")
   status               StatusAjuste @map("status")
   id_usuario_aprovacao Int?         @map("ID_usuario_aprovacao")
   data_aprovacao       DateTime?    @map("data_aprovacao") @db.Timestamp(0)
   justificativa        String?      @map("justificativa") @db.Text
-  estoque              Estoque      @relation(fields: [id_estoque], references: [id_estoque])
+  produto              Produto      @relation(fields: [id_produto], references: [id_produto])
   inventario           Inventario   @relation(fields: [id_inventario], references: [id_inventario])
   usuarioAprovacao     Usuario?     @relation("ajuste_usuario_aprovacao", fields: [id_usuario_aprovacao], references: [id_usuario])
 
-  @@index([id_estoque], map: "ajuste_inventario_ID_estoque_fkey")
+  @@index([id_produto], map: "ajuste_inventario_ID_produto_fkey")
   @@index([id_inventario], map: "ajuste_inventario_ID_inventario_fkey")
   @@index([id_usuario_aprovacao], map: "ajuste_inventario_ID_usuario_aprovacao_fkey")
   @@map("ajuste_inventario")
@@ -509,14 +497,14 @@ model NotaSaida {
 model ItemNotaSaida {
   id_item_nota_saida Int       @id @default(autoincrement()) @map("ID_item_nota_saida")
   id_nota_saida      Int       @map("ID_nota_saida")
-  id_estoque         Int       @map("ID_estoque")
+  id_produto         Int       @map("ID_produto")
   qtd_esperada       Float     @map("qtd_esperada")
   qtd_entregue       Float     @default(0) @map("qtd_entregue")
   observacao         String?   @map("observacao") @db.Text
-  estoque            Estoque   @relation(fields: [id_estoque], references: [id_estoque])
+  produto            Produto   @relation(fields: [id_produto], references: [id_produto])
   notaSaida          NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
 
-  @@index([id_estoque], map: "item_nota_saida_ID_estoque_fkey")
+  @@index([id_produto], map: "item_nota_saida_ID_produto_fkey")
   @@index([id_nota_saida], map: "item_nota_saida_ID_nota_saida_fkey")
   @@map("item_nota_saida")
 }
@@ -539,13 +527,13 @@ model Coleta {
 model ItemColeta {
   id_item_coleta Int     @id @default(autoincrement()) @map("ID_item_coleta")
   id_coleta      Int     @map("ID_coleta")
-  id_estoque     Int     @map("ID_estoque")
+  id_produto     Int     @map("ID_produto")
   quantidade     Float   @map("quantidade")
   coleta         Coleta  @relation(fields: [id_coleta], references: [id_coleta])
-  estoque        Estoque @relation(fields: [id_estoque], references: [id_estoque])
+  produto        Produto @relation(fields: [id_produto], references: [id_produto])
 
   @@index([id_coleta], map: "item_coleta_ID_coleta_fkey")
-  @@index([id_estoque], map: "item_coleta_ID_estoque_fkey")
+  @@index([id_produto], map: "item_coleta_ID_produto_fkey")
   @@map("item_coleta")
 }
 

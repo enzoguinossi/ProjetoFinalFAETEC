@@ -5,12 +5,12 @@ export function itemSaidaDetalhe(item: {
   id_item_nota_saida: number;
   qtd_esperada: number;
   qtd_entregue: number;
-  estoque: { produto: { id_produto: number; descricao: string } };
+  produto: { id_produto: number; descricao: string };
 }): NotaSaidaItemDetalhe {
   return {
     id_item_nota_saida: item.id_item_nota_saida,
-    id_produto: item.estoque.produto.id_produto,
-    descricao: item.estoque.produto.descricao,
+    id_produto: item.produto.id_produto,
+    descricao: item.produto.descricao,
     quantidade_solicitada: Number(item.qtd_esperada),
     quantidade_entregue: Number(item.qtd_entregue),
   };

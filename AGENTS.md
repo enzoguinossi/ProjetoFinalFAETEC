@@ -69,7 +69,7 @@ src/
 └── proxy.ts        # proteção das rotas privadas (sessão)
 
 prisma/
-├── schema.prisma   # modelo físico (52 entidades)
+├── schema.prisma   # modelo físico (48 entidades)
 └── seed.ts         # seed de referência
 
 docs/
@@ -164,6 +164,10 @@ As convenções documentadas são:
 * entidades de cadastro possuem `ativo`;
 * **hard delete é proibido** para entidades de cadastro;
 * desativação deve ser utilizada no lugar de exclusão física.
+* o saldo de estoque **não é entidade própria**: fica em `produto.saldo` e
+  `produto.saldo_reservado` (default `0`). Não existe tabela `estoque`, linha de estoque
+  nem lote; a data de entrada fica no histórico de movimentações e a atividade é
+  `produto.ativo`.
 * **Exceções (sem `ativo`, exclusão física):** `conversao_unidade` e `percurso` são
   excluídos fisicamente e não possuem `ativo`; as demais entidades de cadastro continuam
   com desativação (`ativo = false`). A unidade **padrão** do sistema (UNIDADE/1) é a
@@ -183,48 +187,58 @@ Não introduza uma convenção nova apenas por preferência pessoal.
 
 O estoque é uma área crítica do sistema.
 
-O modelo diferencia:
+**O saldo é do produto.** Não existe tabela `estoque` nem linha de estoque/lote: o saldo
+mora em `produto.saldo` e `produto.saldo_reservado`, ambos `FLOAT NOT NULL DEFAULT 0`.
+Todo produto tem saldo desde a criação (zero). O modelo diferencia:
 
 ```text
-quantidade_atual
-saldo_reservado
+produto.saldo
+produto.saldo_reservado
 saldo_disponivel
 ```
 
 A regra é:
 
 ```text
-saldo_disponivel = quantidade_atual - saldo_reservado
+saldo_disponivel = saldo - saldo_reservado
 ```
 
-Todas as quantidades de estoque — `quantidade_atual`, `saldo_reservado`, movimentação,
-reserva e baixa — estão em **base** (`UNIDADE`, fator 1). A conversão de unidade é **apenas
-auxílio de lançamento**: calcula o total na hora e não é copiada para a nota. Dashboard,
-relatórios, listagens e seletores exibem a quantidade **sem o nome da unidade**.
+Todas as quantidades de estoque — `saldo`, `saldo_reservado`, movimentação, reserva e baixa
+— estão em **base** (`UNIDADE`, fator 1). A conversão de unidade é **apenas auxílio de
+lançamento**: calcula o total na hora e não é copiada para a nota. Dashboard, relatórios,
+listagens e seletores exibem a quantidade **sem o nome da unidade**.
+
+A antiga tabela `estoque` foi achatada em `produto` (RUN-20261026-80): a migração consolidou
+as linhas **ativas** por produto (`saldo = SUM(quantidade_atual)`,
+`saldo_reservado = SUM(saldo_reservado)`), deu zero aos produtos sem linha e remapeou os
+registros históricos de `ID_estoque` para `ID_produto`. `data_entrada` e `estoque.ativo` não
+existem mais; a data fica nas movimentações e a atividade é `produto.ativo`.
 
 ## 8.1 Entrada
 
 Uma entrada confirmada:
 
 ```text
-quantidade_atual += quantidade
+produto.saldo += quantidade
 ```
 
-em que `item_nota_entrada.quantidade` é o **total** que entra no estoque. No item novo, a
+em que `item_nota_entrada.quantidade` é o **total** que entra no saldo. No item novo, a
 Conversão Padrão de Entrada do produto (`ID_conversao_padrao`) e um fator editável na tela
 servem de auxílio para calcular esse total; o item já gravado é editado pelo total guardado.
-A nota não guarda fator nem unidade. Gera também o registro de movimentação de estoque.
+A nota não guarda fator nem unidade. Gera também a `movimentacao_estoque` com `ID_produto`,
+`saldo_anterior` e `saldo_posterior`.
 
 ## 8.2 Reserva (nota de saída Remessa)
 
-Criar uma **nota de saída do tipo Remessa (`SAIDA`) com itens e destinatário** reserva estoque:
+Criar uma **nota de saída do tipo Remessa (`SAIDA`) com itens e destinatário** reserva saldo:
 
 ```text
-saldo_reservado += quantidade
+produto.saldo_reservado += quantidade
 ```
 
-A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa. Criar a
-nota também não representa baixa física definitiva.
+A reserva pertence **à nota de saída** — não existe mais um nível intermediário de remessa
+nem linha de estoque por item (`item_nota_saida` referencia `ID_produto`). Criar a nota também
+não representa baixa física definitiva.
 
 Na Remessa, a Unidade Padrão de Saída do produto (`produto.ID_conversao_saida`) é **auxílio
 do item novo**: a tela mostra unidade e fator e calcula `qtd_esperada = quantidade × fator`.
@@ -233,7 +247,7 @@ unidade, fator ou quantidade “na unidade”. O item já gravado é editado pel
 Reserva, baixa, entrega e pendência usam esses totais.
 
 **Avaria (`AVARIA`) e Consumo Interno (`CONSUMO_INTERNO`)** não são remessa: não têm destinatário,
-**não reservam** e dão **baixa real na criação** (`quantidade_atual -= quantidade`, com movimentação
+**não reservam** e dão **baixa real na criação** (`produto.saldo -= quantidade`, com movimentação
 negativa e `ID_nota_saida`); a nota nasce `BAIXA_TOTAL`, com `qtd_entregue = qtd_esperada`. A
 reserva acima vale apenas para Remessa. Avaria e Consumo Interno digitam o **total** direto, sem
 auxílio de unidade.
@@ -243,7 +257,7 @@ auxílio de unidade.
 O cancelamento da **nota de saída em Remessa** libera a reserva:
 
 ```text
-saldo_reservado -= quantidade
+produto.saldo_reservado -= quantidade
 ```
 
 A nota vai para `CANCELADA` e permanece no histórico (RN004); cancelar de novo é recusado
@@ -255,11 +269,13 @@ são histórico; a correção é uma nota nova.
 A baixa definitiva ocorre quando a entrega da nota é finalizada:
 
 ```text
-quantidade_atual -= quantidade_entregue
-saldo_reservado -= quantidade_entregue
+produto.saldo -= quantidade_entregue
+produto.saldo_reservado -= quantidade_entregue
 ```
 
-Qualquer implementação relacionada a estoque deve preservar essa distinção.
+Qualquer implementação relacionada a estoque deve preservar essa distinção. A baixa não é
+bloqueada por saldo insuficiente (RN001), mas nunca deixa `saldo_reservado` negativo; a
+`movimentacao_estoque` registra o `saldo_anterior`/`saldo_posterior` por `ID_produto`.
 
 ---
 
@@ -432,6 +448,11 @@ entidades de cadastro continuam com desativação.
 
 Históricos operacionais e registros de auditoria devem permanecer preservados.
 
+O saldo não é uma entidade de cadastro e **não tem `ativo`**: `produto.saldo`/
+`produto.saldo_reservado` são valores correntes do produto, e a desativação do produto não
+apaga nem o saldo nem o histórico (`movimentacao_estoque`/`reserva_estoque` continuam por
+`ID_produto`, com `saldo_anterior`/`saldo_posterior`). Não existe mais `estoque.ativo`.
+
 ---
 
 # 14. Entregas e expedições
@@ -461,16 +482,20 @@ a pendência é a própria nota em `BAIXA_PARCIAL` (sem split e sem remessa).
 
 A Remessa usa a **Unidade Padrão de Saída** apenas como auxílio no item novo; a nota guarda
 só `qtd_esperada` e `qtd_entregue` (totais). A expedição, a baixa e a pendência trabalham com
-esses totais e exibem apenas quantidades, sem unidade, fator ou “base”. A entrada segue a
-mesma regra: `quantidade` é o total. Avaria e Consumo Interno digitam o total.
+esses totais e exibem apenas quantidades, sem unidade, fator ou “base”; a reserva e a baixa
+mexem em `produto.saldo_reservado` e `produto.saldo` (o item referencia `ID_produto`, não há
+linha de estoque). A entrada segue a mesma regra: `quantidade` é o total. Avaria e Consumo
+Interno digitam o total.
 
 Não implemente um novo fluxo de entrega sem verificar:
 
+* `produto.saldo` e `produto.saldo_reservado`;
 * `nota_saida`;
-* `item_nota_saida`;
+* `item_nota_saida` (`ID_produto`);
+* `reserva_estoque` e `movimentacao_estoque` (`ID_produto`);
 * `expedicao`;
 * `expedicao_nota`;
-* `coleta`.
+* `coleta` (`item_coleta` por `ID_produto`).
 
 ---
 
@@ -517,13 +542,13 @@ Operações que alteram simultaneamente múltiplos registros relacionados devem 
 
 Especialmente:
 
-* entrada de estoque;
-* reserva/liberação de estoque;
-* baixa de remessa;
+* entrada de estoque (atualização de `produto.saldo`);
+* reserva/liberação de estoque (`produto.saldo_reservado`);
+* baixa de remessa (produto + reserva);
 * correção de notas;
 * ajustes de inventário;
 * desmontagem de produtos compostos;
-* operações que alteram estoque + auditoria.
+* operações que alteram saldo do produto + auditoria.
 
 Uma operação não deve deixar o banco em estado parcialmente atualizado.
 
@@ -532,7 +557,7 @@ Ao implementar uma operação de estoque, pense sempre no conjunto:
 ```text
 registro operacional
 +
-estoque
+produto.saldo / produto.saldo_reservado
 +
 reserva
 +

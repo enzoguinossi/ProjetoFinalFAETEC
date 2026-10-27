@@ -57,6 +57,23 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Estoque achatado em `produto` (RUN-20261026-80):** a tabela/model `estoque` deixou de
+  existir. O saldo passa a ser do produto — `produto.saldo` e `produto.saldo_reservado`
+  (`FLOAT NOT NULL DEFAULT 0`, saldo desde a criação) —, com
+  `saldo_disponivel = saldo − saldo_reservado`. `item_nota_saida`, `reserva_estoque`,
+  `movimentacao_estoque`, `item_coleta`, `item_inventario` e `ajuste_inventario` passaram de
+  `ID_estoque` para `ID_produto` (FK e relação `produto`), sem linha de estoque/lote,
+  `data_entrada` nem `ativo` de estoque (a data fica no histórico de movimentações e a
+  atividade é `produto.ativo`). A migração no dev consolidou as linhas ativas por produto
+  (`saldo = SUM(quantidade_atual)`, `saldo_reservado = SUM(saldo_reservado)`), deu zero aos
+  produtos sem linha e remapeou os registros históricos; o backfill de produção fica para o
+  release (o projeto não versiona migrations — SQL de backfill + `db push`). No código,
+  `src/dao/estoque.ts` passou a expor `SaldoDAO`/`saldoDAO`; dashboard, relatórios e listagens
+  leem `produto.saldo`/`saldo_reservado`. RN001 (aviso sem bloqueio), reserva, baixa,
+  cancelamento, histórico `saldo_anterior`/`saldo_posterior` e auditoria permanecem. O
+  inventário (RF015) será implementado no run seguinte sobre essa base; a coluna
+  `ajuste_inventario.diferenca` ainda existe e será revista então. Validação: `npm test` (35
+  arquivos, 422 testes), `npm run lint`, `npm run build` e `npm run figma:check` — sem commit.
 - **Tela de permissões (KAN-140):** o painel de perfis/usuários deixou a transfer-list de
   duas colunas e passou a usar uma lista única de grupos com busca, chevron, switches por
   grupo e por ação e contador de selecionadas. O modal de perfil ganhou título por modo,

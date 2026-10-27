@@ -133,7 +133,7 @@ type ExpedicaoDetalhe = {
         id_item_nota_saida: number;
         qtd_esperada: number;
         qtd_entregue: number;
-        estoque: { produto: { descricao: string } };
+        produto: { descricao: string };
       }[];
     };
   }[];
@@ -192,7 +192,7 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
       saldo_pendente: saldoPendente(nota.notaSaida.itens),
       itens_detalhe: nota.notaSaida.itens.map((item) => ({
         id_item_nota_saida: item.id_item_nota_saida,
-        descricao: item.estoque.produto.descricao,
+        descricao: item.produto.descricao,
         qtd_esperada: Number(item.qtd_esperada),
         qtd_entregue: Number(item.qtd_entregue),
       })),

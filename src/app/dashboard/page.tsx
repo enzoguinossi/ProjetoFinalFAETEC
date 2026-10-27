@@ -115,7 +115,7 @@ export default async function DashboardPage() {
         <Kpi
           rotulo="Produtos com saldo"
           valor={podeVerEstoque ? numero.format(estoque.produtosComSaldo) : "—"}
-          detalhe="produtos com quantidade atual positiva"
+          detalhe="produtos com saldo positivo"
         />
         <Kpi
           rotulo="Saídas pendentes"

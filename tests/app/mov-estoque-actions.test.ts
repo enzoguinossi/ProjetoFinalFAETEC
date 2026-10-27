@@ -64,10 +64,10 @@ describe("actions da nota de entrada", () => {
 
     expect(resultado).toEqual({ error: "Sem permissão." });
 
-    const estoque = await prismaTeste.estoque.findFirstOrThrow({
+    const estoque = await prismaTeste.produto.findFirstOrThrow({
       where: { id_produto: produto.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(5);
+    expect(estoque.saldo).toBe(5);
     expect(
       await prismaTeste.movimentacaoEstoque.count({
         where: { id_nota_entrada: nota.id_nota_entrada },
@@ -100,10 +100,10 @@ describe("actions da nota de entrada", () => {
       id_nota_entrada: nota.id_nota_entrada,
     });
 
-    const estoque = await prismaTeste.estoque.findFirstOrThrow({
+    const estoque = await prismaTeste.produto.findFirstOrThrow({
       where: { id_produto: produto.id_produto },
     });
-    expect(estoque.quantidade_atual).toBe(7);
+    expect(estoque.saldo).toBe(7);
   });
 
   it("só entrega o detalhe com nota_entrada.consultar", async () => {

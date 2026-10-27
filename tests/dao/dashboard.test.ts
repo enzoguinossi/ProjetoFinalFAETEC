@@ -74,19 +74,19 @@ describe("dashboardDAO", () => {
       const entrada = await criarNotaEntrada();
       const saida = await criarNotaSaida({ status: "BAIXA_TOTAL" });
 
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 10, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 10, {
         dataHora: new Date("2026-09-10T15:00:00.000Z"),
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 2, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 2, {
         dataHora: new Date("2026-10-05T15:00:00.000Z"),
         idNotaEntrada: entrada.id_nota_entrada,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, -4, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, -4, {
         dataHora: new Date("2026-10-06T15:00:00.000Z"),
         idNotaSaida: saida.id_nota_saida,
       });
-      await criarMovimentacao(estoque.id_estoque, usuario.id_usuario, 99, {
+      await criarMovimentacao(estoque.id_produto, usuario.id_usuario, 99, {
         dataHora: new Date("2026-10-07T15:00:00.000Z"),
       });
 

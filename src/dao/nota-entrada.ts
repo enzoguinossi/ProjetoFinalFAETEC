@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { buildPagination, type PaginationParams } from "@/types";
-import { estoqueDAO } from "./estoque";
+import { saldoDAO } from "./estoque";
 
 export type NotaEntradaItemCriacao = {
   id_produto: number;
@@ -192,7 +192,7 @@ export class NotaEntradaDAO {
         const idProduto = anterior?.id_produto ?? item.id_produto;
 
         if (delta !== 0) {
-          await estoqueDAO.registrarEntrada(
+          await saldoDAO.registrarEntrada(
             {
               id_produto: idProduto,
               id_usuario,
@@ -259,7 +259,7 @@ export class NotaEntradaDAO {
           },
         });
 
-        await estoqueDAO.registrarEntrada(
+        await saldoDAO.registrarEntrada(
           {
             id_produto: item.id_produto,
             id_usuario,
