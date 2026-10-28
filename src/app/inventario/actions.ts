@@ -98,6 +98,11 @@ export type InventarioItemRow = {
   ajuste: InventarioAjusteRow | null;
 };
 
+export type InventarioFuncionarioContagem = {
+  id_funcionario: number;
+  nome: string;
+};
+
 export type InventarioDetalhe = {
   id_inventario: number;
   observacao: string;
@@ -110,6 +115,8 @@ export type InventarioDetalhe = {
   aprovacao: string | null;
   total: number;
   contados: number;
+  id_funcionario: number | null;
+  funcionariosContagem: InventarioFuncionarioContagem[];
   podeVerSistema: boolean;
   podeContar: boolean;
   podeFechar: boolean;
@@ -371,6 +378,20 @@ export async function getInventario(
   });
 
   const contados = itens.filter((item) => item.contagens.length > 0).length;
+  const funcionariosMap = new Map<number, InventarioFuncionarioContagem>();
+  for (const item of inventario.itens) {
+    for (const contagem of item.contagens) {
+      if (!funcionariosMap.has(contagem.id_funcionario)) {
+        funcionariosMap.set(contagem.id_funcionario, {
+          id_funcionario: contagem.id_funcionario,
+          nome: contagem.funcionario.pessoaFisica.nome,
+        });
+      }
+    }
+  }
+  const funcionariosContagem = [...funcionariosMap.values()].sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR"),
+  );
   const status = inventario.status;
   const podeGerarLista = await usuarioPode(user, "relatorio.gerar");
 
@@ -389,6 +410,8 @@ export async function getInventario(
       : null,
     total: itens.length,
     contados,
+    id_funcionario: idFuncionario,
+    funcionariosContagem,
     podeVerSistema,
     podeContar:
       (status === "ABERTO" || status === "EM_CONTAGEM") && podeContar,

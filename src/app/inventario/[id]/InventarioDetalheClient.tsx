@@ -23,6 +23,17 @@ function formatarQuantidade(valor: number | null): string {
   return Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 }
 
+/** A, B, ..., Z, AA, AB... para as colunas de contagem. */
+function letraColuna(indice: number): string {
+  let n = indice;
+  let letra = "";
+  while (n >= 0) {
+    letra = String.fromCharCode(65 + (n % 26)) + letra;
+    n = Math.floor(n / 26) - 1;
+  }
+  return letra;
+}
+
 const statusCls: Record<string, string> = {
   ABERTO: "bg-[#e8f0fe] text-[#001d6c]",
   EM_CONTAGEM: "bg-[#fff4e5] text-[#7a4100]",
@@ -119,6 +130,12 @@ export default function InventarioDetalheClient({
   const [processando, setProcessando] = useState(false);
 
   const faltando = inventario.total - inventario.contados;
+  const funcionarios = inventario.funcionariosContagem;
+  const totalColunas =
+    2 +
+    (inventario.podeVerSistema ? 1 : 0) +
+    Math.max(funcionarios.length, 1) +
+    2;
 
   async function fechar() {
     if (faltando > 0) {
@@ -236,7 +253,17 @@ export default function InventarioDetalheClient({
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-white">
-        <table className="w-full border-collapse text-sm">
+        <table
+          className="w-full border-collapse text-sm"
+          style={{
+            minWidth: `${Math.max(
+              760,
+              520 +
+                Math.max(funcionarios.length, 1) * 120 +
+                (inventario.podeVerSistema ? 90 : 0),
+            )}px`,
+          }}
+        >
           <thead>
             <tr className="bg-brand text-left text-white">
               <th className="px-3 py-2 font-display font-semibold">Código</th>
@@ -244,7 +271,23 @@ export default function InventarioDetalheClient({
               {inventario.podeVerSistema && (
                 <th className="px-3 py-2 text-right font-display font-semibold">Sistema</th>
               )}
-              <th className="px-3 py-2 font-display font-semibold">Contagens</th>
+              {funcionarios.length === 0 ? (
+                <th className="px-3 py-2 font-display font-semibold">Contagens</th>
+              ) : (
+                funcionarios.map((funcionario, indice) => (
+                  <th
+                    key={funcionario.id_funcionario}
+                    title={funcionario.nome}
+                    className={`px-2 py-2 text-center font-display font-semibold ${
+                      funcionario.id_funcionario === inventario.id_funcionario
+                        ? "bg-[#15844a]"
+                        : ""
+                    }`}
+                  >
+                    {letraColuna(indice)}
+                  </th>
+                ))
+              )}
               <th className="px-3 py-2 text-right font-display font-semibold">Média</th>
               <th className="px-3 py-2 font-display font-semibold">Minha contagem</th>
             </tr>
@@ -262,20 +305,27 @@ export default function InventarioDetalheClient({
                     {formatarQuantidade(item.quantidade_sistema)}
                   </td>
                 )}
-                <td className="px-3 py-2">
-                  {item.contagens.length === 0 ? (
-                    <span className="text-[#8a1c1c]">Sem contagem</span>
-                  ) : (
-                    <span className="text-xs text-[#4a4f55]">
-                      {item.contagens
-                        .map(
-                          (contagem) =>
-                            `${contagem.funcionario}: ${formatarQuantidade(contagem.quantidade_contada)}`,
-                        )
-                        .join(" · ")}
-                    </span>
-                  )}
-                </td>
+                {funcionarios.length === 0 ? (
+                  <td className="px-3 py-2 text-xs text-[#8a1c1c]">Sem contagem</td>
+                ) : (
+                  funcionarios.map((funcionario) => {
+                    const contagem = item.contagens.find(
+                      (c) => c.id_funcionario === funcionario.id_funcionario,
+                    );
+                    const atual =
+                      funcionario.id_funcionario === inventario.id_funcionario;
+                    return (
+                      <td
+                        key={funcionario.id_funcionario}
+                        className={`px-2 py-2 text-center ${atual ? "bg-[#f0faf4]" : ""}`}
+                      >
+                        {contagem
+                          ? formatarQuantidade(contagem.quantidade_contada)
+                          : ""}
+                      </td>
+                    );
+                  })
+                )}
                 <td className="px-3 py-2 text-right">
                   {item.contagens.length > 0 ? formatarQuantidade(item.media) : "—"}
                 </td>
@@ -300,6 +350,25 @@ export default function InventarioDetalheClient({
               </tr>
             ))}
           </tbody>
+          {funcionarios.length > 0 && (
+            <tfoot>
+              <tr>
+                <td
+                  colSpan={totalColunas}
+                  className="border-t border-border bg-[#f8fafb] px-3 py-2 text-xs text-[#4a4f55]"
+                >
+                  <span className="font-semibold">Legenda:</span>
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {funcionarios.map((funcionario, indice) => (
+                      <span key={funcionario.id_funcionario}>
+                        {letraColuna(indice)} — {funcionario.nome}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

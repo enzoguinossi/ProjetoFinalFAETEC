@@ -24,6 +24,17 @@ function data(valor: Date | null): string {
   return valor ? valor.toLocaleDateString("pt-BR") : "—";
 }
 
+/** A, B, ..., Z, AA, AB... — mesma legenda usada no detalhe do inventário. */
+function letraColuna(indice: number): string {
+  let n = indice;
+  let letra = "";
+  while (n >= 0) {
+    letra = String.fromCharCode(65 + (n % 26)) + letra;
+    n = Math.floor(n / 26) - 1;
+  }
+  return letra;
+}
+
 export default async function RelatorioInventarioPage({
   params,
 }: {
@@ -50,6 +61,22 @@ export default async function RelatorioInventarioPage({
   const ajustes = new Map(
     inventario.ajustes.map((ajuste) => [ajuste.id_produto, ajuste]),
   );
+
+  const funcionariosMap = new Map<number, string>();
+  for (const item of inventario.itens) {
+    for (const contagem of item.contagens) {
+      if (!funcionariosMap.has(contagem.id_funcionario)) {
+        funcionariosMap.set(contagem.id_funcionario, contagem.funcionario.pessoaFisica.nome);
+      }
+    }
+  }
+  const funcionarios = [...funcionariosMap.entries()]
+    .map(([id_funcionario, nome]) => ({ id_funcionario, nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  const letraDe = (idFuncionario: number) => {
+    const indice = funcionarios.findIndex((f) => f.id_funcionario === idFuncionario);
+    return indice < 0 ? "?" : letraColuna(indice);
+  };
 
   return (
     <>
@@ -84,7 +111,17 @@ export default async function RelatorioInventarioPage({
                 <p>
                   Início: {data(inventario.data_inicio)} · Fim: {data(inventario.data_fim)}
                 </p>
-                <p>Aprovador: {inventario.usuarioAprovacao?.funcionario.pessoaFisica.nome ?? "—"}</p>
+                <p>Aprovador: {inventario.usuarioAprovacao?.funcionario.pessoaFisica.nome ?? "-"}</p>
+                {funcionarios.length > 0 && (
+                  <div className="legenda-contagens">
+                    <span>Legenda das contagens:</span>
+                    {funcionarios.map((funcionario, indice) => (
+                      <span key={funcionario.id_funcionario}>
+                        {letraColuna(indice)} — {funcionario.nome}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p>
                   Emissão: {emissao.data} {emissao.hora} · Emitente: {emitente}
                 </p>
@@ -130,7 +167,7 @@ export default async function RelatorioInventarioPage({
                           {item.contagens
                             .map(
                               (contagem) =>
-                                `${contagem.funcionario.pessoaFisica.nome}: ${q(Number(contagem.quantidade_contada))}`,
+                                `${letraDe(contagem.id_funcionario)} — ${contagem.funcionario.pessoaFisica.nome}: ${q(Number(contagem.quantidade_contada))}`,
                             )
                             .join(" | ")}
                         </td>

@@ -61,6 +61,12 @@
   margin: 0;
 }
 
+.relatorio-header .meta-info .legenda-contagens {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2pt;
+}
+
 .relatorio-tabela {
   width: 100%;
   table-layout: fixed;

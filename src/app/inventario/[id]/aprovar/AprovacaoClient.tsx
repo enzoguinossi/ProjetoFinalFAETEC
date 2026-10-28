@@ -16,15 +16,37 @@ function q(valor: number | null): string {
   return Number(valor).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 }
 
+/** A, B, ..., Z, AA, AB... — mesma legenda usada no detalhe do inventário. */
+function letraColuna(indice: number): string {
+  let n = indice;
+  let letra = "";
+  while (n >= 0) {
+    letra = String.fromCharCode(65 + (n % 26)) + letra;
+    n = Math.floor(n / 26) - 1;
+  }
+  return letra;
+}
+
+/** Letra do funcionário na legenda do inventário ("?" quando não contou). */
+function letra(
+  funcionarios: { id_funcionario: number }[],
+  idFuncionario: number,
+): string {
+  const indice = funcionarios.findIndex((f) => f.id_funcionario === idFuncionario);
+  return indice < 0 ? "?" : letraColuna(indice);
+}
+
 function LinhaDecisao({
   item,
   inventarioId,
   podeVerSistema,
+  funcionarios,
   onSalvo,
 }: {
   item: InventarioItemRow;
   inventarioId: number;
   podeVerSistema: boolean;
+  funcionarios: { id_funcionario: number; nome: string }[];
   onSalvo: () => void;
 }) {
   const mostrarAviso = useAviso();
@@ -115,7 +137,7 @@ function LinhaDecisao({
               key={contagem.id_contagem_inventario}
               value={`CONTAGEM:${contagem.id_contagem_inventario}`}
             >
-              {contagem.funcionario} ({q(contagem.quantidade_contada)})
+              {letra(funcionarios, contagem.id_funcionario)} — {contagem.funcionario} ({q(contagem.quantidade_contada)})
             </option>
           ))}
         </select>
@@ -160,6 +182,12 @@ export default function AprovacaoClient({ inventario }: { inventario: Inventario
 
   const pendentes = inventario.itens.filter((item) => !item.decidido).length;
   const decididos = inventario.itens.length - pendentes;
+  const funcionarios = inventario.funcionariosContagem;
+  const totalColunas =
+    2 +
+    (inventario.podeVerSistema ? 2 : 0) +
+    Math.max(funcionarios.length, 1) +
+    1;
 
   async function finalizar() {
     if (pendentes > 0) {
@@ -222,7 +250,19 @@ export default function AprovacaoClient({ inventario }: { inventario: Inventario
               {inventario.podeVerSistema && (
                 <th className="px-3 py-2 text-right font-display font-semibold">Sistema</th>
               )}
-              <th className="px-3 py-2 font-display font-semibold">Contagens</th>
+              {funcionarios.length === 0 ? (
+                <th className="px-3 py-2 font-display font-semibold">Contagens</th>
+              ) : (
+                funcionarios.map((funcionario, indice) => (
+                  <th
+                    key={funcionario.id_funcionario}
+                    title={funcionario.nome}
+                    className="px-2 py-2 text-center font-display font-semibold"
+                  >
+                    {letraColuna(indice)}
+                  </th>
+                ))
+              )}
               {inventario.podeVerSistema && (
                 <th className="px-3 py-2 text-right font-display font-semibold">Média</th>
               )}
@@ -240,14 +280,23 @@ export default function AprovacaoClient({ inventario }: { inventario: Inventario
                 {inventario.podeVerSistema && (
                   <td className="px-3 py-2 text-right">{q(item.quantidade_sistema)}</td>
                 )}
-                <td className="px-3 py-2 text-xs text-[#4a4f55]">
-                  {item.contagens
-                    .map(
-                      (contagem) =>
-                        `${contagem.funcionario}: ${q(contagem.quantidade_contada)}`,
-                    )
-                    .join(" · ")}
-                </td>
+                {funcionarios.length === 0 ? (
+                  <td className="px-3 py-2 text-xs text-[#8a1c1c]">Sem contagem</td>
+                ) : (
+                  funcionarios.map((funcionario) => {
+                    const contagem = item.contagens.find(
+                      (c) => c.id_funcionario === funcionario.id_funcionario,
+                    );
+                    return (
+                      <td
+                        key={funcionario.id_funcionario}
+                        className="px-2 py-2 text-center"
+                      >
+                        {contagem ? q(contagem.quantidade_contada) : ""}
+                      </td>
+                    );
+                  })
+                )}
                 {inventario.podeVerSistema && (
                   <td className="px-3 py-2 text-right">{q(item.media)}</td>
                 )}
@@ -256,12 +305,32 @@ export default function AprovacaoClient({ inventario }: { inventario: Inventario
                     item={item}
                     inventarioId={inventario.id_inventario}
                     podeVerSistema={inventario.podeVerSistema}
+                    funcionarios={funcionarios}
                     onSalvo={() => router.refresh()}
                   />
                 </td>
               </tr>
             ))}
           </tbody>
+          {funcionarios.length > 0 && (
+            <tfoot>
+              <tr>
+                <td
+                  colSpan={totalColunas}
+                  className="border-t border-border bg-[#f8fafb] px-3 py-2 text-xs text-[#4a4f55]"
+                >
+                  <span className="font-semibold">Legenda:</span>
+                  <div className="mt-1 flex flex-col gap-0.5">
+                    {funcionarios.map((funcionario, indice) => (
+                      <span key={funcionario.id_funcionario}>
+                        {letraColuna(indice)} — {funcionario.nome}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>
