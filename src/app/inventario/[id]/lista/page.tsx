@@ -81,18 +81,17 @@ export default async function ListaContagemPage({
               <thead>
                 <tr>
                   <th style={{ width: "10%" }} className="col-centro">Código</th>
-                  <th style={{ width: "40%" }}>Produto</th>
+                  <th style={{ width: resultado.mostrarSistema ? "58%" : "72%" }}>Produto</th>
                   {resultado.mostrarSistema && (
                     <th style={{ width: "14%" }} className="col-direita">Sistema</th>
                   )}
                   <th style={{ width: "18%" }} className="col-centro">Contagem</th>
-                  <th style={{ width: "18%" }}>Observação</th>
                 </tr>
               </thead>
               <tbody>
                 {resultado.itens.length === 0 ? (
                   <tr>
-                    <td colSpan={resultado.mostrarSistema ? 5 : 4} className="relatorio-vazio">
+                    <td colSpan={resultado.mostrarSistema ? 4 : 3} className="relatorio-vazio">
                       Nenhum produto neste inventário.
                     </td>
                   </tr>
@@ -111,9 +110,6 @@ export default async function ListaContagemPage({
                         </td>
                       )}
                       <td className="col-centro">
-                        <span className="block h-6 border-b border-[#697077]" aria-hidden="true" />
-                      </td>
-                      <td>
                         <span className="block h-6 border-b border-[#697077]" aria-hidden="true" />
                       </td>
                     </tr>

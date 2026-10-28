@@ -90,7 +90,7 @@ function ContagemCelula({
       <input
         type="number"
         min="0"
-        step="0.001"
+        step="1"
         value={valor}
         onChange={(event) => setValor(event.target.value)}
         className="h-9 w-24 rounded-lg border border-[#c1c7cd] px-2 font-sans text-sm text-ink outline-none focus:border-brand"
