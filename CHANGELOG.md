@@ -14,6 +14,24 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Added
+- **Gestão de Pedidos (RUN-20261028-87/88, RF025):** módulo `/pedidos` em que o pedido é
+  **somente a solicitação** — sem reserva de estoque, sem número e **sem `ativo`** (não há
+  desativar/excluir; o histórico é o status `PENDENTE`/`CONFIRMADO`/`RECUSADO`, com
+  `data_criacao` automática). Só `PENDENTE` é editável; editar/aprovar/recusar usam transição
+  condicional (`WHERE status = PENDENTE`) e geram auditoria. Itens guardam só o total e a
+  **observação por item** (visível no formulário/detalhe e copiada para a nota); a conversão
+  padrão de saída é auxílio de preenchimento e produtos repetidos somam. O pedido `CONFIRMADO`
+  sem nota pode ser importado na Saída por `pedidoService.importar` (`nota_saida.criar`):
+  destinatário/itens em conferência somente leitura, **uma nota nova** por pedido (1:1),
+  validação de destinatário/produtos/quantidades (**nota divergente recusada**), RN001,
+  bloqueio por inventário e gravação de `pedido.ID_nota_saida` na mesma transação; o pedido sai
+  da importação. Nenhuma nota de entrada/saída aceita produto duplicado
+  (`@@unique([id_nota, id_produto])` + serviço). `/pedidos` aceita qualquer permissão do módulo,
+  com ações conforme a permissão; lista e relatório `/relatorios/pedidos` filtram
+  escola/status/período/produto e **Nota com/sem/todas**, com layout A4 paisagem reutilizável e
+  CSV. Sem Figma/`data-figma`. Release: `npm run db:dedupe-notas`
+  (`scripts/dedupe-itens-nota.ts`) em dry-run por padrão; `--apply` grava backup JSON/auditoria
+  e consolida duplicados antes do `db push` das uniques.
 - **Inventário/contagem (RUN-20261026-81/82 e RUN-20261027-83, RF015/RN005):** abertura por
   produto sobre o estoque achatado em `produto` (`quantidade_sistema = produto.saldo`), com
   bloqueio por produto enquanto `ABERTO`/`EM_CONTAGEM`/`AGUARDANDO_APROVACAO` (exceto a
@@ -348,7 +366,7 @@ Lista de Produtos (KAN-159) e as decisões de modelagem e documentação que as 
   (ENTENDIMENTO, diagramas de classes e DER, AGENTS.md, README.md e JIRA.md). As
   prioridades dos requisitos foram alinhadas à realidade operacional (RF009/RF013/
   RF016/RF024/RNF002 → Essencial), o RF008 foi registrado como lacuna intencional, os
-  requisitos fora de escopo foram isolados em `docs/dominio/ESCOPO_FORA.md` (RF025,
+  requisitos fora de escopo foram isolados em `docs/dominio/ESCOPO_FORA.md` (RF026 — NF-e,
   RNF009 e o RF018 — Kanban — com justificativa) e o `mensagem_mural.ID_usuario` passou a
   ser opcional para permitir mensagens automáticas do mural (RN002/RF014). (Decisões do
   usuário de 2026-10-19 — sem chave de issue.)

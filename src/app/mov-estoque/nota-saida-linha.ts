@@ -1,10 +1,11 @@
 import type { NotaSaidaItemDetalhe } from "./tipos";
 
-/** Item da nota com o total solicitado e o total entregue. */
+/** Item da nota com o total solicitado, o total entregue e a observação. */
 export function itemSaidaDetalhe(item: {
   id_item_nota_saida: number;
   qtd_esperada: number;
   qtd_entregue: number;
+  observacao?: string | null;
   produto: { id_produto: number; descricao: string };
 }): NotaSaidaItemDetalhe {
   return {
@@ -13,5 +14,6 @@ export function itemSaidaDetalhe(item: {
     descricao: item.produto.descricao,
     quantidade_solicitada: Number(item.qtd_esperada),
     quantidade_entregue: Number(item.qtd_entregue),
+    observacao: item.observacao ?? null,
   };
 }

@@ -294,9 +294,14 @@ package "Logística" as Logistica {
       + observacao: Text
     }
 
+    note right of PedidoEscola
+      sem ativo; 1 pedido → 0..1 nota
+    end note
+
     class ItemPedidoEscola {
       + ID_item_pedido_escola: Integer
       + quantidade: Float
+      + observacao: Text
     }
 
     class NotaSaida {
@@ -315,6 +320,10 @@ package "Logística" as Logistica {
           + qtd_esperada: Float
           + qtd_entregue: Float
         }
+
+        note bottom of ItemNotaSaida
+          UNIQUE(ID_nota_saida, ID_produto)
+        end note
 
     class Coleta {
       + ID_coleta: Integer
@@ -406,6 +415,10 @@ package "Nota de Entrada" as NotaEntrada {
     + ID_item_nota_entrada: Integer
     + quantidade: Float
   }
+
+  note bottom of ItemNotaEntrada
+    UNIQUE(ID_nota_entrada, ID_produto)
+  end note
 }
 
 Fornecedor "1" --> "*" NotaEntrada : emite >

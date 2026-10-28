@@ -103,6 +103,8 @@ export type DestinatarioSelecaoRow = {
 export type ItemSaidaPayload = {
   id_produto: number;
   quantidade_solicitada: number;
+  /** Total já em base (item importado do pedido): não reconverte. */
+  total_base?: boolean;
 };
 
 /** Tipos aceitos no formulário de saída (Remessa, Avaria e Consumo Interno). */
@@ -115,6 +117,28 @@ export type NovaSaidaPayload = {
   urgente?: boolean;
   observacao?: string | null;
   itens: ItemSaidaPayload[];
+};
+
+/** Pedido aprovado disponível para importar na Saída. */
+export type PedidoImportacaoRow = {
+  id_pedido_escola: number;
+  escola: string;
+  data: string;
+  itens: { descricao: string; quantidade: number }[];
+  total: number;
+};
+
+export type PedidoImportacaoDetalhe = {
+  id_pedido_escola: number;
+  id_destinatario: number;
+  escola: string;
+  observacao: string | null;
+  itens: {
+    id_produto: number;
+    descricao: string;
+    quantidade: number;
+    observacao: string | null;
+  }[];
 };
 
 /** Item da edição: com `id_item_nota_saida` = existente; sem = novo. */
@@ -137,6 +161,8 @@ export type NotaSaidaItemDetalhe = {
   quantidade_solicitada: number;
   /** Total entregue. */
   quantidade_entregue: number;
+  /** Observação do item (vem do pedido na importação). */
+  observacao: string | null;
 };
 
 export type NotaSaidaListRow = {

@@ -469,7 +469,6 @@ model PedidoEscola {
   data_criacao     DateTime           @map("data_criacao") @db.Timestamp(0)
   status           StatusPedido       @map("status")
   observacao       String?            @map("observacao") @db.Text
-  ativo            Boolean            @default(true) @map("ativo")
   itens            ItemPedidoEscola[]
   destinatario     Destinatario       @relation(fields: [id_destinatario], references: [id_destinatario])
   notaSaida        NotaSaida?         @relation(fields: [id_nota_saida], references: [id_nota_saida])
@@ -527,6 +526,7 @@ model ItemNotaSaida {
 
   @@index([id_produto], map: "item_nota_saida_ID_produto_fkey")
   @@index([id_nota_saida], map: "item_nota_saida_ID_nota_saida_fkey")
+  @@unique([id_nota_saida, id_produto], map: "item_nota_saida_nota_produto_key")
   @@map("item_nota_saida")
 }
 
@@ -652,6 +652,7 @@ model ItemNotaEntrada {
 
   @@index([id_nota_entrada], map: "item_nota_entrada_ID_nota_entrada_fkey")
   @@index([id_produto], map: "item_nota_entrada_ID_produto_fkey")
+  @@unique([id_nota_entrada, id_produto], map: "item_nota_entrada_nota_produto_key")
   @@map("item_nota_entrada")
 }
 

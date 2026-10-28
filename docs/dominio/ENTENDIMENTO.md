@@ -26,7 +26,7 @@ Um sistema web que centraliza:
 
 - **Controle de Estoque** — substitui a contagem manual e planilhas Excel
 - **Cadastro de Produtos** — com fotos, validade e composição
-- **Gestão de Pedidos (Notas de Saída)** — transcrição dos pedidos em papel para o sistema
+- **Pedidos e Notas de Saída** — transcrição dos pedidos em papel; o pedido aprovado é importado na Saída e gera uma nota
 - **Reserva de Estoque** — ao criar uma nota de saída com itens, o sistema reserva os produtos no estoque
 - **Entregas** — notas de saída com destinatário, itens e status de entrega
 - **Expedições** — organização diária das entregas em ordem de visita (com suporte a templates)
@@ -679,34 +679,61 @@ Regras:
 
 #### 3.11.0 Pedido da Escola (Solicitação)
 
-Representa o pedido que chega em **papel** da administração e é registrado no sistema. Ainda não reserva estoque — é apenas a solicitação.
+Representa o pedido que chega em **papel** da administração e é registrado no sistema. É
+**somente a solicitação**: não reserva estoque e não movimenta saldo. O pedido tem
+`data_criacao` automática e **não possui `ativo`, número, desativação nem exclusão** — o
+histórico é o próprio status (`PENDENTE`, `CONFIRMADO`, `RECUSADO`).
 
 ```
 pedido_escola
 ├── ID_pedido_escola        INT PK auto_increment
 ├── ID_destinatario         INT FK NOT NULL
-├── ID_nota_saida           INT FK → nota_saida NULL   ← nota que consolida o pedido
-├── data_criacao            TIMESTAMP NOT NULL
+├── ID_nota_saida           INT FK → nota_saida NULL   ← nota criada na importação
+├── data_criacao            TIMESTAMP NOT NULL         ← automática
 ├── status                  ENUM('PENDENTE','CONFIRMADO','RECUSADO')
-├── observacao              TEXT
-└── ativo                   BOOLEAN DEFAULT TRUE
+└── observacao              TEXT
 
 item_pedido_escola
 ├── ID_item_pedido_escola   INT PK auto_increment
 ├── ID_pedido_escola        INT FK NOT NULL
 ├── ID_produto              INT FK NOT NULL
-├── quantidade              FLOAT NOT NULL
+├── quantidade              FLOAT NOT NULL   ← total (sem fator/unidade)
 └── observacao              TEXT
 ```
 
 Regras:
-- O pedido é apenas a solicitação — **não reserva estoque**
-- Ao confirmar, o sistema **valida o estoque** (avisa se não tiver saldo, mas permite seguir)
-- Ao confirmar, o pedido é **consolidado numa `nota_saida`** — ele passa a apontar para ela por
-  `pedido_escola.ID_nota_saida` (decisão do usuário, 2026-10-19)
-- Um pedido pertence a **no máximo uma nota** (`ID_nota_saida` é `NULL` enquanto o pedido não foi
-  consolidado); a nota, por sua vez, **agrega N pedidos** (1:N)
-- Um pedido RECUSADO não gera nota
+- Criado como `PENDENTE`; só o pedido `PENDENTE` é editável (destinatário, itens, observação).
+  Editar, aprovar e recusar usam **transição condicional** (`WHERE status = PENDENTE`), de modo
+  que uma ação concorrente não altere um pedido já decidido
+- Aprovar → `CONFIRMADO`; recusar → `RECUSADO`. A aprovação **não cria nota** e não reserva:
+  apenas torna o pedido disponível para importação na Saída
+- Cada pedido aprovado pode ser importado **uma única vez**: a importação usa
+  `pedidoService.importar` (não o formulário comum de nota), cria **uma nota nova** (`SAIDA`)
+  com o destinatário e os totais do pedido (1 pedido → 1 nota), grava `pedido.ID_nota_saida` e
+  o retira da lista de importação. A vida da nota depois disso é fora do escopo do módulo
+- Na importação, o destinatário e os itens do pedido aparecem em **conferência somente
+  leitura** (não é possível adicionar, remover ou alterar); o vínculo valida destinatário,
+  produtos e quantidades contra o pedido e **recusa nota divergente**, desfazendo a transação
+- A importação exige `nota_saida.criar`, usa os totais já gravados (**sem reconverter**),
+  soma produtos repetidos, passa por RN001 (aviso sem bloqueio), pelo bloqueio de inventário
+  e por auditoria; a nota gerada é uma Remessa (`SAIDA`)
+- Criar, editar, aprovar, recusar e importar geram `registro_auditoria` com os snapshots e o
+  `ID_nota_saida` quando houver
+- Os itens guardam **só a quantidade total**; a **Unidade Padrão de Saída** do produto é
+  auxílio de preenchimento na tela (mostra unidade/fator e calcula o total), sem vínculo,
+  fator ou quantidade convertida no pedido. Produtos repetidos **somam** no mesmo item
+- A **observação por item** é editável no formulário, aparece no detalhe e é copiada para a
+  observação do item da nota na importação
+- Nenhuma nota (entrada ou saída) aceita produto duplicado: `item_nota_entrada` e
+  `item_nota_saida` têm `UNIQUE(ID_nota, ID_produto)` e o serviço também recusa
+- Pedido RECUSADO não gera nota. Não há desativação/exclusão de pedido (sem `ativo`)
+- Lista e relatório têm busca/filtros por **escola, status, período, produto e com/sem nota**;
+  o filtro **Nota** aceita com/sem/todas (vazio ou ambos = todos). O relatório “Pedidos por
+  escola” usa o layout ampliado A4 paisagem e CSV. O layout é reutilizável; os demais
+  relatórios adotam depois (fora deste run)
+- `/pedidos` é acessível por **qualquer** permissão do módulo (`listar`, `consultar`, `criar`,
+  `alterar`, `aprovar`); cada ação (criar/editar/aprovar/recusar) é exibida e autorizada
+  conforme a permissão correspondente, e a importação na Saída exige `nota_saida.criar`
 
 #### 3.11.1 Nota Saída (Entrega)
 
@@ -719,9 +746,21 @@ destinatário, não passam por reserva e dão baixa física direto na confirmaç
 opera com **Remessa** (`SAIDA`), **Avaria** (`AVARIA`) e **Consumo Interno** (`CONSUMO_INTERNO`);
 `DESMONTAGEM` tem fluxo próprio e é recusada por esse formulário.
 
-A nota também **consolida pedidos** (decisão do usuário, 2026-10-19): ela **agrega os pedidos**
-que consolida (1:N), e o vínculo fica em `pedido_escola.ID_nota_saida` — a nota **não** tem
-coluna de pedido. Cada pedido pertence a **no máximo uma** nota.
+A nota pode ser criada do zero ou **importada de um pedido aprovado** (decisão do usuário,
+2026-10-28): a importação é **1 pedido → 1 nota nova**, o vínculo fica em
+`pedido_escola.ID_nota_saida` e a nota **não** tem coluna de pedido. Cada pedido pertence a
+no máximo uma nota e a nota importada atende um pedido; o ciclo posterior da nota é fora do
+escopo do módulo de Pedidos.
+
+Os itens da nota também são únicos por produto (`UNIQUE(ID_nota_saida, ID_produto)`); a
+importação soma os repetidos do pedido antes de criar a nota. O mesmo vale para
+`item_nota_entrada` (`UNIQUE(ID_nota_entrada, ID_produto)`).
+
+> **Release de produção:** notas antigas podem ter linhas duplicadas por produto. Antes do
+> `db push` que cria as uniques, rode `npm run db:dedupe-notas`
+> (`scripts/dedupe-itens-nota.ts`): por padrão é **dry-run**; com `--apply` grava backup JSON
+> e consolida as quantidades (entrada: `quantidade`; saída: `qtd_esperada`/`qtd_entregue`),
+> preservando a auditoria.
 
 ```
 nota_saida
@@ -969,7 +1008,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**76** no total):
+Permissões criadas por `prisma/seed.ts` (**81** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -983,6 +1022,7 @@ Permissões criadas por `prisma/seed.ts` (**76** no total):
 | `estoque` | entrada, saida, ver_saldo |
 | `nota_entrada` | criar, alterar, consultar, cancelar |
 | `nota_saida` | criar, alterar, consultar, cancelar, alterar_status, finalizar |
+| `pedido` | listar, criar, alterar, consultar, aprovar |
 | `percurso` | listar, criar, alterar, consultar, excluir |
 | `expedicao` | listar, criar, alterar, consultar, desativar |
 | `inventario` | abrir, contar, aprovar_ajuste |
@@ -1164,7 +1204,7 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 ---
 
 > **Documentos relacionados:**
-> - [Requisitos Funcionais](REQUISITOS_FUNCIONAIS.md) — 25 RFs
+> - [Requisitos Funcionais](REQUISITOS_FUNCIONAIS.md) — 26 RFs
 > - [Regras de Negócio](REGRAS_NEGOCIO.md) — 5 RNs
 > - [Requisitos Não Funcionais](REQUISITOS_NAO_FUNCIONAIS.md) — 9 RNFs
 > - [Implementação](IMPLEMENTACAO.md) — o que já existe no código, requisito a requisito

@@ -1,11 +1,12 @@
 # Requisitos Funcionais — Projeto Nexus (Revisão 02/09)
 
-> **Numeração:** o projeto tem **25 requisitos funcionais**, de `RF001` a `RF025`. O ID
+> **Numeração:** o projeto tem **26 requisitos funcionais**, de `RF001` a `RF026`. O ID
 > **`RF008` não existe** — a lacuna entre `RF007` e `RF009` é **preservada de propósito**
 > (não renumerar, não preencher com um requisito novo). A numeração é estável para não
-> quebrar a rastreabilidade já registrada em commits e no changelog.
+> quebrar a rastreabilidade já registrada em commits e no changelog. O antigo `RF025`
+> (Importação de NF-e) passou a **`RF026`** para abrir o `RF025` para Pedidos.
 >
-> **Fora do escopo:** o `RF025` não será implementado — ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md).
+> **Fora do escopo:** o `RF026` não será implementado — ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md).
 
 ## Módulo 1: Gestão de Acessos e Usuários
 
@@ -48,6 +49,7 @@
 | RF020 | Anexo de Fotos | O sistema deve permitir o upload de fotos das mercadorias separadas, vinculadas à nota de saída. | Essencial |
 | RF021 | Gestão de Pendências e Urgências | O sistema deve permitir que notas não entregues (PENDENTE) sejam adicionadas em outra expedição. Retiradas diretas de urgência no galpão devem ser registradas como nota de saída com flag `urgente`, dando baixa parcial na própria nota. | Essencial |
 | RF022 | Percurso e Expedição | O sistema deve gerenciar percursos como templates reutilizáveis (ordem de visitas) e expedições como manifestos do dia (veículo, condutor e ordem). A expedição pode ser baseada em um percurso ou criada do zero, e deve ser editável. A expedição agrupa notas de saída com ordem de visita. | Essencial |
+| RF025 | Gestão de Pedidos | O sistema deve registrar o pedido da escola como **solicitação** (sem reserva de estoque), com destinatário, itens (quantidade total e **observação por item**) e observação; `data_criacao` automática e status `PENDENTE`/`CONFIRMADO`/`RECUSADO`, sem `ativo`, número, desativação ou exclusão. Só pedido `PENDENTE` é editável; editar/aprovar/recusar usam transição condicional (`WHERE status = PENDENTE`) e gravam auditoria. Cada pedido aprovado (`CONFIRMADO`, sem nota) pode ser importado na Saída por `pedidoService.importar`, gerando **uma nota nova** por pedido (1:1) com os totais dos itens — a importação exige `nota_saida.criar`, mostra destinatário/itens em **conferência somente leitura**, valida destinatário/produtos/quantidades contra o pedido (**recusa nota divergente**), soma produtos repetidos, aplica RN001 e o bloqueio por inventário, copia a observação do item e grava `pedido.ID_nota_saida`; o pedido sai da lista de importação. Itens guardam só a quantidade total (a conversão padrão de saída é auxílio de preenchimento, sem vínculo/fator gravado). Nenhuma nota de entrada ou saída aceita produto duplicado (`@@unique` + validação no serviço). `/pedidos` é acessível por qualquer permissão do módulo (`listar/consultar/criar/alterar/aprovar`), com ações conforme a permissão; lista e relatório (`/relatorios/pedidos`) filtram por escola, status, período, produto e Nota (com/sem/todas), em A4 paisagem e CSV. | Essencial |
 
 ## Módulo 5: Relatórios, Consultas e Integrações
 
@@ -55,4 +57,4 @@
 |----|--------|-----------|------------|
 | RF023 | Relatórios de Movimentação | O sistema deve gerar relatórios periódicos (diários, mensais e consolidados semestrais) com filtros por período, produto, escola, motorista e veículo. Deve incluir uma listagem simplificada de todos os produtos com descrição e foto. | Essencial |
 | RF024 | Exportação de Dados | O sistema deve permitir a visualização e exportação de relatórios em formato de planilha para conferência. | Essencial |
-| RF025 | Importação de NF-e (XML) | O sistema deve oferecer suporte ao pré-cadastro e entrada automatizada de produtos por meio da leitura do arquivo XML da Nota Fiscal Eletrônica. | Desejável — fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |
+| RF026 | Importação de NF-e (XML) | O sistema deve oferecer suporte ao pré-cadastro e entrada automatizada de produtos por meio da leitura do arquivo XML da Nota Fiscal Eletrônica. | Desejável — fora do escopo, ver [`ESCOPO_FORA.md`](ESCOPO_FORA.md) |

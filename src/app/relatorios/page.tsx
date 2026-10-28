@@ -43,6 +43,12 @@ const relatorios: CartaoRelatorio[] = [
     href: "/relatorios/entregas",
   },
   {
+    titulo: "Pedidos por Escola",
+    descricao:
+      "Solicitações das escolas no período, com status, itens, total e a nota de saída gerada.",
+    href: "/relatorios/pedidos",
+  },
+  {
     titulo: "Funcionários",
     descricao:
       "Funcionários cadastrados, com código, CPF, cargo, condutor, situação e contato principal.",

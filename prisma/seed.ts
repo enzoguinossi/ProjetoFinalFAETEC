@@ -57,6 +57,7 @@ async function main() {
     "percurso.listar", "percurso.criar", "percurso.alterar", "percurso.consultar", "percurso.excluir",
     "expedicao.listar", "expedicao.criar", "expedicao.alterar", "expedicao.consultar", "expedicao.desativar",
     "inventario.abrir", "inventario.contar", "inventario.aprovar_ajuste",
+    "pedido.listar", "pedido.criar", "pedido.alterar", "pedido.consultar", "pedido.aprovar",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",
   ];

@@ -623,6 +623,7 @@ describe("relatorioDAO", () => {
     it("lista notas do período com esperado, entregue e pendente, na ordem decrescente", async () => {
       const escola = await criarDestinatario({ razaoSocial: "Escola Municipal" });
       const produto = await criarProduto({ descricao: "Arroz" });
+      const produto2 = await criarProduto({ descricao: "Feijão" });
       const estoque = await criarEstoque(produto.id_produto);
 
       const notaA = await prismaTeste.notaSaida.create({
@@ -660,7 +661,7 @@ describe("relatorioDAO", () => {
       await prismaTeste.itemNotaSaida.create({
         data: {
           id_nota_saida: notaA.id_nota_saida,
-          id_produto: estoque.id_produto,
+          id_produto: produto2.id_produto,
           qtd_esperada: 5,
           qtd_entregue: 0,
         },

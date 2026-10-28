@@ -184,7 +184,14 @@ export default function SaidaClient({
                   key={item.id_item_nota_saida}
                   className="grid items-center gap-3 rounded-[1rem] bg-[rgba(0,0,0,0.03)] px-4 py-3 font-sans sm:grid-cols-[2.5fr_1fr_1fr]"
                 >
-                  <span className="text-base text-ink-strong">{item.descricao}</span>
+                  <span className="flex flex-col gap-0.5 text-base text-ink-strong">
+                    <span>{item.descricao}</span>
+                    {item.observacao?.trim() && (
+                      <span className="font-sans text-xs text-[#697077]">
+                        Obs.: {item.observacao}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-sm text-ink">
                     {formatarNumero(item.quantidade_solicitada)}
                   </span>

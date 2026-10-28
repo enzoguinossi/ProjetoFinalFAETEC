@@ -12,6 +12,7 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { notaEntradaService } from "@/services/nota-entrada";
 import { notaSaidaService } from "@/services/nota-saida";
+import { pedidoService } from "@/services/pedido";
 import { itemSaidaDetalhe } from "./nota-saida-linha";
 import {
   buildPagination,
@@ -31,6 +32,8 @@ import type {
   NotaSaidaListRow,
   NovaEntradaPayload,
   NovaSaidaPayload,
+  PedidoImportacaoDetalhe,
+  PedidoImportacaoRow,
   ProdutoEntradaDetalhe,
   ProdutoSaidaDetalhe,
   SelecaoParams,
@@ -365,11 +368,98 @@ export async function obterNotaSaida(
   };
 }
 
+/**
+ * Pedidos aprovados e ainda sem nota, para o seletor "Importar pedido
+ * aprovado" do formulário de Saída. Exige `nota_saida.criar`.
+ */
+export async function listarPedidosParaImportacao(): Promise<PedidoImportacaoRow[]> {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "nota_saida.criar"))) return [];
+
+  const pedidos = await pedidoService.listarParaImportacao();
+  return pedidos.map((pedido) => {
+    const itens = pedido.itens.map((item) => ({
+      descricao: item.produto.descricao,
+      quantidade: Number(item.quantidade),
+    }));
+    return {
+      id_pedido_escola: pedido.id_pedido_escola,
+      escola: pedido.destinatario.pessoaJuridica.razao_social,
+      data: formatarData(pedido.data_criacao),
+      itens,
+      total: itens.reduce((soma, item) => soma + item.quantidade, 0),
+    };
+  });
+}
+
+/**
+ * Pedido aprovado com escola e itens (totais, sem reconverter), para preencher
+ * o formulário de Saída. Exige `nota_saida.criar`.
+ */
+export async function obterPedidoParaImportacao(
+  id: number,
+): Promise<PedidoImportacaoDetalhe | null> {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "nota_saida.criar"))) return null;
+
+  const pedido = await pedidoService.detalhar(Number(id));
+  if (!pedido || pedido.status !== "CONFIRMADO" || pedido.id_nota_saida !== null) {
+    return null;
+  }
+
+  return {
+    id_pedido_escola: pedido.id_pedido_escola,
+    id_destinatario: pedido.id_destinatario,
+    escola: pedido.destinatario.pessoaJuridica.razao_social,
+    observacao: pedido.observacao,
+    itens: pedido.itens.map((item) => ({
+      id_produto: item.id_produto,
+      descricao: item.produto.descricao,
+      quantidade: Number(item.quantidade),
+      observacao: item.observacao,
+    })),
+  };
+}
+
+/**
+ * Importa o pedido aprovado na Saída usando o **serviço do pedido** (não o
+ * fluxo normal da nota): cria uma nota nova por pedido, valida o vínculo,
+ * reserva/RN001/bloqueio de inventário e auditoria na mesma transação.
+ * Exige `nota_saida.criar`.
+ */
+export async function importarPedidoParaSaida(id: number) {
+  return comPermissao("nota_saida.criar", async (user) => {
+    try {
+      const resultado = await pedidoService.importar(id, user.id_usuario);
+      if ("error" in resultado) return resultado;
+      return {
+        success: true,
+        id_nota_saida: resultado.nota.id_nota_saida,
+        aviso: resultado.aviso,
+      };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
 /** Cria a nota de saída (destinatário, itens e reserva). Exige `nota_saida.criar`. */
 export async function criarNotaSaida(payload: NovaSaidaPayload) {
   return comPermissao("nota_saida.criar", async (user) => {
     try {
-      const resultado = await notaSaidaService.registrar(payload, user.id_usuario);
+      // O fluxo normal nunca vincula pedido: a importação tem ação própria
+      // (`importarPedidoParaSaida`). Montar o payload explicitamente impede que
+      // um campo extra enviado pelo cliente crie o vínculo.
+      const resultado = await notaSaidaService.registrar(
+        {
+          tipo: payload.tipo,
+          id_destinatario: payload.id_destinatario,
+          urgente: payload.urgente,
+          observacao: payload.observacao,
+          itens: payload.itens,
+        },
+        user.id_usuario,
+      );
       if ("error" in resultado) return resultado;
       return {
         success: true,

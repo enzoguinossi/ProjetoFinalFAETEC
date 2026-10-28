@@ -2,12 +2,21 @@ import type { StatusNotaSaida } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
+import { pedidoDAO } from "./pedido";
 import { buildPagination, type PaginationParams } from "@/types";
 import { saldoDAO } from "./estoque";
 
 export type NotaSaidaItemCriacao = {
   id_produto: number;
+  /**
+   * Quantidade informada na unidade de saída (o fator multiplica) ou, quando
+   * `total_base`, o total já em base — usado na importação do pedido, que não
+   * reconverte.
+   */
   quantidade_solicitada: number;
+  total_base?: boolean;
+  /** Observação do item (levada do pedido na importação). */
+  observacao?: string | null;
 };
 
 /**
@@ -24,6 +33,8 @@ export type NotaSaidaCriacao = {
   urgente: boolean;
   observacao: string | null;
   itens: NotaSaidaItemCriacao[];
+  /** Pedido aprovado que originou a nota (importação); vinculado na transação. */
+  id_pedido_escola?: number | null;
 };
 
 /** Item da edição: com `id_item_nota_saida` = existente; sem = novo. */
@@ -230,13 +241,21 @@ export class NotaSaidaDAO {
 
       for (const item of data.itens) {
         if (ehRemessa) {
-          const fator = await fatorSaidaDoProduto(tx, item.id_produto);
-          const quantidadeBase = item.quantidade_solicitada * fator;
+          let fator = 1;
+          let quantidadeBase: number;
+          if (item.total_base) {
+            quantidadeBase = item.quantidade_solicitada;
+          } else {
+            fator = await fatorSaidaDoProduto(tx, item.id_produto);
+            quantidadeBase = item.quantidade_solicitada * fator;
+          }
 
           const saldo = await saldoDisponivelNoCliente(tx, item.id_produto);
           if (quantidadeBase > saldo.disponivel) {
             const rotulo = saldo.descricao ?? `produto ${item.id_produto}`;
-            const solicitado = `${item.quantidade_solicitada} × ${fator} = ${quantidadeBase}`;
+            const solicitado = item.total_base
+              ? String(quantidadeBase)
+              : `${item.quantidade_solicitada} × ${fator} = ${quantidadeBase}`;
             avisos.push(
               `Saldo insuficiente de ${rotulo} (disponível ${saldo.disponivel}, solicitado ${solicitado})`,
             );
@@ -258,6 +277,7 @@ export class NotaSaidaDAO {
               id_nota_saida: nota.id_nota_saida,
               id_produto: item.id_produto,
               qtd_esperada: quantidadeBase,
+              observacao: item.observacao ?? null,
             },
           });
 
@@ -329,9 +349,26 @@ export class NotaSaidaDAO {
           ...snapshotNotaSaida(nota, itensGravados),
           reservas: reservasGravadas,
           movimentacoes: movimentacoesGravadas,
+          id_pedido_escola: data.id_pedido_escola ?? null,
         },
         tx,
       );
+
+      if (data.id_pedido_escola) {
+        await pedidoDAO.vincularNota(
+          tx,
+          data.id_pedido_escola,
+          nota.id_nota_saida,
+          id_usuario,
+          {
+            id_destinatario: nota.id_destinatario,
+            itens: itensGravados.map((item) => ({
+              id_produto: item.id_produto,
+              quantidade: item.quantidade_solicitada,
+            })),
+          },
+        );
+      }
 
       return {
         nota,

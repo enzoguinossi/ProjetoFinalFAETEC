@@ -16,6 +16,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
+    "db:dedupe-notas": "tsx scripts/dedupe-itens-nota.ts",
     "db:studio": "prisma studio",
     "setup": "npm install && npm run db:setup",
     "figma:harvest": "tsx tools/figma-export/harvest.ts",

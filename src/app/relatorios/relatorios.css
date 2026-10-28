@@ -135,6 +135,40 @@
   color: #666666;
 }
 
+/*
+ * Layout ampliado (reutilizável): folha A4 paisagem com mais colunas/dados.
+ * `table-layout: auto` deixa a tabela crescer pelo conteúdo em vez de espremer
+ * as colunas; a rolagem horizontal fica só na tela.
+ */
+.relatorio-ampliado {
+  width: 297mm;
+  min-height: 210mm;
+  padding: 12mm;
+  page: ampliado;
+}
+
+.relatorio-tabela-ampliada {
+  table-layout: auto;
+  font-size: 7.5pt;
+}
+
+.relatorio-tabela-ampliada th,
+.relatorio-tabela-ampliada td {
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+  padding: 4px 5px;
+}
+
+.relatorio-tabela-ampliada .col-itens {
+  min-width: 70mm;
+}
+
+@page ampliado {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -192,6 +226,12 @@
     padding: 0;
     box-shadow: none;
     overflow: visible;
+  }
+
+  .relatorio-ampliado {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
   }
 
   .relatorio-tabela thead {

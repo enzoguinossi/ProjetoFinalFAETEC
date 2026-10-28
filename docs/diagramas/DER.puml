@@ -377,8 +377,11 @@ entity "pedido_escola" as pedido {
   * data_criacao : TIMESTAMP
   * status : ENUM(PENDENTE, CONFIRMADO, RECUSADO)
   observacao : TEXT
-  * ativo : BOOLEAN
 }
+
+note right of pedido
+  sem ativo; 1 pedido → 0..1 nota
+end note
 
 entity "item_pedido_escola" as item_pedido {
   * ID_item_pedido_escola : INT <<PK>>
@@ -414,6 +417,10 @@ entity "item_nota_saida" as item_nota {
   * qtd_entregue : FLOAT
   observacao : TEXT
 }
+
+note right of item_nota
+  UNIQUE(ID_nota_saida, ID_produto)
+end note
 
 ' =========================================================
 ' COLETA
@@ -512,6 +519,10 @@ entity "item_nota_entrada" as item_nota_entrada {
   * quantidade : FLOAT
   observacao : TEXT
 }
+
+note right of item_nota_entrada
+  UNIQUE(ID_nota_entrada, ID_produto)
+end note
 
 ' =========================================================
 ' ANEXOS
@@ -656,7 +667,7 @@ destinatario ||--o{ pedido
 pedido ||--|{ item_pedido
 
 ' Nota Saida / Coleta
-nota ||--o{ pedido
+pedido ||--o| nota
 nota ||--|{ item_nota
 nota ||--o{ coleta
 destinatario ||--o{ nota

@@ -17,13 +17,16 @@ Um requisito entra aqui quando as três condições valem:
 
 Decisões do usuário de 2026-10-19.
 
+> **Numeração:** o `RF026` (Importação de NF-e) era o `RF025` até o `RUN-20261028-87`, quando
+> o `RF025` passou a ser **Gestão de Pedidos** (implementado); o NF-e segue fora do escopo.
+
 ## Resumo
 
 | ID | Requisito | Prioridade original | Motivo em uma linha |
 |---|---|---|---|
 | `RF018` | Quadro Kanban de Remessas | Importante | o acompanhamento visual já é feito no Trello, na rua; sem hospedagem online exigiria um aplicativo mobile dedicado |
-| `RF025` | Importação de NF-e (XML) | Desejável | o `RF017a` já registra a entrada com ou sem chave de acesso NF-e |
-| `RNF009` | Interoperabilidade XML NF-e | Desejável | mesma capacidade do `RF025` |
+| `RF026` | Importação de NF-e (XML) | Desejável | o `RF017a` já registra a entrada com ou sem chave de acesso NF-e |
+| `RNF009` | Interoperabilidade XML NF-e | Desejável | mesma capacidade do `RF026` |
 
 ## RF018 — Quadro Kanban de Remessas
 
@@ -46,7 +49,7 @@ Decisões do usuário de 2026-10-19.
 O sistema mantém o status de cada remessa registrado no modelo, que é o que as consultas e
 relatórios usam.
 
-## RF025 — Importação de NF-e (XML)
+## RF026 — Importação de NF-e (XML)
 
 **O que o requisito pedia:** pré-cadastro e entrada automatizada de produtos pela leitura do
 arquivo XML da Nota Fiscal Eletrônica.
@@ -68,15 +71,15 @@ quando houver.
 
 **O que o requisito pedia:** capacidade de processar XML de NF-e no padrão SEFAZ.
 
-**Por que não será implementado:** é **a mesma capacidade do `RF025`**, declarada uma vez
+**Por que não será implementado:** é **a mesma capacidade do `RF026`**, declarada uma vez
 como requisito funcional e outra como não funcional. Vale a mesma justificativa: nenhuma RN
 nem requisito Essencial depende dela, e o `RF017a` cobre a necessidade pelo registro manual.
 
-**O que atende à necessidade:** o mesmo caminho do `RF025` — entrada manual da nota.
+**O que atende à necessidade:** o mesmo caminho do `RF026` — entrada manual da nota.
 
 ## Observação: a mesma capacidade declarada duas vezes
 
-`RF025` e `RNF009` descrevem **o mesmo recurso** — um como requisito funcional, outro como
+`RF026` e `RNF009` descrevem **o mesmo recurso** — um como requisito funcional, outro como
 não funcional (interoperabilidade). Ambos ficam fora do escopo pelas mesmas razões. Se a
 leitura de XML voltar ao escopo no futuro, os dois devem ser tratados como **um** item, e não
 como dois requisitos independentes.

@@ -276,6 +276,16 @@ export async function criarPedidoEscola(idDestinatario: number) {
   });
 }
 
+export async function criarItemPedidoEscola(
+  idPedidoEscola: number,
+  idProduto: number,
+  quantidade = 1,
+) {
+  return prismaTeste.itemPedidoEscola.create({
+    data: { id_pedido_escola: idPedidoEscola, id_produto: idProduto, quantidade },
+  });
+}
+
 export async function criarColeta(idNotaSaida: number, idDestinatario: number) {
   return prismaTeste.coleta.create({
     data: { id_nota_saida: idNotaSaida, id_destinatario: idDestinatario, data_criacao: new Date() },

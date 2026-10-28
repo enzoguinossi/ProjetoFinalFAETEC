@@ -19,6 +19,18 @@ inventário não cria uma segunda linha/coluna de saldo: ele congela um snapshot
 `produto.saldo` e, na aprovação, ajusta o próprio produto. Ver
 [`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.7 e §3.9.
 
+**Semântica do pedido:** o pedido (`pedido_escola`) é **somente a solicitação** — não reserva
+estoque nem movimenta saldo, e **não possui `ativo`**: não é desativado nem excluído; o
+histórico é o status (`PENDENTE`/`CONFIRMADO`/`RECUSADO`). Editar/aprovar/recusar usam
+transição condicional (`PENDENTE`) e geram auditoria. Aprovar apenas torna o pedido elegível
+para importação na Saída; a importação cria **uma nota nova por pedido** (1:1), valida
+destinatário/produtos/quantidades contra o pedido (**nota divergente é recusada**), soma
+produtos repetidos e grava `pedido.ID_nota_saida`. Os itens guardam só o total e a
+**observação por item** (copiada para a nota); a conversão padrão de saída é apenas auxílio de
+preenchimento, e **nenhuma nota** aceita produto duplicado. `/pedidos` é acessível por qualquer
+permissão do módulo, com ações conforme a permissão. Ver
+[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.11.0/§3.11.1.
+
 ## RN001 — Alerta de Saldo Insuficiente
 **Prioridade:** Essencial
 

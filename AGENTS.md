@@ -479,6 +479,10 @@ O saldo não é uma entidade de cadastro e **não tem `ativo`**: `produto.saldo`
 apaga nem o saldo nem o histórico (`movimentacao_estoque`/`reserva_estoque` continuam por
 `ID_produto`, com `saldo_anterior`/`saldo_posterior`). Não existe mais `estoque.ativo`.
 
+O **pedido** (`pedido_escola`) também **não tem `ativo`** e não é desativado nem excluído: o
+histórico é o status (`PENDENTE`/`CONFIRMADO`/`RECUSADO`). Não crie `ativo`, desativação ou
+exclusão para pedidos.
+
 ---
 
 # 14. Entregas e expedições
@@ -522,6 +526,36 @@ Não implemente um novo fluxo de entrega sem verificar:
 * `expedicao`;
 * `expedicao_nota`;
 * `coleta` (`item_coleta` por `ID_produto`).
+
+## 14.1 Pedidos (RF025)
+
+O **pedido** é somente a solicitação: não reserva estoque e não movimenta saldo. Fica em
+`/pedidos`, acessível por **qualquer** permissão do módulo (`listar/consultar/criar/alterar/
+aprovar`), com as ações exibidas conforme a permissão; não tem número nem **`ativo`** (não se
+desativa nem exclui; o histórico é `PENDENTE`/`CONFIRMADO`/`RECUSADO`), e `data_criacao` é
+automática. Só `PENDENTE` é editável; editar exige `pedido.alterar`, aprovar/recusar exige
+`pedido.aprovar`, e as transições são condicionais (`WHERE status = PENDENTE`), com auditoria.
+
+Os itens guardam **só o total** e a **observação por item** (visível no formulário/detalhe e
+copiada para a nota); a Unidade Padrão de Saída é auxílio de preenchimento (sem vínculo/fator)
+e produtos repetidos **somam**. Aprovar **não cria nota**: o pedido `CONFIRMADO` sem nota
+aparece na importação da Saída. A importação usa `pedidoService.importar` (não o formulário
+comum), exige `nota_saida.criar`, mostra destinatário/itens somente leitura, cria **uma nota
+nova por pedido** (1:1), valida destinatário/produtos/quantidades e **recusa nota divergente**,
+aplica RN001 e o bloqueio por inventário, e grava `pedido.ID_nota_saida` na mesma transação.
+Nenhuma nota de entrada ou saída aceita produto duplicado (`@@unique` + serviço).
+
+Lista e relatório (`/relatorios/pedidos`) filtram por escola, status, período, produto e
+**Nota com/sem/todas**; o relatório usa o layout ampliado A4 paisagem e CSV. **O módulo de
+Pedidos não usa Figma/`data-figma`** (decisão do usuário).
+
+No release de produção, antes do `db push` das uniques, rode `npm run db:dedupe-notas`
+(`scripts/dedupe-itens-nota.ts`) **com a URL explícita do banco**: o script não lê o `.env`.
+Use `DATABASE_URL="mysql://..." npm run db:dedupe-notas` para o dry-run (padrão) e
+`DATABASE_URL="mysql://..." npm run db:dedupe-notas -- --apply` para aplicar; `--apply` só
+aceita o banco `nexus_prod` (ou um banco de teste, com "test" no nome), grava backup JSON e
+auditoria e consolida os itens duplicados. Também é possível passar `--url "mysql://..."` em
+vez da variável de ambiente.
 
 ---
 

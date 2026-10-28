@@ -9,6 +9,10 @@ import {
 export type SaidaItemInput = {
   id_produto: number;
   quantidade_solicitada: number;
+  /** Total já em base (importação de pedido): não multiplica pelo fator. */
+  total_base?: boolean;
+  /** Observação do item (na importação vem do pedido). */
+  observacao?: string | null;
 };
 
 /** Tipos que o formulário de saída aceita. `DESMONTAGEM` tem fluxo próprio. */
@@ -24,6 +28,8 @@ export type SaidaInput = {
   urgente?: boolean;
   observacao?: string | null;
   itens: SaidaItemInput[];
+  /** Pedido aprovado importado nesta nota (1 pedido → 1 nota). */
+  id_pedido_escola?: number | null;
 };
 
 /** Item da edição: com `id_item_nota_saida` = existente; sem = novo. */
@@ -61,12 +67,20 @@ function idPositivo(valor: unknown): number | null {
 
 function validarItens(
   itens: SaidaItemAtualizacaoInput[],
-): { itens: NotaSaidaItemAtualizacao[] } | { error: string } {
+): {
+  itens: (NotaSaidaItemAtualizacao & {
+    total_base?: boolean;
+    observacao?: string | null;
+  })[];
+} | { error: string } {
   if (!Array.isArray(itens) || itens.length === 0) {
     return { error: "Informe ao menos um item na nota de saída." };
   }
 
-  const validados: NotaSaidaItemAtualizacao[] = [];
+  const validados: (NotaSaidaItemAtualizacao & {
+    total_base?: boolean;
+    observacao?: string | null;
+  })[] = [];
   for (const item of itens) {
     const idProduto = idPositivo(item.id_produto);
     if (!idProduto) {
@@ -90,6 +104,8 @@ function validarItens(
       id_item_nota_saida: idItem,
       id_produto: idProduto,
       quantidade_solicitada: quantidade,
+      total_base: item.total_base === true,
+      observacao: item.observacao?.trim() || null,
     });
   }
 
@@ -142,7 +158,11 @@ export class NotaSaidaService {
       itens: itens.itens.map((item) => ({
         id_produto: item.id_produto,
         quantidade_solicitada: item.quantidade_solicitada,
+        total_base: item.total_base,
+        observacao: item.observacao ?? null,
       })),
+      id_pedido_escola:
+        ehRemessa && input.id_pedido_escola ? input.id_pedido_escola : null,
     };
 
     const resultado = await notaSaidaDAO.create(data, id_usuario);

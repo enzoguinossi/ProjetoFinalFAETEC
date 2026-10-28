@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
 import SearchEntityModal from "@/components/SearchEntityModal";
 import { useAviso } from "@/components/AvisoProvider";
@@ -12,13 +12,18 @@ import {
   atualizarNotaSaida,
   criarNotaSaida,
   getProdutoSaida,
+  importarPedidoParaSaida,
   listarDestinatariosSelecao,
+  listarPedidosParaImportacao,
   listarProdutosSelecao,
+  obterPedidoParaImportacao,
 } from "./actions";
 import { INPUT_CLASS, LABEL_CLASS } from "./form-ui";
 import type {
   DestinatarioSelecaoRow,
   NotaSaidaFormData,
+  PedidoImportacaoDetalhe,
+  PedidoImportacaoRow,
   ProdutoSaidaDetalhe,
   TipoSaidaPayload,
 } from "./tipos";
@@ -44,6 +49,8 @@ type ItemForm = {
   fator_conversao: number;
   /** Quantidade auxiliar; em Remessa é a quantidade na unidade de saída. */
   quantidade: string;
+  /** Observação do item (vem do pedido ou da própria nota). */
+  observacao: string | null;
 };
 
 const TIPOS_SAIDA: { valor: TipoSaidaPayload; rotulo: string }[] = [
@@ -90,6 +97,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       unidade_saida: null,
       fator_conversao: 1,
       quantidade: String(item.quantidade_solicitada),
+      observacao: item.observacao,
     })),
   );
   const [buscaProduto, setBuscaProduto] = useState("");
@@ -105,7 +113,80 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
   /** Última requisição de unidade de saída: evita que uma resposta antiga sobrescreva a nova. */
   const requisicaoProduto = useRef(0);
 
+  const [pedidosImportaveis, setPedidosImportaveis] = useState<PedidoImportacaoRow[]>([]);
+  const [pedidoSelecionado, setPedidoSelecionado] = useState("");
+  const [pedidoPreview, setPedidoPreview] = useState<PedidoImportacaoDetalhe | null>(
+    null,
+  );
+  const [carregandoImportacao, setCarregandoImportacao] = useState(false);
+
   const ehRemessa = tipo === "SAIDA";
+
+  useEffect(() => {
+    if (mode !== "create" || !ehRemessa) return;
+    let ativo = true;
+    void listarPedidosParaImportacao().then((dados) => {
+      if (ativo) setPedidosImportaveis(dados);
+    });
+    return () => {
+      ativo = false;
+    };
+  }, [mode, ehRemessa]);
+
+  /** Carrega o pedido aprovado para conferência somente leitura. */
+  async function carregarPedido(id: number) {
+    if (!id) return;
+    setCarregandoImportacao(true);
+    try {
+      const pedido = await obterPedidoParaImportacao(id);
+      if (!pedido) {
+        mostrarAviso("Pedido indisponível para importação.", "erro");
+        return;
+      }
+      setPedidoPreview(pedido);
+    } finally {
+      setCarregandoImportacao(false);
+    }
+  }
+
+  /**
+   * Importa o pedido pelo serviço próprio (1 pedido → 1 nota). A nota nasce
+   * com o destinatário e os itens do pedido; nada aqui é editável.
+   */
+  async function importarPedido() {
+    if (!pedidoPreview) return;
+    setCarregandoImportacao(true);
+    try {
+      const resultado = await importarPedidoParaSaida(pedidoPreview.id_pedido_escola);
+      if ("error" in resultado) {
+        mostrarAviso(resultado.error, "erro");
+        return;
+      }
+      if (resultado.aviso) mostrarAviso(resultado.aviso, "cautela");
+      mostrarAviso(
+        `Pedido importado: nota ${formatarCodigo(resultado.id_nota_saida)} criada.`,
+        "sucesso",
+      );
+      setPedidoPreview(null);
+      setPedidoSelecionado("");
+      setPedidosImportaveis((atuais) =>
+        atuais.filter(
+          (p) => p.id_pedido_escola !== pedidoPreview.id_pedido_escola,
+        ),
+      );
+      await onSaved();
+    } catch {
+      mostrarAviso("Não foi possível importar o pedido.", "erro");
+    } finally {
+      setCarregandoImportacao(false);
+    }
+  }
+
+  function cancelarImportacao() {
+    setPedidoPreview(null);
+    setPedidoSelecionado("");
+    void listarPedidosParaImportacao().then(setPedidosImportaveis);
+  }
 
   function totalItem(item: ItemForm): number {
     const quantidade = Number(item.quantidade);
@@ -131,6 +212,8 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       setDestinatario(null);
       setUrgente(false);
       setBuscandoDestinatario(false);
+      setPedidoSelecionado("");
+      setPedidoPreview(null);
     }
   }
 
@@ -207,6 +290,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         unidade_saida: ehRemessa ? (produtoSaidaDetalhe?.unidade_saida ?? null) : null,
         fator_conversao: ehRemessa ? (produtoSaidaDetalhe?.fator ?? 1) : 1,
         quantidade: String(quantidade),
+        observacao: null,
       },
     ]);
     setProdutoPendente(null);
@@ -293,6 +377,8 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         setProdutoPendente(null);
         setProdutoSaidaDetalhe(null);
         setQuantidadePendente("1");
+        setPedidoSelecionado("");
+        void listarPedidosParaImportacao().then(setPedidosImportaveis);
       }
       await onSaved();
     } catch {
@@ -305,6 +391,89 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
     } finally {
       setSalvando(false);
     }
+  }
+
+  if (mode === "create" && pedidoPreview) {
+    return (
+      <div className={ui.form}>
+        <div className="flex flex-col gap-1">
+          <span className={LABEL_CLASS}>Importar pedido aprovado</span>
+          <p className="m-0 font-sans text-sm text-[#697077]">
+            Pedido {formatarCodigo(pedidoPreview.id_pedido_escola)} —{" "}
+            {pedidoPreview.escola}. O destinatário e os itens abaixo são do pedido e não
+            podem ser alterados: a importação cria uma nota nova vinculada a ele.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className={ui.field}>
+            <label className={LABEL_CLASS}>Escola</label>
+            <input readOnly value={pedidoPreview.escola} className={INPUT_CLASS} />
+          </div>
+          <div className={ui.field}>
+            <label className={LABEL_CLASS}>Observação do pedido</label>
+            <input
+              readOnly
+              value={pedidoPreview.observacao?.trim() || "—"}
+              className={INPUT_CLASS}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-[#f2f4f8] text-left">
+                <th className="px-3 py-2 font-display font-semibold">Código</th>
+                <th className="px-3 py-2 font-display font-semibold">Produto</th>
+                <th className="px-3 py-2 text-right font-display font-semibold">
+                  Total
+                </th>
+                <th className="px-3 py-2 font-display font-semibold">Observação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pedidoPreview.itens.map((item) => (
+                <tr key={item.id_produto} className="border-t border-border">
+                  <td className="px-3 py-2 font-mono text-xs text-[#697077]">
+                    {formatarCodigo(item.id_produto)}
+                  </td>
+                  <td className="px-3 py-2">{item.descricao}</td>
+                  <td className="px-3 py-2 text-right">
+                    {new Intl.NumberFormat("pt-BR", {
+                      maximumFractionDigits: 6,
+                    }).format(item.quantidade)}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-[#697077]">
+                    {item.observacao?.trim() || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="m-0 font-sans text-sm text-[#697077]">
+          Saldo insuficiente apenas avisa (RN001). Produto em inventário ativo bloqueia a
+          importação.
+        </p>
+
+        <div className={ui.rowActions}>
+          <Button
+            label="Cancelar"
+            variant="cancel"
+            onClick={cancelarImportacao}
+            disabled={carregandoImportacao}
+          />
+          <Button
+            label={carregandoImportacao ? "Importando..." : "Importar e criar nota"}
+            variant="primary"
+            onClick={() => void importarPedido()}
+            disabled={carregandoImportacao}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -403,6 +572,42 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         <p className="m-0 font-sans text-sm text-[#697077]">
           A baixa no estoque será feita ao gravar a nota.
         </p>
+      )}
+
+      {mode === "create" && ehRemessa && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <span className={LABEL_CLASS}>Importar pedido aprovado</span>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[16rem] flex-1 flex-col gap-1 font-sans text-xs text-[#697077]">
+              Pedido
+              <select
+                value={pedidoSelecionado}
+                onChange={(e) => setPedidoSelecionado(e.target.value)}
+                className={INPUT_CLASS}
+              >
+                <option value="">Selecione um pedido aprovado</option>
+                {pedidosImportaveis.map((pedido) => (
+                  <option
+                    key={pedido.id_pedido_escola}
+                    value={pedido.id_pedido_escola}
+                  >
+                    {formatarCodigo(pedido.id_pedido_escola)} — {pedido.escola}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              label={carregandoImportacao ? "Carregando..." : "Conferir pedido"}
+              variant="primary"
+              onClick={() => void carregarPedido(Number(pedidoSelecionado))}
+              disabled={!pedidoSelecionado || carregandoImportacao}
+            />
+          </div>
+          <span className="font-sans text-xs text-[#697077]">
+            A importação cria uma nota nova por pedido, com o destinatário e os itens
+            do pedido (somente leitura). O pedido sai desta lista ao gravar.
+          </span>
+        </div>
       )}
 
       {!isView && mode === "edit" && initialData?.podeEditar === false && (
@@ -552,8 +757,15 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                   className={`grid gap-3 rounded-lg border border-border p-3 font-sans ${colunas}`}
                 >
                   <span className="text-sm text-ink-strong">{item.codigo}</span>
-                  <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-ink-strong">
-                    {item.descricao}
+                  <span className="flex min-w-0 flex-col gap-0.5 text-sm text-ink-strong">
+                    <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                      {item.descricao}
+                    </span>
+                    {item.observacao?.trim() && (
+                      <span className="font-sans text-xs font-normal text-[#697077]">
+                        Obs.: {item.observacao}
+                      </span>
+                    )}
                   </span>
 
                   {!existente && ehRemessa && (
