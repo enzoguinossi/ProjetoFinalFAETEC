@@ -88,6 +88,7 @@ export type FiltrosExpedicoes = {
   id_condutores: number[];
   /** Status selecionados; lista vazia não filtra. */
   status: StatusExpedicaoRelatorio[];
+  fotos: boolean;
 };
 
 export type FiltrosEntregas = {
@@ -99,6 +100,7 @@ export type FiltrosEntregas = {
   id_destinatarios: number[];
   /** Status da nota selecionados; lista vazia não filtra. */
   status: StatusNotaRelatorio[];
+  fotos: boolean;
 };
 
 /** Filtros do relatório de Auditoria; lista vazia não filtra. */
@@ -116,9 +118,12 @@ export type FiltrosAuditoria = {
 export type FiltrosVencimento = { dias: DiasVencimentoRelatorio };
 
 /** Filtros dos cadastros em multi-seleção; lista vazia não filtra. */
-export type FiltrosFuncionarios = { situacoes: SituacaoCadastroRelatorio[] };
+export type FiltrosFuncionarios = {
+  situacoes: SituacaoCadastroRelatorio[];
+  fotos: boolean;
+};
 export type FiltrosFornecedores = { situacoes: SituacaoCadastroRelatorio[] };
-export type FiltrosDestinatarios = FiltrosFuncionarios & {
+export type FiltrosDestinatarios = FiltrosFornecedores & {
   tipos: TipoDestinatarioRelatorio[];
 };
 
@@ -134,6 +139,7 @@ function primeiro(valor: string | string[] | null | undefined): string {
  */
 export function normalizarFiltrosProdutos(params: {
   situacao?: string | string[] | null;
+  fotos?: string | string[] | null;
 } = {}): Required<ProdutosRelatorioFiltros> {
   const situacaoBruta = primeiro(params.situacao);
   const situacao: SituacaoProdutoRelatorio = SITUACOES_PRODUTO_RELATORIO.includes(
@@ -141,7 +147,7 @@ export function normalizarFiltrosProdutos(params: {
   )
     ? (situacaoBruta as SituacaoProdutoRelatorio)
     : "ativas";
-  return { situacao };
+  return { situacao, fotos: primeiro(params.fotos) === "1" };
 }
 
 /** Limite de dias válido; valor desconhecido cai no padrão de 30 dias. */
@@ -164,10 +170,11 @@ export function normalizarFiltrosVencimento(
 
 /** Normaliza a situação dos cadastros; vazio ou os dois não filtra. */
 export function normalizarFiltrosFuncionarios(
-  params: { situacao?: string | string[] | null } = {},
+  params: { situacao?: string | string[] | null; fotos?: string | string[] | null } = {},
 ): FiltrosFuncionarios {
   return {
     situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
+    fotos: primeiro(params.fotos) === "1",
   };
 }
 
@@ -337,6 +344,7 @@ export function normalizarFiltrosExpedicoes(
     destinatario?: string | string[] | null;
     condutor?: string | string[] | null;
     status?: string | string[] | null;
+    fotos?: string | string[] | null;
   } = {},
   agora: Date = new Date(),
 ): FiltrosExpedicoes {
@@ -354,6 +362,7 @@ export function normalizarFiltrosExpedicoes(
     id_destinatarios: idsNormalizados(params.destinatario),
     id_condutores: idsNormalizados(params.condutor),
     status: opcoesNormalizadas(params.status, STATUS_EXPEDICAO_RELATORIO),
+    fotos: primeiro(params.fotos) === "1",
   };
 }
 
@@ -368,6 +377,7 @@ export function normalizarFiltrosEntregas(
     ate?: string | string[] | null;
     destinatario?: string | string[] | null;
     status?: string | string[] | null;
+    fotos?: string | string[] | null;
   } = {},
   agora: Date = new Date(),
 ): FiltrosEntregas {
@@ -383,6 +393,7 @@ export function normalizarFiltrosEntregas(
     ate,
     id_destinatarios: idsNormalizados(params.destinatario),
     status: opcoesNormalizadas(params.status, STATUS_NOTA_RELATORIO),
+    fotos: primeiro(params.fotos) === "1",
   };
 }
 
@@ -537,13 +548,17 @@ function campoCsv(valor: string): string {
  * CSV da Lista de Produtos (RF024): BOM para o Excel pt-BR reconhecer UTF-8,
  * separador `;` e decimal com vírgula.
  */
-export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
+export function gerarCsvProdutos(
+  linhas: ProdutoRelatorioRow[],
+  incluirFotos = false,
+): string {
   const cabecalho = [
     "Código",
     "Descrição",
     "Quantidade",
     "Qtd. Livre",
     "Situação",
+    ...(incluirFotos ? ["Foto"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -551,6 +566,7 @@ export function gerarCsvProdutos(linhas: ProdutoRelatorioRow[]): string {
     formatarQuantidadeCsv(linha.quantidade),
     formatarQuantidadeCsv(linha.livre),
     linha.situacao,
+    ...(incluirFotos ? [linha.foto_url ?? ""] : []),
   ]);
   const corpo = [cabecalho, ...registros]
     .map((campos) => campos.map(campoCsv).join(";"))
@@ -597,7 +613,10 @@ export function gerarCsvMovimentacoes(linhas: MovimentacaoRelatorioRow[]): strin
  * CSV de Expedições por Período (RF023/RF024), com a mesma formatação pt-BR:
  * BOM UTF-8, separador `;` e decimal com vírgula.
  */
-export function gerarCsvExpedicoes(linhas: ExpedicaoRelatorioRow[]): string {
+export function gerarCsvExpedicoes(
+  linhas: ExpedicaoRelatorioRow[],
+  incluirFotos = false,
+): string {
   const cabecalho = [
     "Data prevista",
     "Status",
@@ -607,6 +626,7 @@ export function gerarCsvExpedicoes(linhas: ExpedicaoRelatorioRow[]): string {
     "Destinatários",
     "Itens esperados",
     "Itens entregues",
+    ...(incluirFotos ? ["Fotos"] : []),
   ];
   const registros = linhas.map((linha) => [
     formatarDataISO(linha.data_prevista),
@@ -617,6 +637,7 @@ export function gerarCsvExpedicoes(linhas: ExpedicaoRelatorioRow[]): string {
     linha.destinatarios,
     formatarQuantidadeCsv(linha.itens_esperados),
     formatarQuantidadeCsv(linha.itens_entregues),
+    ...(incluirFotos ? [linha.fotos.join(";")] : []),
   ]);
   const corpo = [cabecalho, ...registros]
     .map((campos) => campos.map(campoCsv).join(";"))
@@ -628,7 +649,10 @@ export function gerarCsvExpedicoes(linhas: ExpedicaoRelatorioRow[]): string {
  * CSV de Entregas por Instituição (RF023/RF024), com a mesma formatação pt-BR
  * dos demais relatórios.
  */
-export function gerarCsvEntregas(linhas: EntregaRelatorioRow[]): string {
+export function gerarCsvEntregas(
+  linhas: EntregaRelatorioRow[],
+  incluirFotos = false,
+): string {
   const cabecalho = [
     "Nota",
     "Data",
@@ -639,6 +663,7 @@ export function gerarCsvEntregas(linhas: EntregaRelatorioRow[]): string {
     "Entregue",
     "Pendente",
     "Expedição",
+    ...(incluirFotos ? ["Fotos", "Justificativa"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -650,6 +675,7 @@ export function gerarCsvEntregas(linhas: EntregaRelatorioRow[]): string {
     formatarQuantidadeCsv(linha.entregue),
     formatarQuantidadeCsv(linha.pendente),
     linha.expedicao,
+    ...(incluirFotos ? [linha.fotos.join(";"), linha.justificativa ?? ""] : []),
   ]);
   const corpo = [cabecalho, ...registros]
     .map((campos) => campos.map(campoCsv).join(";"))
@@ -685,7 +711,10 @@ export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): str
 }
 
 /** CSV da lista de Funcionários (RF023/RF024). */
-export function gerarCsvFuncionarios(linhas: FuncionarioRelatorioRow[]): string {
+export function gerarCsvFuncionarios(
+  linhas: FuncionarioRelatorioRow[],
+  incluirFotos = false,
+): string {
   const cabecalho = [
     "Código",
     "Nome",
@@ -695,6 +724,7 @@ export function gerarCsvFuncionarios(linhas: FuncionarioRelatorioRow[]): string 
     "Situação",
     "E-mail",
     "Telefone",
+    ...(incluirFotos ? ["Foto"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -705,6 +735,7 @@ export function gerarCsvFuncionarios(linhas: FuncionarioRelatorioRow[]): string 
     linha.situacao,
     linha.email ?? "",
     linha.telefone ?? "",
+    ...(incluirFotos ? [linha.foto_url ?? ""] : []),
   ]);
   const corpo = [cabecalho, ...registros]
     .map((campos) => campos.map(campoCsv).join(";"))
@@ -789,6 +820,7 @@ export class RelatorioService {
   /** Aplica os filtros normalizados e devolve as linhas e os totalizadores. */
   async listarProdutos(params: {
     situacao?: string | string[] | null;
+    fotos?: string | string[] | null;
   } = {}): Promise<ProdutosRelatorioResult & { filtros: Required<ProdutosRelatorioFiltros> }> {
     const filtros = normalizarFiltrosProdutos(params);
     const resultado = await relatorioDAO.listarProdutosRelatorio(filtros);
@@ -832,6 +864,7 @@ export class RelatorioService {
       destinatario?: string | string[] | null;
       condutor?: string | string[] | null;
       status?: string | string[] | null;
+      fotos?: string | string[] | null;
     } = {},
   ): Promise<ExpedicoesRelatorioResult & { filtros: FiltrosExpedicoes }> {
     const filtros = normalizarFiltrosExpedicoes(params);
@@ -843,6 +876,7 @@ export class RelatorioService {
       id_destinatarios: filtros.id_destinatarios,
       id_condutores: filtros.id_condutores,
       status: filtros.status,
+      fotos: filtros.fotos,
     });
     return { ...resultado, filtros };
   }
@@ -854,6 +888,7 @@ export class RelatorioService {
       ate?: string | string[] | null;
       destinatario?: string | string[] | null;
       status?: string | string[] | null;
+      fotos?: string | string[] | null;
     } = {},
   ): Promise<EntregasRelatorioResult & { filtros: FiltrosEntregas }> {
     const filtros = normalizarFiltrosEntregas(params);
@@ -863,6 +898,7 @@ export class RelatorioService {
       ate,
       id_destinatarios: filtros.id_destinatarios,
       status: filtros.status,
+      fotos: filtros.fotos,
     });
     return { ...resultado, filtros };
   }
@@ -881,7 +917,7 @@ export class RelatorioService {
 
   /** Funcionários do cadastro, com a situação selecionada (vazio não filtra). */
   async listarFuncionarios(
-    params: { situacao?: string | string[] | null } = {},
+    params: { situacao?: string | string[] | null; fotos?: string | string[] | null } = {},
   ): Promise<FuncionariosRelatorioResult & { filtros: FiltrosFuncionarios }> {
     const filtros = normalizarFiltrosFuncionarios(params);
     const resultado = await relatorioDAO.listarFuncionariosRelatorio(filtros);

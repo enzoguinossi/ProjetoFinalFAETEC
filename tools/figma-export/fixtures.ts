@@ -364,7 +364,6 @@ async function main() {
     const produto = await prisma.produto.create({
       data: {
         descricao: p.descricao,
-        foto_url: p.foto,
         perecivel: p.perecivel,
         id_conversao_padrao: porNomeConversao[p.conversao] ?? conversaoPadrao,
         id_conversao_saida: porNomeConversao[p.conversao] ?? conversaoPadrao,
@@ -376,6 +375,18 @@ async function main() {
     await prisma.produtoCodigo.create({
       data: { id_produto: produto.id_produto, id_tipo_codigo: tipos.EAN13, codigo: p.codigo },
     });
+    if (p.foto) {
+      await prisma.anexo.create({
+        data: {
+          nome_arquivo: p.foto.replace(/^\//, ""),
+          url: p.foto,
+          tipo_mime: "image/svg+xml",
+          data_upload: new Date(),
+          ativo: true,
+          id_produto: produto.id_produto,
+        },
+      });
+    }
   }
 ﻿  /* ── Inventários ── */
   const produtosCriados = await prisma.produto.findMany({

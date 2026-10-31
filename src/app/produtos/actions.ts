@@ -6,7 +6,12 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
-import { processarImagemWebp, processarImagemDeUrl, salvarImagemProduto, removerImagemProduto } from "@/lib/imagem";
+import {
+  processarImagemDoFormulario,
+  salvarImagemAnexo,
+  removerImagemAnexo,
+} from "@/lib/imagem";
+import { anexoService } from "@/services/anexo";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
@@ -23,6 +28,8 @@ export type ProdutoFormData = {
   id_conversao_padrao: number;
   id_conversao_saida: number;
   foto_url: string | null;
+  /** Anexos ativos do produto (o primeiro é a foto atual). */
+  fotos: { id_anexo: number; url: string }[];
   ativo: boolean;
   codigos: { tipo: string; valor: string }[];
   insumos: { id: number; descricao: string; qtd: number }[];
@@ -60,22 +67,23 @@ export async function listarProdutos(
 async function resolverImagem(
   formData: FormData,
   fotoUrl: string | undefined,
-): Promise<{ buffer: Buffer; hash: string } | null | { error: string }> {
-  const arquivo = formData.get("foto_arquivo");
-  if (arquivo instanceof File && arquivo.size > 0) {
-    const res = await processarImagemWebp(arquivo);
-    if (!res.ok) return { error: res.error };
-    return { buffer: res.buffer, hash: res.hash };
-  }
+): Promise<{
+  buffer: Buffer;
+  hash: string;
+  nome_arquivo: string;
+  tipo_mime: string;
+} | null | { error: string }> {
+  return processarImagemDoFormulario(formData, "foto_arquivo", fotoUrl);
+}
 
-  const url = fotoUrl?.trim();
-  if (url && /^https?:\/\//i.test(url)) {
-    const res = await processarImagemDeUrl(url);
-    if (!res.ok) return { error: res.error };
-    return { buffer: res.buffer, hash: res.hash };
-  }
-
-  return null;
+/** IDs de anexos marcados para remoção no formulário (`remover_anexos`). */
+function lerRemoverAnexos(formData: FormData): number[] {
+  const bruto = String(formData.get("remover_anexos") ?? "").trim();
+  if (!bruto) return [];
+  return bruto
+    .split(",")
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
 }
 
 /** Lê o campo `insumos` (JSON: [{ id, qtd }]) do FormData. */
@@ -109,7 +117,8 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
     data_validade: p.data_validade ? p.data_validade.toISOString().split("T")[0] : null,
     id_conversao_padrao: p.id_conversao_padrao,
     id_conversao_saida: p.id_conversao_saida,
-    foto_url: p.foto_url,
+    foto_url: p.anexos[0]?.url ?? null,
+    fotos: p.anexos.map((anexo) => ({ id_anexo: anexo.id_anexo, url: anexo.url })),
     ativo: p.ativo,
     codigos: p.produtoCodigos.map((c) => ({
       tipo: c.tipoCodigo.nome,
@@ -152,12 +161,11 @@ export async function createProduto(formData: FormData) {
     const imagem = await resolverImagem(formData, foto_url);
     if (imagem && "error" in imagem) return { error: imagem.error };
 
-    let criado: { id_produto: number };
+    let novaUrl: string | null = null;
     try {
-      criado = await produtoDAO.createCompleto(
+      await produtoDAO.createCompleto(
         {
           descricao: descricao.trim(),
-          foto_url: imagem ? undefined : foto_url,
           perecivel,
           composto,
           data_validade,
@@ -167,19 +175,31 @@ export async function createProduto(formData: FormData) {
           insumos,
         },
         id_usuario,
+        async (tx, idProduto) => {
+          if (!imagem) return;
+          novaUrl = await salvarImagemAnexo(
+            `produtos/${idProduto}`,
+            imagem.buffer,
+            imagem.hash,
+          );
+          await anexoService.criarAnexos(
+            { tipo: "produto", id: idProduto },
+            [
+              {
+                nome_arquivo: imagem.nome_arquivo,
+                url: novaUrl,
+                tipo_mime: imagem.tipo_mime,
+              },
+            ],
+            id_usuario,
+            tx,
+          );
+        },
       );
     } catch (e) {
+      // Transação desfeita: o arquivo recém-gravado não pode sobrar no disco.
+      if (novaUrl) await removerImagemAnexo(novaUrl);
       return { error: mensagemDeErro(e) };
-    }
-
-    if (imagem) {
-      try {
-        const path = await salvarImagemProduto(criado.id_produto, imagem.buffer, imagem.hash);
-        await produtoDAO.setFotoUrl(criado.id_produto, path, id_usuario);
-      } catch {
-        await produtoDAO.rollbackCreate(criado.id_produto, id_usuario);
-        return { error: "Não foi possível salvar a imagem. O produto não foi criado." };
-      }
     }
 
     return { success: true };
@@ -217,27 +237,20 @@ export async function updateProduto(formData: FormData) {
 
     const insumos = lerInsumos(formData);
 
-    const atual = await produtoDAO.getById(id);
-    const fotoAnterior = atual?.foto_url ?? null;
-
     const imagem = await resolverImagem(formData, foto_url);
     if (imagem && "error" in imagem) return { error: imagem.error };
 
-    let novaFotoPath: string | null = null;
-    if (imagem) {
-      try {
-        novaFotoPath = await salvarImagemProduto(id, imagem.buffer, imagem.hash);
-      } catch {
-        return { error: "Não foi possível salvar a imagem. Nenhuma alteração foi feita." };
-      }
-    }
+    const id_usuario = user.id_usuario;
+    const dono = { tipo: "produto" as const, id };
+    const removerIds = lerRemoverAnexos(formData);
+    const urlsAntigas: string[] = [];
+    let novaUrl: string | null = null;
 
     try {
       await produtoDAO.updateCompleto(
         id,
         {
           descricao: descricao.trim(),
-          foto_url: novaFotoPath ?? foto_url,
           perecivel,
           composto,
           ativo,
@@ -247,14 +260,44 @@ export async function updateProduto(formData: FormData) {
           codigos,
           insumos,
         },
-        user.id_usuario,
+        id_usuario,
+        async (tx) => {
+          if (removerIds.length > 0) {
+            const ativos = await anexoService.listarAtivos(dono, tx);
+            for (const anexo of ativos) {
+              if (!removerIds.includes(anexo.id_anexo)) continue;
+              await anexoService.desativar(anexo.id_anexo, id_usuario, tx);
+              urlsAntigas.push(anexo.url);
+            }
+          }
+          if (imagem) {
+            novaUrl = await salvarImagemAnexo(
+              `produtos/${id}`,
+              imagem.buffer,
+              imagem.hash,
+            );
+            const troca = await anexoService.substituirFoto(
+              dono,
+              {
+                nome_arquivo: imagem.nome_arquivo,
+                url: novaUrl,
+                tipo_mime: imagem.tipo_mime,
+              },
+              id_usuario,
+              tx,
+            );
+            urlsAntigas.push(...troca.urlsAntigas);
+          }
+        },
       );
     } catch (e) {
+      if (novaUrl) await removerImagemAnexo(novaUrl);
       return { error: mensagemDeErro(e) };
     }
 
-    if (novaFotoPath && fotoAnterior && fotoAnterior !== novaFotoPath) {
-      await removerImagemProduto(fotoAnterior);
+    // Só depois do commit removemos do disco as fotos substituídas.
+    for (const url of urlsAntigas) {
+      if (url !== novaUrl) await removerImagemAnexo(url);
     }
 
     return { success: true };
@@ -264,7 +307,8 @@ export async function updateProduto(formData: FormData) {
 export async function deleteProduto(id: number) {
   return comPermissao("produto.excluir", async (user) => {
     try {
-      await produtoDAO.hardDelete(id, user.id_usuario);
+      const urls = await produtoDAO.hardDelete(id, user.id_usuario);
+      for (const url of urls) await removerImagemAnexo(url);
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }

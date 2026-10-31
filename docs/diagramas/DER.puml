@@ -248,7 +248,6 @@ entity "produto" as produto {
   * ID_produto : INT <<PK>>
   --
   * descricao : VARCHAR
-  foto_url : VARCHAR
   * perecivel : BOOLEAN
   * composto : BOOLEAN
   data_validade : DATE
@@ -480,6 +479,9 @@ entity "expedicao_nota" as expedicao_nota {
   * ID_nota_saida : INT <<FK>>
   * ordem_visita : INT
   * data_adicao : TIMESTAMP
+  justificativa : TEXT
+  data_tentativa : TIMESTAMP
+  ID_usuario_tentativa : INT <<FK>>
 }
 
 ' =========================================================
@@ -525,7 +527,7 @@ note right of item_nota_entrada
 end note
 
 ' =========================================================
-' ANEXOS
+' ANEXOS (dono polimórfico: produto OU funcionario OU expedicao_nota)
 ' =========================================================
 
 entity "anexo" as anexo {
@@ -535,8 +537,11 @@ entity "anexo" as anexo {
   * url : VARCHAR
   tipo_mime : VARCHAR
   * data_upload : TIMESTAMP
-  ID_nota_saida : INT <<FK>>
+  ID_usuario : INT <<FK>>
   * ativo : BOOLEAN
+  ID_produto : INT <<FK>>
+  ID_funcionario : INT <<FK>>
+  ID_expedicao_nota : INT <<FK>>
 }
 
 ' =========================================================
@@ -680,6 +685,7 @@ percurso ||--|{ perc_dest
 destinatario ||--o{ perc_dest
 expedicao ||--o{ expedicao_nota
 nota ||--o{ expedicao_nota
+usuario ||--o{ expedicao_nota : "registrou tentativa"
 funcionario ||--o{ expedicao
 veiculo ||--o{ expedicao
 
@@ -687,8 +693,11 @@ veiculo ||--o{ expedicao
 fornecedor ||--o{ nota_entrada
 nota_entrada ||--|{ item_nota_entrada
 
-' Anexos
-nota ||--o{ anexo
+' Anexos (um dono por linha)
+produto ||--o{ anexo : "foto"
+funcionario ||--o{ anexo : "foto"
+expedicao_nota ||--o{ anexo : "fotos da tentativa"
+usuario ||--o{ anexo : "enviou"
 
 ' Acessos / Auditoria
 usuario ||--o{ usuario_permissao

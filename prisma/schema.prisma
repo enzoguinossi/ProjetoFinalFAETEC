@@ -120,6 +120,7 @@ model Funcionario {
   telefones              FuncionarioTelefone[]
   usuario                Usuario?
   expedicoesComoCondutor Expedicao[]
+  anexos                 Anexo[]
 
   @@map("funcionario")
 }
@@ -145,6 +146,8 @@ model Usuario {
   reservas             ReservaEstoque[]
   funcionario          Funcionario           @relation(fields: [id_funcionario], references: [id_funcionario])
   permissoes           UsuarioPermissao[]
+  anexos               Anexo[]
+  tentativasExpedicaoNota ExpedicaoNota[]    @relation("expedicao_nota_tentativa")
 
   @@map("usuario")
 }
@@ -289,7 +292,6 @@ model ConversaoUnidade {
 model Produto {
   id_produto          Int                @id @default(autoincrement()) @map("ID_produto")
   descricao           String             @map("descricao")
-  foto_url            String?            @map("foto_url")
   perecivel           Boolean            @default(false) @map("perecivel")
   composto            Boolean            @default(false) @map("composto")
   data_validade       DateTime?          @map("data_validade") @db.Date
@@ -311,6 +313,7 @@ model Produto {
   produtoCodigos      ProdutoCodigo[]
   insumosFilho        ProdutoInsumo[]    @relation("produto_filho")
   insumosPai          ProdutoInsumo[]    @relation("produto_pai")
+  anexos              Anexo[]
 
   @@index([id_conversao_padrao], map: "produto_ID_conversao_padrao_fkey")
   @@index([id_conversao_saida], map: "produto_ID_conversao_saida_fkey")
@@ -501,7 +504,6 @@ model NotaSaida {
   urgente         Boolean               @default(false) @map("urgente")
   observacao      String?               @map("observacao") @db.Text
   ativo           Boolean               @default(true) @map("ativo")
-  anexos          Anexo[]
   coletas         Coleta[]
   expedicoes      ExpedicaoNota[]
   itens           ItemNotaSaida[]
@@ -603,11 +605,17 @@ model ExpedicaoNota {
   id_nota_saida     Int       @map("ID_nota_saida")
   ordem_visita      Int       @map("ordem_visita")
   data_adicao       DateTime  @map("data_adicao") @db.Timestamp(0)
+  justificativa     String?   @map("justificativa") @db.Text
+  data_tentativa    DateTime? @map("data_tentativa") @db.Timestamp(0)
+  id_usuario_tentativa Int?   @map("ID_usuario_tentativa")
   notaSaida         NotaSaida @relation(fields: [id_nota_saida], references: [id_nota_saida])
   expedicao         Expedicao @relation(fields: [id_expedicao], references: [id_expedicao])
+  usuarioTentativa  Usuario?  @relation("expedicao_nota_tentativa", fields: [id_usuario_tentativa], references: [id_usuario])
+  anexos            Anexo[]
 
   @@index([id_nota_saida], map: "expedicao_nota_ID_nota_saida_fkey")
   @@index([id_expedicao], map: "expedicao_nota_ID_expedicao_fkey")
+  @@index([id_usuario_tentativa], map: "expedicao_nota_ID_usuario_tentativa_fkey")
   @@map("expedicao_nota")
 }
 
@@ -657,16 +665,25 @@ model ItemNotaEntrada {
 }
 
 model Anexo {
-  id_anexo      Int        @id @default(autoincrement()) @map("ID_anexo")
-  nome_arquivo  String     @map("nome_arquivo")
-  url           String     @map("url")
-  tipo_mime     String?    @map("tipo_mime")
-  data_upload   DateTime   @map("data_upload") @db.Timestamp(0)
-  id_nota_saida Int?       @map("ID_nota_saida")
-  ativo         Boolean    @default(true) @map("ativo")
-  notaSaida     NotaSaida? @relation(fields: [id_nota_saida], references: [id_nota_saida])
+  id_anexo          Int            @id @default(autoincrement()) @map("ID_anexo")
+  nome_arquivo      String         @map("nome_arquivo")
+  url               String         @map("url")
+  tipo_mime         String?        @map("tipo_mime")
+  data_upload       DateTime       @map("data_upload") @db.Timestamp(0)
+  id_usuario        Int?           @map("ID_usuario")
+  ativo             Boolean        @default(true) @map("ativo")
+  id_produto        Int?           @map("ID_produto")
+  id_funcionario    Int?           @map("ID_funcionario")
+  id_expedicao_nota Int?           @map("ID_expedicao_nota")
+  usuario           Usuario?       @relation(fields: [id_usuario], references: [id_usuario])
+  produto           Produto?       @relation(fields: [id_produto], references: [id_produto], onDelete: Cascade)
+  funcionario       Funcionario?   @relation(fields: [id_funcionario], references: [id_funcionario], onDelete: Cascade)
+  expedicaoNota     ExpedicaoNota? @relation(fields: [id_expedicao_nota], references: [id_expedicao_nota], onDelete: Cascade)
 
-  @@index([id_nota_saida], map: "anexo_ID_nota_saida_fkey")
+  @@index([id_produto], map: "anexo_ID_produto_fkey")
+  @@index([id_funcionario], map: "anexo_ID_funcionario_fkey")
+  @@index([id_expedicao_nota], map: "anexo_ID_expedicao_nota_fkey")
+  @@index([id_usuario], map: "anexo_ID_usuario_fkey")
   @@map("anexo")
 }
 

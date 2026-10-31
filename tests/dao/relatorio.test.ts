@@ -48,6 +48,35 @@ describe("relatorioDAO", () => {
       await criarEstoque(arroz.id_produto, { quantidadeAtual: 5, saldoReservado: 2 });
       await criarEstoque(feijao.id_produto, { quantidadeAtual: 2.5 });
 
+      // Foto atual = anexo ativo mais recente; o inativo é ignorado.
+      await prismaTeste.anexo.create({
+        data: {
+          id_produto: arroz.id_produto,
+          nome_arquivo: "antiga.webp",
+          url: "/uploads/produtos/antiga.webp",
+          data_upload: new Date("2026-10-01T10:00:00Z"),
+          ativo: true,
+        },
+      });
+      await prismaTeste.anexo.create({
+        data: {
+          id_produto: arroz.id_produto,
+          nome_arquivo: "atual.webp",
+          url: "/uploads/produtos/atual.webp",
+          data_upload: new Date("2026-10-02T10:00:00Z"),
+          ativo: true,
+        },
+      });
+      await prismaTeste.anexo.create({
+        data: {
+          id_produto: arroz.id_produto,
+          nome_arquivo: "inativa.webp",
+          url: "/uploads/produtos/inativa.webp",
+          data_upload: new Date("2026-10-03T10:00:00Z"),
+          ativo: false,
+        },
+      });
+
       const { data, totais } = await relatorioDAO.listarProdutosRelatorio();
 
       expect(data.map((p) => p.descricao)).toEqual(["Arroz", "Feijão"]);
@@ -57,10 +86,12 @@ describe("relatorioDAO", () => {
         quantidade: 15,
         livre: 10,
         situacao: "Ativo",
+        foto_url: "/uploads/produtos/atual.webp",
       });
       expect(data[1]).toMatchObject({
         quantidade: 2.5,
         livre: 2.5,
+        foto_url: null,
       });
       expect(data[0]).not.toHaveProperty("unidade");
       expect(totais).toEqual({ quantidade: 17.5, livre: 12.5 });
@@ -721,6 +752,49 @@ describe("relatorioDAO", () => {
       expect(resultado.data[0]?.expedicao).toBe(`EXP #${recente.id_expedicao}`);
     });
 
+    it("usa a justificativa da tentativa mais recente, não a do vínculo mais antigo", async () => {
+      const nota = await criarNotaSaida();
+      const primeira = await criarExpedicao();
+      const segunda = await criarExpedicao();
+      const vinculoAntigo = await vincularNota(
+        primeira.id_expedicao,
+        nota.id_nota_saida,
+        1,
+        new Date("2026-10-01"),
+      );
+      const vinculoRecente = await vincularNota(
+        segunda.id_expedicao,
+        nota.id_nota_saida,
+        1,
+        new Date("2026-10-05"),
+      );
+
+      await prismaTeste.expedicaoNota.update({
+        where: { id_expedicao_nota: vinculoAntigo.id_expedicao_nota },
+        data: {
+          data_tentativa: new Date("2026-10-10"),
+          justificativa: "Escola fechada",
+        },
+      });
+      await prismaTeste.expedicaoNota.update({
+        where: { id_expedicao_nota: vinculoRecente.id_expedicao_nota },
+        data: { data_tentativa: new Date("2026-10-02") },
+      });
+
+      const resultado = await relatorioDAO.listarEntregasRelatorio();
+      expect(resultado.data[0]?.justificativa).toBe("Escola fechada");
+      expect(resultado.data[0]?.expedicao).toBe(`EXP #${segunda.id_expedicao}`);
+
+      // Tentativa mais recente sem justificativa (entrega): não repete o motivo antigo.
+      await prismaTeste.expedicaoNota.update({
+        where: { id_expedicao_nota: vinculoRecente.id_expedicao_nota },
+        data: { data_tentativa: new Date("2026-10-12") },
+      });
+
+      const depois = await relatorioDAO.listarEntregasRelatorio();
+      expect(depois.data[0]?.justificativa).toBeNull();
+    });
+
     it("filtra por destinatário e status, inclusive canceladas", async () => {
       const escolaA = await criarDestinatario({ razaoSocial: "Escola A" });
       const escolaB = await criarDestinatario({ razaoSocial: "Escola B" });
@@ -986,6 +1060,25 @@ describe("relatorioDAO", () => {
         },
       });
 
+      await prismaTeste.anexo.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          nome_arquivo: "ana.webp",
+          url: "/uploads/funcionarios/ana.webp",
+          data_upload: new Date("2026-10-01T10:00:00Z"),
+          ativo: true,
+        },
+      });
+      await prismaTeste.anexo.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          nome_arquivo: "ana-antiga.webp",
+          url: "/uploads/funcionarios/ana-antiga.webp",
+          data_upload: new Date("2026-09-01T10:00:00Z"),
+          ativo: true,
+        },
+      });
+
       const todos = await relatorioDAO.listarFuncionariosRelatorio();
       expect(todos.data.map((f) => f.nome)).toEqual(["Ana", "Bruno"]);
       expect(todos.data[0]).toMatchObject({
@@ -997,12 +1090,14 @@ describe("relatorioDAO", () => {
         situacao: "Ativo",
         email: "ana@nexus.test",
         telefone: "21999990001",
+        foto_url: "/uploads/funcionarios/ana.webp",
       });
       expect(todos.data[1]).toMatchObject({
         id_funcionario: bruno.funcionario.id_funcionario,
         situacao: "Inativo",
         email: null,
         telefone: null,
+        foto_url: null,
       });
 
       const ativos = await relatorioDAO.listarFuncionariosRelatorio({

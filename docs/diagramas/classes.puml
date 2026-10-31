@@ -76,6 +76,7 @@ package "Funcionários" as Funcionarios {
     + cargo: String
     + condutor: Boolean
     + ativo: Boolean
+    + anexos: Anexo[] [no máximo 1 ativo]
   }
 
   class Usuario {
@@ -186,7 +187,6 @@ package "Produtos e Estoque" as Produtos {
   class Produto {
       + ID_produto: Integer
       + descricao: String
-      + foto_url: String
       + perecivel: Boolean
       + composto: Boolean
       + data_validade: Date
@@ -361,6 +361,10 @@ package "Logística" as Logistica {
     + ID_expedicao_nota: Integer
     + ordem_visita: Integer
     + data_adicao: Timestamp
+    + justificativa: Text [obrigatória no "não entregue", 1..1000]
+    + data_tentativa: Timestamp
+    + ID_usuario_tentativa: Integer
+    + anexos: Anexo[] [0..5 fotos, imutáveis]
   }
 
   class Veiculo {
@@ -376,7 +380,11 @@ class Anexo {
     + url: String
     + tipo_mime: String
     + data_upload: Timestamp
+    + ID_usuario: Integer
     + ativo: Boolean
+    + ID_produto: Integer [dono 1]
+    + ID_funcionario: Integer [dono 1]
+    + ID_expedicao_nota: Integer [dono 1]
   }
 }
 
@@ -386,7 +394,11 @@ Destinatario "1" --> "*" PedidoEscola : solicita >
 NotaSaida "1" --> "*" ItemNotaSaida : contém >
 NotaSaida "1" --> "*" Coleta : gera >
 Coleta "1" --> "*" ItemColeta : contém >
-NotaSaida "1" --> "*" Anexo : anexa >
+Produto "1" --> "*" Anexo : foto atual >
+Funcionario "1" --> "*" Anexo : foto atual >
+ExpedicaoNota "1" --> "*" Anexo : fotos da tentativa >
+Usuario "0..1" --> "*" Anexo : enviou >
+Usuario "0..1" --> "*" ExpedicaoNota : registrou tentativa >
 Produto "1" --> "*" ItemNotaSaida : reservado em >
 Produto "1" --> "*" ItemColeta : coletado em >
 Funcionario "0..1" --> "0..*" Expedicao : conduz >

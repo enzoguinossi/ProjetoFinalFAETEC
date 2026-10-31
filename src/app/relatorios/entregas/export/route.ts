@@ -17,14 +17,15 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const { data } = await relatorioService.listarEntregas({
+  const { data, filtros } = await relatorioService.listarEntregas({
     de: url.searchParams.get("de"),
     ate: url.searchParams.get("ate"),
     destinatario: url.searchParams.getAll("destinatario"),
     status: url.searchParams.getAll("status"),
+    fotos: url.searchParams.get("fotos"),
   });
 
-  return new Response(gerarCsvEntregas(data), {
+  return new Response(gerarCsvEntregas(data, filtros.fotos), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="entregas-${hojeISO()}.csv"`,

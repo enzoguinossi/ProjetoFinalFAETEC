@@ -181,6 +181,16 @@ export type NotaSaidaListRow = {
   podeEditar: boolean;
 };
 
+/** Tentativa de entrega registrada para a nota (somente leitura). */
+export type NotaSaidaTentativa = {
+  id_expedicao: number;
+  data: string | null;
+  status: string;
+  justificativa: string | null;
+  usuario: string | null;
+  fotos: { id_anexo: number; nome_arquivo: string; url: string }[];
+};
+
 /** Nota de saída carregada para os modais de visualização e edição. */
 export type NotaSaidaFormData = {
   id_nota_saida: number;
@@ -196,4 +206,6 @@ export type NotaSaidaFormData = {
   urgente: boolean;
   observacao: string | null;
   itens: NotaSaidaItemDetalhe[];
+  /** Tentativas de entrega registradas (histórico somente leitura). */
+  tentativas: NotaSaidaTentativa[];
 };

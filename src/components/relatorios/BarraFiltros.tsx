@@ -7,7 +7,8 @@ export type OpcaoFiltro = { valor: string; rotulo: string };
 
 export type CampoFiltro =
   | { id: string; rotulo: string; tipo: "multi"; opcoes: OpcaoFiltro[] }
-  | { id: string; rotulo: string; tipo: "periodo" };
+  | { id: string; rotulo: string; tipo: "periodo" }
+  | { id: string; rotulo: string; tipo: "checkbox" };
 
 /** Seleção atual de cada campo: lista de valores (multi) ou período de/até. */
 export type Valores = Record<string, string[] | { de: string; ate: string }>;
@@ -134,7 +135,7 @@ function copiar(valores: Valores): Valores {
 }
 
 function vazio(campo: CampoFiltro): string[] | { de: string; ate: string } {
-  return campo.tipo === "multi" ? [] : { de: "", ate: "" };
+  return campo.tipo === "periodo" ? { de: "", ate: "" } : [];
 }
 
 export default function BarraFiltros({ basePath, campos, valores }: BarraFiltrosProps) {
@@ -167,16 +168,19 @@ export default function BarraFiltros({ basePath, campos, valores }: BarraFiltros
   function temValor(campo: CampoFiltro): boolean {
     const valor = selecao[campo.id];
     if (!valor) return false;
-    if (campo.tipo === "multi") {
-      return Array.isArray(valor) && valor.length > 0;
+    if (campo.tipo === "periodo") {
+      return !Array.isArray(valor) && Boolean(valor.de || valor.ate);
     }
-    return !Array.isArray(valor) && Boolean(valor.de || valor.ate);
+    return Array.isArray(valor) && valor.length > 0;
   }
 
   const visiveis = campos.filter(
-    (campo) => temValor(campo) || adicionados.includes(campo.id),
+    (campo) =>
+      campo.tipo === "checkbox" || temValor(campo) || adicionados.includes(campo.id),
   );
-  const disponiveis = campos.filter((campo) => !visiveis.includes(campo));
+  const disponiveis = campos.filter(
+    (campo) => campo.tipo !== "checkbox" && !visiveis.includes(campo),
+  );
   const quantidadeAtiva = visiveis.filter(temValor).length;
 
   function alterar(campo: CampoFiltro, valor: string[] | { de: string; ate: string }) {
@@ -208,12 +212,18 @@ export default function BarraFiltros({ basePath, campos, valores }: BarraFiltros
     for (const campo of campos) {
       const valor = selecao[campo.id];
       if (!valor) continue;
-      if (campo.tipo === "multi") {
+      if (campo.tipo === "periodo") {
+        if (!Array.isArray(valor)) {
+          if (valor.de) params.set("de", valor.de);
+          if (valor.ate) params.set("ate", valor.ate);
+        }
+      } else {
         const lista = Array.isArray(valor) ? valor : [];
-        if (lista.length > 0) params.set(campo.id, lista.join(","));
-      } else if (!Array.isArray(valor)) {
-        if (valor.de) params.set("de", valor.de);
-        if (valor.ate) params.set("ate", valor.ate);
+        if (campo.tipo === "checkbox") {
+          if (lista.includes("1")) params.set(campo.id, "1");
+        } else if (lista.length > 0) {
+          params.set(campo.id, lista.join(","));
+        }
       }
     }
     const query = params.toString();
@@ -225,7 +235,7 @@ export default function BarraFiltros({ basePath, campos, valores }: BarraFiltros
     const nova: Valores = {};
     for (const campo of campos) {
       // O período sempre volta ao padrão do relatório (mês corrente).
-      nova[campo.id] = campo.tipo === "multi" ? [] : periodoMesAtual();
+      nova[campo.id] = campo.tipo === "periodo" ? periodoMesAtual() : [];
     }
     setSelecao(nova);
     setAdicionados([]);
@@ -249,6 +259,7 @@ export default function BarraFiltros({ basePath, campos, valores }: BarraFiltros
     }
 
     const escolhidos = Array.isArray(valor) ? valor : [];
+    if (campo.tipo !== "multi") return { texto: "Selecionar" };
     if (escolhidos.length === 0) return { texto: "Selecionar" };
     const nomes = escolhidos.map(
       (item) => campo.opcoes.find((opcao) => opcao.valor === item)?.rotulo ?? item,
@@ -261,6 +272,25 @@ export default function BarraFiltros({ basePath, campos, valores }: BarraFiltros
     <div className="flex flex-col gap-3" ref={raiz}>
       <div className="flex flex-wrap items-center gap-2">
         {visiveis.map((campo) => {
+          if (campo.tipo === "checkbox") {
+            const marcado = temValor(campo);
+            return (
+              <label
+                key={campo.id}
+                className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#c1c7cd] bg-white px-3 text-sm text-ink"
+              >
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  onChange={(evento) =>
+                    alterar(campo, evento.target.checked ? ["1"] : [])
+                  }
+                  className="size-4 accent-[#1b9956]"
+                />
+                {campo.rotulo}
+              </label>
+            );
+          }
           const { texto, titulo } = resumo(campo);
           const ativo = temValor(campo);
           return (

@@ -365,6 +365,21 @@ export async function obterNotaSaida(
     urgente: nota.urgente,
     observacao: nota.observacao,
     itens: nota.itens.map(itemSaidaDetalhe),
+    tentativas: nota.expedicoes
+      .filter((vinculo) => vinculo.data_tentativa !== null)
+      .map((vinculo) => ({
+        id_expedicao: vinculo.id_expedicao,
+        data: formatarData(vinculo.data_tentativa),
+        status: vinculo.justificativa ? "Não entregue" : "Entrega registrada",
+        justificativa: vinculo.justificativa,
+        usuario:
+          vinculo.usuarioTentativa?.funcionario.pessoaFisica.nome ?? null,
+        fotos: vinculo.anexos.map((anexo) => ({
+          id_anexo: anexo.id_anexo,
+          nome_arquivo: anexo.nome_arquivo,
+          url: anexo.url,
+        })),
+      })),
   };
 }
 

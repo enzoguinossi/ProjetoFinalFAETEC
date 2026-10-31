@@ -483,6 +483,10 @@ O **pedido** (`pedido_escola`) também **não tem `ativo`** e não é desativado
 histórico é o status (`PENDENTE`/`CONFIRMADO`/`RECUSADO`). Não crie `ativo`, desativação ou
 exclusão para pedidos.
 
+O **anexo** (`anexo`) tem `ativo` e é **desativado** com auditoria. Exclusão física só
+acontece por **cascade** quando o dono é excluído (`id_produto`/`id_funcionario`/
+`id_expedicao_nota`). Não apague arquivo do disco antes do commit. Ver §14.2.
+
 ---
 
 # 14. Entregas e expedições
@@ -524,7 +528,8 @@ Não implemente um novo fluxo de entrega sem verificar:
 * `item_nota_saida` (`ID_produto`);
 * `reserva_estoque` e `movimentacao_estoque` (`ID_produto`);
 * `expedicao`;
-* `expedicao_nota`;
+* `expedicao_nota` (tentativa: `justificativa`, `data_tentativa`, `ID_usuario_tentativa`);
+* `anexo` com `ID_expedicao_nota` (fotos da tentativa);
 * `coleta` (`item_coleta` por `ID_produto`).
 
 ## 14.1 Pedidos (RF025)
@@ -556,6 +561,26 @@ Use `DATABASE_URL="mysql://..." npm run db:dedupe-notas` para o dry-run (padrão
 aceita o banco `nexus_prod` (ou um banco de teste, com "test" no nome), grava backup JSON e
 auditoria e consolida os itens duplicados. Também é possível passar `--url "mysql://..."` em
 vez da variável de ambiente.
+
+## 14.2 Tentativa de entrega e fotos
+
+A **tentativa** é registrada no vínculo `expedicao_nota`, não na nota:
+
+* **Entrega parcial** — o formulário lista **só itens com pendência** e os completos ficam em
+  bloco somente leitura. O campo **“entregar agora”** recebe o **delta** (default = pendência;
+  `0` desmarca) e o servidor grava `qtd_entregue = atual + delta`. O servidor **recusa** item
+  sem pendência, redução do já entregue, item de outra nota e delta zero em todos os itens sem
+  corte e sem justificativa.
+* **Não entregue** — exige `justificativa` (1..1000 caracteres) e mantém a nota em `PENDENTE`
+  com a reserva intacta; grava `data_tentativa` e `ID_usuario_tentativa`.
+* **Fotos** — 0..5 por tentativa. Depois de registrada, a tentativa é **imutável**: não remova,
+  troque nem desative as fotos de uma tentativa gravada; uma nova tentativa é outro vínculo.
+* A nota de saída exibe as tentativas em modo somente leitura (data, usuário, justificativa e
+  fotos).
+
+**Fotos do cadastro** (produto e funcionário) seguem outra regra: **no máximo 1 anexo ativo**.
+Trocar a foto desativa o anterior e o arquivo antigo do disco só sai **depois do commit**. Use
+`FotosField`/`FotosGaleria` (§17) e `anexoService`/`anexoDAO` — não crie coluna `foto_url`.
 
 ---
 
@@ -643,6 +668,12 @@ A interface deve priorizar:
 O sistema possui requisito de desempenho para buscas por código de barras e Kanban em rede local.
 
 Não adicione complexidade visual ou interações sofisticadas sem necessidade funcional.
+
+**Fotos:** use os componentes compartilhados `FotosField` (edição: upload, URL externa no
+cadastro, limite `max` e remoção via `remover_anexos`) e `FotosGaleria` (visualização
+somente leitura). Não crie um campo de foto por tela nem duplique a lógica de processamento —
+o WEBP/limite é do servidor (`src/lib/imagem.ts`). O input de arquivo aceita seleção múltipla
+apenas quando `max > 1`.
 
 ---
 

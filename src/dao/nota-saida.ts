@@ -406,6 +406,30 @@ export class NotaSaidaDAO {
           orderBy: { id_item_nota_saida: "asc" },
         },
         reservas: { orderBy: { id_reserva_estoque: "asc" } },
+        expedicoes: {
+          orderBy: { data_adicao: "asc" },
+          include: {
+            expedicao: {
+              select: {
+                id_expedicao: true,
+                data_prevista: true,
+                status: true,
+              },
+            },
+            usuarioTentativa: {
+              select: {
+                funcionario: {
+                  select: { pessoaFisica: { select: { nome: true } } },
+                },
+              },
+            },
+            anexos: {
+              where: { ativo: true },
+              orderBy: { id_anexo: "asc" },
+              select: { id_anexo: true, nome_arquivo: true, url: true },
+            },
+          },
+        },
       },
     });
   }

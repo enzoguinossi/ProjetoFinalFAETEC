@@ -1,7 +1,13 @@
 "use server";
 
 import { expedicaoDAO, saldoPendente } from "@/dao/expedicao";
+import { mensagemDeErro } from "@/dao/_errors";
 import { expedicaoService } from "@/services/expedicao";
+import {
+  processarImagemWebp,
+  removerImagemAnexo,
+  salvarImagemAnexo,
+} from "@/lib/imagem";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { formatarCodigo } from "@/lib/formatar";
@@ -55,6 +61,10 @@ export type ExpedicaoNotaRow = {
   itens: number;
   saldo_pendente: number;
   itens_detalhe: ExpedicaoNotaItemRow[];
+  justificativa: string | null;
+  data_tentativa: string | null;
+  usuario_tentativa: string | null;
+  fotos: { id_anexo: number; nome_arquivo: string; url: string }[];
 };
 
 export type ExpedicaoFormData = {
@@ -126,6 +136,12 @@ type ExpedicaoDetalhe = {
   notas: {
     id_nota_saida: number;
     ordem_visita: number;
+    justificativa: string | null;
+    data_tentativa: Date | null;
+    usuarioTentativa: {
+      funcionario: { pessoaFisica: { nome: string } };
+    } | null;
+    anexos: { id_anexo: number; nome_arquivo: string; url: string }[];
     notaSaida: {
       status: string;
       destinatario: { pessoaJuridica: { razao_social: string } } | null;
@@ -195,6 +211,17 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
         descricao: item.produto.descricao,
         qtd_esperada: Number(item.qtd_esperada),
         qtd_entregue: Number(item.qtd_entregue),
+      })),
+      justificativa: nota.justificativa,
+      data_tentativa: nota.data_tentativa
+        ? nota.data_tentativa.toLocaleDateString("pt-BR")
+        : null,
+      usuario_tentativa:
+        nota.usuarioTentativa?.funcionario.pessoaFisica.nome ?? null,
+      fotos: nota.anexos.map((anexo) => ({
+        id_anexo: anexo.id_anexo,
+        nome_arquivo: anexo.nome_arquivo,
+        url: anexo.url,
       })),
     })),
   };
@@ -417,38 +444,111 @@ export async function despacharExpedicao(id: number) {
   });
 }
 
+/** Fotos da tentativa: até 5, processadas WEBP; os arquivos são limpos em erro. */
+async function processarFotosEntrega(
+  formData: FormData,
+  idExpedicao: number,
+  idNotaSaida: number,
+): Promise<
+  | { fotos: { nome_arquivo: string; url: string; tipo_mime: string }[] }
+  | { error: string }
+> {
+  const arquivos = formData
+    .getAll("fotos")
+    .filter((valor): valor is File => valor instanceof File && valor.size > 0);
+
+  if (arquivos.length > 5) {
+    return { error: "A tentativa aceita no máximo 5 fotos." };
+  }
+
+  const fotos: { nome_arquivo: string; url: string; tipo_mime: string }[] = [];
+  const salvas: string[] = [];
+  try {
+    for (const arquivo of arquivos) {
+      const processada = await processarImagemWebp(arquivo);
+      if (!processada.ok) {
+        for (const url of salvas) await removerImagemAnexo(url);
+        return { error: processada.error };
+      }
+      const url = await salvarImagemAnexo(
+        `entregas/${idExpedicao}/${idNotaSaida}`,
+        processada.buffer,
+        processada.hash,
+      );
+      salvas.push(url);
+      fotos.push({
+        nome_arquivo: arquivo.name || "foto.webp",
+        url,
+        tipo_mime: "image/webp",
+      });
+    }
+    return { fotos };
+  } catch (e) {
+    for (const url of salvas) await removerImagemAnexo(url);
+    return { error: mensagemDeErro(e) };
+  }
+}
+
 export async function registrarEntregaNota(
   id: number,
   id_nota_saida: number,
-  itens: { id_item_nota_saida: number; qtd_entregue: number }[],
-  cortar_restante: boolean,
+  formData: FormData,
 ) {
   return comPermissao("expedicao.alterar", async (user) => {
+    let itens: unknown;
+    try {
+      itens = JSON.parse(String(formData.get("itens") ?? "[]"));
+    } catch {
+      return { error: "Itens da entrega inválidos." };
+    }
+
+    const fotos = await processarFotosEntrega(formData, id, id_nota_saida);
+    if ("error" in fotos) return fotos;
+
     const resultado = await expedicaoService.registrarEntrega(
       id,
       id_nota_saida,
       {
-        itens: itens.map((item) => ({
-          id_item_nota_saida: item.id_item_nota_saida,
-          qtd_entregue: item.qtd_entregue,
-        })),
-        cortar_restante,
+        itens,
+        cortar_restante:
+          formData.get("cortar_restante") === "on" ||
+          formData.get("cortar_restante") === "true",
+        fotos: fotos.fotos,
       },
       user.id_usuario,
     );
-    if ("error" in resultado) return { error: resultado.error };
+
+    if ("error" in resultado) {
+      for (const foto of fotos.fotos) await removerImagemAnexo(foto.url);
+      return resultado;
+    }
     return { success: true, status: resultado.entrega.status };
   });
 }
 
-export async function marcarNotaNaoEntregue(id: number, id_nota_saida: number) {
+export async function marcarNotaNaoEntregue(
+  id: number,
+  id_nota_saida: number,
+  formData: FormData,
+) {
   return comPermissao("expedicao.alterar", async (user) => {
+    const fotos = await processarFotosEntrega(formData, id, id_nota_saida);
+    if ("error" in fotos) return fotos;
+
     const resultado = await expedicaoService.marcarNaoEntregue(
       id,
       id_nota_saida,
+      {
+        justificativa: formData.get("justificativa"),
+        fotos: fotos.fotos,
+      },
       user.id_usuario,
     );
-    if ("error" in resultado) return { error: resultado.error };
+
+    if ("error" in resultado) {
+      for (const foto of fotos.fotos) await removerImagemAnexo(foto.url);
+      return resultado;
+    }
     return { success: true, status: resultado.entrega.status };
   });
 }

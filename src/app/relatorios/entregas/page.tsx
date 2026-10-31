@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Button from "@/components/Button";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
+import RelatorioAmpliado from "@/components/relatorios/RelatorioAmpliado";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { STATUS_NOTA_RELATORIO } from "@/dao/relatorio";
@@ -20,6 +21,7 @@ type Params = {
   ate?: string | string[];
   destinatario?: string | string[];
   status?: string | string[];
+  fotos?: string | string[];
 };
 
 function formatarQuantidade(valor: number): string {
@@ -66,12 +68,14 @@ export default async function RelatorioEntregasPage({
         rotulo: rotuloStatusNota(status),
       })),
     },
+    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
   ];
 
   const valores = {
     periodo: { de: filtros.de, ate: filtros.ate },
     destinatario: filtros.id_destinatarios.map(String),
     status: [...filtros.status],
+    fotos: filtros.fotos ? ["1"] : [],
   };
 
   const query = new URLSearchParams({ de: filtros.de, ate: filtros.ate });
@@ -79,6 +83,7 @@ export default async function RelatorioEntregasPage({
     query.set("destinatario", filtros.id_destinatarios.join(","));
   }
   if (filtros.status.length > 0) query.set("status", filtros.status.join(","));
+  if (filtros.fotos) query.set("fotos", "1");
 
   const statusTexto =
     filtros.status.length === 0
@@ -117,99 +122,113 @@ export default async function RelatorioEntregasPage({
         />
       </div>
 
-      <div className="relatorio-scroll">
-        <div className="relatorio-container">
-          <div className="relatorio-conteudo">
-            <header className="relatorio-header">
-              <h1 className="titulo-relatorio">Entregas por Instituição</h1>
-              <div className="meta-info">
-                {destinatariosSelecionados.length > 0 && (
-                  <p>
-                    Destinatário{destinatariosSelecionados.length === 1 ? "" : "s"}:{" "}
-                    {destinatariosSelecionados.map((d) => d.nome).join(", ")}
-                  </p>
-                )}
-                <p>Status: {statusTexto}</p>
-                <p>
-                  Período: {formatarDataISO(filtros.de)} a {formatarDataISO(filtros.ate)}
-                </p>
-                <p>
-                  Emissão: {emissao.data} {emissao.hora}
-                </p>
-                <p>
-                  {data.length} nota{data.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </header>
-
-            <table className="relatorio-tabela">
-              <thead>
-                <tr>
-                  <th style={{ width: "8%" }} className="col-centro">
-                    Nota
-                  </th>
-                  <th style={{ width: "9%" }} className="col-centro">
-                    Data
-                  </th>
-                  <th style={{ width: "22%" }}>Destinatário</th>
-                  <th style={{ width: "11%" }} className="col-centro">
-                    Status
-                  </th>
-                  <th style={{ width: "6%" }} className="col-centro">
-                    Itens
-                  </th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Esperado
-                  </th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Entregue
-                  </th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Pendente
-                  </th>
-                  <th style={{ width: "17%" }} className="col-centro">
-                    Expedição
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="relatorio-vazio">
-                      Nenhuma entrega encontrada no período.
+      <RelatorioAmpliado
+        titulo="Entregas por Instituição"
+        meta={[
+          ...(destinatariosSelecionados.length > 0
+            ? [
+                `Destinatário${destinatariosSelecionados.length === 1 ? "" : "s"}: ${destinatariosSelecionados
+                  .map((d) => d.nome)
+                  .join(", ")}`,
+              ]
+            : []),
+          `Status: ${statusTexto}`,
+          `Período: ${formatarDataISO(filtros.de)} a ${formatarDataISO(filtros.ate)}`,
+          `Emissão: ${emissao.data} ${emissao.hora}`,
+          `${data.length} nota${data.length === 1 ? "" : "s"}`,
+        ]}
+        emissor={emissor}
+      >
+        <table className="relatorio-tabela relatorio-tabela-ampliada">
+          <thead>
+            <tr>
+              <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
+                Nota
+              </th>
+              <th style={{ width: filtros.fotos ? "8%" : "9%" }} className="col-centro">
+                Data
+              </th>
+              <th style={{ width: filtros.fotos ? "16%" : "22%" }}>Destinatário</th>
+              <th style={{ width: "9%" }} className="col-centro">
+                Status
+              </th>
+              <th style={{ width: "5%" }} className="col-centro">
+                Itens
+              </th>
+              <th style={{ width: "8%" }} className="col-direita">
+                Esperado
+              </th>
+              <th style={{ width: "8%" }} className="col-direita">
+                Entregue
+              </th>
+              <th style={{ width: "8%" }} className="col-direita">
+                Pendente
+              </th>
+              <th style={{ width: "10%" }} className="col-centro">
+                Expedição
+              </th>
+              {filtros.fotos && <th style={{ width: "12%" }}>Fotos</th>}
+              {filtros.fotos && <th style={{ width: "9%" }}>Justificativa</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={filtros.fotos ? 11 : 9} className="relatorio-vazio">
+                  Nenhuma entrega encontrada no período.
+                </td>
+              </tr>
+            ) : (
+              data.map((linha) => (
+                <tr key={linha.id_nota_saida}>
+                  <td className="col-centro">{linha.codigo}</td>
+                  <td className="col-centro">{formatarDataRelatorio(linha.data)}</td>
+                  <td title={linha.destinatario}>{linha.destinatario}</td>
+                  <td className="col-centro">{linha.status}</td>
+                  <td className="col-centro">{linha.itens}</td>
+                  <td className="col-direita">{formatarQuantidade(linha.esperado)}</td>
+                  <td className="col-direita">{formatarQuantidade(linha.entregue)}</td>
+                  <td className="col-direita">{formatarQuantidade(linha.pendente)}</td>
+                  <td className="col-centro">{linha.expedicao}</td>
+                  {filtros.fotos && (
+                    <td>
+                      <div className="flex flex-wrap gap-1">
+                        {linha.fotos.slice(0, 3).map((url) => (
+                          <a key={url} href={url} target="_blank" rel="noreferrer">
+                            <img
+                              src={url}
+                              alt={`Foto da nota ${linha.codigo}`}
+                              width={40}
+                              height={40}
+                              style={{ width: 40, height: 40 }}
+                              className="rounded border border-[#dddddd] object-cover"
+                            />
+                          </a>
+                        ))}
+                        {linha.fotos.length > 3 && (
+                          <span>+{linha.fotos.length - 3}</span>
+                        )}
+                      </div>
                     </td>
-                  </tr>
-                ) : (
-                  data.map((linha) => (
-                    <tr key={linha.id_nota_saida}>
-                      <td className="col-centro">{linha.codigo}</td>
-                      <td className="col-centro">{formatarDataRelatorio(linha.data)}</td>
-                      <td title={linha.destinatario}>{linha.destinatario}</td>
-                      <td className="col-centro">{linha.status}</td>
-                      <td className="col-centro">{linha.itens}</td>
-                      <td className="col-direita">{formatarQuantidade(linha.esperado)}</td>
-                      <td className="col-direita">{formatarQuantidade(linha.entregue)}</td>
-                      <td className="col-direita">{formatarQuantidade(linha.pendente)}</td>
-                      <td className="col-centro">{linha.expedicao}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  )}
+                  {filtros.fotos && (
+                    <td title={linha.justificativa ?? undefined}>
+                      {linha.justificativa ?? "—"}
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
 
-            <div className="relatorio-totais">
-              <span>Esperado: {formatarQuantidade(totais.esperado)}</span>
-              <span>Entregue: {formatarQuantidade(totais.entregue)}</span>
-              <span>Pendente: {formatarQuantidade(totais.pendente)}</span>
-            </div>
-          </div>
-
-          <footer className="relatorio-footer">
-            <span>Emissor: {emissor}</span>
-            <span>Documento gerado para uso interno</span>
-          </footer>
+        <div className="relatorio-totais">
+          <span>Esperado: {formatarQuantidade(totais.esperado)}</span>
+          <span>Entregue: {formatarQuantidade(totais.entregue)}</span>
+          <span>Pendente: {formatarQuantidade(totais.pendente)}</span>
         </div>
-      </div>
+      </RelatorioAmpliado>
+
     </>
   );
 }

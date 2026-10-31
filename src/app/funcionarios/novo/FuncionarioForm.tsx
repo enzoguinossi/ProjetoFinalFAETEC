@@ -5,6 +5,8 @@ import { createFuncionario, updateFuncionario } from "../actions";
 import type { FuncionarioFormData } from "../actions";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import ContatosSection, { type EmailEntry, type TelefoneEntry } from "@/components/ContatosSection";
+import FotosField from "@/components/FotosField";
+import FotosGaleria from "@/components/FotosGaleria";
 import { normalizaTelefones } from "@/lib/contatos";
 import { CPF_MAX_CARACTERES, formatarCpf } from "@/lib/cpf";
 import Button from "@/components/Button";
@@ -108,6 +110,18 @@ export default function FuncionarioForm({
             )}
           </div>
           {textField("Cargo", "cargo", initialData?.cargo, cargo, setCargo)}
+
+          {isView ? (
+            <FotosGaleria fotos={initialData?.fotos ?? []} label="Foto" />
+          ) : (
+            <FotosField
+              key={initialData?.fotos.map((foto) => foto.id_anexo).join(",") ?? "novo"}
+              initial={initialData?.fotos ?? []}
+              max={1}
+              allowUrl
+              label="Foto"
+            />
+          )}
 
           {!isView ? (
             <label className="flex items-center gap-2 font-sans text-base text-ink-strong cursor-pointer">

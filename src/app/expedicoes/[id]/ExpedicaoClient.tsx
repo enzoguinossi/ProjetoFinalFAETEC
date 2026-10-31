@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import FotosField from "@/components/FotosField";
 import Modal from "@/components/Modal";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
@@ -56,104 +57,132 @@ function EntregaForm({
   processando,
 }: {
   nota: ExpedicaoNotaRow;
-  onConfirm: (
-    itens: { id_item_nota_saida: number; qtd_entregue: number }[],
-    cortar: boolean,
-  ) => Promise<void>;
+  onConfirm: (formData: FormData) => Promise<void>;
   onCancel: () => void;
   processando: boolean;
 }) {
+  const pendentes = nota.itens_detalhe.filter(
+    (item) => item.qtd_esperada - item.qtd_entregue > 0.000001,
+  );
+  const completos = nota.itens_detalhe.filter(
+    (item) => item.qtd_esperada - item.qtd_entregue <= 0.000001,
+  );
+
   const [valores, setValores] = useState<Record<number, string>>(() =>
     Object.fromEntries(
-      nota.itens_detalhe.map((item) => [
+      pendentes.map((item) => [
         item.id_item_nota_saida,
-        String(item.qtd_esperada),
+        String(item.qtd_esperada - item.qtd_entregue),
       ]),
     ),
   );
   const [cortar, setCortar] = useState(false);
 
-  const itens = nota.itens_detalhe.map((item) => ({
-    ...item,
-    valor: Number(valores[item.id_item_nota_saida] ?? ""),
-  }));
-
-  const invalido = itens.some(
-    (item) =>
-      valores[item.id_item_nota_saida] === "" ||
-      !Number.isFinite(item.valor) ||
-      item.valor < item.qtd_entregue ||
-      item.valor > item.qtd_esperada,
-  );
+  const invalido =
+    pendentes.length === 0 ||
+    pendentes.some((item) => {
+      const pendente = item.qtd_esperada - item.qtd_entregue;
+      const valor = Number(valores[item.id_item_nota_saida] ?? "");
+      return (
+        valores[item.id_item_nota_saida] === "" ||
+        !Number.isFinite(valor) ||
+        valor < 0 ||
+        valor > pendente
+      );
+    });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (invalido) return;
 
-    await onConfirm(
-      itens.map((item) => ({
-        id_item_nota_saida: item.id_item_nota_saida,
-        qtd_entregue: item.valor,
-      })),
-      cortar,
-    );
+    const itens = pendentes.map((item) => ({
+      id_item_nota_saida: item.id_item_nota_saida,
+      qtd_entregue:
+        item.qtd_entregue + Number(valores[item.id_item_nota_saida] ?? 0),
+    }));
+
+    const formData = new FormData(e.currentTarget);
+    formData.set("itens", JSON.stringify(itens));
+    formData.set("cortar_restante", cortar ? "on" : "");
+    await onConfirm(formData);
   }
 
   return (
     <form onSubmit={handleSubmit} className={ui.form}>
       <p className="m-0 font-sans text-sm text-[#697077]">
-        Nota {nota.codigo} — informe a quantidade entregue <strong>total</strong> por
-        item. Sem corte, o restante continua reservado para outra expedição.
+        Nota {nota.codigo} — informe quanto será <strong>entregue agora</strong> em
+        cada item com pendência. O já entregue não é alterado.
       </p>
 
-      {nota.itens_detalhe.length === 0 ? (
+      {pendentes.length === 0 ? (
         <p className="m-0 rounded-[1rem] border border-border-input bg-[#f8f9fb] px-4 py-3 font-sans text-sm text-[#697077]">
-          Esta nota não possui itens.
+          Todos os itens já foram entregues.
         </p>
       ) : (
         <div className="flex w-full flex-col overflow-x-auto rounded-[1rem] border border-[#e2e8f0]">
           <div
-            className="grid min-w-[520px] bg-brand px-[0.6875rem] py-2 font-display text-sm text-white [font-weight:590]"
-            style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
+            className="grid min-w-[560px] bg-brand px-[0.6875rem] py-2 font-display text-sm text-white [font-weight:590]"
+            style={{ gridTemplateColumns: "2fr 0.8fr 0.8fr 0.8fr 1fr" }}
           >
             <div>Item</div>
             <div className="text-center">Esperada</div>
             <div className="text-center">Já entregue</div>
-            <div className="text-center">Entrega (total)</div>
+            <div className="text-center">Pendente</div>
+            <div className="text-center">Entregar agora</div>
           </div>
-          {itens.map((item, indice) => (
-            <div
-              key={item.id_item_nota_saida}
-              className={`grid min-w-[520px] items-center px-[0.6875rem] py-2 font-sans text-sm text-ink ${
-                indice % 2 === 1 ? "bg-table-alt!" : "bg-white"
-              }`}
-              style={{ gridTemplateColumns: "2fr 1fr 1fr 1.2fr" }}
-            >
-              <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-2">
-                {item.descricao}
+          {pendentes.map((item, indice) => {
+            const pendente = item.qtd_esperada - item.qtd_entregue;
+            return (
+              <div
+                key={item.id_item_nota_saida}
+                className={`grid min-w-[560px] items-center px-[0.6875rem] py-2 font-sans text-sm text-ink ${
+                  indice % 2 === 1 ? "bg-table-alt!" : "bg-white"
+                }`}
+                style={{ gridTemplateColumns: "2fr 0.8fr 0.8fr 0.8fr 1fr" }}
+              >
+                <div className="overflow-hidden text-ellipsis whitespace-nowrap pr-2">
+                  {item.descricao}
+                </div>
+                <div className="text-center">{formatarNumero(item.qtd_esperada)}</div>
+                <div className="text-center">{formatarNumero(item.qtd_entregue)}</div>
+                <div className="text-center">{formatarNumero(pendente)}</div>
+                <div className="px-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={pendente}
+                    step="any"
+                    value={valores[item.id_item_nota_saida] ?? ""}
+                    onChange={(e) =>
+                      setValores((atual) => ({
+                        ...atual,
+                        [item.id_item_nota_saida]: e.target.value,
+                      }))
+                    }
+                    className={`${ui.input} h-9`}
+                    aria-label={`Entregar agora de ${item.descricao}`}
+                    disabled={processando}
+                  />
+                </div>
               </div>
-              <div className="text-center">{formatarNumero(item.qtd_esperada)}</div>
-              <div className="text-center">{formatarNumero(item.qtd_entregue)}</div>
-              <div className="px-1">
-                <input
-                  type="number"
-                  min={item.qtd_entregue}
-                  max={item.qtd_esperada}
-                  step="any"
-                  value={valores[item.id_item_nota_saida] ?? ""}
-                  onChange={(e) =>
-                    setValores((atual) => ({
-                      ...atual,
-                      [item.id_item_nota_saida]: e.target.value,
-                    }))
-                  }
-                  className={`${ui.input} h-9`}
-                  aria-label={`Quantidade entregue de ${item.descricao}`}
-                  disabled={processando}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+
+      {completos.length > 0 && (
+        <div className="rounded-lg border border-border bg-[#f8fafb] p-3 font-sans text-sm">
+          <span className="font-semibold text-ink-strong">
+            Itens já completos (somente leitura)
+          </span>
+          <div className="mt-1 flex flex-col gap-0.5 text-[#697077]">
+            {completos.map((item) => (
+              <span key={item.id_item_nota_saida}>
+                {item.descricao}: {formatarNumero(item.qtd_entregue)} de{" "}
+                {formatarNumero(item.qtd_esperada)}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
@@ -167,6 +196,15 @@ function EntregaForm({
         />
         Cortar o restante (não será entregue)
       </label>
+
+      <FotosField
+        initial={[]}
+        max={5}
+        allowUrl={false}
+        label="Fotos da entrega (opcional)"
+        name="fotos"
+        disabled={processando}
+      />
 
       <div className={ui.rowActions}>
         <Button label="Cancelar" variant="cancel" onClick={onCancel} />
@@ -346,6 +384,8 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
   const [notaEntrega, setNotaEntrega] = useState<ExpedicaoNotaRow | null>(null);
   const [notaNaoEntregue, setNotaNaoEntregue] =
     useState<ExpedicaoNotaRow | null>(null);
+  const [motivoNaoEntrega, setMotivoNaoEntrega] = useState("");
+  const [erroNaoEntrega, setErroNaoEntrega] = useState<string | null>(null);
   const [concluindo, setConcluindo] = useState(false);
   const [processando, setProcessando] = useState(false);
 
@@ -421,35 +461,48 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
     if (ok) setDespachando(false);
   }
 
-  async function confirmarEntrega(
-    itens: { id_item_nota_saida: number; qtd_entregue: number }[],
-    cortar: boolean,
-  ) {
+  async function confirmarEntrega(formData: FormData) {
     if (!notaEntrega) return;
     const ok = await executar(
       () =>
         registrarEntregaNota(
           detalhe.id_expedicao,
           notaEntrega.id_nota_saida,
-          itens,
-          cortar,
+          formData,
         ),
       "Entrega registrada.",
     );
     if (ok) setNotaEntrega(null);
   }
 
-  async function confirmarNaoEntregue() {
+  async function confirmarNaoEntregue(formData: FormData) {
     if (!notaNaoEntregue) return;
-    const ok = await executar(
-      () =>
-        marcarNotaNaoEntregue(
-          detalhe.id_expedicao,
-          notaNaoEntregue.id_nota_saida,
-        ),
-      "Nota marcada como não entregue.",
-    );
-    if (ok) setNotaNaoEntregue(null);
+    setProcessando(true);
+    setErroNaoEntrega(null);
+    try {
+      const resultado = await marcarNotaNaoEntregue(
+        detalhe.id_expedicao,
+        notaNaoEntregue.id_nota_saida,
+        formData,
+      );
+      if ("error" in resultado && resultado.error) {
+        setErroNaoEntrega(resultado.error);
+        return;
+      }
+      mostrarAviso("Nota marcada como não entregue.", "sucesso");
+      setNotaNaoEntregue(null);
+      await recarregar();
+    } catch {
+      setErroNaoEntrega("Erro ao registrar a não entrega. Tente novamente.");
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  function abrirNaoEntrega(nota: ExpedicaoNotaRow) {
+    setMotivoNaoEntrega("");
+    setErroNaoEntrega(null);
+    setNotaNaoEntregue(nota);
   }
 
   async function confirmarConclusao() {
@@ -581,13 +634,13 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
           </div>
 
           {detalhe.notas.map((nota, indice) => (
-            <div
-              key={nota.id_nota_saida}
-              className={`grid min-w-[720px] items-center bg-white font-sans text-base text-ink ${
-                indice % 2 === 1 ? "bg-table-alt!" : ""
-              }`}
-              style={{ gridTemplateColumns: gridNotas }}
-            >
+            <Fragment key={nota.id_nota_saida}>
+              <div
+                className={`grid min-w-[720px] items-center bg-white font-sans text-base text-ink ${
+                  indice % 2 === 1 ? "bg-table-alt!" : ""
+                }`}
+                style={{ gridTemplateColumns: gridNotas }}
+              >
               <div className="px-[0.6875rem] py-2 text-center font-semibold">
                 {nota.ordem_visita}
               </div>
@@ -652,7 +705,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                       <button
                         type="button"
                         className="rounded-md border border-border bg-white px-2 py-1 font-sans text-[0.8125rem] text-ink cursor-pointer transition-[background-color] duration-100 hover:bg-[#f2f4f8] disabled:cursor-default disabled:opacity-50"
-                        onClick={() => setNotaNaoEntregue(nota)}
+                        onClick={() => abrirNaoEntrega(nota)}
                         disabled={processando}
                       >
                         Não entregue
@@ -660,12 +713,63 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                     </>
                   ) : (
                     <span className="font-sans text-xs text-[#697077]">
-                      Entrega registrada
+                      {nota.justificativa ? "Não entregue" : "Entrega registrada"}
                     </span>
                   )}
                 </div>
               )}
-            </div>
+              </div>
+              {(nota.data_tentativa || nota.justificativa || nota.fotos.length > 0) && (
+                <div className="flex min-w-[720px] flex-col gap-2 border-t border-[#e2e8f0] bg-[#fbfcfd] px-[0.6875rem] py-3 font-sans text-sm text-ink">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#697077]">
+                    {nota.data_tentativa && (
+                      <span>
+                        Tentativa: {nota.data_tentativa}
+                        {nota.usuario_tentativa
+                          ? ` · ${nota.usuario_tentativa}`
+                          : ""}
+                      </span>
+                    )}
+                    {nota.saldo_pendente > 0 && (
+                      <span className="rounded-full bg-[#fff4e5] px-2 py-0.5 font-semibold text-[#7a4100]">
+                        {
+                          nota.itens_detalhe.filter(
+                            (item) =>
+                              item.qtd_esperada - item.qtd_entregue > 0.000001,
+                          ).length
+                        }{" "}
+                        item(ns) pendente(s)
+                      </span>
+                    )}
+                  </div>
+                  {nota.justificativa && (
+                    <span>Justificativa: {nota.justificativa}</span>
+                  )}
+                  {nota.fotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {nota.fotos.map((foto) => (
+                        <a
+                          key={foto.id_anexo}
+                          href={foto.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={foto.nome_arquivo}
+                        >
+                          <img
+                            src={foto.url}
+                            alt={foto.nome_arquivo}
+                            width={64}
+                            height={64}
+                            style={{ width: 64, height: 64 }}
+                            className="rounded border border-border object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Fragment>
           ))}
         </div>
       )}
@@ -735,17 +839,78 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
         )}
       </Modal>
 
-      <ConfirmDialog
+      <Modal
         open={notaNaoEntregue !== null}
         onClose={() => setNotaNaoEntregue(null)}
-        onConfirm={() => {
-          void confirmarNaoEntregue();
-        }}
         title="Não entregue"
-        message={`Marcar a nota ${notaNaoEntregue?.codigo ?? ""} como não entregue? Nada é baixado do estoque e a reserva continua para outra expedição.`}
-        confirmLabel="Marcar como não entregue"
-        loading={processando}
-      />
+        width="680px"
+      >
+        {notaNaoEntregue && (
+          <form
+            className={ui.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void confirmarNaoEntregue(new FormData(event.currentTarget));
+            }}
+          >
+            <p className="m-0 font-sans text-sm text-[#697077]">
+              Marcar a nota {notaNaoEntregue.codigo} como não entregue? Nada é
+              baixado do estoque e a reserva continua para outra expedição.
+            </p>
+
+            <div className={ui.field}>
+              <label className={ui.label} htmlFor="motivo-nao-entrega">
+                Motivo / justificativa da não entrega
+              </label>
+              <textarea
+                id="motivo-nao-entrega"
+                name="justificativa"
+                required
+                maxLength={1000}
+                rows={4}
+                value={motivoNaoEntrega}
+                onChange={(event) => setMotivoNaoEntrega(event.target.value)}
+                className="w-full rounded-lg border border-border-input bg-white px-3 py-2 font-sans text-sm text-ink outline-none focus:border-brand"
+                placeholder="Ex.: escola fechada, responsável ausente..."
+              />
+              <span className="self-end font-sans text-xs text-[#697077]">
+                {motivoNaoEntrega.length}/1000
+              </span>
+            </div>
+
+            <FotosField
+              key={`nao-entrega-${notaNaoEntregue.id_nota_saida}`}
+              initial={[]}
+              max={5}
+              allowUrl={false}
+              label="Fotos da não entrega (opcional)"
+              name="fotos"
+              disabled={processando}
+            />
+
+            {erroNaoEntrega && (
+              <p className="m-0 rounded-lg bg-[#fdecea] px-3 py-2 font-sans text-sm text-[#8a1c1c]">
+                {erroNaoEntrega}
+              </p>
+            )}
+
+            <div className={ui.rowActions}>
+              <Button
+                label="Cancelar"
+                variant="cancel"
+                onClick={() => setNotaNaoEntregue(null)}
+                disabled={processando}
+              />
+              <Button
+                label="Registrar não entrega"
+                variant="primary"
+                type="submit"
+                disabled={processando || motivoNaoEntrega.trim().length === 0}
+              />
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={concluindo}

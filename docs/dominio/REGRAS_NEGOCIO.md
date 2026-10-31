@@ -31,6 +31,14 @@ preenchimento, e **nenhuma nota** aceita produto duplicado. `/pedidos` é acess�
 permissão do módulo, com ações conforme a permissão. Ver
 [`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.11.0/§3.11.1.
 
+**Semântica das fotos e anexos:** as fotos vivem em **`anexo`**, com dono único — exatamente
+um entre `ID_produto`, `ID_funcionario` e `ID_expedicao_nota` (o vínculo expedição/nota; não
+existe mais `anexo.ID_nota_saida`). **Cadastro tem no máximo uma foto ativa** (produto e
+funcionário): trocar desativa a anterior e o arquivo antigo só é apagado do disco após o
+commit. **Tentativa de entrega tem 0..5 fotos** e, depois de registrada, é imutável. `anexo` é
+desativado (soft delete) e o hard delete do dono o leva por cascade. Ver
+[`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.14.
+
 ## RN001 — Alerta de Saldo Insuficiente
 **Prioridade:** Essencial
 
@@ -56,6 +64,13 @@ entregar continua derivado de `item_nota_saida.qtd_esperada − qtd_entregue`, e
 permanece reservado (`produto.saldo_reservado`) até ser entregue ou cortado. Ver
 [`ENTENDIMENTO.md`](./ENTENDIMENTO.md) §3.11.2.
 
+**Execução parcial:** o formulário lista **só itens com pendência** (os completos ficam em
+bloco somente leitura) e informa o **“entregar agora”** — o delta, com default na pendência.
+O servidor recusa item sem pendência, redução do já entregue e entrega com tudo em zero sem
+corte e sem justificativa. **Não entregue** exige justificativa (1..1000), mantém a nota em
+`PENDENTE` e a reserva intacta, e grava a tentativa (`data_tentativa`, usuário e 0..5 fotos)
+no vínculo `expedicao_nota`.
+
 ## RN004 — Imutabilidade de Histórico
 **Prioridade:** Essencial
 
@@ -66,6 +81,10 @@ O histórico não é o saldo: `produto.saldo`/`saldo_reservado` guardam o valor 
 `saldo_anterior` e `saldo_posterior`. Apagar ou reescrever a movimentação (ou zerar o saldo)
 para "corrigir" um lançamento é proibido; a correção gera o registro corretivo, e a auditoria
 preserva antes/depois.
+
+A **tentativa de entrega** também é histórico: `justificativa`, `data_tentativa`,
+`ID_usuario_tentativa` e as fotos do vínculo `expedicao_nota` não são editados nem removidos
+depois do registro; uma nova tentativa gera outro vínculo, sem sobrescrever o anterior.
 
 ## RN005 — Aprovação de Ajuste de Inventário
 **Prioridade:** Essencial

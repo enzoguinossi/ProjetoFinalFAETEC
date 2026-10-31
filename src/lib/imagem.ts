@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import sharp from "sharp";
+import { resolverCaminhoUpload } from "./uploads";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_DIM = 1024;
@@ -73,27 +74,97 @@ export async function processarImagemDeUrl(url: string): Promise<ResultadoImagem
 }
 
 /**
- * Grava o buffer WEBP em public/uploads/produtos/{idProduto}/{nome}.webp
- * e retorna o caminho público relativo.
+ * Resolve a imagem de um formulário: upload (`campoArquivo`) ou URL externa.
+ * Converte para WEBP; retorna `null` quando não há imagem. Ponto único de
+ * entrada usado por produto e funcionário (cadastro).
  */
-export async function salvarImagemProduto(
-  idProduto: number,
+export async function processarImagemDoFormulario(
+  formData: FormData,
+  campoArquivo: string,
+  urlExterna?: string | null,
+): Promise<
+  | { buffer: Buffer; hash: string; nome_arquivo: string; tipo_mime: string }
+  | null
+  | { error: string }
+> {
+  const arquivo = formData.get(campoArquivo);
+  if (arquivo instanceof File && arquivo.size > 0) {
+    const res = await processarImagemWebp(arquivo);
+    if (!res.ok) return { error: res.error };
+    return {
+      buffer: res.buffer,
+      hash: res.hash,
+      nome_arquivo: arquivo.name || "imagem.webp",
+      tipo_mime: "image/webp",
+    };
+  }
+
+  const url = urlExterna?.trim();
+  if (url && /^https?:\/\//i.test(url)) {
+    const res = await processarImagemDeUrl(url);
+    if (!res.ok) return { error: res.error };
+    const nomeUrl = (() => {
+      try {
+        return decodeURIComponent(new URL(url).pathname.split("/").pop() || "");
+      } catch {
+        return "";
+      }
+    })();
+    return {
+      buffer: res.buffer,
+      hash: res.hash,
+      nome_arquivo: nomeUrl || "imagem.webp",
+      tipo_mime: "image/webp",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Grava o buffer WEBP em `public/uploads/{pasta}/{nome}.webp` e devolve o
+ * caminho público relativo. `pasta` é relativa a `public/uploads`
+ * (ex.: `produtos/12`, `funcionarios/5`, `entregas/3/8`).
+ */
+export async function salvarImagemAnexo(
+  pasta: string,
   buffer: Buffer,
   hash: string,
 ): Promise<string> {
-  const dirRelativo = path.posix.join("uploads", "produtos", String(idProduto));
-  const dirAbsoluto = path.join(process.cwd(), "public", dirRelativo);
+  const bruta = pasta.replace(/\\/g, "/");
+  const relativa = bruta.replace(/^\/+|\/+$/g, "");
+  const segmentos = relativa.split("/");
+  if (
+    relativa === "" ||
+    path.posix.isAbsolute(bruta) ||
+    /^[A-Za-z]:/.test(bruta) ||
+    segmentos.some((s) => s === "" || s === "." || s === "..")
+  ) {
+    throw new Error("Pasta de anexo inválida.");
+  }
+
+  const dirAbsoluto = resolverCaminhoUpload(segmentos);
+  if (!dirAbsoluto) {
+    throw new Error("Pasta de anexo inválida.");
+  }
+
   await fs.mkdir(dirAbsoluto, { recursive: true });
 
   const nomeArquivo = `${Date.now()}-${hash}.webp`;
   await fs.writeFile(path.join(dirAbsoluto, nomeArquivo), buffer);
 
-  return `/${dirRelativo}/${nomeArquivo}`;
+  return `/uploads/${relativa}/${nomeArquivo}`;
 }
 
-/** Remove um arquivo de imagem previamente salvo (ignora ausência). */
-export async function removerImagemProduto(fotoUrl: string | null | undefined): Promise<void> {
-  if (!fotoUrl || !fotoUrl.startsWith("/uploads/")) return;
-  const absoluto = path.join(process.cwd(), "public", fotoUrl.replace(/^\//, ""));
+/**
+ * Remove um arquivo de imagem salvo em `public/uploads`. URLs externas são
+ * ignoradas; a ausência do arquivo não é erro. Qualquer caminho que resolva
+ * fora de `public/uploads` é recusado (proteção contra path traversal).
+ */
+export async function removerImagemAnexo(url: string | null | undefined): Promise<void> {
+  if (!url || !url.startsWith("/uploads/")) return;
+  const relativo = url.slice("/uploads/".length).split(/[?#]/)[0] ?? "";
+  const absoluto = resolverCaminhoUpload(relativo.split("/").filter(Boolean));
+  if (!absoluto) return;
   await fs.rm(absoluto, { force: true });
 }

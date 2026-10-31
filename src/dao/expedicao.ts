@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
+import { anexoDAO, type AnexoInput } from "./anexo";
 import { saldoDAO } from "./estoque";
 import { buildPagination, type ListParams } from "@/types";
 
@@ -52,6 +53,18 @@ const includeNotas = {
   notas: {
     orderBy: { ordem_visita: "asc" as const },
     include: {
+      usuarioTentativa: {
+        select: {
+          funcionario: {
+            select: { pessoaFisica: { select: { nome: true } } },
+          },
+        },
+      },
+      anexos: {
+        where: { ativo: true },
+        select: { id_anexo: true, nome_arquivo: true, url: true },
+        orderBy: { id_anexo: "asc" as const },
+      },
       notaSaida: {
         include: {
           destinatario: { include: { pessoaJuridica: true } },
@@ -194,6 +207,10 @@ async function finalizarNota(
   itens: EntregaItem[],
   cortar_restante: boolean,
   id_usuario: number,
+  tentativa: { justificativa: string | null; fotos: AnexoInput[] } = {
+    justificativa: null,
+    fotos: [],
+  },
 ): Promise<ResultadoEntrega> {
   const expedicao = await tx.expedicao.findFirst({
     where: { id_expedicao, ativo: true },
@@ -204,24 +221,39 @@ async function finalizarNota(
     throw new Error("Só expedições em percurso registram entrega.");
   }
 
+  const justificativa = tentativa.justificativa?.trim() || null;
+  if (justificativa !== null && justificativa.length > 1000) {
+    throw new Error("A justificativa deve ter no máximo 1000 caracteres.");
+  }
+  if (!Array.isArray(tentativa.fotos) || tentativa.fotos.length > 5) {
+    throw new Error("A tentativa aceita no máximo 5 fotos.");
+  }
+
   const nota = await tx.notaSaida.findFirst({
     where: { id_nota_saida, tipo: "SAIDA", ativo: true },
     include: {
       itens: { orderBy: { id_item_nota_saida: "asc" } },
-      expedicoes: { select: { id_expedicao: true } },
+      expedicoes: {
+        select: {
+          id_expedicao: true,
+          id_expedicao_nota: true,
+          justificativa: true,
+          data_tentativa: true,
+          id_usuario_tentativa: true,
+          anexos: { select: { nome_arquivo: true, url: true } },
+        },
+      },
     },
   });
   if (!nota) throw new Error("Nota de saída não encontrada.");
-  if (!nota.expedicoes.some((vinculo) => vinculo.id_expedicao === id_expedicao)) {
-    throw new Error("Esta nota não pertence à expedição.");
-  }
+  const vinculo = nota.expedicoes.find(
+    (item) => item.id_expedicao === id_expedicao,
+  );
+  if (!vinculo) throw new Error("Esta nota não pertence à expedição.");
   if (nota.status !== "EM_PERCURSO") {
     throw new Error(
       "Esta nota não está em percurso: a entrega já foi registrada ou a nota não saiu.",
     );
-  }
-  if (itens.length !== nota.itens.length) {
-    throw new Error("Informe a quantidade entregue de todos os itens da nota.");
   }
 
   const informado = new Map<number, number>();
@@ -229,18 +261,37 @@ async function finalizarNota(
     if (informado.has(item.id_item_nota_saida)) {
       throw new Error("Cada item da nota deve ser informado uma única vez.");
     }
+    const daNota = nota.itens.some(
+      (notaItem) => notaItem.id_item_nota_saida === item.id_item_nota_saida,
+    );
+    if (!daNota) throw new Error("Item informado não pertence a esta nota.");
     informado.set(item.id_item_nota_saida, item.qtd_entregue);
   }
 
+  const EPS = 0.000001;
   const plano = nota.itens.map((item) => {
     const nova = informado.get(item.id_item_nota_saida);
-    if (nova === undefined) {
-      throw new Error("Informe a quantidade entregue de todos os itens da nota.");
-    }
-
     const esperada = Number(item.qtd_esperada);
     const atual = Number(item.qtd_entregue);
 
+    // Item omitido permanece com o já entregue (delta zero); no corte, a
+    // pendência omitida também libera a reserva.
+    if (nova === undefined) {
+      return {
+        item,
+        esperada,
+        atual,
+        nova: atual,
+        delta: 0,
+        restante: cortar_restante ? esperada - atual : 0,
+      };
+    }
+
+    if (esperada - atual <= EPS) {
+      throw new Error(
+        "Item já entregue não pode ser alterado; informe apenas itens com pendência.",
+      );
+    }
     if (!Number.isFinite(nova) || nova < 0 || nova > esperada) {
       throw new Error(
         "Quantidade entregue inválida: precisa estar entre zero e a quantidade esperada do item.",
@@ -265,6 +316,14 @@ async function finalizarNota(
   const totalEsperada = plano.reduce((total, item) => total + item.esperada, 0);
   const totalEntregue = plano.reduce((total, item) => total + item.nova, 0);
   const totalDelta = plano.reduce((total, item) => total + item.delta, 0);
+
+  // Registrar entrega sem baixar nada e sem justificativa é o mesmo que "não
+  // entregue" sem motivo, que exige `marcarNaoEntregue`.
+  if (totalDelta === 0 && !cortar_restante && justificativa === null) {
+    throw new Error(
+      "Informe ao menos uma quantidade entregue ou use “Não entregue” com a justificativa.",
+    );
+  }
 
   const status: StatusNotaSaida =
     totalDelta === 0 && !cortar_restante
@@ -393,6 +452,34 @@ async function finalizarNota(
     });
   }
 
+  // A tentativa (resultado + justificativa + fotos) fica no vínculo da nota
+  // com a expedição. Depois de gravada é imutável: não há remoção de fotos.
+  const dataTentativa = new Date();
+  await tx.expedicaoNota.update({
+    where: { id_expedicao_nota: vinculo.id_expedicao_nota },
+    data: {
+      data_tentativa: dataTentativa,
+      id_usuario_tentativa: id_usuario,
+      justificativa,
+    },
+  });
+  const anexos = await anexoDAO.criar(
+    { tipo: "expedicao_nota", id: vinculo.id_expedicao_nota },
+    tentativa.fotos,
+    id_usuario,
+    tx,
+  );
+  const tentativaGravada = {
+    justificativa,
+    data_tentativa: dataTentativa.toISOString(),
+    id_usuario_tentativa: id_usuario,
+    fotos: anexos.map((anexo) => ({
+      id_anexo: anexo.id_anexo,
+      nome_arquivo: anexo.nome_arquivo,
+      url: anexo.url,
+    })),
+  };
+
   await registrarAuditoria(
     id_usuario,
     "ALTERAR",
@@ -410,6 +497,12 @@ async function finalizarNota(
         qtd_entregue: item.atual,
       })),
       saldos: saldosAnteriores,
+      tentativa: {
+        justificativa: vinculo.justificativa,
+        data_tentativa: vinculo.data_tentativa?.toISOString() ?? null,
+        id_usuario_tentativa: vinculo.id_usuario_tentativa,
+        fotos: vinculo.anexos,
+      },
     },
     {
       id_nota_saida,
@@ -425,6 +518,7 @@ async function finalizarNota(
       saldos: saldosPosteriores,
       movimentacoes,
       reservas_liberadas: reservasLiberadas,
+      tentativa: tentativaGravada,
     },
     tx,
   );
@@ -1059,6 +1153,10 @@ export class ExpedicaoDAO {
     itens: EntregaItem[],
     cortar_restante: boolean,
     id_usuario: number,
+    tentativa: { justificativa: string | null; fotos: AnexoInput[] } = {
+      justificativa: null,
+      fotos: [],
+    },
   ): Promise<ResultadoEntrega> {
     return prisma.$transaction(
       (tx) =>
@@ -1069,6 +1167,7 @@ export class ExpedicaoDAO {
           itens,
           cortar_restante,
           id_usuario,
+          tentativa,
         ),
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
@@ -1082,27 +1181,19 @@ export class ExpedicaoDAO {
     id: number,
     id_nota_saida: number,
     id_usuario: number,
+    tentativa: { justificativa: string | null; fotos: AnexoInput[] },
   ): Promise<ResultadoEntrega> {
     return prisma.$transaction(
-      async (tx) => {
-        const nota = await tx.notaSaida.findFirst({
-          where: { id_nota_saida, tipo: "SAIDA", ativo: true },
-          include: { itens: { orderBy: { id_item_nota_saida: "asc" } } },
-        });
-        if (!nota) throw new Error("Nota de saída não encontrada.");
-
-        return finalizarNota(
+      (tx) =>
+        finalizarNota(
           tx,
           id,
           id_nota_saida,
-          nota.itens.map((item) => ({
-            id_item_nota_saida: item.id_item_nota_saida,
-            qtd_entregue: Number(item.qtd_entregue),
-          })),
+          [],
           false,
           id_usuario,
-        );
-      },
+          tentativa,
+        ),
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   }

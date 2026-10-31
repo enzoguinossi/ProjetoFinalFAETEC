@@ -839,6 +839,60 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
         )}
       </div>
 
+      {isView && initialData && initialData.tentativas.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4">
+          <span className={LABEL_CLASS}>Tentativas de entrega</span>
+          {initialData.tentativas.map((tentativa) => (
+            <div
+              key={`${tentativa.id_expedicao}-${tentativa.data ?? ""}`}
+              className="flex flex-col gap-2 border-t border-border pt-3 first:border-t-0 first:pt-0"
+            >
+              <div className="flex flex-wrap items-center gap-2 font-sans text-sm text-ink">
+                <span className="font-semibold">
+                  EXP #{tentativa.id_expedicao}
+                </span>
+                <span className="text-[#697077]">{tentativa.data ?? "—"}</span>
+                <span className="rounded-full bg-[#f2f4f8] px-2 py-0.5 text-xs font-semibold text-[#4a4f55]">
+                  {tentativa.status}
+                </span>
+                {tentativa.usuario && (
+                  <span className="text-xs text-[#697077]">
+                    por {tentativa.usuario}
+                  </span>
+                )}
+              </div>
+              {tentativa.justificativa && (
+                <p className="m-0 font-sans text-sm text-[#8a5a00]">
+                  Justificativa: {tentativa.justificativa}
+                </p>
+              )}
+              {tentativa.fotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {tentativa.fotos.map((foto) => (
+                    <a
+                      key={foto.id_anexo}
+                      href={foto.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={foto.nome_arquivo}
+                    >
+                      <img
+                        src={foto.url}
+                        alt={foto.nome_arquivo}
+                        width={96}
+                        height={96}
+                        style={{ width: 96, height: 96 }}
+                        className="rounded-lg border border-border object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className={ui.rowActions}>
         {isView ? (
           <Button label="Fechar" variant="cancel" onClick={onCancel} />

@@ -15,6 +15,8 @@ export type ProdutoRelatorioRow = {
   /** `saldo − saldo_reservado`. */
   livre: number;
   situacao: "Ativo" | "Inativo";
+  /** URL do anexo ativo mais recente (foto atual), se houver. */
+  foto_url: string | null;
 };
 
 export type ProdutosRelatorioResult = {
@@ -25,6 +27,8 @@ export type ProdutosRelatorioResult = {
 export type ProdutosRelatorioFiltros = {
   /** `ativas` (padrão), `inativas` ou `todas`. */
   situacao?: SituacaoProdutoRelatorio;
+  /** Inclui a coluna/URL da foto no relatório e no CSV. */
+  fotos?: boolean;
 };
 
 /** Tipos de movimentação que podem ser filtrados na Movimentação (lista vazia = todos). */
@@ -140,6 +144,8 @@ export type ExpedicaoRelatorioRow = {
   destinatarios: string;
   itens_esperados: number;
   itens_entregues: number;
+  /** URLs das fotos das tentativas das notas da expedição. */
+  fotos: string[];
 };
 
 export type ExpedicoesRelatorioResult = {
@@ -160,6 +166,8 @@ export type ExpedicoesRelatorioFiltros = {
   id_condutores?: number[];
   /** Status selecionados; vazio não filtra. */
   status?: StatusExpedicaoRelatorio[];
+  /** Inclui as fotos no relatório/CSV. */
+  fotos?: boolean;
 };
 
 export type EntregaRelatorioRow = {
@@ -175,8 +183,12 @@ export type EntregaRelatorioRow = {
   entregue: number;
   /** `Σ(qtd_esperada − qtd_entregue)`. */
   pendente: number;
-  /** `EXP #id` do vínculo mais recente, ou `—`. */
+  /** `EXP #id` do vínculo mais recente, ou `-`. */
   expedicao: string;
+  /** URLs das fotos das tentativas da nota. */
+  fotos: string[];
+  /** Justificativa da última não entrega, se houver. */
+  justificativa: string | null;
 };
 
 export type EntregasRelatorioResult = {
@@ -193,6 +205,8 @@ export type EntregasRelatorioFiltros = {
   id_destinatarios?: number[];
   /** Status da nota selecionados; vazio não filtra. */
   status?: StatusNotaRelatorio[];
+  /** Inclui fotos/justificativa no relatório/CSV. */
+  fotos?: boolean;
 };
 
 export type ExpedicaoFiltroRelatorio = {
@@ -269,6 +283,8 @@ export type FuncionarioRelatorioRow = {
   email: string | null;
   /** Telefone principal ativo do funcionário. */
   telefone: string | null;
+  /** URL do anexo ativo mais recente (foto atual), se houver. */
+  foto_url: string | null;
 };
 
 export type FuncionariosRelatorioResult = { data: FuncionarioRelatorioRow[] };
@@ -276,6 +292,8 @@ export type FuncionariosRelatorioResult = { data: FuncionarioRelatorioRow[] };
 export type FuncionariosRelatorioFiltros = {
   /** `ativos`/`inativos`; vazio ou os dois não filtra. */
   situacoes?: SituacaoCadastroRelatorio[];
+  /** Inclui a coluna/URL da foto no relatório e no CSV. */
+  fotos?: boolean;
 };
 
 export type DestinatarioRelatorioRow = {
@@ -430,6 +448,12 @@ export class RelatorioDAO {
         ativo: true,
         saldo: true,
         saldo_reservado: true,
+        anexos: {
+          where: { ativo: true },
+          orderBy: [{ data_upload: "desc" }, { id_anexo: "desc" }],
+          select: { url: true },
+          take: 1,
+        },
       },
       orderBy: { descricao: "asc" },
     });
@@ -444,6 +468,7 @@ export class RelatorioDAO {
         quantidade: arredondar(quantidade),
         livre: arredondar(quantidade - reservado),
         situacao: p.ativo ? "Ativo" : "Inativo",
+        foto_url: p.anexos[0]?.url ?? null,
       };
     });
 
@@ -540,6 +565,12 @@ export class RelatorioDAO {
           select: { numero: true },
           take: 1,
         },
+        anexos: {
+          where: { ativo: true },
+          orderBy: [{ data_upload: "desc" }, { id_anexo: "desc" }],
+          select: { url: true },
+          take: 1,
+        },
       },
       orderBy: { pessoaFisica: { nome: "asc" } },
     });
@@ -555,6 +586,7 @@ export class RelatorioDAO {
         situacao: funcionario.ativo ? "Ativo" : "Inativo",
         email: funcionario.emails[0]?.endereco ?? null,
         telefone: funcionario.telefones[0]?.numero ?? null,
+        foto_url: funcionario.anexos[0]?.url ?? null,
       })),
     };
   }
@@ -885,6 +917,10 @@ export class RelatorioDAO {
         condutor: { select: { pessoaFisica: { select: { nome: true } } } },
         notas: {
           select: {
+            anexos: {
+              where: { ativo: true },
+              select: { url: true },
+            },
             notaSaida: {
               select: {
                 destinatario: {
@@ -923,6 +959,13 @@ export class RelatorioDAO {
         itens_entregues: arredondar(
           itens.reduce((soma, item) => soma + Number(item.qtd_entregue), 0),
         ),
+        fotos: [
+          ...new Set(
+            expedicao.notas.flatMap((nota) =>
+              nota.anexos.map((anexo) => anexo.url),
+            ),
+          ),
+        ],
       };
     });
 
@@ -976,9 +1019,17 @@ export class RelatorioDAO {
         },
         itens: { select: { qtd_esperada: true, qtd_entregue: true } },
         expedicoes: {
-          select: { id_expedicao: true },
+          select: {
+            id_expedicao: true,
+            justificativa: true,
+            data_adicao: true,
+            data_tentativa: true,
+            anexos: {
+              where: { ativo: true },
+              select: { url: true },
+            },
+          },
           orderBy: { data_adicao: "desc" },
-          take: 1,
         },
       },
       orderBy: [{ data_criacao: "desc" }, { id_nota_saida: "desc" }],
@@ -986,6 +1037,13 @@ export class RelatorioDAO {
 
     const data: EntregaRelatorioRow[] = notas.map((nota) => {
       const ultimaExpedicao = nota.expedicoes[0];
+      // A justificativa vem da tentativa mais recente (`data_tentativa`, com
+      // fallback em `data_adicao`), não da ordem em que a nota foi vinculada.
+      const ultimaTentativa = [...nota.expedicoes].sort(
+        (a, b) =>
+          (b.data_tentativa ?? b.data_adicao).getTime() -
+          (a.data_tentativa ?? a.data_adicao).getTime(),
+      )[0];
       const esperado = arredondar(
         nota.itens.reduce((soma, item) => soma + Number(item.qtd_esperada), 0),
       );
@@ -1004,6 +1062,14 @@ export class RelatorioDAO {
         entregue,
         pendente: arredondar(esperado - entregue),
         expedicao: ultimaExpedicao ? `EXP #${ultimaExpedicao.id_expedicao}` : "—",
+        fotos: [
+          ...new Set(
+            nota.expedicoes.flatMap((vinculo) =>
+              vinculo.anexos.map((anexo) => anexo.url),
+            ),
+          ),
+        ],
+        justificativa: ultimaTentativa?.justificativa ?? null,
       };
     });
 

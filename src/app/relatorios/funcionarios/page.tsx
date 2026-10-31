@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 type Params = {
   situacao?: string | string[];
+  fotos?: string | string[];
 };
 
 export default async function RelatorioFuncionariosPage({
@@ -40,14 +41,19 @@ export default async function RelatorioFuncionariosPage({
         rotulo: rotuloSituacaoCadastro(situacao),
       })),
     },
+    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
   ];
 
-  const valores = { situacao: [...filtros.situacoes] };
+  const valores = {
+    situacao: [...filtros.situacoes],
+    fotos: filtros.fotos ? ["1"] : [],
+  };
 
   const query = new URLSearchParams();
   if (filtros.situacoes.length > 0) {
     query.set("situacao", filtros.situacoes.join(","));
   }
+  if (filtros.fotos) query.set("fotos", "1");
 
   const situacaoTexto =
     filtros.situacoes.length === 0
@@ -102,30 +108,35 @@ export default async function RelatorioFuncionariosPage({
             <table className="relatorio-tabela">
               <thead>
                 <tr>
-                  <th style={{ width: "7%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "6%" : "7%" }} className="col-centro">
                     Código
                   </th>
-                  <th style={{ width: "27%" }}>Nome</th>
-                  <th style={{ width: "11%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "23%" : "27%" }}>Nome</th>
+                  <th style={{ width: filtros.fotos ? "10%" : "11%" }} className="col-centro">
                     CPF
                   </th>
-                  <th style={{ width: "16%" }}>Cargo</th>
-                  <th style={{ width: "8%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "13%" : "16%" }}>Cargo</th>
+                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
                     Condutor
                   </th>
-                  <th style={{ width: "8%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
                     Situação
                   </th>
-                  <th style={{ width: "13%" }}>E-mail</th>
-                  <th style={{ width: "10%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "12%" : "13%" }}>E-mail</th>
+                  <th style={{ width: filtros.fotos ? "9%" : "10%" }} className="col-centro">
                     Telefone
                   </th>
+                  {filtros.fotos && (
+                    <th style={{ width: "13%" }} className="col-centro">
+                      Foto
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="relatorio-vazio">
+                    <td colSpan={filtros.fotos ? 9 : 8} className="relatorio-vazio">
                       Nenhum funcionário encontrado.
                     </td>
                   </tr>
@@ -140,6 +151,20 @@ export default async function RelatorioFuncionariosPage({
                       <td className="col-centro">{linha.situacao}</td>
                       <td title={linha.email ?? undefined}>{linha.email ?? "—"}</td>
                       <td className="col-centro">{linha.telefone ?? "—"}</td>
+                      {filtros.fotos && (
+                        <td className="col-centro">
+                          {linha.foto_url ? (
+                            <img
+                              src={linha.foto_url}
+                              alt={`Foto de ${linha.nome}`}
+                              width={64}
+                              height={64}
+                              style={{ width: 64, height: 64 }}
+                              className="mx-auto rounded object-cover"
+                            />
+                          ) : null}
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

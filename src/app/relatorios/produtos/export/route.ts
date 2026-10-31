@@ -17,11 +17,12 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const { data } = await relatorioService.listarProdutos({
+  const { data, filtros } = await relatorioService.listarProdutos({
     situacao: url.searchParams.get("situacao"),
+    fotos: url.searchParams.get("fotos"),
   });
 
-  return new Response(gerarCsvProdutos(data), {
+  return new Response(gerarCsvProdutos(data, filtros.fotos), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="produtos-${hojeISO()}.csv"`,

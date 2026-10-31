@@ -8,6 +8,12 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
 import { validarCpf } from "@/lib/cpf";
+import {
+  processarImagemDoFormulario,
+  removerImagemAnexo,
+  salvarImagemAnexo,
+} from "@/lib/imagem";
+import { anexoService } from "@/services/anexo";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type FuncionarioListRow = {
@@ -25,6 +31,9 @@ export type FuncionarioFormData = {
   cargo: string | null;
   condutor: boolean;
   ativo: boolean;
+  /** Foto atual, derivada do anexo ativo. */
+  foto_url: string | null;
+  fotos: { id_anexo: number; url: string }[];
   codigos: { tipo: string; valor: string }[];
   emails: { endereco: string; principal: boolean }[];
   telefones: { numero: string; tipo: "CELULAR" | "FIXO" | "COMERCIAL"; principal: boolean }[];
@@ -40,6 +49,16 @@ function lerCpf(formData: FormData): { cpf?: string } | { error: string } {
   const resultado = validarCpf(bruto);
   if (!resultado.ok) return { error: resultado.erro };
   return { cpf: resultado.cpf };
+}
+
+/** IDs de anexos marcados para remoção no formulário (`remover_anexos`). */
+function lerRemoverAnexos(formData: FormData): number[] {
+  const bruto = String(formData.get("remover_anexos") ?? "").trim();
+  if (!bruto) return [];
+  return bruto
+    .split(",")
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
 }
 
 export async function listarFuncionarios(
@@ -74,6 +93,8 @@ export async function getFuncionario(id: number): Promise<FuncionarioFormData | 
     cargo: f.cargo,
     condutor: f.condutor,
     ativo: f.ativo,
+    foto_url: f.anexos[0]?.url ?? null,
+    fotos: f.anexos.map((anexo) => ({ id_anexo: anexo.id_anexo, url: anexo.url })),
     codigos: f.funcionarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
     emails: f.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
     telefones: f.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })),
@@ -94,6 +115,15 @@ export async function createFuncionario(formData: FormData) {
     const contatoResult = contatoService.resolverContatosParaSalvar(formData);
     if ("error" in contatoResult) return { error: contatoResult.error };
 
+    const fotoUrl = String(formData.get("foto_url") ?? "").trim() || undefined;
+    const imagem = await processarImagemDoFormulario(
+      formData,
+      "foto_arquivo",
+      fotoUrl,
+    );
+    if (imagem && "error" in imagem) return { error: imagem.error };
+
+    let novaUrl: string | null = null;
     try {
       await funcionarioDAO.create(
         {
@@ -105,8 +135,29 @@ export async function createFuncionario(formData: FormData) {
           ...contatoResult.contatos,
         },
         user.id_usuario,
+        async (tx, idFuncionario) => {
+          if (!imagem) return;
+          novaUrl = await salvarImagemAnexo(
+            `funcionarios/${idFuncionario}`,
+            imagem.buffer,
+            imagem.hash,
+          );
+          await anexoService.criarAnexos(
+            { tipo: "funcionario", id: idFuncionario },
+            [
+              {
+                nome_arquivo: imagem.nome_arquivo,
+                url: novaUrl,
+                tipo_mime: imagem.tipo_mime,
+              },
+            ],
+            user.id_usuario,
+            tx,
+          );
+        },
       );
     } catch (e) {
+      if (novaUrl) await removerImagemAnexo(novaUrl);
       return { error: mensagemDeErro(e) };
     }
 
@@ -136,6 +187,19 @@ export async function updateFuncionario(formData: FormData) {
     const contatoResult = contatoService.resolverContatosParaSalvar(formData);
     if ("error" in contatoResult) return { error: contatoResult.error };
 
+    const fotoUrl = String(formData.get("foto_url") ?? "").trim() || undefined;
+    const imagem = await processarImagemDoFormulario(
+      formData,
+      "foto_arquivo",
+      fotoUrl,
+    );
+    if (imagem && "error" in imagem) return { error: imagem.error };
+
+    const dono = { tipo: "funcionario" as const, id };
+    const removerIds = lerRemoverAnexos(formData);
+    const urlsAntigas: string[] = [];
+    let novaUrl: string | null = null;
+
     try {
       await funcionarioDAO.update(
         id,
@@ -149,9 +213,42 @@ export async function updateFuncionario(formData: FormData) {
           ...contatoResult.contatos,
         },
         user.id_usuario,
+        async (tx) => {
+          if (removerIds.length > 0) {
+            const ativos = await anexoService.listarAtivos(dono, tx);
+            for (const anexo of ativos) {
+              if (!removerIds.includes(anexo.id_anexo)) continue;
+              await anexoService.desativar(anexo.id_anexo, user.id_usuario, tx);
+              urlsAntigas.push(anexo.url);
+            }
+          }
+          if (imagem) {
+            novaUrl = await salvarImagemAnexo(
+              `funcionarios/${id}`,
+              imagem.buffer,
+              imagem.hash,
+            );
+            const troca = await anexoService.substituirFoto(
+              dono,
+              {
+                nome_arquivo: imagem.nome_arquivo,
+                url: novaUrl,
+                tipo_mime: imagem.tipo_mime,
+              },
+              user.id_usuario,
+              tx,
+            );
+            urlsAntigas.push(...troca.urlsAntigas);
+          }
+        },
       );
     } catch (e) {
+      if (novaUrl) await removerImagemAnexo(novaUrl);
       return { error: mensagemDeErro(e) };
+    }
+
+    for (const url of urlsAntigas) {
+      if (url !== novaUrl) await removerImagemAnexo(url);
     }
 
     return { success: true };
@@ -161,7 +258,8 @@ export async function updateFuncionario(formData: FormData) {
 export async function deleteFuncionario(id: number) {
   return comPermissao("funcionario.excluir", async (user) => {
     try {
-      await funcionarioDAO.hardDelete(id, user.id_usuario);
+      const urls = await funcionarioDAO.hardDelete(id, user.id_usuario);
+      for (const url of urls) await removerImagemAnexo(url);
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }

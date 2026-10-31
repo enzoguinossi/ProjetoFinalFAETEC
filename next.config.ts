@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
   experimental: {
     typedEnv: true,
     serverActions: {
+      bodySizeLimit: "30mb",
       allowedOrigins: tunnelHost
         ? ["localhost:3000", "127.0.0.1:3000", tunnelHost]
         : ["localhost:3000", "127.0.0.1:3000"],

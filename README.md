@@ -50,8 +50,9 @@ acesso do sistema.
 Toda a documentação está indexada em **[`docs/README.md`](docs/README.md)** — modelo de
 dados, regras de negócio, requisitos, diagramas e convenções de processo.
 
-> Uploads: as fotos de produto são convertidas para WEBP e gravadas em `public/uploads/`
-> (fora do versionamento — ver `.gitignore`).
+> Uploads: as fotos de produto, de funcionário e das tentativas de entrega são convertidas para
+> WEBP e gravadas em `public/uploads/` (fora do versionamento — ver `.gitignore`); os metadados
+> ficam na tabela `anexo`.
 
 ## Equipe
 

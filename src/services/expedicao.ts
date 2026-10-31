@@ -88,6 +88,38 @@ function normalizarItensEntrega(
   return { itens };
 }
 
+export type EntregaFoto = {
+  nome_arquivo: string;
+  url: string;
+  tipo_mime: string | null;
+};
+
+/** Fotos já processadas e gravadas pela action; valida limite e metadados. */
+function normalizarFotos(valor: unknown): { fotos: EntregaFoto[] } | { error: string } {
+  if (valor === undefined || valor === null) return { fotos: [] };
+  if (!Array.isArray(valor)) return { error: "Fotos da tentativa inválidas." };
+  if (valor.length > 5) {
+    return { error: "A tentativa aceita no máximo 5 fotos." };
+  }
+
+  const fotos: EntregaFoto[] = [];
+  for (const bruto of valor) {
+    if (!bruto || typeof bruto !== "object") {
+      return { error: "Foto da tentativa inválida." };
+    }
+    const registro = bruto as Record<string, unknown>;
+    const nome = String(registro.nome_arquivo ?? "").trim();
+    const url = String(registro.url ?? "").trim();
+    if (!nome || !url) return { error: "Foto da tentativa inválida." };
+    fotos.push({
+      nome_arquivo: nome,
+      url,
+      tipo_mime: registro.tipo_mime ? String(registro.tipo_mime) : null,
+    });
+  }
+  return { fotos };
+}
+
 export class ExpedicaoService {
   /**
    * Valida e normaliza os campos da expedição. A data é aceita como
@@ -267,7 +299,7 @@ export class ExpedicaoService {
   async registrarEntrega(
     id: number,
     id_nota_saida: number,
-    input: { itens?: unknown; cortar_restante?: unknown },
+    input: { itens?: unknown; cortar_restante?: unknown; fotos?: unknown },
     id_usuario: number,
   ) {
     const idExpedicao = idPositivo(id);
@@ -278,6 +310,12 @@ export class ExpedicaoService {
 
     const itens = normalizarItensEntrega(input.itens);
     if ("error" in itens) return itens;
+    if (itens.itens.length === 0) {
+      return { error: "Informe ao menos um item com pendência para entregar." };
+    }
+
+    const fotos = normalizarFotos(input.fotos);
+    if ("error" in fotos) return fotos;
 
     try {
       return {
@@ -287,6 +325,7 @@ export class ExpedicaoService {
           itens.itens,
           booleano(input.cortar_restante),
           id_usuario,
+          { justificativa: null, fotos: fotos.fotos },
         ),
       };
     } catch (e) {
@@ -294,10 +333,15 @@ export class ExpedicaoService {
     }
   }
 
-  /** Atalho de "não entregue": zero entregue, sem corte e sem mexer no estoque. */
+  /**
+   * "Não entregue": exige justificativa (1..1000), zero entregue agora e sem
+   * corte. A nota volta a `PENDENTE`, a reserva permanece e a tentativa guarda
+   * justificativa/data/usuário e as fotos opcionais.
+   */
   async marcarNaoEntregue(
     id: number,
     id_nota_saida: number,
+    input: { justificativa?: unknown; fotos?: unknown },
     id_usuario: number,
   ) {
     const idExpedicao = idPositivo(id);
@@ -306,12 +350,24 @@ export class ExpedicaoService {
     const idNota = idPositivo(id_nota_saida);
     if (!idNota) return { error: "Nota de saída inválida." };
 
+    const justificativa = String(input.justificativa ?? "").trim();
+    if (justificativa.length === 0) {
+      return { error: "Informe a justificativa da não entrega." };
+    }
+    if (justificativa.length > 1000) {
+      return { error: "A justificativa deve ter no máximo 1000 caracteres." };
+    }
+
+    const fotos = normalizarFotos(input.fotos);
+    if ("error" in fotos) return fotos;
+
     try {
       return {
         entrega: await expedicaoDAO.marcarNaoEntregue(
           idExpedicao,
           idNota,
           id_usuario,
+          { justificativa, fotos: fotos.fotos },
         ),
       };
     } catch (e) {

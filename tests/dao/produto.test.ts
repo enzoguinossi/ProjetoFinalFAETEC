@@ -244,6 +244,34 @@ describe("produtoDAO", () => {
       expect(criado.conversaoPadrao).toMatchObject({ nome: "CX12" });
       expect(criado.conversaoSaida).toMatchObject({ nome: "CX50" });
     });
+
+    it("desfaz produto e anexo quando o callback da foto falha", async () => {
+      const { usuario } = await criarUsuario();
+      await garantirUnidadePadrao();
+
+      await expect(
+        produtoDAO.createCompleto(
+          { descricao: "Falha atômica" },
+          usuario.id_usuario,
+          async (tx, idProduto) => {
+            await tx.anexo.create({
+              data: {
+                id_produto: idProduto,
+                nome_arquivo: "foto.webp",
+                url: "/uploads/produtos/foto.webp",
+                data_upload: new Date(),
+              },
+            });
+            throw new Error("falha depois do anexo");
+          },
+        ),
+      ).rejects.toThrow("falha depois do anexo");
+
+      expect(
+        await prismaTeste.produto.count({ where: { descricao: "Falha atômica" } }),
+      ).toBe(0);
+      expect(await prismaTeste.anexo.count()).toBe(0);
+    });
   });
 
   describe("updateCompleto", () => {
@@ -372,56 +400,6 @@ describe("produtoDAO", () => {
       expect(
         await prismaTeste.produto.findUnique({ where: { id_produto: produto.id_produto } }),
       ).not.toBeNull();
-    });
-  });
-
-  describe("setFotoUrl", () => {
-    it("atualiza a foto e registra auditoria ALTERAR com antes/depois", async () => {
-      const { usuario } = await criarUsuario();
-      const produto = await criarProduto();
-
-      await produtoDAO.setFotoUrl(produto.id_produto, "/uploads/produtos/1/foto.webp", usuario.id_usuario);
-
-      const noBanco = await prismaTeste.produto.findUniqueOrThrow({
-        where: { id_produto: produto.id_produto },
-      });
-      expect(noBanco.foto_url).toBe("/uploads/produtos/1/foto.webp");
-
-      const auditorias = await auditoriasDe("Produto", produto.id_produto);
-      expect(auditorias).toHaveLength(1);
-      expect(auditorias[0]?.acao).toBe("ALTERAR");
-      expect(auditorias[0]?.dados_anteriores).toMatchObject({ foto_url: null });
-      expect(auditorias[0]?.dados_novos).toMatchObject({ foto_url: "/uploads/produtos/1/foto.webp" });
-    });
-  });
-
-  describe("rollbackCreate", () => {
-    it("remove produto recém-criado (com códigos e insumos) e registra auditoria EXCLUIR", async () => {
-      const { usuario } = await criarUsuario();
-      const tipo = await criarTipoCodigo("DIGITACAO");
-      const insumo = await criarProduto();
-      const criado = await produtoDAO.createCompleto(
-        {
-          descricao: "Rollback",
-          codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "RB" }],
-          insumos: [{ id_produto_filho: insumo.id_produto, quantidade: 1 }],
-        },
-        usuario.id_usuario,
-      );
-
-      await produtoDAO.rollbackCreate(criado.id_produto, usuario.id_usuario);
-
-      expect(
-        await prismaTeste.produto.findUnique({ where: { id_produto: criado.id_produto } }),
-      ).toBeNull();
-      expect(await prismaTeste.produtoCodigo.count({ where: { id_produto: criado.id_produto } })).toBe(0);
-      expect(
-        await prismaTeste.produtoInsumo.count({ where: { id_produto_pai: criado.id_produto } }),
-      ).toBe(0);
-
-      const auditorias = await auditoriasDe("Produto", criado.id_produto);
-      expect(auditorias.map((a) => a.acao)).toEqual(["CRIAR", "EXCLUIR"]);
-      expect(auditorias[1]?.dados_anteriores).toMatchObject({ descricao: "Rollback" });
     });
   });
 });

@@ -170,6 +170,9 @@ Regras:
 - **Ser condutor é uma flag do próprio funcionário** (`funcionario.condutor`) — não existe
   tabela `condutor`, nem dados de CNH no modelo. A expedição aponta para o funcionário
   condutor pela FK obrigatória `expedicao.ID_funcionario_condutor → funcionario`
+- **Foto:** o funcionário tem **uma foto no cadastro**, guardada como `anexo` com
+  `ID_funcionario` (dono único) — não há coluna de foto em `funcionario`. A foto é opcional,
+  aparece no formulário e na visualização e segue as regras de §3.14
 
 #### 3.3.2 Usuário (1:1 com Funcionário — opcional)
 
@@ -288,7 +291,6 @@ Quem usa:
 produto
 ├── ID_produto            INT PK auto_increment
 ├── descricao             VARCHAR NOT NULL
-├── foto_url              VARCHAR
 ├── perecivel             BOOLEAN DEFAULT FALSE
 ├── composto              BOOLEAN DEFAULT FALSE
 ├── data_validade         DATE NULL                 ← controlado manualmente, menor validade
@@ -305,7 +307,14 @@ O **produto é dono do saldo**: não existe tabela/linha de estoque nem lote. To
 
 **Flags removidas:** fracionado, porGrade, localizacao_fisica, gtin (gtin agora é código personalizado)
 
-**Foto:** O usuário faz upload para o servidor da aplicação. A imagem é validada (JPG/PNG/WEBP, ≤ 5 MB), redimensionada (máx. 1024px) e convertida para **WEBP** (qualidade 80) via `sharp`, gravada no file system em `public/uploads/produtos/{ID_produto}/{timestamp}-{hash}.webp` e o caminho relativo é salvo em `foto_url`. A gravação é atômica em relação ao cadastro: se o processamento falhar, o produto não é persistido (rollback).
+**Foto:** o produto tem **uma foto no cadastro**, guardada como `anexo` com `ID_produto`
+(dono único) — `produto.foto_url` **não existe mais**. O usuário faz upload no formulário
+(JPG/PNG/WEBP, ≤ 5 MB) ou informa uma URL externa; a imagem é validada, redimensionada (máx.
+1024px) e convertida para **WEBP** (qualidade 80) via `sharp`, gravada em
+`public/uploads/produtos/{ID_produto}/{timestamp}-{hash}.webp` e registrada em `anexo`
+(`url` relativa, `ativo = true`). A gravação do anexo acontece **na mesma transação** do
+cadastro; se a transação falhar, o arquivo recém-gravado é removido do disco. Trocar a foto
+desativa o anexo anterior e apaga o arquivo antigo **somente depois do commit**. Ver §3.14.
 
 #### 3.6.1 Conversão de Unidades (entrada e saída)
 
@@ -837,9 +846,14 @@ A baixa definitiva acontece na conclusão da entrega: para cada item entregue,
 - **`PENDENTE`**: a tentativa de entrega não ocorreu (ex.: escola fechada); a reserva permanece e
   a nota pode ser adicionada a outra expedição.
 
-A execução acontece **dentro da expedição em `EM_PERCURSO`**, por nota e por item: a quantidade
-informada é o **total entregue** (o sistema aplica o delta sobre `qtd_entregue`), o **corte** libera
-a reserva do restante e o atalho **não entregue** mantém tudo reservado. A baixa física não é
+A execução acontece **dentro da expedição em `EM_PERCURSO`**, por nota e por item: o campo
+**Entregar agora** informa o **delta** a entregar (default = pendência
+`qtd_esperada − qtd_entregue`; `0` desmarca), e o formulário lista **somente itens com
+pendência** — os já completos aparecem em bloco somente leitura. O sistema mantém o total já
+entregue e aplica o delta, o **corte** libera a reserva do restante e o atalho **não
+entregue** mantém tudo reservado. O servidor **recusa** item já completo, redução do já
+entregue, item que não pertence à nota e entrega com todos os itens em zero sem corte e sem
+justificativa. A baixa física não é
 bloqueada por `saldo` insuficiente — divergência de inventário não impede registrar uma
 entrega que aconteceu (RN001) —, mas nunca deixa `saldo_reservado` negativo. A segunda tentativa
 numa nota já finalizada é recusada sem debitar de novo. Ao **concluir** a expedição, as notas ainda
@@ -878,9 +892,18 @@ expedicao_nota
 ├── ID_nota_saida          INT FK → nota_saida
 ├── ordem_visita           INT                      ← posição na expedição naquele dia
 ├── data_adicao            TIMESTAMP
+├── justificativa          TEXT NULL                ← motivo do "não entregue" (1..1000)
+├── data_tentativa         TIMESTAMP NULL           ← quando a tentativa foi registrada
+└── ID_usuario_tentativa   INT FK → usuario NULL    ← quem registrou a tentativa
 ```
 
 A PK independente permite que **a mesma nota apareça em expedições diferentes** (ex: tentativa falhou no dia X, entra na expedição do dia Y). A auditoria se mantém intacta pois cada entrada é um registro separado.
+
+A **tentativa de entrega** fica no próprio vínculo: `data_tentativa`, `ID_usuario_tentativa`,
+`justificativa` (obrigatória no "não entregue", 1..1000 caracteres) e as **fotos** (0..5,
+`anexo` com `ID_expedicao_nota`). Duas tentativas da mesma nota em expedições diferentes geram
+vínculos com históricos independentes. Depois de registrada, a tentativa é **imutável**: não
+há remoção nem troca das fotos e um novo registro só é possível em outra expedição.
 
 #### 3.11.5 Ciclo de Vida Completo
 
@@ -976,7 +999,10 @@ veiculo
 
 ---
 
-### 3.14 Bloco: Anexos
+### 3.14 Bloco: Anexos (fotos)
+
+O anexo é uma **tabela única com dono polimórfico**: cada linha pertence a **exatamente um**
+dono — produto, funcionário ou vínculo expedição/nota (`expedicao_nota`).
 
 ```
 anexo
@@ -984,10 +1010,29 @@ anexo
 ├── nome_arquivo           VARCHAR NOT NULL
 ├── url                    VARCHAR NOT NULL
 ├── tipo_mime              VARCHAR
-├── data_upload            TIMESTAMP
-├── ID_nota_saida          INT FK → nota_saida NULL
-└── ativo                  BOOLEAN DEFAULT TRUE
+├── data_upload            TIMESTAMP NOT NULL
+├── ID_usuario             INT FK → usuario NULL     ← quem enviou (auditoria)
+├── ativo                  BOOLEAN DEFAULT TRUE
+├── ID_produto             INT FK → produto NULL            onDelete: Cascade
+├── ID_funcionario         INT FK → funcionario NULL        onDelete: Cascade
+└── ID_expedicao_nota      INT FK → expedicao_nota NULL     onDelete: Cascade
 ```
+
+Regras:
+- **Dono único:** exatamente um dos três campos preenchido. Zero ou dois donos é recusado pelo
+  serviço (`validarDonoUnico`) antes de qualquer escrita
+- **Cadastro (produto e funcionário): no máximo 1 foto ativa.** Trocar a foto desativa o anexo
+  anterior (`ativo = false`) e cria o novo na mesma transação; o arquivo antigo é apagado do
+  disco **só depois do commit** e a URL antiga fica na auditoria
+- **Tentativa de entrega: 0..5 fotos**, criadas junto com o registro da tentativa
+  (`expedicao_nota`); depois disso são **imutáveis** — não há edição, remoção ou troca
+- Todas as fotos passam por `src/lib/imagem.ts` (JPG/PNG/WEBP, ≤ 5 MB → WEBP 1024px via
+  `sharp`) e ficam em `public/uploads/{produtos|funcionarios|entregas/ID_expedicao/ID_nota}/`
+- `anexo` é **desativado** (soft delete) com auditoria; o hard delete da entidade dona
+  (`produto`/`funcionario`) leva os anexos por **cascade** e as URLs são devolvidas ao
+  chamador para apagar os arquivos
+- `anexo.ID_nota_saida` foi **removido**: o dono da tentativa é o vínculo `expedicao_nota`,
+  não a nota
 
 > A antiga coluna `ID_documento_fiscal` foi **removida** do schema: era órfã (sem modelo
 > `documento_fiscal`, sem FK e sem uso no código).
@@ -1200,6 +1245,13 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 | **Listagem Simplificada de Produtos** | — | PDF, CSV/XLSX |
 | Auditoria | Usuário, período, entidade, ação | CSV/XLSX |
 | Consolidado Semestral | Movimentações agregadas (6 em 6 meses) | PDF, CSV/XLSX |
+
+**Fotos nos relatórios:** Produtos, Funcionários, Entregas e Expedições têm o checkbox opcional
+**“Listar fotos”** (`?fotos=1`). Ele adiciona a coluna de miniaturas na tela/PDF (as imagens
+abrem em nova aba; acima de 3–4 fotos a linha mostra `+N`) e a coluna de URL no CSV. Em
+**Entregas** acrescenta também a **justificativa** da última não entrega. Entregas e Expedições
+usam o layout ampliado A4 paisagem (`RelatorioAmpliado`); Produtos e Funcionários seguem em A4
+retrato. O relatório de Produtos mostra **a foto atual** (anexo ativo mais recente).
 
 ---
 

@@ -16,11 +16,12 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const { data } = await relatorioService.listarFuncionarios({
+  const { data, filtros } = await relatorioService.listarFuncionarios({
     situacao: url.searchParams.getAll("situacao"),
+    fotos: url.searchParams.get("fotos"),
   });
 
-  return new Response(gerarCsvFuncionarios(data), {
+  return new Response(gerarCsvFuncionarios(data, filtros.fotos), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="funcionarios-${hojeISO()}.csv"`,

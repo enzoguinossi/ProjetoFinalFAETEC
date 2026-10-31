@@ -39,6 +39,10 @@ export class FuncionarioDAO {
         telefones: { where: { ativo: true } },
         emails: true,
         funcionarioCodigos: { include: { tipoCodigo: true } },
+        anexos: {
+          where: { ativo: true },
+          orderBy: [{ data_upload: "desc" }, { id_anexo: "desc" }],
+        },
       },
     });
   }
@@ -54,6 +58,8 @@ export class FuncionarioDAO {
   async create(
     data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
+    /** Executado na mesma transação, após o funcionário existir (foto/anexo). */
+    depoisDeCriar?: (tx: Prisma.TransactionClient, id_funcionario: number) => Promise<void>,
   ) {
     const result = await prisma.$transaction(async (tx) => {
       const pf = await tx.pessoaFisica.create({
@@ -97,9 +103,19 @@ export class FuncionarioDAO {
         tx,
       );
 
+      if (depoisDeCriar) {
+        await depoisDeCriar(tx, func.id_funcionario);
+      }
+
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: func.id_funcionario },
-        include: { pessoaFisica: true },
+        include: {
+          pessoaFisica: true,
+          anexos: {
+            where: { ativo: true },
+            orderBy: [{ data_upload: "desc" }, { id_anexo: "desc" }],
+          },
+        },
       });
     });
     return result;
@@ -109,6 +125,8 @@ export class FuncionarioDAO {
     id: number,
     data: { nome?: string; cpf?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
     id_usuario: number,
+    /** Executado na mesma transação, após atualizar o funcionário (foto/anexo). */
+    depoisDeAtualizar?: (tx: Prisma.TransactionClient) => Promise<void>,
   ) {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.funcionario.findUniqueOrThrow({
@@ -194,9 +212,19 @@ export class FuncionarioDAO {
         tx,
       );
 
+      if (depoisDeAtualizar) {
+        await depoisDeAtualizar(tx);
+      }
+
       return tx.funcionario.findUniqueOrThrow({
         where: { id_funcionario: id },
-        include: { pessoaFisica: true },
+        include: {
+          pessoaFisica: true,
+          anexos: {
+            where: { ativo: true },
+            orderBy: [{ data_upload: "desc" }, { id_anexo: "desc" }],
+          },
+        },
       });
     });
   }
@@ -216,12 +244,16 @@ export class FuncionarioDAO {
     return { podeExcluir: vinculos.length === 0, vinculos };
   }
 
-  async hardDelete(id: number, id_usuario: number) {
+  async hardDelete(id: number, id_usuario: number): Promise<string[]> {
     return prisma.$transaction(async (tx) => {
       const { podeExcluir, vinculos } = await this.verificarRelacionamentos(id, tx);
       if (!podeExcluir) throw new EntidadeComVinculosError(`o funcionário`, vinculos);
 
       const func = await tx.funcionario.findUniqueOrThrow({ where: { id_funcionario: id } });
+      const anexos = await tx.anexo.findMany({
+        where: { id_funcionario: id, ativo: true },
+        select: { url: true },
+      });
 
       await tx.funcionarioCodigo.deleteMany({ where: { id_funcionario: id } });
       await tx.funcionarioTelefone.deleteMany({ where: { id_funcionario: id } });
@@ -235,6 +267,8 @@ export class FuncionarioDAO {
         null,
         tx,
       );
+
+      return anexos.map((anexo) => anexo.url);
     });
   }
 }

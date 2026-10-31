@@ -10,7 +10,7 @@ import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
 import Modal from "@/components/Modal";
 import ProdutoView from "./ProdutoView";
-import FotoField from "./FotoField";
+import FotosField from "@/components/FotosField";
 import Button from "@/components/Button";
 import { useAviso } from "@/components/AvisoProvider";
 
@@ -324,7 +324,13 @@ export default function ProdutoForm({
         )}
 
         {/* Foto */}
-        <FotoField initialFotoUrl={initialData?.foto_url} />
+        <FotosField
+          key={initialData?.fotos.map((foto) => foto.id_anexo).join(",") ?? "novo"}
+          initial={initialData?.fotos ?? []}
+          max={1}
+          allowUrl
+          label="Foto"
+        />
 
         {/* Actions */}
         <div className="flex justify-end gap-[10px] pt-1">

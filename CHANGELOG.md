@@ -14,6 +14,27 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Added
+- **Fotos em `anexo` e tentativa de entrega (RUN-20261031-89/90, RF020/RF021):** `anexo`
+  virou tabela de **dono polimórfico** — exatamente um entre `ID_produto`, `ID_funcionario` e
+  `ID_expedicao_nota` (cascade), mais `ID_usuario`; `anexo.ID_nota_saida` e
+  `produto.foto_url` foram removidos. **Produto e funcionário têm 1 foto ativa** (troca
+  desativa a anterior e o arquivo antigo é apagado só depois do commit; falha de transação
+  remove o arquivo novo), com os componentes reutilizáveis `FotosField`/`FotosGaleria`.
+  **Funcionário ganhou foto** no cadastro e na visualização. A **tentativa de entrega**
+  (`expedicao_nota`) passou a guardar `justificativa` (obrigatória no "não entregue",
+  1..1000), `data_tentativa`, `ID_usuario_tentativa` e **0..5 fotos**, imutáveis depois de
+  registrada; a nota de saída exibe o histórico de tentativas somente leitura. **Entrega
+  parcial:** o formulário lista só itens com pendência (completos em bloco somente leitura) e
+  usa **"entregar agora"** com o delta (default = pendência); o servidor recusa item sem
+  pendência, redução do já entregue, item de outra nota e zero sem corte/justificativa.
+  **Relatórios:** checkbox opcional **"Listar fotos"** em Produtos, Funcionários, Entregas e
+  Expedições (miniaturas, justificativa em Entregas e URL no CSV), com Entregas/Expedições no
+  layout ampliado A4 paisagem. Uploads de 5 fotos exigem `serverActions.bodySizeLimit =
+  "12mb"` (`next.config.ts`). Cobertura: `tests/services/anexo.test.ts`,
+  `tests/app/fotos-cadastro.test.ts` e `tests/services/expedicao.test.ts` (parcial,
+  justificativa e duas tentativas).
+  **Pendência de release:** os `scripts` de migração do `anexo` em produção ainda não existem
+  (o `db push` com `id_nota_saida → id_expedicao_nota`/`foto_url → anexo` é destrutivo).
 - **Gestão de Pedidos (RUN-20261028-87/88, RF025):** módulo `/pedidos` em que o pedido é
   **somente a solicitação** — sem reserva de estoque, sem número e **sem `ativo`** (não há
   desativar/excluir; o histórico é o status `PENDENTE`/`CONFIRMADO`/`RECUSADO`, com

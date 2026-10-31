@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 type Params = {
   situacao?: string | string[];
+  fotos?: string | string[];
 };
 
 function formatarQuantidade(valor: number): string {
@@ -31,7 +32,8 @@ export default async function RelatorioProdutosPage({
 
   const query = new URLSearchParams({
     situacao: filtros.situacao,
-  }).toString();
+  });
+  if (filtros.fotos) query.set("fotos", "1");
 
   return (
     <>
@@ -71,6 +73,16 @@ export default async function RelatorioProdutosPage({
             <option value="todas">Todas</option>
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-ink">
+          <input
+            type="checkbox"
+            name="fotos"
+            value="1"
+            defaultChecked={filtros.fotos}
+            className="size-4 accent-[#1b9956]"
+          />
+          Listar fotos
+        </label>
         <Button label="Filtrar" type="submit" />
       </form>
 
@@ -92,25 +104,30 @@ export default async function RelatorioProdutosPage({
             <table className="relatorio-tabela">
               <thead>
                 <tr>
-                  <th style={{ width: "8%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
                     Código
                   </th>
-                  <th style={{ width: "40%" }}>Descrição</th>
-                  <th style={{ width: "20%" }} className="col-direita">
+                  <th style={{ width: filtros.fotos ? "33%" : "40%" }}>Descrição</th>
+                  <th style={{ width: filtros.fotos ? "16%" : "20%" }} className="col-direita">
                     Quantidade
                   </th>
-                  <th style={{ width: "17%" }} className="col-direita">
+                  <th style={{ width: filtros.fotos ? "14%" : "17%" }} className="col-direita">
                     Qtd. Livre
                   </th>
-                  <th style={{ width: "15%" }} className="col-centro">
+                  <th style={{ width: filtros.fotos ? "13%" : "15%" }} className="col-centro">
                     Situação
                   </th>
+                  {filtros.fotos && (
+                    <th style={{ width: "17%" }} className="col-centro">
+                      Foto
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {data.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="relatorio-vazio">
+                    <td colSpan={filtros.fotos ? 6 : 5} className="relatorio-vazio">
                       Nenhum produto encontrado.
                     </td>
                   </tr>
@@ -126,6 +143,20 @@ export default async function RelatorioProdutosPage({
                         {formatarQuantidade(produto.livre)}
                       </td>
                       <td className="col-centro">{produto.situacao}</td>
+                      {filtros.fotos && (
+                        <td className="col-centro">
+                          {produto.foto_url ? (
+                            <img
+                              src={produto.foto_url}
+                              alt={`Foto de ${produto.descricao}`}
+                              width={64}
+                              height={64}
+                              style={{ width: 64, height: 64 }}
+                              className="mx-auto rounded object-cover"
+                            />
+                          ) : null}
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -133,7 +164,7 @@ export default async function RelatorioProdutosPage({
               {data.length > 0 && (
                 <tfoot>
                   <tr>
-                    <td colSpan={3} className="col-direita">
+                    <td colSpan={2} className="col-direita">
                       Total
                     </td>
                     <td className="col-direita">
@@ -143,6 +174,7 @@ export default async function RelatorioProdutosPage({
                       {formatarQuantidade(totais.livre)}
                     </td>
                     <td />
+                    {filtros.fotos && <td />}
                   </tr>
                 </tfoot>
               )}

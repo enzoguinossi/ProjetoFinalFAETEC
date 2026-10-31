@@ -51,12 +51,13 @@ const linha: ProdutoRelatorioRow = {
   quantidade: 10,
   livre: 7.5,
   situacao: "Ativo",
+  foto_url: null,
 };
 
 describe("serviço de relatórios", () => {
   describe("normalizarFiltrosProdutos", () => {
     it("usa ativas como padrão", () => {
-      expect(normalizarFiltrosProdutos()).toEqual({ situacao: "ativas" });
+      expect(normalizarFiltrosProdutos()).toEqual({ situacao: "ativas", fotos: false });
     });
 
     it("aceita situação válida, inclusive em array, e ignora valor inválido", () => {
@@ -65,6 +66,7 @@ describe("serviço de relatórios", () => {
         "inativas",
       );
       expect(normalizarFiltrosProdutos({ situacao: "qualquer" }).situacao).toBe("ativas");
+      expect(normalizarFiltrosProdutos({ fotos: "1" }).fotos).toBe(true);
     });
   });
 
@@ -98,6 +100,18 @@ describe("serviço de relatórios", () => {
       ]);
 
       expect(csv).toContain('"Arroz ""tipo 1""; integral\nrefinado"');
+    });
+
+    it("inclui a coluna Foto somente quando solicitado", () => {
+      const comFoto = gerarCsvProdutos(
+        [{ ...linha, foto_url: "/uploads/produtos/1/foto.webp" }],
+        true,
+      );
+      expect(comFoto).toContain("Situação;Foto");
+      expect(comFoto).toContain("/uploads/produtos/1/foto.webp");
+
+      const semFoto = gerarCsvProdutos([linha], false);
+      expect(semFoto).not.toContain("Foto");
     });
   });
 
@@ -258,6 +272,7 @@ describe("serviço de relatórios", () => {
         id_destinatarios: [],
         id_condutores: [],
         status: [],
+        fotos: false,
       });
     });
 
@@ -278,6 +293,7 @@ describe("serviço de relatórios", () => {
         id_destinatarios: [3, 5],
         id_condutores: [7],
         status: ["EM_PERCURSO", "CONCLUIDA"],
+        fotos: false,
       });
     });
 
@@ -301,6 +317,7 @@ describe("serviço de relatórios", () => {
         id_destinatarios: [],
         id_condutores: [],
         status: [],
+        fotos: false,
       });
     });
   });
@@ -314,6 +331,7 @@ describe("serviço de relatórios", () => {
         ate: "2026-10-31",
         id_destinatarios: [],
         status: [],
+        fotos: false,
       });
     });
 
@@ -330,6 +348,7 @@ describe("serviço de relatórios", () => {
         ate: "2026-09-30",
         id_destinatarios: [8, 9],
         status: ["BAIXA_PARCIAL", "PENDENTE"],
+        fotos: false,
       });
     });
 
@@ -349,6 +368,7 @@ describe("serviço de relatórios", () => {
         ate: "2026-10-31",
         id_destinatarios: [],
         status: [],
+        fotos: false,
       });
     });
   });
@@ -380,6 +400,7 @@ describe("serviço de relatórios", () => {
         destinatarios: "Escola A, Escola B",
         itens_esperados: 15,
         itens_entregues: 10.5,
+        fotos: [],
       };
 
       const csv = gerarCsvExpedicoes([expedicao]);
@@ -388,6 +409,15 @@ describe("serviço de relatórios", () => {
       expect(csv).toBe(
         "\uFEFFData prevista;Status;Veículo;Condutor;Notas;Destinatários;Itens esperados;Itens entregues\r\n" +
           "05/10/2026;Concluída;AAA1111;Ana Condutora;2;Escola A, Escola B;15;10,5\r\n",
+      );
+
+      const comFotos = gerarCsvExpedicoes(
+        [{ ...expedicao, fotos: ["/uploads/entregas/1/2/a.webp", "/uploads/entregas/1/2/b.webp"] }],
+        true,
+      );
+      expect(comFotos).toContain("Itens entregues;Fotos");
+      expect(comFotos).toContain(
+        "/uploads/entregas/1/2/a.webp;/uploads/entregas/1/2/b.webp",
       );
     });
 
@@ -403,6 +433,8 @@ describe("serviço de relatórios", () => {
         entregue: 6,
         pendente: 9,
         expedicao: "EXP #3",
+        fotos: [],
+        justificativa: null,
       };
 
       const csv = gerarCsvEntregas([entrega]);
@@ -412,6 +444,19 @@ describe("serviço de relatórios", () => {
         "\uFEFFNota;Data;Destinatário;Status;Itens;Esperado;Entregue;Pendente;Expedição\r\n" +
           "000012;10/10/2026;Escola Municipal;Baixa parcial;2;15;6;9;EXP #3\r\n",
       );
+
+      const comFotos = gerarCsvEntregas(
+        [
+          {
+            ...entrega,
+            fotos: ["/uploads/entregas/1/12/a.webp"],
+            justificativa: "Escola fechada",
+          },
+        ],
+        true,
+      );
+      expect(comFotos).toContain("Expedição;Fotos;Justificativa");
+      expect(comFotos).toContain("/uploads/entregas/1/12/a.webp;Escola fechada");
     });
 
     it("protege campos especiais no CSV de Entregas", () => {
@@ -427,6 +472,8 @@ describe("serviço de relatórios", () => {
           entregue: 0,
           pendente: 0,
           expedicao: "—",
+          fotos: [],
+          justificativa: null,
         },
       ]);
 
@@ -451,15 +498,16 @@ describe("serviço de relatórios", () => {
 
   describe("normalizarFiltros dos cadastros", () => {
     it("normaliza a situação de funcionários e fornecedores (vazio não filtra)", () => {
-      expect(normalizarFiltrosFuncionarios()).toEqual({ situacoes: [] });
-      expect(normalizarFiltrosFuncionarios({ situacao: "inativos" })).toEqual({
-        situacoes: ["inativos"],
-      });
+      expect(normalizarFiltrosFuncionarios()).toEqual({ situacoes: [], fotos: false });
+      expect(
+        normalizarFiltrosFuncionarios({ situacao: "inativos", fotos: "1" }),
+      ).toEqual({ situacoes: ["inativos"], fotos: true });
       expect(
         normalizarFiltrosFuncionarios({ situacao: ["ativos", "inativos", "ativos"] }),
-      ).toEqual({ situacoes: ["ativos", "inativos"] });
+      ).toEqual({ situacoes: ["ativos", "inativos"], fotos: false });
       expect(normalizarFiltrosFuncionarios({ situacao: "qualquer" })).toEqual({
         situacoes: [],
+        fotos: false,
       });
       expect(normalizarFiltrosFornecedores({ situacao: "ativos" })).toEqual({
         situacoes: ["ativos"],
@@ -516,6 +564,7 @@ describe("serviço de relatórios", () => {
         situacao: "Ativo",
         email: "ana@nexus.test",
         telefone: "21999990001",
+        foto_url: null,
       };
 
       const csv = gerarCsvFuncionarios([funcionario]);
@@ -525,6 +574,13 @@ describe("serviço de relatórios", () => {
         "\uFEFFCódigo;Nome;CPF;Cargo;Condutor;Situação;E-mail;Telefone\r\n" +
           "000001;Ana;11111111111;Conferente;Sim;Ativo;ana@nexus.test;21999990001\r\n",
       );
+
+      const comFoto = gerarCsvFuncionarios(
+        [{ ...funcionario, foto_url: "/uploads/funcionarios/1/foto.webp" }],
+        true,
+      );
+      expect(comFoto).toContain("Telefone;Foto");
+      expect(comFoto).toContain("/uploads/funcionarios/1/foto.webp");
     });
 
     it("gera o CSV de destinatários com tipo, endereço e contato", () => {

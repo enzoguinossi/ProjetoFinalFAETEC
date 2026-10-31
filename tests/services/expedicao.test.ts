@@ -923,12 +923,47 @@ describe("expedicaoService — execução da entrega", () => {
     )).toEqual([-20, -6]);
   });
 
+  it("corte libera a reserva do item pendente que foi omitido", async () => {
+    const ctx = await montarEntregaEmPercurso([10, 20]);
+
+    // Só o segundo item é informado (zero); o primeiro fica omitido e precisa
+    // ter a pendência liberada pelo corte.
+    const resultado = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      {
+        itens: [
+          { id_item_nota_saida: ctx.itens[1]!.id_item_nota_saida, qtd_entregue: 0 },
+        ],
+        cortar_restante: true,
+      },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in resultado) throw new Error(resultado.error);
+    expect(resultado.entrega.status).toBe("BAIXA_COM_CORTE");
+
+    for (const estoque of ctx.estoques) {
+      const produto = await prismaTeste.produto.findUniqueOrThrow({
+        where: { id_produto: estoque.id_produto },
+      });
+      expect(produto.saldo).toBe(100);
+      expect(produto.saldo_reservado).toBe(0);
+    }
+
+    const itens = await prismaTeste.itemNotaSaida.findMany({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+      orderBy: { id_item_nota_saida: "asc" },
+    });
+    expect(itens.map((item) => Number(item.qtd_entregue))).toEqual([0, 0]);
+  });
+
   it("não entregue vai para PENDENTE sem alterar estoque nem reserva", async () => {
     const ctx = await montarEntregaEmPercurso([10]);
 
     const resultado = await expedicaoService.marcarNaoEntregue(
       ctx.expedicao.id_expedicao,
       ctx.nota.id_nota_saida,
+      { justificativa: "Escola fechada", fotos: [] },
       ctx.usuario.id_usuario,
     );
     if ("error" in resultado) throw new Error(resultado.error);
@@ -951,6 +986,267 @@ describe("expedicaoService — execução da entrega", () => {
         where: { id_nota_saida: ctx.nota.id_nota_saida },
       }),
     ).toBe(0);
+  });
+
+  it("reenvio parcial aceita só o item com pendência e mantém o já entregue", async () => {
+    const ctx = await montarEntregaEmPercurso([10, 20], {
+      entregues: [4, 20],
+    });
+
+    const resultado = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { itens: [{ id_item_nota_saida: ctx.itens[0]!.id_item_nota_saida, qtd_entregue: 10 }] },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in resultado) throw new Error(resultado.error);
+
+    expect(resultado.entrega.status).toBe("BAIXA_TOTAL");
+
+    const itens = await prismaTeste.itemNotaSaida.findMany({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+      orderBy: { id_item_nota_saida: "asc" },
+    });
+    expect(itens.map((item) => Number(item.qtd_entregue))).toEqual([10, 20]);
+  });
+
+  it("recusa item já completo e redução do já entregue", async () => {
+    const ctx = await montarEntregaEmPercurso([10, 20], {
+      entregues: [4, 20],
+    });
+
+    const completo = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { itens: [{ id_item_nota_saida: ctx.itens[1]!.id_item_nota_saida, qtd_entregue: 20 }] },
+      ctx.usuario.id_usuario,
+    );
+    expect("error" in completo && completo.error).toMatch(/já entregue/i);
+
+    const reduzir = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { itens: [{ id_item_nota_saida: ctx.itens[0]!.id_item_nota_saida, qtd_entregue: 3 }] },
+      ctx.usuario.id_usuario,
+    );
+    expect("error" in reduzir && reduzir.error).toMatch(/menor que a já registrada/i);
+  });
+
+  it("recusa entrega com todos os itens em zero e sem corte, mas aceita não entrega com justificativa e corte", async () => {
+    const zerada = await montarEntregaEmPercurso([10]);
+    const recusada = await expedicaoService.registrarEntrega(
+      zerada.expedicao.id_expedicao,
+      zerada.nota.id_nota_saida,
+      { itens: entregaDe(zerada.itens, [0]) },
+      zerada.usuario.id_usuario,
+    );
+    expect("error" in recusada && recusada.error).toMatch(
+      /ao menos uma quantidade entregue/i,
+    );
+
+    const naoEntregue = await montarEntregaEmPercurso([10]);
+    const pendente = await expedicaoService.marcarNaoEntregue(
+      naoEntregue.expedicao.id_expedicao,
+      naoEntregue.nota.id_nota_saida,
+      { justificativa: "Escola sem responsável", fotos: [] },
+      naoEntregue.usuario.id_usuario,
+    );
+    if ("error" in pendente) throw new Error(pendente.error);
+    expect(pendente.entrega.status).toBe("PENDENTE");
+
+    const cortada = await montarEntregaEmPercurso([10]);
+    const corte = await expedicaoService.registrarEntrega(
+      cortada.expedicao.id_expedicao,
+      cortada.nota.id_nota_saida,
+      { itens: entregaDe(cortada.itens, [0]), cortar_restante: true },
+      cortada.usuario.id_usuario,
+    );
+    if ("error" in corte) throw new Error(corte.error);
+    expect(corte.entrega.status).toBe("BAIXA_COM_CORTE");
+
+    const item = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: cortada.itens[0]!.id_item_nota_saida },
+    });
+    expect(Number(item.qtd_entregue)).toBe(0);
+  });
+
+  it("não entregue exige justificativa e grava tentativa + fotos", async () => {
+    const ctx = await montarEntregaEmPercurso([10]);
+
+    const vazia = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { justificativa: "   ", fotos: [] },
+      ctx.usuario.id_usuario,
+    );
+    expect("error" in vazia && vazia.error).toMatch(/justificativa/i);
+
+    const longa = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { justificativa: "x".repeat(1001), fotos: [] },
+      ctx.usuario.id_usuario,
+    );
+    expect("error" in longa && longa.error).toMatch(/1000/i);
+
+    const resultado = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      {
+        justificativa: "  Escola fechada  ",
+        fotos: [
+          {
+            nome_arquivo: "fachada.webp",
+            url: "/uploads/entregas/1/1/fachada.webp",
+            tipo_mime: "image/webp",
+          },
+        ],
+      },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in resultado) throw new Error(resultado.error);
+    expect(resultado.entrega.status).toBe("PENDENTE");
+
+    const vinculo = await prismaTeste.expedicaoNota.findFirstOrThrow({
+      where: {
+        id_expedicao: ctx.expedicao.id_expedicao,
+        id_nota_saida: ctx.nota.id_nota_saida,
+      },
+      include: { anexos: true },
+    });
+    expect(vinculo.justificativa).toBe("Escola fechada");
+    expect(vinculo.data_tentativa).toBeInstanceOf(Date);
+    expect(vinculo.id_usuario_tentativa).toBe(ctx.usuario.id_usuario);
+    expect(vinculo.anexos).toHaveLength(1);
+    expect(vinculo.anexos[0]!.url).toBe("/uploads/entregas/1/1/fachada.webp");
+
+    const auditoria = (await auditoriasDe("NotaSaida", ctx.nota.id_nota_saida)).at(-1);
+    expect(auditoria?.dados_novos).toMatchObject({
+      tentativa: {
+        justificativa: "Escola fechada",
+        fotos: [{ url: "/uploads/entregas/1/1/fachada.webp" }],
+      },
+    });
+
+    // A tentativa é imutável: a nota saiu de EM_PERCURSO e não aceita de novo.
+    const repetida = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { justificativa: "Outra", fotos: [] },
+      ctx.usuario.id_usuario,
+    );
+    expect("error" in repetida).toBe(true);
+  });
+
+  it("não entregue funciona em nota parcial com item já completo, sem alterar o entregue", async () => {
+    const ctx = await montarEntregaEmPercurso([10, 20], {
+      entregues: [10, 4],
+    });
+
+    const antes = await prismaTeste.produto.findMany({
+      where: { id_produto: { in: ctx.estoques.map((e) => e.id_produto) } },
+      orderBy: { id_produto: "asc" },
+      select: { id_produto: true, saldo: true, saldo_reservado: true },
+    });
+
+    const resultado = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { justificativa: "Responsável ausente", fotos: [] },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in resultado) throw new Error(resultado.error);
+    expect(resultado.entrega.status).toBe("PENDENTE");
+
+    const itens = await prismaTeste.itemNotaSaida.findMany({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+      orderBy: { id_item_nota_saida: "asc" },
+    });
+    expect(itens.map((item) => Number(item.qtd_entregue))).toEqual([10, 4]);
+
+    const depois = await prismaTeste.produto.findMany({
+      where: { id_produto: { in: ctx.estoques.map((e) => e.id_produto) } },
+      orderBy: { id_produto: "asc" },
+      select: { id_produto: true, saldo: true, saldo_reservado: true },
+    });
+    expect(depois).toEqual(antes);
+  });
+
+  it("mantém históricos independentes em duas tentativas da mesma nota", async () => {
+    const ctx = await montarEntregaEmPercurso([10]);
+
+    const primeira = await expedicaoService.marcarNaoEntregue(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      {
+        justificativa: "Portão fechado",
+        fotos: [
+          {
+            nome_arquivo: "portao.webp",
+            url: "/uploads/entregas/9/9/portao.webp",
+            tipo_mime: "image/webp",
+          },
+        ],
+      },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in primeira) throw new Error(primeira.error);
+
+    const conclusao = await expedicaoService.concluir(
+      ctx.expedicao.id_expedicao,
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in conclusao) throw new Error(conclusao.error);
+
+    const nova = await criarExpedicao({
+      idVeiculo: ctx.veiculo.id_veiculo,
+      status: "EM_PERCURSO",
+    });
+    await prismaTeste.expedicaoNota.create({
+      data: {
+        id_expedicao: nova.id_expedicao,
+        id_nota_saida: ctx.nota.id_nota_saida,
+        ordem_visita: 1,
+        data_adicao: new Date(),
+      },
+    });
+    await prismaTeste.notaSaida.update({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+      data: { status: "EM_PERCURSO" },
+    });
+
+    const segunda = await expedicaoService.registrarEntrega(
+      nova.id_expedicao,
+      ctx.nota.id_nota_saida,
+      {
+        itens: [{ id_item_nota_saida: ctx.itens[0]!.id_item_nota_saida, qtd_entregue: 10 }],
+        fotos: [
+          {
+            nome_arquivo: "entrega.webp",
+            url: "/uploads/entregas/10/10/entrega.webp",
+            tipo_mime: "image/webp",
+          },
+        ],
+      },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in segunda) throw new Error(segunda.error);
+    expect(segunda.entrega.status).toBe("BAIXA_TOTAL");
+
+    const vinculos = await prismaTeste.expedicaoNota.findMany({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+      include: { anexos: true },
+      orderBy: { id_expedicao: "asc" },
+    });
+    expect(vinculos).toHaveLength(2);
+    expect(vinculos[0]).toMatchObject({ justificativa: "Portão fechado" });
+    expect(vinculos[0]!.anexos.map((anexo) => anexo.url)).toEqual([
+      "/uploads/entregas/9/9/portao.webp",
+    ]);
+    expect(vinculos[1]!.justificativa).toBeNull();
+    expect(vinculos[1]!.anexos.map((anexo) => anexo.url)).toEqual([
+      "/uploads/entregas/10/10/entrega.webp",
+    ]);
   });
 
   it("concluir marca as notas restantes como PENDENTE, conclui a expedição e libera o veículo", async () => {
