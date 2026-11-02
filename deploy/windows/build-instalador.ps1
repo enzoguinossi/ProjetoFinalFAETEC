@@ -61,7 +61,7 @@ if ($git) {
             if ($LASTEXITCODE -eq 0) {
                 & $git.Source -C $ScriptRoot cat-file -e ("{0}:src/app/api/health/route.ts" -f $Tag) 2> $null
                 if ($LASTEXITCODE -ne 0) {
-                    Fail "A tag $Tag existe localmente, mas não contém src/app/api/health/route.ts. Gere a release do KAN-170 e atualize o manifesto."
+                    Fail "A tag $Tag existe localmente, mas não contém src/app/api/health/route.ts. Crie a tag do release com a rota."
                 }
                 Write-Host "Tag $Tag contém src/app/api/health/route.ts." -ForegroundColor Green
             }

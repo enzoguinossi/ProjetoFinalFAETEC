@@ -19,7 +19,7 @@
     URL do repositório. Padrão: manifesto.json.
 
 .PARAMETER Tag
-    Tag a instalar. Padrão: manifesto.json (ou a tag do instalador).
+    Tag a instalar (o instalador passa a tag do build).
 #>
 [CmdletBinding()]
 param(

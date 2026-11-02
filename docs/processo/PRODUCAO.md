@@ -325,12 +325,12 @@ Parâmetros:
 | `-SkipTray` | não copia nem registra a bandeja |
 | `-TrayExe` | caminho explícito do `NexusTray.exe`; se informado e ausente, falha |
 | `-RepoUrl` | URL do repositório; padrão: `manifesto.json` |
-| `-Tag` | tag a instalar; padrão: `manifesto.json` |
+| `-Tag` | obrigatória no bootstrap manual (ex.: `v2.02.11.2026`); o instalador passa a tag do build |
 
 Exemplo de retomada após instalar o MySQL:
 
 ```powershell
-.\bootstrap.ps1 -Hostname nexus.galpao.local -Resume
+.\bootstrap.ps1 -Hostname nexus.galpao.local -Tag v2.02.11.2026 -Resume
 ```
 
 Se o diretório `C:\Program Files\Nexus\app` existir, não for um repositório Git e tiver
@@ -756,7 +756,7 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 | "Reiniciar aplicação" falha e o site fica fora | `restart.ps1` não encontrado, health não voltou ou o `NexusCaddy` não religou | veja `C:\ProgramData\Nexus\logs\restart-<timestamp>.log`; o script para o Caddy antes e só o religa após o health — se falhar, religue manualmente `NexusCaddy` |
 | backup falha no `mysqldump` | `backup.cnf` ausente, senha do `nexus_app` mudou ou MySQL fora | rode a fase 2 do bootstrap; confira o log `backup-<timestamp>.log` e o erro redigido no console |
 | backup gera `.sql` grande e o disco enche | dump acima de ~1,8 GB é mantido sem compactar | confira `backups\db`; a retenção remove `.zip`/`.sql` antigos, mas não `backups\uploads`; limpe manualmente |
-| atualização falha com "A tag ... não contém /api/health" ou versão divergente | tag antiga (`v1.02.11.2026`), `manifesto.json` desatualizado ou `package.json` diferente da tag | crie a nova tag DateVer, atualize `manifesto.json` e garanta `package.json` = tag; veja `deploy-<tag>.log` |
+| atualização falha com "A tag ... não contém /api/health" ou versão divergente | tag antiga (`v1.02.11.2026`) ou `package.json` diferente da tag | crie a nova tag DateVer e garanta `package.json` = tag; veja `deploy-<tag>.log` |
 | atualização falha e volta a versão anterior | build, `db push`, health, HTTPS ou smoke falharam | leia `deploy-<tag>.log` e `app.failed-<tag>`; se o banco mudou, restaure o dump (§8.5); scripts/Caddyfile copiados não são revertidos |
 | atualização não encontra hostname | `bootstrap.state.json` e `Caddyfile` ausentes | rode o bootstrap ou informe o hostname no `Caddyfile`; o `atualizar.ps1` não aceita `-Hostname` |
 | instalador mostra `MsgBox` de erro ou o sistema não funciona após a instalação | o bootstrap não concluiu; o `instalador.iss` verifica o `ResultCode` e mostra `MsgBox` | confira `instalador-*.log` e `bootstrap-*.log`, corrija a causa e rode a instalação de novo |
@@ -901,8 +901,8 @@ Para uma remoção **total** (depois de copiar o que precisa):
       `src/app/api/health/route.ts` e é recusada pelo bootstrap/atualizador. Bump do
       `package.json` para a mesma versão da tag (o health reporta essa versão e o smoke a
       compara).
-- [ ] Atualizar `deploy/windows/manifesto.json` com a nova tag em `repo.tag`; o instalador
-      usa o manifesto para clonar a release.
+- [ ] `deploy/windows/manifesto.json` **não guarda tag**: o build do instalador passa
+      `v<versão>` a partir do `package.json`; o bootstrap manual exige `-Tag`.
 - [ ] Commit de release na `main`; tag criada e **enviada ao GitHub** (o bootstrap e o
       `atualizar.ps1` clonam a tag; sem ela, a instalação falha).
 - [ ] Branch local **`producao`** avançada por **fast-forward** até o commit da release

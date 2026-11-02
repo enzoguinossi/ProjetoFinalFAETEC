@@ -13,15 +13,22 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [2.02.11.2026] - 2026-11-02
+
+Esta seção consolida a instalação e a operação em produção no Windows (KAN-170): health
+check, uploads configuráveis, automação NSSM/Caddy, bandeja e instalador Inno Setup.
+
 ### Added
 - **Produção Windows (KAN-170):** entrega da instalação e operação em servidor Windows —
   `GET /api/health` público (200 com `db=true`; 503 quando o banco não responde) e raiz de
   uploads configurável por `UPLOADS_DIR`, fora da pasta da aplicação para sobreviver à
   atualização; `bootstrap.ps1` em 8 fases idempotentes/retomáveis, com NSSM (serviços
-  `NexusApp` e `NexusCaddy`), Caddy com CA interna e `caddy trust`, MySQL 8.4 LTS com
+  `NexusApp` e `NexusCaddy`), Caddy com CA interna via `certutil` e `admin off`, ACLs
+  restritas (backups/config/CA fora do alcance do serviço), MySQL 8.4 LTS com
   `nexus_prod`/`nexus_app` e tarefa `NexusBackup` (diária, 02:00); bandeja `NexusTray`
-  (.NET 8) no logon; instalador Inno Setup `NexusSetup-<versão>.exe`, `atualizar.ps1` com
-  backup/rollback e `desinstalar.ps1` que preserva `C:\ProgramData\Nexus`; runbook em
+  (.NET 8) no logon, com reinício via `restart.ps1`; instalador Inno Setup
+  `NexusSetup-<versão>.exe`, `atualizar.ps1` com backup/rollback e `desinstalar.ps1` que
+  preserva `C:\ProgramData\Nexus`; runbook em
   [`docs/processo/PRODUCAO.md`](docs/processo/PRODUCAO.md).
 
 ## [1.02.11.2026] - 2026-11-02

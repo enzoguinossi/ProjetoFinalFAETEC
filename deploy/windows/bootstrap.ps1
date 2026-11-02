@@ -17,7 +17,7 @@
     URL do repositório. Padrão: manifesto.json.
 
 .PARAMETER Tag
-    Tag a instalar. Padrão: manifesto.json.
+    Tag a instalar (obrigatória; ex.: v2.02.11.2026).
 
 .PARAMETER Resume
     Retoma da última fase concluída.
@@ -52,9 +52,8 @@ if ($Hostname -notmatch '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$') {
 
 $manifest = Get-Manifest
 if (-not $RepoUrl) { $RepoUrl = [string]$manifest.repo.url }
-if (-not $Tag) { $Tag = [string]$manifest.repo.tag }
 if (-not $RepoUrl) { Fail "repo.url não definido no manifesto." }
-if (-not $Tag) { Fail "repo.tag não definido no manifesto." }
+if (-not $Tag) { Fail "Informe a tag do release com -Tag (ex.: v2.02.11.2026)." }
 
 $ProgramRoot = $script:NexusProgramRoot
 $AppDir = $script:NexusAppDir
@@ -690,7 +689,7 @@ try {
 
         $healthRoute = Join-Path $AppDir "src\app\api\health\route.ts"
         if (-not (Test-Path -LiteralPath $healthRoute)) {
-            Fail "A tag $Tag não contém src/app/api/health/route.ts; gere a release do KAN-170 e atualize o manifesto."
+            Fail "A tag $Tag não contém src/app/api/health/route.ts; crie a tag do release com a rota."
         }
         try {
             $packageInfo = Get-Content -LiteralPath (Join-Path $AppDir "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -700,7 +699,7 @@ try {
         }
         $expectedTagVersion = $Tag -replace '^v', ''
         if ([string]$packageInfo.version -ne $expectedTagVersion) {
-            Fail "A versão do package.json da tag $Tag é '$([string]$packageInfo.version)', esperada '$expectedTagVersion'. Gere a release do KAN-170 e atualize o manifesto."
+            Fail "A versão do package.json da tag $Tag é '$([string]$packageInfo.version)', esperada '$expectedTagVersion'. Crie a tag a partir do release."
         }
         Write-Ok "Tag $Tag contém /api/health e versão $expectedTagVersion."
 

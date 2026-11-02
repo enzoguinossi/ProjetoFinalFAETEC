@@ -156,7 +156,7 @@ function Assert-TagContents {
     )
     $healthRoute = Join-Path $AppPath "src\app\api\health\route.ts"
     if (-not (Test-Path -LiteralPath $healthRoute)) {
-        throw "A tag $Tag não contém src/app/api/health/route.ts; gere a release do KAN-170 e atualize o manifesto."
+        throw "A tag $Tag não contém src/app/api/health/route.ts; crie a tag do release com a rota."
     }
 
     $packagePath = Join-Path $AppPath "package.json"
@@ -168,7 +168,7 @@ function Assert-TagContents {
     }
     $expectedVersion = $Tag -replace '^v', ''
     if ([string]$package.version -ne $expectedVersion) {
-        throw "A versão do package.json da tag $Tag é '$([string]$package.version)', esperada '$expectedVersion'. Gere a release do KAN-170 e atualize o manifesto."
+        throw "A versão do package.json da tag $Tag é '$([string]$package.version)', esperada '$expectedVersion'. Crie a tag a partir do release."
     }
 }
 
