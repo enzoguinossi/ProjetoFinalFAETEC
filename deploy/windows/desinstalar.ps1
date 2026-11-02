@@ -6,7 +6,9 @@
 .DESCRIPTION
     Para e remove os serviços NexusApp e NexusCaddy, remove as tarefas NexusTray
     e NexusBackup, encerra a bandeja e apaga C:\Program Files\Nexus\app,
-    C:\Program Files\Nexus\NexusTray e C:\ProgramData\Caddy.
+    C:\Program Files\Nexus\NexusTray, C:\Program Files\Nexus\caddy,
+    C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts e
+    C:\ProgramData\Caddy.
 
     C:\ProgramData\Nexus é PRESERVADO: banco, uploads, configuração, backups e
     logs continuam intactos. MySQL, Node.js e Git não são desinstalados.
@@ -205,6 +207,9 @@ try {
     Remove-NexusService -Name "NexusCaddy"
     Remove-NexusService -Name "NexusApp"
 
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "caddy") -Label "Caddy"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "tools") -Label "Ferramentas (NSSM)"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "scripts") -Label "Scripts de operação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "app") -Label "Aplicação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusTray") -Label "Bandeja"
     Remove-NexusDirectory -Path $CaddyData -Label "Dados do Caddy"
