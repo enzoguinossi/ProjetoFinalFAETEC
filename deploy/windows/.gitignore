@@ -1,0 +1,5 @@
+# Artefatos do projeto .NET da bandeja (NexusTray)
+NexusTray/bin/
+NexusTray/obj/
+NexusTray/dist/
+*.user

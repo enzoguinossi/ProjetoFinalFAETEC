@@ -1,0 +1,38 @@
+{
+  "node": {
+    "version": "24.19.0",
+    "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-x64.msi",
+    "sha256": ""
+  },
+  "mysql": {
+    "version": "8.4",
+    "channel": "lts",
+    "installer": "MySQL Installer 8.4 LTS - Server only",
+    "url": "",
+    "sha256": ""
+  },
+  "nssm": {
+    "version": "2.24",
+    "url": "https://nssm.cc/release/nssm-2.24.zip",
+    "sha256": ""
+  },
+  "vcredist": {
+    "version": "14.x",
+    "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+    "sha256": ""
+  },
+  "git": {
+    "version": "latest",
+    "url": "",
+    "sha256": ""
+  },
+  "caddy": {
+    "version": "latest",
+    "url": "",
+    "sha256": ""
+  },
+  "repo": {
+    "url": "https://github.com/enzoguinossi/ProjetoFinalFAETEC.git",
+    "tag": "v1.02.11.2026"
+  }
+}
