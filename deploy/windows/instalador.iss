@@ -60,9 +60,6 @@ Name: "{group}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o
 Name: "{group}\Desinstalar Nexus"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"; Tasks: desktopicon
 
-[Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\instalar-gui.ps1"" -Hostname ""{code:GetHostname}"" -TrayExe ""{app}\NexusTray.exe"" -Tag ""{#MyAppTag}"""; WorkingDir: "{app}"; StatusMsg: "Instalando o Nexus (pode levar vários minutos)..."; Flags: waituntilterminated
-
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\desinstalar.ps1"""; RunOnceId: "NexusDesinstalar"; Flags: runhidden
 
@@ -153,4 +150,23 @@ begin
     Result := Lowercase(Trim(HostnamePage.Values[0]))
   else
     Result := 'nexus.galpao.local';
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+  Cmd: String;
+  Message: String;
+begin
+  if CurStep = ssPostInstall then
+  begin
+    Cmd := Format('-NoProfile -ExecutionPolicy Bypass -File "%s\instalar-gui.ps1" -Hostname "%s" -TrayExe "%s\NexusTray.exe" -Tag "%s"', [ExpandConstant('{app}'), GetHostname(''), ExpandConstant('{app}'), '{#MyAppTag}']);
+    ResultCode := -1;
+    if (not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Cmd, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+    begin
+      Message := 'A instalação do Nexus não foi concluída (código ' + IntToStr(ResultCode) + ').';
+      Message := Message + #13#10 + #13#10 + 'Consulte os logs em C:\ProgramData\Nexus\logs antes de tentar novamente.';
+      MsgBox(Message, mbError, MB_OK);
+    end;
+  end;
 end;

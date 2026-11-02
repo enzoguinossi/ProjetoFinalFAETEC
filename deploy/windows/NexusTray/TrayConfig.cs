@@ -17,7 +17,7 @@ internal sealed class TrayConfig
     private const string DefaultNssmPath = @"C:\Program Files\Nexus\tools\nssm\nssm.exe";
     private const string DefaultLogsDir = @"C:\ProgramData\Nexus\logs";
     private const string DefaultDataDir = @"C:\ProgramData\Nexus";
-    private const string DefaultBackupScript = @"C:\ProgramData\Nexus\scripts\backup.ps1";
+    private const string DefaultBackupScript = @"C:\Program Files\Nexus\scripts\backup.ps1";
 
     public string BaseUrl { get; init; } = DefaultBaseUrl;
 
