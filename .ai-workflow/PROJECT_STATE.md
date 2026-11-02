@@ -1,17 +1,17 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (relatórios em faixa: cadastro + movimentação).
+> Última consolidação: 2026-11-02 (relatórios em fichas/faixas + auditoria legível,
+> commit `KAN-157`).
 
 ## Objetivo atual
 
-Substituir as tabelas dos relatórios de cadastro pelo layout “ficha” aprovado (cabeçalho
-com código/descrição/situação, corpo com foto e campos, grade de 4 colunas com todos os
-códigos personalizados) e adaptar a movimentação/extrato ao modelo em faixas, com
-componentes compartilhados. Base anterior: repaginação dos cadastros + seed demo no commit
-`KAN-139` (worktree principal, `main`).
+Padronizar todos os relatórios: cadastro em “ficha”, movimentação/extrato por documento/
+produto, auditoria legível com antes/depois e os quatro relatórios restantes em faixas/cartões.
+Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (worktree principal,
+`main`). Esta rodada foi commitada em `KAN-157` (`4bc480d` + `a191f62`, sem push).
 
-## Entregue nesta rodada (run `RUN-20261102-01`, sem commit)
+## Entregue (runs `RUN-20261102-01..11`)
 
 1. **Componentes:** `FichaRelatorio` e `RelatorioCadastro` em `src/components/relatorios/`
    + `src/types/relatorio.ts` e `src/lib/fichas-relatorio.ts` (adaptadores por entidade).
@@ -50,17 +50,23 @@ componentes compartilhados. Base anterior: repaginação dos cadastros + seed de
     Alterações legíveis. Módulo de auditoria com pesquisa/filtros avançados fica para depois.
 11. **Padronizações:** `ImprimirButton` movido para `components/relatorios/`; helpers
     `formatarQuantidade` e `contagem`; `ROTULOS_TIPO_CODIGO`; helper `montarCsv`.
-12. **Sem schema novo**; quantidades seguem sem unidade (AGENTS §8).
+12. **Vencimento, Pedidos, Expedições e Entregas** (run `RUN-20261102-11`): todos em A4
+    retrato com `RelatorioCadastro`; Vencimento em faixas de urgência; Pedidos por escola →
+    pedido (status em badge) → itens; Expedições por dia + cartão por expedição; Entregas por
+    instituição + cartão por nota. `BadgeStatus`/`CartaoRegistro` compartilhados;
+    `id_destinatario` nas linhas de pedidos/entregas; CSV preservado.
+13. **Sem schema novo**; quantidades seguem sem unidade (AGENTS §8).
 
 ## Verificação
 
 - `npm run lint` → exit 0.
 - `npm run build` → exit 0.
 - `tests/lib/relatorio-movimentacao.test.ts` + `tests/services/relatorio.test.ts` +
-  `tests/dao/relatorio.test.ts` → 84/84; com os helpers de auditoria
-  (`tests/lib/auditoria-diff.test.ts` e `auditoria.test.ts`) → 102/102.
-  (`npm test` padrão continua bloqueado pelo `prisma db push` do `globalSetup` sob agente;
-  suíte completa rodou 497/497 com o push desligado.)
+  `tests/dao/relatorio.test.ts` → 84/84; com auditoria e vencimento → **118/118** em 6
+  arquivos. (`npm test` padrão continua bloqueado pelo `prisma db push` do `globalSetup` sob
+  agente; suíte completa rodou 497/497 com o push desligado.)
+- Commits `KAN-157`: `4bc480d` (relatórios em fichas/faixas + auditoria) e `a191f62`
+  (seed de movimentações). Sem push.
 - Seed de movimentações executado no `nexus`; conferência independente: 12 produtos,
   3 notas de entrada, 9 pedidos/remessas/expedições e **3 entradas + 3 saídas por produto**
   (36+36 movimentos), sem divergências; reexecução idempotente.
@@ -73,18 +79,22 @@ componentes compartilhados. Base anterior: repaginação dos cadastros + seed de
   “Usuário da tentativa” resolvido, coleções com descrição dos produtos, login sem diff e
   sem linhas vazias; sem JSON na folha. Após o ajuste de layout, cada item tem cabeçalho e
   uma linha por atributo (`Qtd. entregue 0 → 40`, `Saldo 250 → 210`).
+- Quatro relatórios restantes conferidos em 1440×900 no dev server: Pedidos (escola →
+  pedido com badge APROVADO → itens), Entregas (instituição + cartões BAIXA TOTAL),
+  Vencimento (faixa “61 a 90 dias” com badge “em 74 dias”) e Expedições (dia + cartões com
+  status/veículo/condutor).
 
 ## Pendências
 
-1. **Jira/commit:** definir a issue para o commit (nenhuma associada; não houve commit).
-2. **Relatórios restantes no padrão antigo:** vencimento, pedidos (com status em badge),
-   expedições e entregas — proposta em faixas/cartões aprovada, ainda não implementada.
-3. **Docs:** atualizar `docs/dominio/IMPLEMENTACAO.md` com o modelo de ficha, as rotas de
-   movimentação/extrato, a auditoria com diff e o seed de movimentações.
-4. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
+1. **Docs:** atualizar `docs/dominio/IMPLEMENTACAO.md` com o modelo de ficha, as rotas de
+   movimentação/extrato, a auditoria com diff/descrições, os quatro relatórios em faixas e o
+   seed de movimentações.
+2. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
+   usuário; o resolvedor de descrições já é reutilizável.
+3. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
    (helpers de data/filtros) e trocar os SVGs inline por `lucide-react`.
-5. **Release** `1.xx.xx.2026` + push (aprovação).
-6. **Produção:** backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
+4. **Release** `1.xx.xx.2026` + push (aprovação).
+5. **Produção:** backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
    gates, `db push`, build/start/smoke.
-7. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
+6. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
    fora do escopo.
