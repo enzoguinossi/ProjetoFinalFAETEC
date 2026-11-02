@@ -21,13 +21,15 @@ estações da rede
 ┌─────────────────────┐        ┌──────────────────────┐        ┌──────────────────┐
 │ NexusCaddy (Caddy)  │ ─────► │ NexusApp (Next.js)   │ ─────► │ MySQL84          │
 │ 0.0.0.0:80/443      │  HTTP  │ 127.0.0.1:3000       │  3306  │ 127.0.0.1:3306   │
+│ LocalService        │        │ NetworkService       │        │                  │
 └─────────────────────┘        └──────────────────────┘        └──────────────────┘
         ▲                                ▲
-        │ caddy trust (CA local)         │ .env + UPLOADS_DIR
-        │                                ▼
+        │ certutil -addstore -f Root     │ .env + UPLOADS_DIR
+        │ (CA local)                     ▼
         │                        C:\ProgramData\Nexus\uploads
         │
    C:\ProgramData\Nexus\logs  ·  C:\ProgramData\Nexus\backups
+   C:\ProgramData\Nexus\caddy\{data,config,logs}
 ```
 
 | Peça | Papel |
@@ -35,11 +37,12 @@ estações da rede
 | `NexusSetup-<versão>.exe` | instalador **Inno Setup 7**; não embute o código da aplicação — o bootstrap clona a tag do GitHub durante a instalação |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
-| [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) | atualização com backup, troca de versão e rollback da aplicação |
-| [`backup.ps1`](../../deploy/windows/backup.ps1) | backup do banco, dos uploads e do `.env` |
-| [`smoke.ps1`](../../deploy/windows/smoke.ps1) | smoke test dos serviços, do health e do HTTPS |
-| [`desinstalar.ps1`](../../deploy/windows/desinstalar.ps1) | remove serviços, tarefas e arquivos instalados; **preserva** `C:\ProgramData\Nexus` |
-| `NexusTray` | bandeja em **.NET 8** (WinForms, self-contained) para acompanhar o serviço e reiniciá-lo |
+| [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) | atualização com indisponibilidade total, backup, cópia de scripts/configuração, validação de tag e rollback |
+| [`backup.ps1`](../../deploy/windows/backup.ps1) | backup do banco, dos uploads, do `.env` e do `Caddyfile` |
+| [`restart.ps1`](../../deploy/windows/restart.ps1) | reinício controlado do `NexusApp` com o `NexusCaddy` parado; usado pela bandeja |
+| [`smoke.ps1`](../../deploy/windows/smoke.ps1) | smoke test dos serviços, das ACLs, do health e do HTTPS |
+| [`desinstalar.ps1`](../../deploy/windows/desinstalar.ps1) | remove serviços, tarefas e arquivos instalados; **preserva** `C:\ProgramData\Nexus`, exceto `caddy` |
+| `NexusTray` | bandeja em **.NET 8** (WinForms, self-contained) para acompanhar o serviço, reiniciá-lo e fazer backup |
 | [`common.ps1`](../../deploy/windows/common.ps1) | funções e caminhos compartilhados pelos scripts |
 
 ### 1.1 Versões e componentes
@@ -68,8 +71,8 @@ estações da rede
 | Caminho | Conteúdo |
 | --- | --- |
 | `app\` | clone Git da tag em produção; `.env`, `node_modules`, `.next` |
-| `Instalador\` | scripts entregues pelo `.exe`: `bootstrap.ps1`, `atualizar.ps1`, `backup.ps1`, `smoke.ps1`, `common.ps1`, `desinstalar.ps1`, `instalar-gui.ps1`, `build-instalador.ps1`, `Caddyfile`, `manifesto.json`, `NexusTray.exe` |
-| `scripts\` | `backup.ps1` e `common.ps1` copiados pelo bootstrap; usados pela tarefa `NexusBackup` e pela bandeja |
+| `Instalador\` | scripts entregues pelo `.exe`: `bootstrap.ps1`, `atualizar.ps1`, `backup.ps1`, `restart.ps1`, `smoke.ps1`, `common.ps1`, `desinstalar.ps1`, `instalar-gui.ps1`, `build-instalador.ps1`, `Caddyfile`, `manifesto.json`, `NexusTray.exe` |
+| `scripts\` | `backup.ps1`, `common.ps1` e `restart.ps1` copiados pelo bootstrap; usados pela tarefa `NexusBackup` e pela bandeja |
 | `NexusTray\` | `NexusTray.exe` e `tray.json` (caminhos reais, sem segredos) |
 | `caddy\` | `caddy.exe` |
 | `tools\nssm\` | `nssm.exe` |
@@ -82,26 +85,31 @@ estações da rede
 | Caminho | Conteúdo |
 | --- | --- |
 | `bootstrap.state.json` | fase concluída, hostname, tag e pausa do bootstrap |
-| `uploads\` | raiz física dos uploads; é o valor de `UPLOADS_DIR` |
-| `logs\` | `app.out.log`/`app.err.log`, `caddy.out.log`/`caddy.err.log`, `bootstrap-*.log`, `instalador-*.log`, `deploy-*.log`, `desinstalar-*.log` |
-| `backups\db\` | dumps `nexus_prod-<timestamp>.zip` |
+| `uploads\` | raiz física dos uploads (`UPLOADS_DIR`); `NetworkService` pode modificar |
+| `logs\` | `app.out.log`/`app.err.log`, `bootstrap-*.log`, `instalador-*.log`, `deploy-*.log`, `desinstalar-*.log`, `backup-*.log`, `restart-*.log`; `NetworkService` pode modificar |
+| `backups\db\` | dumps `nexus_prod-<timestamp>.zip` ou, acima de ~1,8 GB, `nexus_prod-<timestamp>.sql` |
 | `backups\uploads\` | cópia dos uploads |
-| `backups\config\` | `.env-<timestamp>` e backups do `my.ini` (`my.ini-<timestamp>.bak`) |
-| `config\Caddyfile` | Caddyfile gerado a partir do template, com o hostname real |
-| `config\backup.cnf` | credenciais do `nexus_app` para o `mysqldump` (ACL restrita) |
+| `backups\config\` | `.env-<timestamp>`, `Caddyfile-<timestamp>` e backups do `my.ini` (`my.ini-<timestamp>.bak`) |
+| `config\Caddyfile` | Caddyfile gerado a partir do template, com o hostname real; leitura para `LocalService` |
+| `config\backup.cnf` | credenciais do `nexus_app` para o `mysqldump`; **sem leitura pelo app** |
 | `caddy\data\` | dados do Caddy (`XDG_DATA_HOME`); a CA local fica em `caddy\data\caddy\pki\authorities\local\` |
 | `caddy\config\` | configuração do Caddy (`XDG_CONFIG_HOME`) |
+| `caddy\logs\` | `caddy.out.log`, `caddy.err.log` e `access.log` |
+
+O diretório raiz `C:\ProgramData\Nexus` é restrito a **Administrators/SYSTEM**; apenas
+`uploads` e `logs` recebem `Modify` para o `NetworkService`, e `caddy\{data,config,logs}`
+recebem `Modify` para o `LocalService`. `backups` e `config` continuam só para
+Administrators/SYSTEM. Ver §12.1.
 
 ### 2.3 Fora de `Nexus`
 
 | Caminho | Conteúdo |
 | --- | --- |
-| `C:\ProgramData\Caddy\logs\access.log` | log de acesso do Caddy (roll de 10 MiB, mantém 5) |
 | `C:\Program Files\MySQL\MySQL Server 8.4\` | instalação do MySQL e `mysql.exe`/`mysqldump.exe` |
 | `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini` | configuração do MySQL ajustada pelo pós-instalação |
 
-> `C:\ProgramData\Caddy` é removido na desinstalação; `C:\ProgramData\Nexus` **não** é.
-> Ver §13.
+> A desinstalação remove `C:\ProgramData\Nexus\caddy` (dados/CA) e preserva o restante de
+> `C:\ProgramData\Nexus`. Ver §13.
 
 ---
 
@@ -113,7 +121,7 @@ estações da rede
 | --- | --- | --- | --- | --- | --- |
 | `MySQL84` | MySQL Installer 8.4 LTS | conta do serviço MySQL | automático | — | log do MySQL |
 | `NexusApp` | `bootstrap.ps1` (NSSM) | `NT AUTHORITY\NetworkService` | automático | `MySQL84` | `C:\ProgramData\Nexus\logs\app.out.log` e `app.err.log` |
-| `NexusCaddy` | `bootstrap.ps1` (NSSM) | `NT AUTHORITY\NetworkService` | automático | `NexusApp` | `caddy.out.log`/`caddy.err.log` + access log em `C:\ProgramData\Caddy\logs` |
+| `NexusCaddy` | `bootstrap.ps1` (NSSM) | `NT AUTHORITY\LocalService` | automático | `NexusApp` | `C:\ProgramData\Nexus\caddy\logs\caddy.out.log`/`caddy.err.log` + `access.log` |
 
 O NSSM configura `AppExit Default Restart` (reinício após 5 s), rotação de log em 10 MiB e
 parada com 15 s para o console. Se o `NexusApp` não subir, o `NexusCaddy` também não sobe
@@ -126,8 +134,8 @@ por causa da dependência.
 | `NexusBackup` | diário às **02:00** (executa no próximo boot se a máquina estiver desligada) | `SYSTEM` | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Nexus\scripts\backup.ps1" -RetentionDays 30` |
 | `NexusTray` | **logon do usuário que executou a instalação** | esse usuário, `RunLevel Highest` | `C:\Program Files\Nexus\NexusTray\NexusTray.exe` |
 
-A bandeja roda elevada (`requireAdministrator`) para reiniciar o serviço via NSSM sem pedir
-UAC. Ela **não** é registrada para "todos os usuários" — ver §9 e §15.
+A bandeja roda elevada (`requireAdministrator`) para executar o `restart.ps1` (que usa NSSM)
+sem pedir UAC. Ela **não** é registrada para "todos os usuários" — ver §9 e §15.
 
 ### 3.3 Portas
 
@@ -136,10 +144,9 @@ UAC. Ela **não** é registrada para "todos os usuários" — ver §9 e §15.
 | `3306` | `MySQL84` | `127.0.0.1` | `bind-address=127.0.0.1`; X Plugin desligado (`mysqlx=0`) |
 | `3000` | `NexusApp` | `127.0.0.1` | `next start -H 127.0.0.1 -p 3000` |
 | `80`/`443` | `NexusCaddy` | todas as interfaces | HTTPS com CA interna; a 80 atende o redirecionamento automático do Caddy |
-| `2019` | Caddy (admin) | `localhost` | usado pelo `caddy trust`; **não** deve ser exposto na rede |
 
-O `bootstrap.ps1` verifica 3306, 3000, 80 e 443 antes de instalar. A **2019 não é
-verificada** — ver §15.
+O Caddy usa `admin off`: **não há API administrativa**. O `bootstrap.ps1` verifica 3306,
+3000, 80 e 443 antes de instalar.
 
 ---
 
@@ -232,7 +239,9 @@ mesma restrição de caracteres.
 
 As senhas são lidas com `Read-Host -AsSecureString`; o transcript é suspenso durante a
 leitura e os arquivos temporários do MySQL nascem com ACL restrita. O `backup.cnf` fica
-com acesso apenas para Administrators/SYSTEM.
+com acesso apenas para Administrators/SYSTEM: o `NexusApp` (`NetworkService`) **não** o lê;
+quem usa o arquivo é o `bootstrap.ps1` (teste da fase 2) e o `backup.ps1`, rodando como
+`SYSTEM` ou em PowerShell elevado.
 
 ### 5.4 O que o bootstrap faz (fases 0–7)
 
@@ -241,11 +250,11 @@ com acesso apenas para Administrators/SYSTEM.
 | **0 — Pré-checagem** | confere Administrador, 64 bits, 5 GB livres em `C:`, internet (`nodejs.org:443`), portas 3306/3000/80/443 e relógio (tolerância de 10 min) |
 | **1 — Runtime** | instala VC++ x64, **Node.js 24.19.0** (se a versão instalada for diferente) e Git for Windows (se ausente); atualiza o PATH da sessão |
 | **2 — MySQL** | exige o serviço `MySQL84`; pausa com código 2 se ele não existir; inicia o serviço, testa o `nexus_app` com o `backup.cnf` existente e, se necessário, pede as senhas e roda o `pos-instalacao-mysql.ps1`; grava `backup.cnf` |
-| **3 — Ferramentas, diretórios e ACLs** | instala **NSSM 2.24** e **Caddy**; gera o `Caddyfile` a partir do template com o hostname; valida o Caddyfile; cria os diretórios e aplica ACLs para o `NetworkService` |
-| **4 — Aplicação** | clona/atualiza a tag do GitHub em `C:\Program Files\Nexus\app`; grava o `.env` (`DATABASE_URL`, `UPLOADS_DIR`, `NODE_ENV=production`, `PORT=3000`, `JWT_SECRET` gerado se ausente); roda `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`; ajusta ACLs do `.env` e do cache |
-| **5 — Serviços** | cria/reconfigura `NexusApp` e `NexusCaddy` via NSSM; inicia o app; valida `http://127.0.0.1:3000/api/health` com `db=true`; inicia o Caddy; executa `caddy trust` (até 15 tentativas) e valida `https://<hostname>/login` |
-| **6 — Bandeja e backup** | copia `backup.ps1`/`common.ps1` para `C:\Program Files\Nexus\scripts`; registra `NexusBackup` (diária, 02:00); copia o `NexusTray.exe` e grava o `tray.json`; registra `NexusTray` no logon do usuário atual |
-| **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão esperada (tag sem o `v`) e imprime URL, caminhos, versão e o comando de atualização |
+| **3 — Ferramentas, diretórios e ACLs** | instala **NSSM 2.24** e **Caddy**; gera o `Caddyfile` com `admin off`; valida o Caddyfile; cria `C:\ProgramData\Nexus\caddy\{data,config,logs}`; aplica ACLs restritas: raiz `ProgramData\Nexus` só admins/SYSTEM, `uploads`/`logs` com `NetworkService`, `config`/`backups` só admins/SYSTEM e `caddy` com `LocalService` |
+| **4 — Aplicação** | clona/atualiza a tag do GitHub em `C:\Program Files\Nexus\app`; **valida que a tag contém `src/app/api/health/route.ts` e que o `package.json` bate com a tag**; grava o `.env` (`DATABASE_URL`, `UPLOADS_DIR`, `NODE_ENV=production`, `PORT=3000`, `JWT_SECRET` gerado se ausente); roda `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`; ajusta ACLs do `.env` e do cache |
+| **5 — Serviços** | cria/reconfigura `NexusApp` (`NetworkService`) e `NexusCaddy` (`LocalService`) via NSSM; inicia o app; valida `http://127.0.0.1:3000/api/health` com `db=true`; inicia o Caddy; instala a CA local com `certutil -addstore -f Root` (até 30 tentativas) e valida `https://<hostname>/login` |
+| **6 — Bandeja e backup** | copia `backup.ps1`, `common.ps1` e `restart.ps1` para `C:\Program Files\Nexus\scripts`; registra `NexusBackup` (diária, 02:00); copia o `NexusTray.exe`, grava o `tray.json` (com `restartScript`) e registra `NexusTray` no logon do usuário atual |
+| **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão esperada (tag sem o `v`), incluindo as verificações de ACL, e imprime URL, caminhos, versão e o comando de atualização |
 
 O estado é gravado em `C:\ProgramData\Nexus\bootstrap.state.json` ao fim de cada fase. Se
 algo falhar, corrija a causa e rode de novo com `-Resume`; se o hostname mudou, o bootstrap
@@ -275,19 +284,21 @@ Ao final, o bootstrap executa:
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
   -NoProfile -ExecutionPolicy Bypass `
   -File "C:\Program Files\Nexus\Instalador\smoke.ps1" `
-  -Hostname nexus.galpao.local -ExpectedVersion 1.02.11.2026
+  -Hostname nexus.galpao.local -ExpectedVersion 1.03.11.2026
 ```
 
 O smoke test confere:
 
 - `MySQL84`, `NexusApp` e `NexusCaddy` em execução;
+- ACLs de `backups`, `config` e `app\.env` **sem `BUILTIN\Users`** (S-1-5-32-545);
 - `GET http://127.0.0.1:3000/api/health` → HTTP 200 com `db=true`;
-- `https://<hostname>/login` → HTTP 200 (com validação de certificado; exige `caddy trust`);
+- `https://<hostname>/login` → HTTP 200 (com validação de certificado; exige a CA do Caddy
+  confiada no Windows via `certutil`);
 - versão do health igual à esperada, quando `-ExpectedVersion` é informado.
 
 Saída esperada: `SMOKE: OK` e código 0. Qualquer falha retorna código 1 e lista os itens.
-O mesmo teste pode ser rodado depois, a qualquer momento, em qualquer PowerShell (não exige
-elevação).
+O mesmo teste pode ser rodado depois, a qualquer momento; rode em **PowerShell elevado**
+para conseguir ler as ACLs restritas de `backups` e `config`.
 
 ---
 
@@ -328,8 +339,8 @@ arquivos, o bootstrap recusa continuar sem `-Force`; com `-Force`, move o diret�
 
 Logs: `C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log` e o resumo no console. A
 instalação manual **não** copia `atualizar.ps1`/`smoke.ps1` para
-`C:\Program Files\Nexus\scripts` — apenas `backup.ps1` e `common.ps1`; os demais continuam
-no checkout de origem.
+`C:\Program Files\Nexus\scripts` — apenas `backup.ps1`, `common.ps1` e `restart.ps1`; os
+demais continuam no checkout de origem.
 
 ---
 
@@ -342,8 +353,9 @@ no checkout de origem.
 2. Confirme que a tag existe no GitHub (`git ls-remote --tags origin vN.DD.MM.YYYY`); o
    `atualizar.ps1` clona a tag, não um branch.
 3. Rode um backup manual e copie o resultado para fora do servidor (§8).
-4. Agende uma **janela de manutenção**: o `NexusApp` é parado durante o build; o Caddy
-   continua no ar, mas o upstream fica indisponível (erro 502/503 para os usuários).
+4. Agende uma **janela de manutenção**: o `atualizar.ps1` para o `NexusCaddy` **e** o
+   `NexusApp` antes de mexer na aplicação. O site fica **totalmente indisponível** durante o
+   build (conexão recusada), não apenas com 502/503.
 5. Tenha o plano de rollback (§7.4) e o dump mais recente à mão.
 
 ### 7.2 Comando
@@ -361,30 +373,49 @@ no checkout de origem.
 1. Confere `C:\Program Files\Nexus\app\package.json` e o serviço `NexusApp`.
 2. Descobre o hostname no `bootstrap.state.json` (ou no `Caddyfile`).
 3. Roda o `backup.ps1`; se o backup falhar, **cancela antes de alterar a aplicação**.
-4. Para o `NexusApp`.
+4. Para o `NexusCaddy` e, em seguida, o `NexusApp` — **indisponibilidade total**.
 5. Move a aplicação atual para `C:\Program Files\Nexus\app.prev-<tag-atual>`.
 6. Clona a nova tag em `C:\Program Files\Nexus\app`.
-7. Copia o `.env` da versão anterior e reaplica a ACL restrita.
-8. Executa `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`.
-9. Ajusta ACLs do cache (`Modify`) e da aplicação (`ReadAndExecute`).
-10. Inicia `NexusApp` e `NexusCaddy`; valida o health local com `db=true`, o
-    `https://<hostname>/login` e o `smoke.ps1` com a versão da tag.
-11. Mantém a versão anterior e mais uma `app.prev-*`; remove as mais antigas. A versão
+7. Valida a tag: exige `src/app/api/health/route.ts` e `package.json` com a mesma versão da
+   tag (sem o `v`); se não bater, falha antes de compilar.
+8. Copia o `.env` da versão anterior e garante `UPLOADS_DIR` com a ACL do `NetworkService`.
+9. Se a versão anterior tiver `public\uploads`, migra o conteúdo para
+   `C:\ProgramData\Nexus\uploads` com `robocopy /E`.
+10. Copia os `*.ps1` da tag para `C:\Program Files\Nexus\Instalador`, o `Caddyfile` e o
+    `manifesto.json`; copia `backup.ps1`, `common.ps1` e `restart.ps1` para
+    `C:\Program Files\Nexus\scripts`; atualiza o `NexusTray.exe` se a tag trouxer
+    `NexusTray\dist\NexusTray.exe`.
+11. Regenera o `Caddyfile` com o hostname e reaplica a leitura para `LocalService`.
+12. Executa `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`.
+13. Ajusta ACLs do cache (`Modify`) e da aplicação (`ReadAndExecute`).
+14. Inicia o `NexusApp`, valida o health local com `db=true`, inicia o `NexusCaddy`, valida
+    `https://<hostname>/login` e roda o `smoke.ps1` com a versão da tag.
+15. Mantém a versão anterior e mais uma `app.prev-*`; remove as mais antigas. A versão
     atual nunca é apagada.
 
 Log: `C:\ProgramData\Nexus\logs\deploy-<tag>.log`.
 
 ### 7.4 Rollback
 
-Se qualquer etapa falhar, o `atualizar.ps1`:
+Se qualquer etapa falhar, o `atualizar.ps1` usa flags para saber o que já foi alterado:
 
-1. para o `NexusApp`;
-2. move a versão com falha para `C:\Program Files\Nexus\app.failed-<tag>`;
-3. restaura `app.prev-<tag-atual>` como `app`;
-4. inicia `NexusApp` e `NexusCaddy` e tenta o health da versão anterior.
+- **falha antes de mover a aplicação** (por exemplo, ao parar um serviço): a produção não é
+  alterada; o script tenta religar `NexusApp` e `NexusCaddy` e informa que a versão em
+  produção permaneceu;
+- **falha depois de mover, mas antes/durante o clone**: se houver um clone parcial, ele vai
+  para `C:\Program Files\Nexus\app.failed-<tag>`; o `app.prev-<tag-atual>` volta a ser
+  `app`;
+- **falha no build, `db push`, health, HTTPS ou smoke**: a versão nova vai para
+  `C:\Program Files\Nexus\app.failed-<tag>` e a anterior é restaurada.
 
-O **banco não é restaurado automaticamente**. Se o `db push`/`db:seed` alterou dados, pare
-o serviço e restaure o dump mais recente de `C:\ProgramData\Nexus\backups\db` (§8.5).
+Depois de restaurar, ele religa o `NexusApp`, espera o health, religa o `NexusCaddy` e
+confere o HTTPS. O **banco não é restaurado automaticamente**. Se o `db push`/`db:seed`
+alterou dados, pare o serviço e restaure o dump mais recente de
+`C:\ProgramData\Nexus\backups\db` (§8.5).
+
+> **Atenção:** o rollback restaura a **aplicação**, não os arquivos copiados para
+> `Instalador`, `scripts` ou o `Caddyfile`/`manifesto.json`; eles permanecem com a versão
+> nova. O `app.failed-<tag>` fica para diagnóstico e não é limpo automaticamente.
 
 ### 7.5 `db push`, seed e mudanças destrutivas
 
@@ -406,10 +437,10 @@ schema precisa de backup, ensaio em banco de teste e um roteiro de rollback.
 ### 7.6 Reinstalar pelo `.exe` em vez de atualizar
 
 Rodar o `NexusSetup-<nova-versão>.exe` sobre uma instalação existente executa o bootstrap
-do zero (fases 0–7). Ele preserva o `.env` e o `JWT_SECRET` e reconfigura os serviços, mas
-**não faz backup automático** e não tem o rollback do `atualizar.ps1`. Use o `.exe` para a
-primeira instalação ou para recuperação; para atualização rotineira, prefira o
-`atualizar.ps1`.
+do zero (fases 0–7). Ele preserva o `.env` e o `JWT_SECRET`, reconfigura os serviços e
+**também valida a tag** (`/api/health` + versão do `package.json`), mas **não faz backup
+automático** e não tem o rollback do `atualizar.ps1`. Use o `.exe` para a primeira
+instalação ou para recuperação; para atualização rotineira, prefira o `atualizar.ps1`.
 
 ---
 
@@ -427,7 +458,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 `StartWhenAvailable` faz a tarefa rodar no próximo boot se o servidor estiver desligado no
 horário. Ela não aparece na bandeja; confira em **Agendador de Tarefas** ou com
-`Get-ScheduledTaskInfo -TaskName NexusBackup`.
+`Get-ScheduledTaskInfo -TaskName NexusBackup`. O log de cada execução fica em
+`C:\ProgramData\Nexus\logs\backup-<timestamp>.log`.
 
 ### 8.2 Backup manual
 
@@ -449,36 +481,45 @@ que só Administrators/SYSTEM acessam.
 | Item | Destino | Formato |
 | --- | --- | --- |
 | Banco `nexus_prod` | `C:\ProgramData\Nexus\backups\db\nexus_prod-<timestamp>.zip` | dump `mysqldump` (`--single-transaction --routines --triggers --no-tablespaces --databases nexus_prod`) compactado; o `.sql` intermediário é apagado |
+| Banco grande | `C:\ProgramData\Nexus\backups\db\nexus_prod-<timestamp>.sql` | acima de **~1,8 GB** (limite prático do `Compress-Archive` no PowerShell 5.1), o `.sql` é mantido **sem compactar** |
 | Uploads | `C:\ProgramData\Nexus\backups\uploads\` | cópia com `robocopy /E` |
 | `.env` | `C:\ProgramData\Nexus\backups\config\.env-<timestamp>` | cópia com ACL restrita |
+| `Caddyfile` | `C:\ProgramData\Nexus\backups\config\Caddyfile-<timestamp>` | cópia com ACL restrita |
+| Log | `C:\ProgramData\Nexus\logs\backup-<timestamp>.log` | transcript da execução |
 
 Também em `backups\config` (mas **fora** do `backup.ps1`) ficam os backups do `my.ini`
 (`my.ini-<timestamp>.bak`), criados pelo `pos-instalacao-mysql.ps1`.
 
 O `backup.ps1` retorna código diferente de zero quando o dump falha, quando o arquivo do
 dump fica vazio, quando o `robocopy` falha (código ≥ 8) ou quando o `.env` não é encontrado.
+Se o `Caddyfile` não existir, ele avisa que o backup está incompleto, mas continua.
 
 ### 8.4 Retenção e verificação
 
-A retenção remove, por `LastWriteTime`, os `*.zip` de `backups\db` e os `.env-*` de
-`backups\config` mais antigos que `RetentionDays`.
+A retenção remove, por `LastWriteTime`, os `*.zip` e `*.sql` de `backups\db` e os
+`.env-*`/`Caddyfile-*` de `backups\config` mais antigos que `RetentionDays`.
 
 > **Atenção:** a retenção **não** poda `backups\uploads` nem os `my.ini-*.bak`; a cópia de
 > uploads não é podada e pode crescer sem limite. Monitore o espaço em
-> `C:\ProgramData\Nexus\backups` e limpe manualmente o excedente. Ver §15.
+> `C:\ProgramData\Nexus\backups` e limpe manualmente o excedente. Dumps grandes ficam como
+> `.sql` sem compactação e ocupam mais disco. Ver §15.
 
 Verificação rápida:
 
 ```powershell
-Get-ChildItem C:\ProgramData\Nexus\backups\db -Filter *.zip |
+Get-ChildItem C:\ProgramData\Nexus\backups\db -File |
   Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, Length, LastWriteTime
 
-# confira o conteúdo do dump mais recente
-$zip = Get-ChildItem C:\ProgramData\Nexus\backups\db -Filter *.zip |
+# confira o conteúdo do dump mais recente (.zip ou .sql)
+$latest = Get-ChildItem C:\ProgramData\Nexus\backups\db -File |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Expand-Archive $zip.FullName -DestinationPath "$env:TEMP\nexus-backup-check" -Force
-Select-String -Path "$env:TEMP\nexus-backup-check\*.sql" -Pattern "CREATE TABLE" |
-  Select-Object -First 1
+if ($latest.Extension -eq ".zip") {
+  Expand-Archive $latest.FullName -DestinationPath "$env:TEMP\nexus-backup-check" -Force
+  $sql = Get-ChildItem "$env:TEMP\nexus-backup-check\*.sql" | Select-Object -First 1
+} else {
+  $sql = $latest
+}
+Select-String -Path $sql.FullName -Pattern "CREATE TABLE" | Select-Object -First 1
 ```
 
 Copie os backups para fora do servidor (NAS, unidade de rede ou nuvem) — o script não faz
@@ -486,11 +527,12 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
 
 ### 8.5 Restauração em produção
 
-> **Pare o `NexusApp` antes de restaurar.** O Caddy pode continuar no ar; os usuários verão
-> erro até o app voltar. O dump foi feito com `--databases nexus_prod`, então contém
-> `CREATE DATABASE`/`USE nexus_prod` — a importação **substitui as tabelas incluídas no dump**
-> no banco de produção. Tabelas criadas depois do dump e que não estão nele **permanecem**;
-> para voltar a um ponto exato, importe em um banco vazio ou recrie o `nexus_prod` antes.
+> **Pare o `NexusApp` antes de restaurar.** Todo o procedimento é em **PowerShell elevado**.
+> O Caddy pode continuar no ar; os usuários verão erro até o app voltar. O dump foi feito com
+> `--databases nexus_prod`, então contém `CREATE DATABASE`/`USE nexus_prod` — a importação
+> **substitui as tabelas incluídas no dump** no banco de produção. Tabelas criadas depois do
+> dump e que não estão nele **permanecem**; para voltar a um ponto exato, importe em um banco
+> vazio ou recrie o `nexus_prod` antes.
 
 1. Pare o serviço:
 
@@ -498,12 +540,17 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    Stop-Service NexusApp -Force
    ```
 
-2. Extraia o dump escolhido:
+2. Prepare o dump escolhido (`.zip` ou `.sql`):
 
    ```powershell
-   $zip = "C:\ProgramData\Nexus\backups\db\nexus_prod-20261102-020000.zip"
+   $dump = "C:\ProgramData\Nexus\backups\db\nexus_prod-20261102-020000.zip"
    New-Item -ItemType Directory -Force -Path "D:\restore" | Out-Null
-   Expand-Archive $zip -DestinationPath "D:\restore" -Force
+   if ($dump.EndsWith(".zip")) {
+     Expand-Archive $dump -DestinationPath "D:\restore" -Force
+     $sql = Get-ChildItem "D:\restore\*.sql" | Select-Object -First 1
+   } else {
+     $sql = Get-Item $dump
+   }
    ```
 
 3. Crie um arquivo de opções do MySQL com as credenciais do **root** (o `nexus_app` não tem
@@ -525,9 +572,8 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
 
    ```powershell
    $mysql = "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe"
-   $dump  = "D:\restore\nexus_prod-20261102-020000.sql"
    $process = Start-Process -FilePath $mysql -Wait -NoNewWindow -PassThru `
-     -RedirectStandardInput $dump `
+     -RedirectStandardInput $sql.FullName `
      -ArgumentList @(
        "--defaults-extra-file=C:\ProgramData\Nexus\config\restore.cnf",
        "-h", "127.0.0.1", "-P", "3306"
@@ -553,7 +599,17 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    Protect-File -Path "C:\Program Files\Nexus\app\.env" -ReadIdentities @("S-1-5-20")
    ```
 
-7. Remova o `restore.cnf` e reinicie/valide:
+7. Se necessário, restaure o `Caddyfile` de `backups\config\Caddyfile-<timestamp>` em
+   `C:\ProgramData\Nexus\config\Caddyfile` e reaplique a leitura para o `LocalService`:
+
+   ```powershell
+   Copy-Item "C:\ProgramData\Nexus\backups\config\Caddyfile-20261102-020000" `
+     "C:\ProgramData\Nexus\config\Caddyfile" -Force
+   . "C:\Program Files\Nexus\scripts\common.ps1"
+   Protect-File -Path "C:\ProgramData\Nexus\config\Caddyfile" -ReadIdentities @("S-1-5-19")
+   ```
+
+8. Remova o `restore.cnf` e reinicie/valide:
 
    ```powershell
    Remove-Item "C:\ProgramData\Nexus\config\restore.cnf" -Force
@@ -599,7 +655,7 @@ O polling é a cada **20 s**; a transição de estado gera um balão. O tooltip 
 | --- | --- |
 | **Abrir Nexus** | abre `https://<hostname>` no navegador (via `explorer.exe`, fora do processo elevado) |
 | **Status** | `Serviço: ... · Banco: ... · v...` (somente leitura) |
-| **Reiniciar aplicação** | `nssm restart NexusApp`; o Caddy **não** é reiniciado |
+| **Reiniciar aplicação** | executa `C:\Program Files\Nexus\scripts\restart.ps1`: para o Caddy, reinicia o App, espera o health, inicia o Caddy e confere o health; log em `C:\ProgramData\Nexus\logs\restart-<timestamp>.log` |
 | **Abrir logs** | abre `C:\ProgramData\Nexus\logs` |
 | **Fazer backup agora** | roda `C:\Program Files\Nexus\scripts\backup.ps1` e informa o código de saída |
 | **Abrir pasta de dados** | abre `C:\ProgramData\Nexus` |
@@ -617,20 +673,23 @@ O bootstrap grava:
   "nssmPath": "C:\\Program Files\\Nexus\\tools\\nssm\\nssm.exe",
   "logsDir": "C:\\ProgramData\\Nexus\\logs",
   "dataDir": "C:\\ProgramData\\Nexus",
-  "backupScript": "C:\\Program Files\\Nexus\\scripts\\backup.ps1"
+  "backupScript": "C:\\Program Files\\Nexus\\scripts\\backup.ps1",
+  "restartScript": "C:\\Program Files\\Nexus\\scripts\\restart.ps1"
 }
 ```
 
-Se o arquivo faltar ou estiver inválido, a bandeja usa os padrões do código; o padrão de
-`backupScript` é `C:\Program Files\Nexus\scripts\backup.ps1`. Mantenha o `tray.json` no
-lugar para preservar os caminhos desta instalação.
+Se o arquivo faltar ou estiver inválido, a bandeja usa os padrões do código; os padrões de
+`backupScript` e `restartScript` já apontam para `C:\Program Files\Nexus\scripts`. Mantenha
+o `tray.json` no lugar para preservar os caminhos desta instalação.
 
 ### 9.4 Limitações
 
 - A tarefa `NexusTray` é registrada no **logon do usuário que executou a instalação**, com
   `RunLevel Highest`; outros usuários do servidor não veem a bandeja.
 - O executável tem `requireAdministrator`; abrir manualmente sem elevação pede UAC.
-- O reinício afeta apenas o `NexusApp`; para o Caddy, use `Restart-Service NexusCaddy`.
+- O reinício usa o `restart.ps1` e afeta **Caddy e App**: se o App não voltar ao health, o
+  Caddy permanece parado e o site fica fora do ar até uma intervenção; veja o log
+  `restart-<timestamp>.log`.
 - Falhas fatais da bandeja vão para `%LOCALAPPDATA%\NexusTray\tray.log` (do usuário), não
   para `C:\ProgramData\Nexus\logs`.
 
@@ -643,7 +702,7 @@ lugar para preservar os caminhos desta instalação.
 Rota pública (não exige sessão; `src/proxy.ts`), `force-dynamic`, runtime Node:
 
 ```json
-{ "status": "ok", "db": true, "versao": "1.02.11.2026" }
+{ "status": "ok", "db": true, "versao": "1.03.11.2026" }
 ```
 
 - HTTP **200** quando `SELECT 1` no banco responde.
@@ -655,15 +714,15 @@ Rota pública (não exige sessão; `src/proxy.ts`), `force-dynamic`, runtime Nod
 ### 10.2 `smoke.ps1`
 
 ```powershell
-# PowerShell elevado ou não; não altera nada
+# PowerShell elevado; o smoke só lê o sistema
 cd "C:\Program Files\Nexus\Instalador"
-.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 1.02.11.2026
+.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 1.03.11.2026
 ```
 
-Confere os três serviços, o health local com `db=true`, `https://<hostname>/login` e a
-versão. **Não ignora erro de certificado**: o HTTPS só passa se a CA do Caddy estiver
-confiada no Windows (`caddy trust`). Saída `SMOKE: OK` (código 0) ou `SMOKE: FALHOU
-(n verificação(ões))` (código 1).
+Confere os três serviços, as ACLs de `backups`/`config`/`app\.env` (sem `BUILTIN\Users`), o
+health local com `db=true`, `https://<hostname>/login` e a versão. **Não ignora erro de
+certificado**: o HTTPS só passa se a CA do Caddy estiver confiada no Windows. Saída
+`SMOKE: OK` (código 0) ou `SMOKE: FALHOU (n verificação(ões))` (código 1).
 
 ### 10.3 Testes manuais
 
@@ -685,18 +744,23 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 | `mysql.exe não encontrado` | MySQL fora de `C:\Program Files\MySQL\MySQL Server 8.4` | instale no caminho padrão ou inclua o `bin` do MySQL no PATH |
 | fase 5/7 falha em `https://<hostname>/login` | hostname não resolve no servidor ou DNS ainda não propagou | crie o registro A no DNS ou uma entrada em `C:\Windows\System32\drivers\etc\hosts`; teste `Resolve-DnsName <hostname>` |
 | HTTPS com aviso de certificado nas estações | a CA interna do Caddy só foi confiada no servidor | exporte `C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt` e instale em **Autoridades de Certificação Raiz Confiáveis** nas estações |
-| `caddy trust falhou` | Caddy não está rodando, admin API ocupada ou sem elevação | confira `NexusCaddy`, a porta 2019 e o `caddy.err.log`; rode `caddy trust` em PowerShell elevado |
+| `bootstrap`/`smoke` falha ao confiar na CA | `root.crt` ainda não existe ou `certutil` falhou | confira `NexusCaddy`, `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` e rode `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` em PowerShell elevado |
 | porta 80/443/3000/3306 em uso | outro processo/serviço ocupa a porta | `Get-NetTCPConnection -LocalPort 80,443,3000,3306 -State Listen`; pare o processo ou ajuste o serviço |
-| `NexusApp` não sobe | `.env` ausente/ilegível, build incompleto ou `node_modules` corrompido | veja `C:\ProgramData\Nexus\logs\app.err.log`; confira `C:\Program Files\Nexus\app\.env` e a ACL; refaça `npm ci && npm run build` na pasta do app |
+| `NexusApp` não sobe ou não escreve uploads/logs | `.env` ausente/ilegível, build incompleto ou ACL de `uploads`/`logs` sem `NetworkService` | veja `C:\ProgramData\Nexus\logs\app.err.log`; confira `app\.env` e as ACLs (`icacls "C:\ProgramData\Nexus\uploads"` e `...\logs`); refaça `npm ci && npm run build` se o build estiver corrompido |
 | health responde 503 (`db=false`) | MySQL parado, senha divergente ou `nexus_prod` ausente | `Get-Service MySQL84`; teste `& "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe" --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3306 -D nexus_prod -e "SELECT 1"`; se a senha mudou, rode a fase 2 com `-Resume` |
-| `NexusCaddy` não sobe | Caddyfile inválido, porta ocupada ou CA | `& "C:\Program Files\Nexus\caddy\caddy.exe" validate --config "C:\ProgramData\Nexus\config\Caddyfile" --adapter caddyfile` e `caddy.err.log` |
+| `NexusCaddy` não sobe | Caddyfile inválido, `LocalService` sem leitura do `Caddyfile`/pastas `caddy`, porta ocupada | `& "C:\Program Files\Nexus\caddy\caddy.exe" validate --config "C:\ProgramData\Nexus\config\Caddyfile" --adapter caddyfile`; confira `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` e as ACLs de `caddy\{data,config,logs}`/`Caddyfile` |
+| smoke falha em "ACL permite BUILTIN\Users" | `backups`, `config` ou `app\.env` herdaram `Users` | rode o `bootstrap`/`smoke` elevado; reaplique `Set-AclRestricted`/`Protect-File` (ou o bootstrap) e confira com `icacls` |
 | bandeja vermelha com serviço rodando | health inacessível ou banco fora | confira o health local e o `app.err.log`; a bandeja mostra "banco indisponível" quando `db=false` |
 | bandeja não aparece | tarefa registrada para outro usuário ou não houve logon | veja `Get-ScheduledTask NexusTray`; rode `C:\Program Files\Nexus\NexusTray\NexusTray.exe` elevado ou registre a tarefa para o usuário desejado |
 | "Fazer backup agora" falha | `backup.ps1` ausente ou `tray.json` com `backupScript` inválido | confira `C:\Program Files\Nexus\scripts\backup.ps1`; o padrão do código já aponta para esse caminho — restaure o `tray.json` ou corrija o `backupScript` |
-| backup falha no `mysqldump` | `backup.cnf` ausente, senha do `nexus_app` mudou ou MySQL fora | rode a fase 2 do bootstrap; confira o erro redigido no console |
-| atualização falha e volta a versão anterior | build, `db push`, health ou smoke falharam | leia `deploy-<tag>.log` e `app.failed-<tag>`; se o banco mudou, restaure o dump (§8.5) |
+| "Reiniciar aplicação" falha e o site fica fora | `restart.ps1` não encontrado, health não voltou ou o `NexusCaddy` não religou | veja `C:\ProgramData\Nexus\logs\restart-<timestamp>.log`; o script para o Caddy antes e só o religa após o health — se falhar, religue manualmente `NexusCaddy` |
+| backup falha no `mysqldump` | `backup.cnf` ausente, senha do `nexus_app` mudou ou MySQL fora | rode a fase 2 do bootstrap; confira o log `backup-<timestamp>.log` e o erro redigido no console |
+| backup gera `.sql` grande e o disco enche | dump acima de ~1,8 GB é mantido sem compactar | confira `backups\db`; a retenção remove `.zip`/`.sql` antigos, mas não `backups\uploads`; limpe manualmente |
+| atualização falha com "A tag ... não contém /api/health" ou versão divergente | tag antiga (`v1.02.11.2026`), `manifesto.json` desatualizado ou `package.json` diferente da tag | crie a nova tag DateVer, atualize `manifesto.json` e garanta `package.json` = tag; veja `deploy-<tag>.log` |
+| atualização falha e volta a versão anterior | build, `db push`, health, HTTPS ou smoke falharam | leia `deploy-<tag>.log` e `app.failed-<tag>`; se o banco mudou, restaure o dump (§8.5); scripts/Caddyfile copiados não são revertidos |
 | atualização não encontra hostname | `bootstrap.state.json` e `Caddyfile` ausentes | rode o bootstrap ou informe o hostname no `Caddyfile`; o `atualizar.ps1` não aceita `-Hostname` |
 | instalador mostra `MsgBox` de erro ou o sistema não funciona após a instalação | o bootstrap não concluiu; o `instalador.iss` verifica o `ResultCode` e mostra `MsgBox` | confira `instalador-*.log` e `bootstrap-*.log`, corrija a causa e rode a instalação de novo |
+| desinstalação mostra erro e preserva `app`/`NexusTray` | o `desinstalar.ps1` não conseguiu remover serviços/tarefas e abortou antes de apagar os diretórios | veja `desinstalar-*.log`; corrija o serviço/tarefa e rode de novo |
 | disco enche | `backups\uploads` e `my.ini-*.bak` sem retenção; `app.failed-*` acumulam | limpe manualmente os diretórios antigos após conferir os backups |
 
 ### 11.1 Onde olhar primeiro
@@ -705,12 +769,14 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 | --- | --- |
 | `C:\ProgramData\Nexus\logs\app.err.log` | erro da aplicação Next |
 | `C:\ProgramData\Nexus\logs\app.out.log` | saída da aplicação |
-| `C:\ProgramData\Nexus\logs\caddy.err.log` | erro do Caddy |
+| `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` | erro do Caddy |
+| `C:\ProgramData\Nexus\caddy\logs\access.log` | requisições HTTP |
 | `C:\ProgramData\Nexus\logs\bootstrap-*.log` | instalação |
 | `C:\ProgramData\Nexus\logs\instalador-*.log` | andamento do `.exe` |
 | `C:\ProgramData\Nexus\logs\deploy-*.log` | atualização |
+| `C:\ProgramData\Nexus\logs\backup-*.log` | backup |
+| `C:\ProgramData\Nexus\logs\restart-*.log` | reinício pela bandeja |
 | `C:\ProgramData\Nexus\logs\desinstalar-*.log` | desinstalação |
-| `C:\ProgramData\Caddy\logs\access.log` | requisições HTTP |
 | Visualizador de Eventos → Windows Logs → System | erros de serviço/NSSM |
 | `%LOCALAPPDATA%\NexusTray\tray.log` | falha fatal da bandeja (usuário) |
 
@@ -720,13 +786,25 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 
 ### 12.1 ACLs e segredos
 
-- **`.env`** (`C:\Program Files\Nexus\app\.env`): herança desabilitada; **Administrators**
-  (S-1-5-32-544) e **SYSTEM** (S-1-5-18) com controle total; **NetworkService**
-  (S-1-5-20) somente leitura. O serviço `NexusApp` roda como NetworkService.
-- **`backup.cnf`** (`C:\ProgramData\Nexus\config\backup.cnf`): somente
-  Administrators/SYSTEM; guarda a senha do `nexus_app`.
-- **`restore.cnf`** (criado manualmente para restauração): mesma proteção; apague depois do
-  uso.
+O `bootstrap.ps1` **remove a herança de `C:\ProgramData`** e aplica ACLs explícitas:
+
+| Caminho | Permissão |
+| --- | --- |
+| `C:\ProgramData\Nexus` (raiz) | somente **Administrators** (S-1-5-32-544) e **SYSTEM** (S-1-5-18) |
+| `C:\ProgramData\Nexus\uploads` | `NetworkService` (S-1-5-20) `Modify` + Administrators/SYSTEM |
+| `C:\ProgramData\Nexus\logs` | `NetworkService` `Modify` + Administrators/SYSTEM |
+| `C:\ProgramData\Nexus\backups` e `config` | somente Administrators/SYSTEM |
+| `C:\ProgramData\Nexus\caddy\{data,config,logs}` | `LocalService` (S-1-5-19) `Modify` + Administrators/SYSTEM |
+| `C:\ProgramData\Nexus\config\Caddyfile` | `LocalService` somente leitura (`Protect-File`) |
+| `C:\Program Files\Nexus\app\.env` | `NetworkService` somente leitura; Administrators/SYSTEM controle total |
+| `C:\ProgramData\Nexus\config\backup.cnf` | somente Administrators/SYSTEM; **o app não lê** |
+| `C:\Program Files\Nexus` e `app` | `ReadAndExecute` para `NetworkService`; `ProgramRoot` também para `LocalService`; `.next\cache` com `Modify` para `NetworkService` |
+
+- **`NexusApp`** roda como `NetworkService`; **`NexusCaddy`** roda como `LocalService`.
+- **`backup.cnf`** guarda a senha do `nexus_app`. Quem o usa é o `backup.ps1` (SYSTEM ou
+  PowerShell elevado); o processo da aplicação não precisa e não consegue lê-lo.
+- **`restore.cnf`** (criado manualmente para restauração): mesma proteção do `backup.cnf`;
+  apague depois do uso.
 - **Arquivos temporários do MySQL** (opções, SQL e saída): criados com `Protect-File` e
   removidos ao final; erros do `mysqldump` são redigidos (`password`/`identified by`).
 - **Transcripts**: suspensos durante a leitura das senhas; não registram a digitação.
@@ -735,36 +813,41 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 - **Senhas**: `nexus_app` com 12–64 caracteres do conjunto seguro; root sem quebra de linha.
   Não use `-p<senha>` na linha de comando.
 
+O `smoke.ps1` verifica que `backups`, `config` e `app\.env` não tenham ACE para
+`BUILTIN\Users` (S-1-5-32-545). Rode-o elevado para conseguir ler as ACLs restritas.
+
 ### 12.2 Exposição de rede
 
 - O **Next** escuta apenas em `127.0.0.1:3000`; o **MySQL** apenas em `127.0.0.1:3306`.
 - O **Caddy** é a única porta exposta (80/443) e usa **CA interna** (`tls internal`).
-- O admin do Caddy (`localhost:2019`) deve permanecer local.
+- O Caddy usa `admin off`: **não há API administrativa**.
 - **Não há regra de firewall criada pelos scripts.** Libere 80/443 manualmente e mantenha
-  3000/3306/2019 bloqueadas para a rede.
+  3000/3306 bloqueadas para a rede.
 - O MySQL usa `utf8mb4`/`utf8mb4_0900_ai_ci` e fuso `-03:00`; o X Plugin (`mysqlx`) fica
   desligado.
 
 ### 12.3 Backups
 
-Os backups contêm banco, uploads e o `.env` (com `DATABASE_URL` e `JWT_SECRET`). Proteja
-`C:\ProgramData\Nexus\backups` como dado sensível, copie para fora do servidor e restrinja
-quem acessa a pasta. O `NexusBackup` roda como SYSTEM; o acesso manual exige elevação.
+Os backups contêm banco, uploads, o `.env` (com `DATABASE_URL` e `JWT_SECRET`) e o
+`Caddyfile`. Proteja `C:\ProgramData\Nexus\backups` como dado sensível, copie para fora do
+servidor e restrinja quem acessa a pasta. O `NexusBackup` roda como SYSTEM; o acesso manual
+exige elevação. A pasta `caddy\data` (CA/chave privada) **não** entra no backup.
 
 ### 12.4 CA interna
 
-O `caddy trust` instala a CA local no repositório de confiança do Windows **no servidor**.
-Para as estações, distribua o `root.crt` por GPO/script e instale em **Autoridades de
-Certificação Raiz Confiáveis**. A desinstalação **não** remove essa CA do trust store — ver
-§13.
+O `bootstrap.ps1` instala a CA local com `certutil -addstore -f Root` a partir de
+`C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt`. Para as estações,
+distribua o `root.crt` por GPO/script e instale em **Autoridades de Certificação Raiz
+Confiáveis**. A desinstalação **não** remove essa CA do trust store — ver §13.
 
 ---
 
 ## 13. Desinstalação
 
 Use **Configurações → Aplicativos → Nexus → Desinstalar** (ou o atalho "Desinstalar Nexus"
-no Menu Iniciar). O Inno executa o `desinstalar.ps1` e depois remove os arquivos que ele
-próprio instalou.
+no Menu Iniciar). O `.iss` **não tem `[UninstallRun]` nem `[UninstallDelete]`**: a remoção é
+feita pelo `desinstalar.ps1`, chamado em `CurUninstallStepChanged(usUninstall)`. O Inno
+verifica o `ResultCode` e mostra um `MsgBox` de erro se o script falhar.
 
 ### 13.1 O que é removido
 
@@ -772,26 +855,33 @@ próprio instalou.
   senão `sc.exe`).
 - Tarefas agendadas **`NexusTray`** e **`NexusBackup`**.
 - Processo da bandeja em execução.
+- `C:\Program Files\Nexus\app`
+- `C:\Program Files\Nexus\NexusTray`
 - `C:\Program Files\Nexus\caddy`
 - `C:\Program Files\Nexus\tools` (NSSM)
 - `C:\Program Files\Nexus\scripts`
-- `C:\Program Files\Nexus\NexusTray`
-- `C:\Program Files\Nexus\app`
-- `C:\ProgramData\Caddy` (logs de acesso)
+- Versões antigas `app.prev-*`, `app.failed-*` e `app.prev-manual-*`
+- `C:\ProgramData\Nexus\caddy` (dados/configuração/logs e a CA local)
 - O diretório do instalador (`C:\Program Files\Nexus\Instalador`) é removido pelo Inno.
+
+O script só apaga `app`, `NexusTray` e as versões antigas **depois** de remover serviços e
+tarefas com sucesso. Se falhar antes disso, ele mostra erro e **preserva** esses diretórios;
+o Inno ainda remove os arquivos do próprio `Instalador`.
 
 ### 13.2 O que é preservado
 
-- **`C:\ProgramData\Nexus` inteiro**: `uploads`, `logs`, `backups`, `config`
-  (`Caddyfile`, `backup.cnf`), `caddy\data` (CA/chaves) e `bootstrap.state.json`.
+- **`C:\ProgramData\Nexus`**, exceto `caddy`: `uploads`, `logs`, `backups`, `config`
+  (`Caddyfile`, `backup.cnf`) e `bootstrap.state.json`.
 - **MySQL 8.4**, o banco `nexus_prod`, o usuário `nexus_app` e o serviço `MySQL84`.
 - **Node.js**, **Git** e o VC++ Redistributable.
-- A **CA interna** no repositório de confiança do Windows (o `root.crt` continua confiado).
+- A **CA interna** no repositório de confiança do Windows (o `root.crt` continua confiado,
+  embora os arquivos em `caddy\data` tenham sido removidos).
 
 Para uma remoção **total** (depois de copiar o que precisa):
 
 1. Rode a desinstalação normal.
-2. Apague `C:\ProgramData\Nexus` manualmente (isso apaga banco lógico, uploads e backups).
+2. Apague `C:\ProgramData\Nexus` manualmente (isso apaga banco lógico, uploads, backups e
+   configuração restantes).
 3. Desinstale o MySQL 8.4, o Node.js e o Git, se não forem usados por outro sistema.
 4. Remova a CA da Caddy de **Autoridades de Certificação Raiz Confiáveis**
    (`certlm.msc`) — procure o certificado da CA local da Caddy e exclua.
@@ -807,9 +897,12 @@ Para uma remoção **total** (depois de copiar o que precisa):
 
 - [ ] Entregas aprovadas (reviewer sem bloqueante; QA verde) e `CHANGELOG.md` atualizado.
 - [ ] Documentação de `/docs` atualizada (incluindo este runbook, se o processo mudou).
-- [ ] Versão **DateVer** `N.DD.MM.YYYY` no `package.json` e tag `vN.DD.MM.YYYY` no Git.
-      O health reporta a versão do `package.json` e o smoke a compara com a tag — mantenha
-      os dois iguais.
+- [ ] **Criar uma nova tag DateVer** `vN.DD.MM.YYYY`; a tag `v1.02.11.2026` **não** contém
+      `src/app/api/health/route.ts` e é recusada pelo bootstrap/atualizador. Bump do
+      `package.json` para a mesma versão da tag (o health reporta essa versão e o smoke a
+      compara).
+- [ ] Atualizar `deploy/windows/manifesto.json` com a nova tag em `repo.tag`; o instalador
+      usa o manifesto para clonar a release.
 - [ ] Commit de release na `main`; tag criada e **enviada ao GitHub** (o bootstrap e o
       `atualizar.ps1` clonam a tag; sem ela, a instalação falha).
 - [ ] Branch local **`producao`** avançada por **fast-forward** até o commit da release
@@ -818,15 +911,17 @@ Para uma remoção **total** (depois de copiar o que precisa):
 - [ ] Se a bandeja mudou: `deploy\windows\NexusTray\build.ps1` (requer **.NET 8 SDK**;
       `dist\NexusTray.exe` é ignorado pelo Git e é gerado no build).
 - [ ] Instalador gerado: `deploy\windows\build-instalador.ps1` → `out\NexusSetup-<versão>.exe`
-      (Inno Setup 7; baixa o ISCC 7.1.0 do NuGet se necessário). Confira o tamanho e o log
-      do `ISCC`.
+      (Inno Setup 7; baixa o ISCC 7.1.0 do NuGet se necessário). Se a tag existir localmente
+      e não tiver `/api/health`, o script **recusa** a compilação; se a tag não existir
+      localmente, a validação fica para o clone.
 - [ ] Ensaio em **VM Windows limpa** (10/11 x64, sem Node/Git/MySQL): instalação completa,
       pausa do MySQL, primeira execução/Super Admin, `smoke.ps1`, login e uma operação
       básica. Teste também a atualização a partir da tag anterior e a desinstalação
-      preservando `C:\ProgramData\Nexus`.
+      preservando `C:\ProgramData\Nexus` (exceto `caddy`).
 - [ ] **Backup manual** da produção + cópia para fora do servidor; confira o dump mais
       recente (§8.4).
-- [ ] Janela de manutenção comunicada; plano de rollback definido (`app.prev-*` + dump).
+- [ ] Janela de manutenção comunicada; planeje a **indisponibilidade total** durante a
+      atualização e o rollback (`app.prev-*` + dump).
 - [ ] Atualização executada com `atualizar.ps1 -Tag v...`; acompanhe o `deploy-<tag>.log`.
 - [ ] Pós-release: `smoke.ps1`, `/api/health` com `db=true`, login, versão exibida, tarefa
       `NexusBackup` e bandeja no estado verde.
@@ -841,31 +936,33 @@ Para uma remoção **total** (depois de copiar o que precisa):
 
 ## 15. Atenções conhecidas (divergências entre scripts)
 
-As divergências abaixo continuam **reais** nos scripts desta branch. As correções de código
-são feitas fora deste documento; o que já foi resolvido sai da lista. As divergências do
-fallback de backup da bandeja e da verificação do código de saída do instalador foram
-corrigidas no `RUN-20261102-20` e não aparecem mais aqui.
+As divergências de ACL/conta, Caddy, reinício, atualização, backup e desinstalação foram
+corrigidas no `RUN-20261102-23..25` e não aparecem mais aqui. A lista abaixo contém apenas
+o que permanece real nos scripts desta branch; correções de código são feitas fora deste
+documento.
 
 1. **A retenção do backup não cobre uploads.**
-   `backup.ps1` poda apenas `backups\db\*.zip` e `backups\config\.env-*`. A cópia de
-   `backups\uploads` (e os `my.ini-*.bak`) não é podada e pode crescer sem limite.
+   `backup.ps1` poda `backups\db\*.zip`, `backups\db\*.sql` e
+   `backups\config\.env-*`/`Caddyfile-*`. A cópia de `backups\uploads` (e os
+   `my.ini-*.bak`) não é podada e pode crescer sem limite.
 
-2. **O backup não inclui o Caddy.**
-   Não há cópia do `Caddyfile` nem de `C:\ProgramData\Nexus\caddy\data` (CA e chave
-   privada). Após uma perda total, o Caddy gera uma CA nova e as estações precisam confiar
-   nela de novo.
+2. **O backup não inclui os dados do Caddy.**
+   O `Caddyfile` agora é copiado, mas `C:\ProgramData\Nexus\caddy\data` (CA e chave
+   privada) não entra no backup. Após uma perda total, o Caddy gera uma CA nova e as
+   estações precisam confiar nela de novo.
 
 3. **A bandeja é registrada só para o usuário que instalou.**
    `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários do servidor não a veem.
 
 4. **O `.env` não é mesclado na atualização.**
-   `atualizar.ps1` copia o `.env` anterior inteiro. Variáveis novas introduzidas por uma
-   release não são adicionadas automaticamente; compare com `.env.example` e ajuste à mão
-   (reaplicando a ACL).
+   `atualizar.ps1` copia o `.env` anterior inteiro e só garante `UPLOADS_DIR`. Variáveis
+   novas introduzidas por uma release não são adicionadas automaticamente; compare com
+   `.env.example` e ajuste à mão (reaplicando a ACL).
 
 5. **`app.failed-*` e `app.prev-manual-*` não são limpos.**
    O `atualizar.ps1` mantém a versão anterior e mais uma `app.prev-*`, mas não remove
-   `app.failed-*`; o bootstrap também deixa `app.prev-manual-*`. Monitore o disco.
+   `app.failed-*`; o bootstrap também deixa `app.prev-manual-*`. A desinstalação remove
+   esses diretórios, mas durante a operação eles acumulam. Monitore o disco.
 
 6. **Hashes do manifesto vazios.**
    `manifesto.json` tem `sha256: ""` para Node, NSSM e VC++; Caddy/Git usam "latest" quando
@@ -880,19 +977,15 @@ corrigidas no `RUN-20261102-20` e não aparecem mais aqui.
    A fase 5 e o `smoke.ps1` testam `https://<hostname>/login`; os scripts não criam entrada
    em `hosts` nem registro DNS. Sem resolução, a instalação falha no fim.
 
-9. **A porta 2019 (admin do Caddy) não é verificada.**
-   A pré-checagem cobre 3306/3000/80/443. Se a 2019 estiver ocupada, o Caddy e o
-   `caddy trust` podem falhar.
+9. **`db push` não é migration.**
+   O `atualizar.ps1` aplica `prisma db push` e roda `db:seed` em toda atualização. Mudanças
+   destrutivas podem exigir `--accept-data-loss`/SQL revisado e scripts de preparação; o
+   caminho alvo é SQL revisado em releases futuras.
 
-10. **`db push` não é migration.**
-    O `atualizar.ps1` aplica `prisma db push` e roda `db:seed` em toda atualização. Mudanças
-    destrutivas podem exigir `--accept-data-loss`/SQL revisado e scripts de preparação; o
-    caminho alvo é SQL revisado em releases futuras.
-
-11. **A desinstalação preserva a CA no trust store.**
-    `desinstalar.ps1` remove `C:\ProgramData\Caddy`, mas preserva
-    `C:\ProgramData\Nexus\caddy` e não remove o certificado raiz da Caddy do repositório de
-    confiança do Windows. Para remoção total, exclua-o manualmente (§13).
+10. **A desinstalação preserva a CA no trust store.**
+    `desinstalar.ps1` remove `C:\ProgramData\Nexus\caddy` (inclusive os arquivos da CA),
+    mas não remove o certificado raiz da Caddy do repositório de confiança do Windows. Para
+    remoção total, exclua-o manualmente (§13).
 
 ---
 
@@ -905,6 +998,7 @@ corrigidas no `RUN-20261102-20` e não aparecem mais aqui.
 | MySQL | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) |
 | atualização | [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) |
 | backup | [`backup.ps1`](../../deploy/windows/backup.ps1) |
+| reinício | [`restart.ps1`](../../deploy/windows/restart.ps1) |
 | validação | [`smoke.ps1`](../../deploy/windows/smoke.ps1) e [`src/app/api/health/route.ts`](../../src/app/api/health/route.ts) |
 | uploads | [`src/lib/uploads.ts`](../../src/lib/uploads.ts) |
 | bandeja | [`deploy/windows/NexusTray/`](../../deploy/windows/NexusTray/) |
