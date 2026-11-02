@@ -6,6 +6,7 @@ const ISSUER = "nexus";
 const AUDIENCE = "nexus-web";
 
 const publicRoutes = [
+  "/api/health",
   "/login",
   "/primeiro-acesso",
   "/definir-senha",
