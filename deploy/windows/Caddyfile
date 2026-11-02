@@ -1,9 +1,13 @@
+{
+	admin off
+}
+
 __HOSTNAME__ {
 	tls internal
 	encode zstd gzip
 	reverse_proxy 127.0.0.1:3000
 	log {
-		output file C:\ProgramData\Caddy\logs\access.log {
+		output file C:\ProgramData\Nexus\caddy\logs\access.log {
 			roll_size 10MiB
 			roll_keep 5
 		}

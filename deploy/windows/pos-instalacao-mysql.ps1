@@ -117,6 +117,7 @@ if (-not (Test-Path -LiteralPath $configBackups)) {
 }
 $myIniBackup = Join-Path $configBackups ("my.ini-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".bak")
 Copy-Item -LiteralPath $myIni -Destination $myIniBackup -Force
+Protect-File -Path $myIniBackup
 Write-Ok "Backup do my.ini: $myIniBackup"
 
 $encoding = [System.Text.Encoding]::Default
@@ -178,8 +179,9 @@ try {
         "default-character-set=utf8mb4",
         ""
     )
-    Write-Utf8NoBom -Path $rootCnf -Lines $rootLines
+    Write-Utf8NoBom -Path $rootCnf -Lines @("")
     Protect-File -Path $rootCnf
+    Write-Utf8NoBom -Path $rootCnf -Lines $rootLines
 
     $sql = @"
 CREATE DATABASE IF NOT EXISTS nexus_prod CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -188,8 +190,9 @@ ALTER USER 'nexus_app'@'localhost' IDENTIFIED BY '$appPlain';
 GRANT ALL PRIVILEGES ON nexus_prod.* TO 'nexus_app'@'localhost';
 FLUSH PRIVILEGES;
 "@
-    Write-Utf8NoBom -Path $sqlFile -Lines @($sql)
+    Write-Utf8NoBom -Path $sqlFile -Lines @("")
     Protect-File -Path $sqlFile
+    Write-Utf8NoBom -Path $sqlFile -Lines @($sql)
 
     $rootArgs = "--defaults-extra-file=`"$rootCnf`" --protocol=TCP -h 127.0.0.1 -P 3306 --default-character-set=utf8mb4"
     $process = Start-Process -FilePath $mysqlExe -ArgumentList $rootArgs `
@@ -214,8 +217,9 @@ FLUSH PRIVILEGES;
         "default-character-set=utf8mb4",
         ""
     )
-    Write-Utf8NoBom -Path $appCnf -Lines $appLines
+    Write-Utf8NoBom -Path $appCnf -Lines @("")
     Protect-File -Path $appCnf
+    Write-Utf8NoBom -Path $appCnf -Lines $appLines
 
     $appArgs = "--defaults-extra-file=`"$appCnf`" --protocol=TCP -h 127.0.0.1 -P 3306 -D nexus_prod -e `"SELECT 1;`""
     $appProcess = Start-Process -FilePath $mysqlExe -ArgumentList $appArgs `
@@ -240,3 +244,4 @@ finally {
 }
 
 Write-Ok "MySQL pronto para o Nexus em $Hostname."
+exit 0

@@ -7,7 +7,7 @@
     Verifica os serviços MySQL84/NexusApp/NexusCaddy, o health local com
     db=true, a página https://<hostname>/login e, opcionalmente, a versão.
     Não ignora validação de certificado: o HTTPS exige a CA do Caddy confiada
-    (caddy trust).
+    no repositório do Windows.
 
 .PARAMETER Hostname
     Nome DNS configurado no Caddyfile.
@@ -37,6 +37,35 @@ function Add-Failure {
     $script:failures.Add($Message)
 }
 
+function Test-UsersAce {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    try {
+        $acl = Get-Acl -LiteralPath $Path
+        foreach ($rule in $acl.Access) {
+            $sid = $null
+            if ($rule.IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
+                $sid = $rule.IdentityReference.Value
+            }
+            else {
+                try {
+                    $sid = $rule.IdentityReference.Translate(
+                        [System.Security.Principal.SecurityIdentifier]
+                    ).Value
+                }
+                catch {
+                    $sid = [string]$rule.IdentityReference
+                }
+            }
+            if ($sid -eq "S-1-5-32-545") { return $true }
+        }
+        return $false
+    }
+    catch {
+        # Na dúvida, trate como exposto: o smoke deve falhar.
+        return $true
+    }
+}
+
 Write-Step "Smoke test do Nexus"
 
 foreach ($serviceName in @("MySQL84", "NexusApp", "NexusCaddy")) {
@@ -49,6 +78,37 @@ foreach ($serviceName in @("MySQL84", "NexusApp", "NexusCaddy")) {
         if ($service) { $status = $service.Status.ToString() }
         Write-Warn "${serviceName}: $status."
         Add-Failure "serviço $serviceName não está em execução"
+    }
+}
+
+$aclChecks = @(
+    @{ Path = $script:NexusBackupsDir; Label = "backups"; Recursive = $true },
+    @{ Path = $script:NexusConfigDir; Label = "config"; Recursive = $true },
+    @{ Path = (Join-Path $script:NexusAppDir ".env"); Label = "app\.env"; Recursive = $false }
+)
+foreach ($check in $aclChecks) {
+    if (-not (Test-Path -LiteralPath $check.Path)) {
+        Write-Warn "ACL: $($check.Label) não encontrado em $($check.Path)."
+        Add-Failure "caminho ausente para verificação de ACL: $($check.Label)"
+        continue
+    }
+
+    $paths = @($check.Path)
+    if ($check.Recursive) {
+        $item = Get-Item -LiteralPath $check.Path -Force
+        if ($item.PSIsContainer) {
+            $paths += @(Get-ChildItem -LiteralPath $check.Path -Recurse -Force -ErrorAction SilentlyContinue |
+                ForEach-Object { $_.FullName })
+        }
+    }
+
+    $offenders = @($paths | Where-Object { Test-UsersAce -Path $_ })
+    if ($offenders.Count -gt 0) {
+        Write-Warn "ACL de $($check.Label) contém BUILTIN\Users (S-1-5-32-545): $($offenders -join ', ')."
+        Add-Failure "ACL de $($check.Label) permite BUILTIN\Users"
+    }
+    else {
+        Write-Ok "ACL restrita: $($check.Label)."
     }
 }
 
@@ -66,7 +126,7 @@ if ($public.Ok) {
     Write-Ok "https://$Hostname/login: HTTP 200."
 }
 else {
-    Write-Warn "https://$Hostname/login: falhou (HTTP $($public.StatusCode)). Verifique 'caddy trust', o DNS e o NexusCaddy."
+    Write-Warn "https://$Hostname/login: falhou (HTTP $($public.StatusCode)). Verifique a CA do Caddy, o DNS e o NexusCaddy."
     Add-Failure "HTTPS /login não respondeu 200"
 }
 

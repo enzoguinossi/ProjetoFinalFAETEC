@@ -12,7 +12,10 @@ $script:NexusLogsDir = Join-Path $script:NexusDataDir "logs"
 $script:NexusConfigDir = Join-Path $script:NexusDataDir "config"
 $script:NexusBackupsDir = Join-Path $script:NexusDataDir "backups"
 $script:NexusUploadsDir = Join-Path $script:NexusDataDir "uploads"
-$script:NexusCaddyLogsDir = "C:\ProgramData\Caddy\logs"
+$script:NexusCaddyDir = Join-Path $script:NexusDataDir "caddy"
+$script:NexusCaddyDataDir = Join-Path $script:NexusCaddyDir "data"
+$script:NexusCaddyConfigDir = Join-Path $script:NexusCaddyDir "config"
+$script:NexusCaddyLogsDir = Join-Path $script:NexusCaddyDir "logs"
 
 $script:NexusTranscriptPath = $null
 $script:NexusTranscriptActive = $false
@@ -294,6 +297,68 @@ function Set-AclReadExecute {
     Set-Acl -LiteralPath $Path -AclObject $acl
 }
 
+function Set-AclRestricted {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string[]]$ModifyIdentities = @(),
+        [string[]]$ReadIdentities = @()
+    )
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Fail "Caminho não encontrado para ACL: $Path"
+    }
+
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer) {
+        $inheritance = [Security.AccessControl.InheritanceFlags]"ContainerInherit, ObjectInherit"
+    }
+    else {
+        $inheritance = [Security.AccessControl.InheritanceFlags]::None
+    }
+
+    $acl = Get-Acl -LiteralPath $Path
+    # Remove a herança de C:\ProgramData e qualquer ACE explícita anterior.
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($rule in @($acl.Access)) {
+        [void]$acl.RemoveAccessRule($rule)
+    }
+
+    $fullIdentities = @("S-1-5-32-544", "S-1-5-18")
+    foreach ($identity in ($fullIdentities | Select-Object -Unique)) {
+        $fullRule = New-Object Security.AccessControl.FileSystemAccessRule -ArgumentList @(
+            (Get-AccessIdentity -Identity $identity),
+            [Security.AccessControl.FileSystemRights]::FullControl,
+            $inheritance,
+            [Security.AccessControl.PropagationFlags]::None,
+            [Security.AccessControl.AccessControlType]::Allow
+        )
+        $acl.AddAccessRule($fullRule)
+    }
+
+    foreach ($identity in ($ModifyIdentities | Where-Object { $_ } | Select-Object -Unique)) {
+        $modifyRule = New-Object Security.AccessControl.FileSystemAccessRule -ArgumentList @(
+            (Get-AccessIdentity -Identity $identity),
+            [Security.AccessControl.FileSystemRights]::Modify,
+            $inheritance,
+            [Security.AccessControl.PropagationFlags]::None,
+            [Security.AccessControl.AccessControlType]::Allow
+        )
+        $acl.AddAccessRule($modifyRule)
+    }
+
+    foreach ($identity in ($ReadIdentities | Where-Object { $_ } | Select-Object -Unique)) {
+        $readRule = New-Object Security.AccessControl.FileSystemAccessRule -ArgumentList @(
+            (Get-AccessIdentity -Identity $identity),
+            [Security.AccessControl.FileSystemRights]::Read,
+            $inheritance,
+            [Security.AccessControl.PropagationFlags]::None,
+            [Security.AccessControl.AccessControlType]::Allow
+        )
+        $acl.AddAccessRule($readRule)
+    }
+
+    Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Protect-File {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -372,11 +437,12 @@ function Set-EnvFile {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$Key,
-        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value,
+        [string[]]$ReadIdentities = @()
     )
     $output = New-Object System.Collections.Generic.List[string]
     $updated = $false
-    $pattern = "^\\s*" + [regex]::Escape($Key) + "\\s*="
+    $pattern = '^\s*' + [regex]::Escape($Key) + '\s*='
 
     if (Test-Path -LiteralPath $Path) {
         foreach ($line in [System.IO.File]::ReadAllLines($Path)) {
@@ -399,8 +465,14 @@ function Set-EnvFile {
     if ($parent -and -not (Test-Path -LiteralPath $parent)) {
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
     }
-    $encoding = New-Object System.Text.UTF8Encoding -ArgumentList $false
-    [System.IO.File]::WriteAllLines($Path, [string[]]$output.ToArray(), $encoding)
+
+    # O arquivo nasce vazio e protegido; o conteúdo (que pode ter segredo) só
+    # é gravado depois da ACL restrita.
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Utf8NoBom -Path $Path -Lines @("")
+    }
+    Protect-File -Path $Path -ReadIdentities $ReadIdentities
+    Write-Utf8NoBom -Path $Path -Lines ([string[]]$output.ToArray())
 }
 
 function Get-CnfValue {

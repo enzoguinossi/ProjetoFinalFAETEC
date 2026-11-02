@@ -7,11 +7,12 @@
     Para e remove os serviços NexusApp e NexusCaddy, remove as tarefas NexusTray
     e NexusBackup, encerra a bandeja e apaga C:\Program Files\Nexus\app,
     C:\Program Files\Nexus\NexusTray, C:\Program Files\Nexus\caddy,
-    C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts e
-    C:\ProgramData\Caddy.
+    C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts,
+    C:\ProgramData\Nexus\caddy e, se existir, C:\ProgramData\Caddy.
 
-    C:\ProgramData\Nexus é PRESERVADO: banco, uploads, configuração, backups e
-    logs continuam intactos. MySQL, Node.js e Git não são desinstalados.
+    C:\ProgramData\Nexus é PRESERVADO (banco, uploads, configuração, backups e
+    logs), exceto o subdiretório caddy, que é removido. MySQL, Node.js e Git
+    não são desinstalados.
 #>
 [CmdletBinding()]
 param()
@@ -21,6 +22,7 @@ $ErrorActionPreference = "Stop"
 $ProgramRoot = "C:\Program Files\Nexus"
 $DataRoot = "C:\ProgramData\Nexus"
 $LogsDir = Join-Path $DataRoot "logs"
+$NexusCaddyData = Join-Path $DataRoot "caddy"
 $CaddyData = "C:\ProgramData\Caddy"
 $NssmExe = Join-Path $ProgramRoot "tools\nssm\nssm.exe"
 $ScExe = Join-Path $env:SystemRoot "System32\sc.exe"
@@ -212,9 +214,10 @@ try {
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "scripts") -Label "Scripts de operação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "app") -Label "Aplicação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusTray") -Label "Bandeja"
-    Remove-NexusDirectory -Path $CaddyData -Label "Dados do Caddy"
+    Remove-NexusDirectory -Path $NexusCaddyData -Label "Dados do Caddy (Nexus)"
+    Remove-NexusDirectory -Path $CaddyData -Label "Dados legados do Caddy"
 
-    Write-Log "C:\ProgramData\Nexus preservado (banco, uploads, configuração, backups e logs)."
+    Write-Log "C:\ProgramData\Nexus preservado (exceto caddy): banco, uploads, configuração, backups e logs."
     Write-Log "MySQL, Node.js e Git não foram desinstalados."
 
     if ($script:Failures -gt 0) {

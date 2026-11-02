@@ -63,6 +63,9 @@ $LogsDir = $script:NexusLogsDir
 $ConfigDir = $script:NexusConfigDir
 $BackupsDir = $script:NexusBackupsDir
 $UploadsDir = $script:NexusUploadsDir
+$CaddyDataDir = $script:NexusCaddyDataDir
+$CaddyConfigDir = $script:NexusCaddyConfigDir
+$CaddyLogsDir = $script:NexusCaddyLogsDir
 $CaddyDir = Join-Path $ProgramRoot "caddy"
 $NssmDir = Join-Path $ProgramRoot "tools\nssm"
 $NssmExe = Join-Path $NssmDir "nssm.exe"
@@ -167,7 +170,8 @@ function Set-NexusService {
         [Parameter(Mandatory = $true)][string]$Stdout,
         [Parameter(Mandatory = $true)][string]$Stderr,
         [Parameter(Mandatory = $true)][string]$Description,
-        [string]$DependOnService = ""
+        [string]$DependOnService = "",
+        [string]$ObjectName = "NT AUTHORITY\NetworkService"
     )
 
     $existing = Get-Service -Name $Name -ErrorAction SilentlyContinue
@@ -188,7 +192,7 @@ function Set-NexusService {
     Invoke-Nssm -Arguments @("set", $Name, "AppDirectory", $Directory)
     $envArguments = @("set", $Name, "AppEnvironmentExtra") + $Environment
     Invoke-Nssm -Arguments $envArguments
-    Invoke-Nssm -Arguments @("set", $Name, "ObjectName", "NT AUTHORITY\NetworkService")
+    Invoke-Nssm -Arguments @("set", $Name, "ObjectName", $ObjectName)
     Invoke-Nssm -Arguments @("set", $Name, "Start", "SERVICE_AUTO_START")
     Invoke-Nssm -Arguments @("set", $Name, "AppStdout", $Stdout)
     Invoke-Nssm -Arguments @("set", $Name, "AppStderr", $Stderr)
@@ -232,8 +236,11 @@ function Write-BackupCnf {
         "default-character-set=utf8mb4",
         ""
     )
-    Write-Utf8NoBom -Path $BackupCnf -Lines $lines
+    if (-not (Test-Path -LiteralPath $BackupCnf)) {
+        Write-Utf8NoBom -Path $BackupCnf -Lines @("")
+    }
     Protect-File -Path $BackupCnf
+    Write-Utf8NoBom -Path $BackupCnf -Lines $lines
 }
 
 try {
@@ -462,12 +469,18 @@ try {
                     -RootPassword $rootSecure `
                     -AppPassword $appSecure `
                     -Hostname $Hostname
-                Write-BackupCnf -Password $appPlain
+                $mysqlSetupCode = $LASTEXITCODE
+                if ($mysqlSetupCode -eq 0) {
+                    Write-BackupCnf -Password $appPlain
+                }
             }
             finally {
                 Resume-Transcript
                 $rootPlain = $null
                 $appPlain = $null
+            }
+            if ($mysqlSetupCode -ne 0) {
+                Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
             }
             Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
         }
@@ -492,11 +505,10 @@ try {
             (Join-Path $BackupsDir "uploads"),
             (Join-Path $BackupsDir "config"),
             $UploadsDir,
-            (Join-Path $DataDir "caddy"),
-            (Join-Path $DataDir "caddy\data"),
-            (Join-Path $DataDir "caddy\config"),
-            (Split-Path -Parent $script:NexusCaddyLogsDir),
-            $script:NexusCaddyLogsDir
+            $script:NexusCaddyDir,
+            $CaddyDataDir,
+            $CaddyConfigDir,
+            $CaddyLogsDir
         )) {
             if (-not (Test-Path -LiteralPath $dir)) {
                 New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -574,9 +586,9 @@ try {
         $oldXdgData = $env:XDG_DATA_HOME
         $oldXdgConfig = $env:XDG_CONFIG_HOME
         $oldAppData = $env:APPDATA
-        $env:XDG_DATA_HOME = Join-Path $DataDir "caddy\data"
-        $env:XDG_CONFIG_HOME = Join-Path $DataDir "caddy\config"
-        $env:APPDATA = Join-Path $DataDir "caddy\data"
+        $env:XDG_DATA_HOME = $CaddyDataDir
+        $env:XDG_CONFIG_HOME = $CaddyConfigDir
+        $env:APPDATA = $CaddyDataDir
         try {
             & $CaddyExe validate --config $Caddyfile --adapter caddyfile
             $caddyValidateCode = $LASTEXITCODE
@@ -591,26 +603,32 @@ try {
         }
         Write-Ok "Caddyfile gerado para $Hostname."
 
-        # NETWORK SERVICE precisa escrever dados/logs e ler a instalação.
+        # ACLs restritas: nada herda Users de C:\ProgramData.
         Set-AclReadExecute -Path $ProgramRoot
-        Set-AclModify -Path $DataDir
+        Set-AclReadExecute -Path $ProgramRoot -Identity "S-1-5-19"
+        Set-AclRestricted -Path $DataDir
+        Set-AclRestricted -Path $UploadsDir -ModifyIdentities @("S-1-5-20")
+        Set-AclRestricted -Path $LogsDir -ModifyIdentities @("S-1-5-20")
+        Set-AclRestricted -Path $ConfigDir
+        Set-AclRestricted -Path $BackupsDir
         foreach ($dir in @(
-            $LogsDir,
-            $ConfigDir,
-            $BackupsDir,
             (Join-Path $BackupsDir "db"),
             (Join-Path $BackupsDir "uploads"),
-            (Join-Path $BackupsDir "config"),
-            $UploadsDir,
-            (Join-Path $DataDir "caddy"),
-            (Join-Path $DataDir "caddy\data"),
-            (Join-Path $DataDir "caddy\config"),
-            (Split-Path -Parent $script:NexusCaddyLogsDir),
-            $script:NexusCaddyLogsDir
+            (Join-Path $BackupsDir "config")
         )) {
-            Set-AclModify -Path $dir
+            Set-AclRestricted -Path $dir
         }
-        Write-Ok "ACLs aplicadas em $DataDir e $ProgramRoot."
+        foreach ($dir in @(
+            $script:NexusCaddyDir,
+            $CaddyDataDir,
+            $CaddyConfigDir,
+            $CaddyLogsDir
+        )) {
+            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
+        }
+        # O serviço LocalService do Caddy precisa ler o arquivo de configuração.
+        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
+        Write-Ok "ACLs restritas aplicadas em $DataDir e $ProgramRoot."
 
         $appEnv = Join-Path $AppDir ".env"
         if (Test-Path -LiteralPath $appEnv) {
@@ -683,14 +701,14 @@ try {
                 Fail "Senha de nexus_app não encontrada em $BackupCnf. Refaça a fase 2."
             }
 
-            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:3306/nexus_prod"' -f $appPassword)
-            Set-EnvFile -Path $envPath -Key "UPLOADS_DIR" -Value $UploadsDir
-            Set-EnvFile -Path $envPath -Key "NODE_ENV" -Value "production"
-            Set-EnvFile -Path $envPath -Key "PORT" -Value "3000"
+            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:3306/nexus_prod"' -f $appPassword) -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $envPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $envPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $envPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
             $jwtSecret = Get-EnvValue -Path $envPath -Key "JWT_SECRET"
             if (-not $jwtSecret) {
                 $jwtSecret = New-RandomSecret -Bytes 48
-                Set-EnvFile -Path $envPath -Key "JWT_SECRET" -Value ('"{0}"' -f $jwtSecret)
+                Set-EnvFile -Path $envPath -Key "JWT_SECRET" -Value ('"{0}"' -f $jwtSecret) -ReadIdentities @("S-1-5-20")
                 $generatedJwt = $true
             }
         }
@@ -760,13 +778,11 @@ try {
             Fail "O binário do Next não foi encontrado em $nextBin. Refaça a fase 4."
         }
 
-        $caddyData = Join-Path $DataDir "caddy\data"
-        $caddyConfig = Join-Path $DataDir "caddy\config"
-        foreach ($dir in @($caddyData, $caddyConfig, (Split-Path -Parent $script:NexusCaddyLogsDir), $script:NexusCaddyLogsDir)) {
+        foreach ($dir in @($script:NexusCaddyDir, $CaddyDataDir, $CaddyConfigDir, $CaddyLogsDir)) {
             if (-not (Test-Path -LiteralPath $dir)) {
                 New-Item -ItemType Directory -Force -Path $dir | Out-Null
             }
-            Set-AclModify -Path $dir
+            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
         }
 
         # AppDirectory é o diretório da aplicação; por isso o caminho do Next pode
@@ -797,15 +813,16 @@ try {
             -Parameters $caddyParameters `
             -Directory $CaddyDir `
             -Environment @(
-                "XDG_DATA_HOME=$caddyData",
-                "XDG_CONFIG_HOME=$caddyConfig",
-                "APPDATA=$caddyData"
+                "XDG_DATA_HOME=$CaddyDataDir",
+                "XDG_CONFIG_HOME=$CaddyConfigDir",
+                "APPDATA=$CaddyDataDir"
             ) `
-            -Stdout (Join-Path $LogsDir "caddy.out.log") `
-            -Stderr (Join-Path $LogsDir "caddy.err.log") `
+            -Stdout (Join-Path $CaddyLogsDir "caddy.out.log") `
+            -Stderr (Join-Path $CaddyLogsDir "caddy.err.log") `
             -Description "Nexus - proxy HTTPS (Caddy)" `
-            -DependOnService "NexusApp"
-        Write-Ok "Serviço NexusCaddy configurado (NT AUTHORITY\NetworkService)."
+            -DependOnService "NexusApp" `
+            -ObjectName "NT AUTHORITY\LocalService"
+        Write-Ok "Serviço NexusCaddy configurado (NT AUTHORITY\LocalService)."
 
         $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
         if (-not $appService -or $appService.Status.ToString() -ne "Running") {
@@ -827,35 +844,26 @@ try {
             Start-Service -Name "NexusCaddy"
         }
         if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Running" -TimeoutSeconds 60)) {
-            Fail "O serviço NexusCaddy não iniciou. Veja $LogsDir\caddy.err.log."
+            Fail "O serviço NexusCaddy não iniciou. Veja $CaddyLogsDir\caddy.err.log."
         }
         Write-Ok "NexusCaddy em execução."
 
-        # O `caddy trust` conversa com a API administrativa (localhost:2019) para
-        # obter a CA; por isso roda depois de o serviço estar em execução.
-        $oldXdgData = $env:XDG_DATA_HOME
-        $oldXdgConfig = $env:XDG_CONFIG_HOME
-        $oldAppData = $env:APPDATA
-        $env:XDG_DATA_HOME = $caddyData
-        $env:XDG_CONFIG_HOME = $caddyConfig
-        $env:APPDATA = $caddyData
-        try {
-            Write-Ok "Instalando a CA interna do Caddy no repositório de confiança do Windows..."
-            $trustCode = 1
-            for ($attempt = 1; $attempt -le 15; $attempt++) {
-                & $CaddyExe trust
+        # Com `admin off` não há API administrativa para o `caddy trust`; a CA
+        # local é lida do data dir e instalada diretamente no repositório do Windows.
+        $certUtil = Join-Path $env:SystemRoot "System32\certutil.exe"
+        $rootCert = Join-Path $CaddyDataDir "caddy\pki\authorities\local\root.crt"
+        Write-Ok "Instalando a CA interna do Caddy no repositório de confiança do Windows..."
+        $trustCode = 1
+        for ($attempt = 1; $attempt -le 30; $attempt++) {
+            if (Test-Path -LiteralPath $rootCert) {
+                & $certUtil -addstore -f Root $rootCert | Out-Null
                 $trustCode = $LASTEXITCODE
                 if ($trustCode -eq 0) { break }
-                Start-Sleep -Seconds 2
             }
-        }
-        finally {
-            if ($oldXdgData) { $env:XDG_DATA_HOME = $oldXdgData } else { Remove-Item Env:XDG_DATA_HOME -ErrorAction SilentlyContinue }
-            if ($oldXdgConfig) { $env:XDG_CONFIG_HOME = $oldXdgConfig } else { Remove-Item Env:XDG_CONFIG_HOME -ErrorAction SilentlyContinue }
-            if ($oldAppData) { $env:APPDATA = $oldAppData } else { Remove-Item Env:APPDATA -ErrorAction SilentlyContinue }
+            Start-Sleep -Seconds 2
         }
         if ($trustCode -ne 0) {
-            Fail "caddy trust falhou. O HTTPS não será confiável até a CA ser instalada."
+            Fail "Não foi possível instalar a CA interna do Caddy em $rootCert. Verifique $CaddyLogsDir\caddy.err.log."
         }
         Write-Ok "CA interna confiada pelo Windows."
 
@@ -868,7 +876,7 @@ try {
             } while (-not $https.Ok -and (Get-Date) -lt $deadline)
         }
         if (-not $https.Ok) {
-            Fail "HTTPS https://$Hostname/login não respondeu 200 após o caddy trust. Verifique DNS/certificado."
+            Fail "HTTPS https://$Hostname/login não respondeu 200 após confiar na CA do Caddy. Verifique DNS/certificado."
         }
         Write-Ok "HTTPS https://$Hostname/login OK."
 
