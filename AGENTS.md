@@ -557,7 +557,7 @@ aplica RN001 e o bloqueio por inventário, e grava `pedido.ID_nota_saida` na mes
 Nenhuma nota de entrada ou saída aceita produto duplicado (`@@unique` + serviço).
 
 Lista e relatório (`/relatorios/pedidos`) filtram por escola, status, período, produto e
-**Nota com/sem/todas**; o relatório usa o layout ampliado A4 paisagem e CSV. **O módulo de
+**Nota com/sem/todas**; o relatório usa A4 retrato e CSV. **O módulo de
 Pedidos não usa Figma/`data-figma`** (decisão do usuário).
 
 No release de produção, antes do `db push` das uniques, rode `npm run db:dedupe-notas`

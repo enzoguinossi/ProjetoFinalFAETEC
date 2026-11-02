@@ -736,8 +736,7 @@ Regras:
 - Pedido RECUSADO não gera nota. Não há desativação/exclusão de pedido (sem `ativo`)
 - Lista e relatório têm busca/filtros por **escola, status, período, produto e com/sem nota**;
   o filtro **Nota** aceita com/sem/todas (vazio ou ambos = todos). O relatório “Pedidos por
-  escola” usa o layout ampliado A4 paisagem e CSV. O layout é reutilizável; os demais
-  relatórios adotam depois (fora deste run)
+  escola” usa A4 retrato e CSV, como os demais relatórios
 - `/pedidos` é acessível por **qualquer** permissão do módulo (`listar`, `consultar`, `criar`,
   `alterar`, `aprovar`); cada ação (criar/editar/aprovar/recusar) é exibida e autorizada
   conforme a permissão correspondente, e a importação na Saída exige `nota_saida.criar`
@@ -1247,9 +1246,8 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 **Fotos nos relatórios:** Produtos, Funcionários, Entregas e Expedições têm o checkbox opcional
 **“Listar fotos”** (`?fotos=1`). Ele adiciona a coluna de miniaturas na tela/PDF (as imagens
 abrem em nova aba; acima de 3–4 fotos a linha mostra `+N`) e a coluna de URL no CSV. Em
-**Entregas** acrescenta também a **justificativa** da última não entrega. Entregas e Expedições
-usam o layout ampliado A4 paisagem (`RelatorioAmpliado`); Produtos e Funcionários seguem em A4
-retrato. O relatório de Produtos mostra **a foto atual** (anexo ativo mais recente).
+**Entregas** acrescenta também a **justificativa** da última não entrega. Todos os relatórios
+usam A4 retrato. O relatório de Produtos mostra **a foto atual** (anexo ativo mais recente).
 
 ---
 
