@@ -34,6 +34,7 @@ internal sealed class TrayApp : ApplicationContext
     private TrayState? _iconState;
     private TrayState? _lastState;
     private bool _polling;
+    private bool _restarting;
     private bool _disposed;
 
     public TrayApp(TrayConfig config)
@@ -47,7 +48,7 @@ internal sealed class TrayApp : ApplicationContext
         openItem.Click += (_, _) => OpenUrl(_config.BaseUrl);
 
         ToolStripMenuItem restartItem = new("Reiniciar aplicação");
-        restartItem.Click += (_, _) => RestartService();
+        restartItem.Click += async (_, _) => await RestartServiceAsync();
 
         ToolStripMenuItem logsItem = new("Abrir logs");
         logsItem.Click += (_, _) => OpenFolder(_config.LogsDir, "logs");
@@ -349,26 +350,71 @@ internal sealed class TrayApp : ApplicationContext
         }
     }
 
-    private void RestartService()
+    private async Task RestartServiceAsync()
     {
+        if (_restarting)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_config.RestartScript) || !File.Exists(_config.RestartScript))
+        {
+            ShowBalloon(
+                "Reinício não configurado",
+                $"O script de reinício não foi encontrado: {_config.RestartScript}",
+                ToolTipIcon.Error);
+            return;
+        }
+
+        _restarting = true;
         try
         {
-            ProcessStartInfo startInfo = new(_config.NssmPath)
+            ProcessStartInfo startInfo = new(GetPowerShellPath())
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 WindowStyle = ProcessWindowStyle.Hidden
             };
-            startInfo.ArgumentList.Add("restart");
-            startInfo.ArgumentList.Add(_config.ServiceName);
+            startInfo.ArgumentList.Add("-NoProfile");
+            startInfo.ArgumentList.Add("-ExecutionPolicy");
+            startInfo.ArgumentList.Add("Bypass");
+            startInfo.ArgumentList.Add("-File");
+            startInfo.ArgumentList.Add(_config.RestartScript);
 
-            Process.Start(startInfo);
-            ShowBalloon("Nexus", "Reiniciando o serviço…", ToolTipIcon.Info);
-            _ = PollAfterAsync(TimeSpan.FromSeconds(6));
+            using Process? process = Process.Start(startInfo);
+            if (process is null)
+            {
+                ShowBalloon(
+                    "Falha ao reiniciar",
+                    "Não foi possível iniciar o script de reinício.",
+                    ToolTipIcon.Error);
+                return;
+            }
+
+            ShowBalloon("Nexus", "Reiniciando a aplicação…", ToolTipIcon.Info);
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0)
+            {
+                ShowBalloon("Nexus", "Aplicação reiniciada com sucesso.", ToolTipIcon.Info);
+            }
+            else
+            {
+                ShowBalloon(
+                    "Falha ao reiniciar",
+                    $"O script terminou com código {process.ExitCode}. Veja os logs.",
+                    ToolTipIcon.Error);
+            }
+
+            _ = PollAfterAsync(TimeSpan.FromSeconds(2));
         }
         catch (Exception ex)
         {
-            ShowBalloon("Não foi possível reiniciar", ex.Message, ToolTipIcon.Error);
+            ShowBalloon("Falha ao reiniciar", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            _restarting = false;
         }
     }
 

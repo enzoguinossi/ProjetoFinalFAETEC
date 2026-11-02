@@ -688,6 +688,22 @@ try {
             Fail "A aplicação não foi encontrada em $AppDir após o clone."
         }
 
+        $healthRoute = Join-Path $AppDir "src\app\api\health\route.ts"
+        if (-not (Test-Path -LiteralPath $healthRoute)) {
+            Fail "A tag $Tag não contém src/app/api/health/route.ts; gere a release do KAN-170 e atualize o manifesto."
+        }
+        try {
+            $packageInfo = Get-Content -LiteralPath (Join-Path $AppDir "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        catch {
+            Fail "Não foi possível ler o package.json da tag $Tag`: $($_.Exception.Message)"
+        }
+        $expectedTagVersion = $Tag -replace '^v', ''
+        if ([string]$packageInfo.version -ne $expectedTagVersion) {
+            Fail "A versão do package.json da tag $Tag é '$([string]$packageInfo.version)', esperada '$expectedTagVersion'. Gere a release do KAN-170 e atualize o manifesto."
+        }
+        Write-Ok "Tag $Tag contém /api/health e versão $expectedTagVersion."
+
         $envPath = Join-Path $AppDir ".env"
         $appPassword = $null
         $jwtSecret = $null
@@ -896,9 +912,17 @@ try {
         }
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "backup.ps1") -Destination (Join-Path $scriptsDir "backup.ps1") -Force
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "common.ps1") -Destination (Join-Path $scriptsDir "common.ps1") -Force
+        $restartScriptSource = Join-Path $PSScriptRoot "restart.ps1"
+        if (Test-Path -LiteralPath $restartScriptSource -PathType Leaf) {
+            Copy-Item -LiteralPath $restartScriptSource -Destination (Join-Path $scriptsDir "restart.ps1") -Force
+        }
+        else {
+            Write-Warn "restart.ps1 não encontrado em $restartScriptSource; o reinício pela bandeja ficará indisponível."
+        }
         Set-AclReadExecute -Path $scriptsDir
 
         $backupScript = Join-Path $scriptsDir "backup.ps1"
+        $restartScript = Join-Path $scriptsDir "restart.ps1"
         $backupAction = New-ScheduledTaskAction -Execute $PsExe `
             -Argument ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -RetentionDays 30' -f $backupScript)
         $backupTrigger = New-ScheduledTaskTrigger -Daily -At "02:00"
@@ -951,6 +975,7 @@ try {
                     logsDir      = $LogsDir
                     dataDir      = $DataDir
                     backupScript = $backupScript
+                    restartScript = $restartScript
                 }
                 Write-Utf8NoBom -Path $trayJsonPath -Lines @(($trayConfig | ConvertTo-Json -Depth 3))
                 Set-AclReadExecute -Path $trayDir

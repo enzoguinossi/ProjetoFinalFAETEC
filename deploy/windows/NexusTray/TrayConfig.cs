@@ -18,6 +18,7 @@ internal sealed class TrayConfig
     private const string DefaultLogsDir = @"C:\ProgramData\Nexus\logs";
     private const string DefaultDataDir = @"C:\ProgramData\Nexus";
     private const string DefaultBackupScript = @"C:\Program Files\Nexus\scripts\backup.ps1";
+    private const string DefaultRestartScript = @"C:\Program Files\Nexus\scripts\restart.ps1";
 
     public string BaseUrl { get; init; } = DefaultBaseUrl;
 
@@ -32,6 +33,8 @@ internal sealed class TrayConfig
     public string DataDir { get; init; } = DefaultDataDir;
 
     public string BackupScript { get; init; } = DefaultBackupScript;
+
+    public string RestartScript { get; init; } = DefaultRestartScript;
 
     public static TrayConfig Load()
     {
@@ -59,7 +62,8 @@ internal sealed class TrayConfig
                 NssmPath = Pick(file.NssmPath, defaults.NssmPath),
                 LogsDir = Pick(file.LogsDir, defaults.LogsDir),
                 DataDir = Pick(file.DataDir, defaults.DataDir),
-                BackupScript = Pick(file.BackupScript, defaults.BackupScript)
+                BackupScript = Pick(file.BackupScript, defaults.BackupScript),
+                RestartScript = Pick(file.RestartScript, defaults.RestartScript)
             };
         }
         catch (Exception)
@@ -95,5 +99,8 @@ internal sealed class TrayConfig
 
         [JsonPropertyName("backupScript")]
         public string? BackupScript { get; set; }
+
+        [JsonPropertyName("restartScript")]
+        public string? RestartScript { get; set; }
     }
 }
