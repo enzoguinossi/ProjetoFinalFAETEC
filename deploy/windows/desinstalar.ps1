@@ -9,6 +9,8 @@
     C:\Program Files\Nexus\NexusTray, C:\Program Files\Nexus\caddy,
     C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts,
     C:\ProgramData\Nexus\caddy e, se existir, C:\ProgramData\Caddy.
+    Também remove as versões antigas app.prev-*, app.failed-* e
+    app.prev-manual-* em C:\Program Files\Nexus.
 
     C:\ProgramData\Nexus é PRESERVADO (banco, uploads, configuração, backups e
     logs), exceto o subdiretório caddy, que é removido. MySQL, Node.js e Git
@@ -208,6 +210,17 @@ try {
 
     Remove-NexusService -Name "NexusCaddy"
     Remove-NexusService -Name "NexusApp"
+
+    if ($script:Failures -gt 0) {
+        Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray e versões antigas serão preservados."
+        Write-Log "C:\ProgramData\Nexus preservado."
+        exit 1
+    }
+
+    # Versões deixadas pelo atualizador (app.prev-*, app.failed-*, app.prev-manual-*).
+    Get-ChildItem -LiteralPath $ProgramRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "app.prev-*" -or $_.Name -like "app.failed-*" -or $_.Name -like "app.prev-manual-*" } |
+        ForEach-Object { Remove-NexusDirectory -Path $_.FullName -Label ("Versão antiga " + $_.Name) }
 
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "caddy") -Label "Caddy"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "tools") -Label "Ferramentas (NSSM)"

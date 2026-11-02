@@ -122,8 +122,9 @@ export async function processarImagemDoFormulario(
 }
 
 /**
- * Grava o buffer WEBP em `public/uploads/{pasta}/{nome}.webp` e devolve o
- * caminho público relativo. `pasta` é relativa a `public/uploads`
+ * Grava o buffer WEBP em `UPLOADS_DIR/{pasta}/{nome}.webp` (ou em
+ * `public/uploads/{pasta}/{nome}.webp` quando `UPLOADS_DIR` não está definido)
+ * e devolve o caminho público relativo. `pasta` é relativa à raiz de uploads
  * (ex.: `produtos/12`, `funcionarios/5`, `entregas/3/8`).
  */
 export async function salvarImagemAnexo(
@@ -157,9 +158,10 @@ export async function salvarImagemAnexo(
 }
 
 /**
- * Remove um arquivo de imagem salvo em `public/uploads`. URLs externas são
- * ignoradas; a ausência do arquivo não é erro. Qualquer caminho que resolva
- * fora de `public/uploads` é recusado (proteção contra path traversal).
+ * Remove um arquivo de imagem salvo em `UPLOADS_DIR` (fallback
+ * `public/uploads`). URLs externas são ignoradas; a ausência do arquivo não é
+ * erro. Qualquer caminho que resolva fora da raiz de uploads é recusado
+ * (proteção contra path traversal).
  */
 export async function removerImagemAnexo(url: string | null | undefined): Promise<void> {
   if (!url || !url.startsWith("/uploads/")) return;

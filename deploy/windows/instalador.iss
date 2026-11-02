@@ -49,6 +49,7 @@ Source: "common.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "desinstalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "instalar-gui.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "pos-instalacao-mysql.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "restart.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "smoke.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Caddyfile"; DestDir: "{app}"; Flags: ignoreversion
 Source: "manifesto.json"; DestDir: "{app}"; Flags: ignoreversion
@@ -59,15 +60,6 @@ Source: "NexusTray\dist\NexusTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"
 Name: "{group}\Desinstalar Nexus"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"; Tasks: desktopicon
-
-[UninstallRun]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\desinstalar.ps1"""; RunOnceId: "NexusDesinstalar"; Flags: runhidden
-
-[UninstallDelete]
-; Remove a aplicação e a bandeja instaladas pelo bootstrap.
-; C:\ProgramData\Nexus (banco, uploads, backups, logs) é preservado.
-Type: filesandordirs; Name: "{commonpf}\Nexus\app"
-Type: filesandordirs; Name: "{commonpf}\Nexus\NexusTray"
 
 [Code]
 var
@@ -94,6 +86,8 @@ begin
   if (Value[1] = '.') or (Value[1] = '-') then
     Exit;
   if (Value[Length(Value)] = '.') or (Value[Length(Value)] = '-') then
+    Exit;
+  if (Pos('..', Value) > 0) or (Pos('.-', Value) > 0) or (Pos('-.', Value) > 0) then
     Exit;
   for I := 1 to Length(Value) do
   begin
@@ -165,6 +159,25 @@ begin
     if (not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Cmd, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
     begin
       Message := 'A instalação do Nexus não foi concluída (código ' + IntToStr(ResultCode) + ').';
+      Message := Message + #13#10 + #13#10 + 'Consulte os logs em C:\ProgramData\Nexus\logs antes de tentar novamente.';
+      MsgBox(Message, mbError, MB_OK);
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
+  Cmd: String;
+  Message: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    Cmd := Format('-NoProfile -ExecutionPolicy Bypass -File "%s\desinstalar.ps1"', [ExpandConstant('{app}')]);
+    ResultCode := -1;
+    if (not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Cmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
+    begin
+      Message := 'A desinstalação do Nexus não foi concluída (código ' + IntToStr(ResultCode) + ').';
       Message := Message + #13#10 + #13#10 + 'Consulte os logs em C:\ProgramData\Nexus\logs antes de tentar novamente.';
       MsgBox(Message, mbError, MB_OK);
     end;

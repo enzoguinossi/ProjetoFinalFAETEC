@@ -13,10 +13,11 @@ const TIPOS_POR_EXTENSAO: Record<string, string> = {
 };
 
 /**
- * Serve os uploads gravados em `public/uploads` em runtime (produtos, etc.).
- * O `next start` só serve o `public` existente no momento do build, então arquivos
- * enviados depois ficam 404 sem esta rota. O `proxy.ts` continua exigindo sessão
- * para `/uploads` — a imagem segue protegida.
+ * Serve os uploads gravados em `UPLOADS_DIR` ou, quando a variável não está
+ * definida, em `public/uploads`, em runtime (produtos, etc.). O `next start` só
+ * serve o `public` existente no momento do build, então arquivos enviados depois
+ * ficam 404 sem esta rota. O `proxy.ts` continua exigindo sessão para `/uploads`
+ * — a imagem segue protegida.
  */
 export async function GET(
   _request: Request,

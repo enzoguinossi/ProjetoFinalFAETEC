@@ -48,6 +48,39 @@ if (-not $Tag) { $Tag = "v$Version" }
 $Tag = $Tag.Trim()
 if (-not $Tag) { Fail "Tag vazia. Informe -Tag." }
 
+# Se a tag já existe localmente, garante que ela contém a rota de health exigida
+# pelo bootstrap/update. Tag ausente localmente será validada no clone.
+$git = Get-Command git.exe -ErrorAction SilentlyContinue
+if ($git) {
+    $oldErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $git.Source -C $ScriptRoot rev-parse --is-inside-work-tree *> $null
+        if ($LASTEXITCODE -eq 0) {
+            & $git.Source -C $ScriptRoot rev-parse --verify --quiet ("refs/tags/{0}" -f $Tag) *> $null
+            if ($LASTEXITCODE -eq 0) {
+                & $git.Source -C $ScriptRoot cat-file -e ("{0}:src/app/api/health/route.ts" -f $Tag) 2> $null
+                if ($LASTEXITCODE -ne 0) {
+                    Fail "A tag $Tag existe localmente, mas não contém src/app/api/health/route.ts. Gere a release do KAN-170 e atualize o manifesto."
+                }
+                Write-Host "Tag $Tag contém src/app/api/health/route.ts." -ForegroundColor Green
+            }
+            else {
+                Write-Host "A tag $Tag não existe localmente; a presença de /api/health será conferida no clone." -ForegroundColor Yellow
+            }
+        }
+        else {
+            Write-Host "Não foi possível verificar a tag $Tag no Git local; siga para a compilação." -ForegroundColor Yellow
+        }
+    }
+    finally {
+        $ErrorActionPreference = $oldErrorAction
+    }
+}
+else {
+    Write-Host "Git não encontrado; não foi possível verificar a tag $Tag localmente." -ForegroundColor Yellow
+}
+
 function Test-Iscc {
     param([Parameter(Mandatory = $true)][string]$Path)
     return (Test-Path -LiteralPath $Path -PathType Leaf)

@@ -1,4 +1,4 @@
-# Publica a bandeja do Nexus (self-contained, single-file) em dist\.
+﻿# Publica a bandeja do Nexus (self-contained, single-file) em dist\.
 # Compatível com Windows PowerShell 5.1.
 [CmdletBinding()]
 param(
@@ -22,11 +22,9 @@ function Test-DotnetSdk {
 
 if (-not $Dotnet) {
     $candidates = New-Object System.Collections.Generic.List[string]
-    $onPath = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+    $onPath = Get-Command dotnet -ErrorAction SilentlyContinue
     if ($onPath) { $candidates.Add($onPath.Source) }
     if ($env:USERPROFILE) { $candidates.Add((Join-Path $env:USERPROFILE ".dotnet\dotnet.exe")) }
-    # SDK usado nesta máquina de build (o dotnet do PATH não tem SDK).
-    $candidates.Add("C:\Users\Enzo\.dotnet\dotnet.exe")
 
     foreach ($candidate in $candidates) {
         if ((Test-Path -LiteralPath $candidate) -and (Test-DotnetSdk -Exe $candidate)) {
