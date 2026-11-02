@@ -932,12 +932,27 @@ try {
                 }
                 $trayTarget = Join-Path $trayDir "NexusTray.exe"
                 Copy-Item -LiteralPath $traySource -Destination $trayTarget -Force
+
+                # Configuração da bandeja: caminhos reais desta instalação, sem segredos.
+                $trayJsonPath = Join-Path $trayDir "tray.json"
+                $trayConfig = [ordered]@{
+                    baseUrl      = ("https://{0}" -f $Hostname)
+                    healthUrl    = "http://127.0.0.1:3000/api/health"
+                    serviceName  = "NexusApp"
+                    nssmPath     = $NssmExe
+                    logsDir      = $LogsDir
+                    dataDir      = $DataDir
+                    backupScript = $backupScript
+                }
+                Write-Utf8NoBom -Path $trayJsonPath -Lines @(($trayConfig | ConvertTo-Json -Depth 3))
                 Set-AclReadExecute -Path $trayDir
+                Set-AclReadExecute -Path $trayJsonPath
 
                 $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent().Name
                 $trayAction = New-ScheduledTaskAction -Execute $trayTarget -WorkingDirectory $trayDir
                 $trayTrigger = New-ScheduledTaskTrigger -AtLogOn -User $currentUser
-                $trayPrincipal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
+                # Highest: a bandeja reinicia o serviço via NSSM sem pedir UAC.
+                $trayPrincipal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Highest
                 $traySettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
                 try {
                     Register-ScheduledTask -TaskName "NexusTray" -Action $trayAction -Trigger $trayTrigger `
