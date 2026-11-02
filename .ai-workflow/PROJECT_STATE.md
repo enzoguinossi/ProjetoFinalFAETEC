@@ -1,15 +1,15 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (relatórios em fichas/faixas + auditoria legível,
-> commit `KAN-157`).
+> Última consolidação: 2026-11-02 (release `1.02.11.2026`, tag `v1.02.11.2026`).
 
 ## Objetivo atual
 
 Padronizar todos os relatórios: cadastro em “ficha”, movimentação/extrato por documento/
 produto, auditoria legível com antes/depois e os quatro relatórios restantes em faixas/cartões.
 Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (worktree principal,
-`main`). Esta rodada foi commitada em `KAN-157` (`4bc480d` + `a191f62`, sem push).
+`main`). Rodada entregue na release `1.02.11.2026` (commit `ceccd10`, tag `v1.02.11.2026`),
+publicada em `origin/main`.
 
 ## Entregue (runs `RUN-20261102-01..11`)
 
@@ -56,6 +56,10 @@ Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (work
     instituição + cartão por nota. `BadgeStatus`/`CartaoRegistro` compartilhados;
     `id_destinatario` nas linhas de pedidos/entregas; CSV preservado.
 13. **Sem schema novo**; quantidades seguem sem unidade (AGENTS §8).
+14. **Documentação e release** (runs `RUN-20261102-12/13`): `IMPLEMENTACAO.md` (RF023/RF024)
+    e `docs/relatorios/README.md` alinhados ao código; `A4 paisagem`/`RelatorioAmpliado`
+    removidos do código, docs e AGENTS (o sistema só gera A4 retrato); release
+    `1.02.11.2026` no `CHANGELOG.md` e `package.json`; tag `v1.02.11.2026`.
 
 ## Verificação
 
@@ -65,8 +69,10 @@ Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (work
   `tests/dao/relatorio.test.ts` → 84/84; com auditoria e vencimento → **118/118** em 6
   arquivos. (`npm test` padrão continua bloqueado pelo `prisma db push` do `globalSetup` sob
   agente; suíte completa rodou 497/497 com o push desligado.)
-- Commits `KAN-157`: `4bc480d` (relatórios em fichas/faixas + auditoria) e `a191f62`
-  (seed de movimentações). Sem push.
+- Commits `KAN-157`: `4bc480d` (relatórios em fichas/faixas + auditoria), `a191f62`
+  (seed de movimentações), `dbf4198` (estado), `45d3b22` (implementação), `0be8d21`
+  (remoção do A4 paisagem), `759964e` (docs) e `ceccd10` (release). `main` e a tag
+  `v1.02.11.2026` publicados em `origin`.
 - Seed de movimentações executado no `nexus`; conferência independente: 12 produtos,
   3 notas de entrada, 9 pedidos/remessas/expedições e **3 entradas + 3 saídas por produto**
   (36+36 movimentos), sem divergências; reexecução idempotente.
@@ -86,14 +92,13 @@ Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (work
 
 ## Pendências
 
-1. **Docs:** atualizar `docs/dominio/IMPLEMENTACAO.md` com o modelo de ficha, as rotas de
-   movimentação/extrato, a auditoria com diff/descrições, os quatro relatórios em faixas e o
-   seed de movimentações.
-2. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
+1. **Worklog KAN-157:** registrar via `addOrEditJiraIssueWorklog` o tempo efetivo informado
+   pelo usuário (a regra do projeto proíbe estimar).
+2. **Comentário no Jira:** só com aprovação prévia do conteúdo.
+3. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
    usuário; o resolvedor de descrições já é reutilizável.
-3. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
+4. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
    (helpers de data/filtros) e trocar os SVGs inline por `lucide-react`.
-4. **Release** `1.xx.xx.2026` + push (aprovação).
 5. **Produção:** backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
    gates, `db push`, build/start/smoke.
 6. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
