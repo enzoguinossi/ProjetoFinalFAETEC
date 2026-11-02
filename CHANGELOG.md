@@ -13,7 +13,37 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [1.02.11.2026] - 2026-11-02
+
+Esta seção consolida os relatórios padronizados (ficha, faixas e cartões), o Extrato de
+Produto em rota própria, a auditoria legível e o seed de movimentações, sobre a base dos
+cadastros repaginados.
+
 ### Added
+- **Relatórios padronizados em ficha, faixas e cartões (KAN-157):** os relatórios de
+  cadastro (produtos, funcionários, destinatários e fornecedores) passaram ao layout
+  **ficha** — banda de identidade com código, descrição e situação, foto quando houver,
+  seções e grade de 4 colunas com todos os códigos personalizados — e os demais ganharam
+  componentes compartilhados (`FichaRelatorio`, `RelatorioCadastro`, `BadgeStatus` e
+  `CartaoRegistro`). **Vencimento** agrupa por urgência (vencidos, hoje, 1–30, 31–60,
+  61–90 e mais de 90 dias) com badge de dias restantes; **Pedidos por Escola** mostra faixa
+  por escola, sub-faixa por pedido com status em badge e itens em linhas; **Expedições por
+  Período** usa faixa por dia e cartão por expedição; **Entregas por Instituição** usa faixa
+  por instituição e cartão por nota, com justificativa e fotos. Todos em A4 retrato, com
+  impressão/PDF e CSV próprios; `id_destinatario` entrou nas linhas de pedidos e entregas
+  para o agrupamento.
+- **Extrato de Produto em rota própria (KAN-157):** `/relatorios/extrato` lista as
+  movimentações por produto (com ou sem produto selecionado — sem filtro, todos os que têm
+  movimento) com saldo anterior/posterior e totais; a Movimentação
+  (`/relatorios/movimentacao`) continua por documento. Cada tela tem a sua exportação CSV.
+- **Auditoria legível (KAN-157):** `/relatorios/auditoria` passou a mostrar o diff
+  estruturado em vez de JSON — campos simples em `antes → depois`, coleções como blocos por
+  item (código + descrição) com **uma linha por atributo alterado**, descrições de
+  entidades e referências resolvidas em lote, `[oculto]` para campos sensíveis e sem diff
+  em `LOGIN`/`LOGOUT`/`LOGIN_FALHA`.
+- **Seed de movimentações dev-only (KAN-157):** `prisma/seed-movimentacoes.ts` +
+  `npm run db:seed:mov` geram entradas, saídas, pedidos, remessas e expedições no banco
+  `nexus` para exercitar os relatórios; aditivo/idempotente e recusado em produção.
 - **Tipos de destinatário CMEI e CMEIA (RUN-20261101-98):** `TipoDestinatario` passou a
   `ESCOLA`, `CRECHE`, `CMEI` e `CMEIA` (rótulos exatos) no schema, tipos, ficha, listagem,
   filtros/relatórios, percursos e seletores de saída. O seed de demonstração ficou com
@@ -42,8 +72,8 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   usa **"entregar agora"** com o delta (default = pendência); o servidor recusa item sem
   pendência, redução do já entregue, item de outra nota e zero sem corte/justificativa.
   **Relatórios:** checkbox opcional **"Listar fotos"** em Produtos, Funcionários, Entregas e
-  Expedições (miniaturas, justificativa em Entregas e URL no CSV), com Entregas/Expedições no
-  layout ampliado A4 paisagem. Uploads de 5 fotos exigem `serverActions.bodySizeLimit =
+  Expedições (miniaturas, justificativa em Entregas e URL no CSV), em A4 retrato. Uploads de
+  5 fotos exigem `serverActions.bodySizeLimit =
   "12mb"` (`next.config.ts`). Cobertura: `tests/services/anexo.test.ts`,
   `tests/app/fotos-cadastro.test.ts` e `tests/services/expedicao.test.ts` (parcial,
   justificativa e duas tentativas).
@@ -63,8 +93,8 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   da importação. Nenhuma nota de entrada/saída aceita produto duplicado
   (`@@unique([id_nota, id_produto])` + serviço). `/pedidos` aceita qualquer permissão do módulo,
   com ações conforme a permissão; lista e relatório `/relatorios/pedidos` filtram
-  escola/status/período/produto e **Nota com/sem/todas**, com layout A4 paisagem reutilizável e
-  CSV. Sem Figma/`data-figma`. Release: `npm run db:dedupe-notas`
+  escola/status/período/produto e **Nota com/sem/todas**, em A4 retrato e CSV. Sem
+  Figma/`data-figma`. Release: `npm run db:dedupe-notas`
   (`scripts/dedupe-itens-nota.ts`) em dry-run por padrão; `--apply` grava backup JSON/auditoria
   e consolida duplicados antes do `db push` das uniques.
 - **Inventário/contagem (RUN-20261026-81/82 e RUN-20261027-83, RF015/RN005):** abertura por
@@ -134,6 +164,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ### Changed
 
+- **Relatórios em A4 retrato (KAN-157):** todos os relatórios — cadastros em ficha,
+  movimentação, extrato, auditoria, vencimento, pedidos, expedições e entregas — usam o shell
+  `RelatorioCadastro` e a folha A4 retrato, com faixas/cartões e sem colunas espremidas. Os
+  helpers `formatarQuantidade`, `contagem` e `montarCsv` centralizam formatação e exportação,
+  e o `ImprimirButton` foi movido para `src/components/relatorios/`.
 - **Estoque achatado em `produto` (RUN-20261026-80):** a tabela/model `estoque` deixou de
   existir. O saldo passa a ser do produto — `produto.saldo` e `produto.saldo_reservado`
   (`FLOAT NOT NULL DEFAULT 0`, saldo desde a criação) —, com
@@ -560,6 +595,4 @@ esteja no banco.
 <!--
 Categorias: Added, Changed, Deprecated, Removed, Fixed, Security.
 Não crie uma versão nova sem cumprir o checklist de release.
-Próximo release: sem data marcada — depende de o sistema ganhar telas para os módulos que
-ficaram fora de 1.17.10.2026 (estoque, notas, remessas e rotas, inventário, mural e relatórios).
 -->
