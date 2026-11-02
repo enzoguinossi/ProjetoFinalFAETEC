@@ -25,9 +25,13 @@ Modelo padronizado em HTML5 e CSS3 para geracao de relatorios operacionais em fo
 | KAN-160 | 5/5 Fornecedores | Fornecedores.html | A fazer |
 | - | Documentacao do modelo | Projeto.html | Referencia |
 
-> O **Extrato de Produto** usa a mesma tela da **Movimentação de Estoque**
-> (`/relatorios/movimentacao`): basta escolher o produto no filtro (equivalente a
-> `?produto=<id>`). O título e o cabeçalho passam a identificar o produto.
+> O **Extrato de Produto** é um relatório próprio em `/relatorios/extrato`, com filtro de
+> período e de produtos (opcional). Sem produto selecionado, ele mostra todos os produtos
+> que tiveram movimentação no período, agrupados por produto; com produtos selecionados,
+> inclui também os que não tiveram movimento no período. Ele mostra saldo inicial,
+> movimentações e saldo final por produto; a **Movimentação de Estoque**
+> (`/relatorios/movimentacao`) permanece agrupada por documento, mesmo quando filtrada por
+> produto.
 
 ---
 

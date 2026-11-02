@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const { data } = await relatorioService.listarAuditoria({
+  const { data, referencias } = await relatorioService.listarAuditoria({
     de: url.searchParams.get("de"),
     ate: url.searchParams.get("ate"),
     usuario: url.searchParams.getAll("usuario"),
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     acao: url.searchParams.getAll("acao"),
   });
 
-  return new Response(gerarCsvAuditoria(data), {
+  return new Response(gerarCsvAuditoria(data, referencias), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="auditoria-${hojeISO()}.csv"`,

@@ -45,6 +45,9 @@ import {
   type UsuarioFiltroRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
+import { descricaoEvento, rotuloAcao, rotuloEntidade, acaoTemDiff } from "@/lib/auditoria";
+import { diffAuditoria, type ReferenciasAuditoria } from "@/lib/auditoria-diff";
+import { formatarTelefone, TIPO_TELEFONE_LABEL } from "@/lib/telefone";
 
 const FUSO = "America/Sao_Paulo";
 /**
@@ -121,8 +124,14 @@ export type FiltrosVencimento = { dias: DiasVencimentoRelatorio };
 export type FiltrosFuncionarios = {
   situacoes: SituacaoCadastroRelatorio[];
   fotos: boolean;
+  codigos: boolean;
+  contatos: boolean;
 };
-export type FiltrosFornecedores = { situacoes: SituacaoCadastroRelatorio[] };
+export type FiltrosFornecedores = {
+  situacoes: SituacaoCadastroRelatorio[];
+  codigos: boolean;
+  contatos: boolean;
+};
 export type FiltrosDestinatarios = FiltrosFornecedores & {
   tipos: TipoDestinatarioRelatorio[];
 };
@@ -140,6 +149,7 @@ function primeiro(valor: string | string[] | null | undefined): string {
 export function normalizarFiltrosProdutos(params: {
   situacao?: string | string[] | null;
   fotos?: string | string[] | null;
+  codigos?: string | string[] | null;
 } = {}): Required<ProdutosRelatorioFiltros> {
   const situacaoBruta = primeiro(params.situacao);
   const situacao: SituacaoProdutoRelatorio = SITUACOES_PRODUTO_RELATORIO.includes(
@@ -147,7 +157,11 @@ export function normalizarFiltrosProdutos(params: {
   )
     ? (situacaoBruta as SituacaoProdutoRelatorio)
     : "ativas";
-  return { situacao, fotos: primeiro(params.fotos) === "1" };
+  return {
+    situacao,
+    fotos: primeiro(params.fotos) === "1",
+    codigos: primeiro(params.codigos) === "1",
+  };
 }
 
 /** Limite de dias válido; valor desconhecido cai no padrão de 30 dias. */
@@ -170,11 +184,18 @@ export function normalizarFiltrosVencimento(
 
 /** Normaliza a situação dos cadastros; vazio ou os dois não filtra. */
 export function normalizarFiltrosFuncionarios(
-  params: { situacao?: string | string[] | null; fotos?: string | string[] | null } = {},
+  params: {
+    situacao?: string | string[] | null;
+    fotos?: string | string[] | null;
+    codigos?: string | string[] | null;
+    contatos?: string | string[] | null;
+  } = {},
 ): FiltrosFuncionarios {
   return {
     situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
     fotos: primeiro(params.fotos) === "1",
+    codigos: primeiro(params.codigos) === "1",
+    contatos: primeiro(params.contatos) === "1",
   };
 }
 
@@ -183,20 +204,30 @@ export function normalizarFiltrosDestinatarios(
   params: {
     situacao?: string | string[] | null;
     tipo?: string | string[] | null;
+    codigos?: string | string[] | null;
+    contatos?: string | string[] | null;
   } = {},
 ): FiltrosDestinatarios {
   return {
     situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
     tipos: opcoesNormalizadas(params.tipo, TIPOS_DESTINATARIO_RELATORIO),
+    codigos: primeiro(params.codigos) === "1",
+    contatos: primeiro(params.contatos) === "1",
   };
 }
 
 /** Normaliza a situação dos fornecedores (multi; vazio não filtra). */
 export function normalizarFiltrosFornecedores(
-  params: { situacao?: string | string[] | null } = {},
+  params: {
+    situacao?: string | string[] | null;
+    codigos?: string | string[] | null;
+    contatos?: string | string[] | null;
+  } = {},
 ): FiltrosFornecedores {
   return {
     situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
+    codigos: primeiro(params.codigos) === "1",
+    contatos: primeiro(params.contatos) === "1",
   };
 }
 
@@ -544,6 +575,38 @@ function campoCsv(valor: string): string {
   return valor;
 }
 
+/** Monta o CSV pt-BR: BOM para o Excel, separador `;` e quebra `\r\n`. */
+function montarCsv(cabecalho: string[], registros: string[][]): string {
+  const corpo = [cabecalho, ...registros]
+    .map((campos) => campos.map(campoCsv).join(";"))
+    .join("\r\n");
+  return `\uFEFF${corpo}\r\n`;
+}
+
+/** Códigos de uma linha no CSV: `Tipo: código | Tipo: código`. */
+function codigosCsv(codigos: { tipo: string; codigo: string }[]): string {
+  return codigos.map((codigo) => `${codigo.tipo}: ${codigo.codigo}`).join(" | ");
+}
+
+/** E-mails de uma linha no CSV, marcando o principal. */
+function emailsCsv(emails: { endereco: string; principal: boolean }[]): string {
+  return emails
+    .map((email) => (email.principal ? `${email.endereco} (principal)` : email.endereco))
+    .join(" | ");
+}
+
+/** Telefones de uma linha no CSV, com tipo formatado e marca do principal. */
+function telefonesCsv(telefones: FornecedorRelatorioRow["telefones"]): string {
+  return telefones
+    .map(
+      (telefone) =>
+        `${formatarTelefone(telefone.numero)} (${TIPO_TELEFONE_LABEL[telefone.tipo]}${
+          telefone.principal ? ", principal" : ""
+        })`,
+    )
+    .join(" | ");
+}
+
 /**
  * CSV da Lista de Produtos (RF024): BOM para o Excel pt-BR reconhecer UTF-8,
  * separador `;` e decimal com vírgula.
@@ -551,6 +614,7 @@ function campoCsv(valor: string): string {
 export function gerarCsvProdutos(
   linhas: ProdutoRelatorioRow[],
   incluirFotos = false,
+  incluirCodigos = false,
 ): string {
   const cabecalho = [
     "Código",
@@ -559,6 +623,7 @@ export function gerarCsvProdutos(
     "Qtd. Livre",
     "Situação",
     ...(incluirFotos ? ["Foto"] : []),
+    ...(incluirCodigos ? ["Códigos"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -567,11 +632,9 @@ export function gerarCsvProdutos(
     formatarQuantidadeCsv(linha.livre),
     linha.situacao,
     ...(incluirFotos ? [linha.foto_url ?? ""] : []),
+    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
   ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(cabecalho, registros);
 }
 
 /**
@@ -714,6 +777,8 @@ export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): str
 export function gerarCsvFuncionarios(
   linhas: FuncionarioRelatorioRow[],
   incluirFotos = false,
+  incluirCodigos = false,
+  incluirContatos = false,
 ): string {
   const cabecalho = [
     "Código",
@@ -722,9 +787,9 @@ export function gerarCsvFuncionarios(
     "Cargo",
     "Condutor",
     "Situação",
-    "E-mail",
-    "Telefone",
+    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
     ...(incluirFotos ? ["Foto"] : []),
+    ...(incluirCodigos ? ["Códigos"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -733,18 +798,21 @@ export function gerarCsvFuncionarios(
     linha.cargo ?? "",
     linha.condutor ? "Sim" : "Não",
     linha.situacao,
-    linha.email ?? "",
-    linha.telefone ?? "",
+    ...(incluirContatos
+      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+      : [linha.email ?? "", linha.telefone ?? ""]),
     ...(incluirFotos ? [linha.foto_url ?? ""] : []),
+    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
   ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(cabecalho, registros);
 }
 
 /** CSV da lista de Destinatários (RF023/RF024). */
-export function gerarCsvDestinatarios(linhas: DestinatarioRelatorioRow[]): string {
+export function gerarCsvDestinatarios(
+  linhas: DestinatarioRelatorioRow[],
+  incluirCodigos = false,
+  incluirContatos = false,
+): string {
   const cabecalho = [
     "Código",
     "Razão social",
@@ -752,8 +820,8 @@ export function gerarCsvDestinatarios(linhas: DestinatarioRelatorioRow[]): strin
     "Tipo",
     "Situação",
     "Endereço",
-    "E-mail",
-    "Telefone",
+    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
+    ...(incluirCodigos ? ["Códigos"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -762,25 +830,28 @@ export function gerarCsvDestinatarios(linhas: DestinatarioRelatorioRow[]): strin
     linha.tipo,
     linha.situacao,
     linha.endereco,
-    linha.email ?? "",
-    linha.telefone ?? "",
+    ...(incluirContatos
+      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+      : [linha.email ?? "", linha.telefone ?? ""]),
+    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
   ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(cabecalho, registros);
 }
 
 /** CSV da lista de Fornecedores (RF023/RF024). */
-export function gerarCsvFornecedores(linhas: FornecedorRelatorioRow[]): string {
+export function gerarCsvFornecedores(
+  linhas: FornecedorRelatorioRow[],
+  incluirCodigos = false,
+  incluirContatos = false,
+): string {
   const cabecalho = [
     "Código",
     "Razão social",
     "CNPJ",
     "Situação",
     "Endereço",
-    "E-mail",
-    "Telefone",
+    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
+    ...(incluirCodigos ? ["Códigos"] : []),
   ];
   const registros = linhas.map((linha) => [
     linha.codigo,
@@ -788,27 +859,47 @@ export function gerarCsvFornecedores(linhas: FornecedorRelatorioRow[]): string {
     linha.cnpj ?? "",
     linha.situacao,
     linha.endereco,
-    linha.email ?? "",
-    linha.telefone ?? "",
+    ...(incluirContatos
+      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+      : [linha.email ?? "", linha.telefone ?? ""]),
+    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
   ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(cabecalho, registros);
 }
 
 /**
  * CSV da Auditoria (RF023/RF024), com a mesma formatação pt-BR: BOM UTF-8,
  * separador `;` e decimal com vírgula. A linha traz a data/hora do registro.
  */
-export function gerarCsvAuditoria(linhas: AuditoriaRelatorioRow[]): string {
-  const cabecalho = ["Data/hora", "Usuário", "Ação", "Entidade", "Registro"];
+export function gerarCsvAuditoria(
+  linhas: AuditoriaRelatorioRow[],
+  referencias: ReferenciasAuditoria = new Map(),
+): string {
+  const cabecalho = [
+    "Data/hora",
+    "Usuário",
+    "Ação",
+    "Entidade",
+    "Registro",
+    "Descrição",
+    "Alterações",
+  ];
   const registros = linhas.map((linha) => [
     formatarDataHoraRelatorio(linha.data_hora),
     linha.usuario,
-    linha.acao,
-    linha.entidade,
-    linha.id_entidade_afetada === null ? "—" : String(linha.id_entidade_afetada),
+    rotuloAcao(linha.acao),
+    rotuloEntidade(linha.entidade),
+    linha.id_entidade_afetada === null ? "—" : `#${linha.id_entidade_afetada}`,
+    descricaoEvento(linha, referencias) ?? "",
+    acaoTemDiff(linha.acao)
+      ? diffAuditoria(linha.dados_anteriores, linha.dados_novos, referencias)
+          .map((campo) =>
+            campo.grupo && campo.item
+              ? `${campo.grupo} · ${campo.item} · ${campo.campo}: ${campo.antes} → ${campo.depois}`
+              : `${campo.campo}: ${campo.antes} → ${campo.depois}`,
+          )
+          .join(" | ")
+      : "",
   ]);
   const corpo = [cabecalho, ...registros]
     .map((campos) => campos.map(campoCsv).join(";"))
@@ -821,6 +912,7 @@ export class RelatorioService {
   async listarProdutos(params: {
     situacao?: string | string[] | null;
     fotos?: string | string[] | null;
+    codigos?: string | string[] | null;
   } = {}): Promise<ProdutosRelatorioResult & { filtros: Required<ProdutosRelatorioFiltros> }> {
     const filtros = normalizarFiltrosProdutos(params);
     const resultado = await relatorioDAO.listarProdutosRelatorio(filtros);
@@ -917,7 +1009,12 @@ export class RelatorioService {
 
   /** Funcionários do cadastro, com a situação selecionada (vazio não filtra). */
   async listarFuncionarios(
-    params: { situacao?: string | string[] | null; fotos?: string | string[] | null } = {},
+    params: {
+      situacao?: string | string[] | null;
+      fotos?: string | string[] | null;
+      codigos?: string | string[] | null;
+      contatos?: string | string[] | null;
+    } = {},
   ): Promise<FuncionariosRelatorioResult & { filtros: FiltrosFuncionarios }> {
     const filtros = normalizarFiltrosFuncionarios(params);
     const resultado = await relatorioDAO.listarFuncionariosRelatorio(filtros);
@@ -929,6 +1026,8 @@ export class RelatorioService {
     params: {
       situacao?: string | string[] | null;
       tipo?: string | string[] | null;
+      codigos?: string | string[] | null;
+      contatos?: string | string[] | null;
     } = {},
   ): Promise<DestinatariosRelatorioResult & { filtros: FiltrosDestinatarios }> {
     const filtros = normalizarFiltrosDestinatarios(params);
@@ -938,7 +1037,11 @@ export class RelatorioService {
 
   /** Fornecedores do cadastro, com a situação selecionada (vazio não filtra). */
   async listarFornecedores(
-    params: { situacao?: string | string[] | null } = {},
+    params: {
+      situacao?: string | string[] | null;
+      codigos?: string | string[] | null;
+      contatos?: string | string[] | null;
+    } = {},
   ): Promise<FornecedoresRelatorioResult & { filtros: FiltrosFornecedores }> {
     const filtros = normalizarFiltrosFornecedores(params);
     const resultado = await relatorioDAO.listarFornecedoresRelatorio(filtros);
@@ -958,7 +1061,12 @@ export class RelatorioService {
       entidade?: string | string[] | null;
       acao?: string | string[] | null;
     } = {},
-  ): Promise<{ data: AuditoriaRelatorioRow[]; total: number; filtros: FiltrosAuditoria }> {
+  ): Promise<{
+    data: AuditoriaRelatorioRow[];
+    total: number;
+    filtros: FiltrosAuditoria;
+    referencias: ReferenciasAuditoria;
+  }> {
     const filtros = normalizarFiltrosAuditoria(params);
     const { de, ate } = limitesDoPeriodo(filtros);
     const daoFiltros: AuditoriaRelatorioFiltros = {
@@ -969,7 +1077,8 @@ export class RelatorioService {
       acoes: filtros.acoes,
     };
     const resultado = await relatorioDAO.listarAuditoriaRelatorio(daoFiltros);
-    return { ...resultado, filtros };
+    const referencias = await relatorioDAO.referenciasAuditoria(resultado.data);
+    return { ...resultado, filtros, referencias };
   }
 
   /** Opções dos filtros da Auditoria: usuários ativos, entidades e ações. */

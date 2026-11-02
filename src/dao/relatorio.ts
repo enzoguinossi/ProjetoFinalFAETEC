@@ -1,9 +1,15 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { formatarCodigo } from "@/lib/formatar";
+import type { ReferenciasAuditoria } from "@/lib/auditoria-diff";
+import { normalizarEntidade } from "@/lib/auditoria";
+import type { TipoTelefone } from "@/types";
 
 export const SITUACOES_PRODUTO_RELATORIO = ["ativas", "inativas", "todas"] as const;
 export type SituacaoProdutoRelatorio = (typeof SITUACOES_PRODUTO_RELATORIO)[number];
+
+/** Código personalizado do cadastro já com o rótulo técnico do tipo. */
+export type CodigoRelatorio = { tipo: string; codigo: string };
 
 export type ProdutoRelatorioRow = {
   id_produto: number;
@@ -12,9 +18,17 @@ export type ProdutoRelatorioRow = {
   descricao: string;
   /** Saldo atual do produto. */
   quantidade: number;
+  /** `produto.saldo_reservado`. */
+  reservado: number;
   /** `saldo − saldo_reservado`. */
   livre: number;
   situacao: "Ativo" | "Inativo";
+  /** Nome da Conversão Padrão de Entrada (`produto.ID_conversao_padrao`). */
+  unidade_entrada: string;
+  /** Nome da Unidade Padrão de Saída (`produto.ID_conversao_saida`). */
+  unidade_saida: string;
+  /** Todos os códigos personalizados do produto. */
+  codigos: CodigoRelatorio[];
   /** URL do anexo ativo mais recente (foto atual), se houver. */
   foto_url: string | null;
 };
@@ -29,6 +43,8 @@ export type ProdutosRelatorioFiltros = {
   situacao?: SituacaoProdutoRelatorio;
   /** Inclui a coluna/URL da foto no relatório e no CSV. */
   fotos?: boolean;
+  /** Inclui os códigos personalizados no relatório e no CSV. */
+  codigos?: boolean;
 };
 
 /** Tipos de movimentação que podem ser filtrados na Movimentação (lista vazia = todos). */
@@ -172,6 +188,8 @@ export type ExpedicoesRelatorioFiltros = {
 
 export type EntregaRelatorioRow = {
   id_nota_saida: number;
+  /** Destinatário da nota; `null` quando a nota não tem destinatário. */
+  id_destinatario: number | null;
   /** Código exibido no relatório (`formatarCodigo(ID_nota_saida)`). */
   codigo: string;
   data: Date;
@@ -290,6 +308,12 @@ export type FuncionarioRelatorioRow = {
   email: string | null;
   /** Telefone principal ativo do funcionário. */
   telefone: string | null;
+  /** Todos os e-mails do cadastro (principal primeiro). */
+  emails: { endereco: string; principal: boolean }[];
+  /** Todos os telefones ativos do cadastro (principal primeiro). */
+  telefones: { numero: string; tipo: TipoTelefone; principal: boolean }[];
+  /** Todos os códigos personalizados do funcionário. */
+  codigos: CodigoRelatorio[];
   /** URL do anexo ativo mais recente (foto atual), se houver. */
   foto_url: string | null;
 };
@@ -301,6 +325,10 @@ export type FuncionariosRelatorioFiltros = {
   situacoes?: SituacaoCadastroRelatorio[];
   /** Inclui a coluna/URL da foto no relatório e no CSV. */
   fotos?: boolean;
+  /** Inclui os códigos personalizados no relatório e no CSV. */
+  codigos?: boolean;
+  /** Inclui todos os contatos (e-mails e telefones) no relatório e no CSV. */
+  contatos?: boolean;
 };
 
 export type DestinatarioRelatorioRow = {
@@ -315,6 +343,12 @@ export type DestinatarioRelatorioRow = {
   endereco: string;
   email: string | null;
   telefone: string | null;
+  /** Todos os e-mails do cadastro (principal primeiro). */
+  emails: { endereco: string; principal: boolean }[];
+  /** Todos os telefones ativos do cadastro (principal primeiro). */
+  telefones: { numero: string; tipo: TipoTelefone; principal: boolean }[];
+  /** Todos os códigos personalizados do destinatário. */
+  codigos: CodigoRelatorio[];
 };
 
 export type DestinatariosRelatorioResult = { data: DestinatarioRelatorioRow[] };
@@ -322,6 +356,10 @@ export type DestinatariosRelatorioResult = { data: DestinatarioRelatorioRow[] };
 export type DestinatariosRelatorioFiltros = {
   situacoes?: SituacaoCadastroRelatorio[];
   tipos?: TipoDestinatarioRelatorio[];
+  /** Inclui os códigos personalizados no relatório e no CSV. */
+  codigos?: boolean;
+  /** Inclui todos os contatos (e-mails e telefones) no relatório e no CSV. */
+  contatos?: boolean;
 };
 
 export type FornecedorRelatorioRow = {
@@ -335,12 +373,22 @@ export type FornecedorRelatorioRow = {
   endereco: string;
   email: string | null;
   telefone: string | null;
+  /** Todos os e-mails do cadastro (principal primeiro). */
+  emails: { endereco: string; principal: boolean }[];
+  /** Todos os telefones ativos do cadastro (principal primeiro). */
+  telefones: { numero: string; tipo: TipoTelefone; principal: boolean }[];
+  /** Todos os códigos personalizados do fornecedor. */
+  codigos: CodigoRelatorio[];
 };
 
 export type FornecedoresRelatorioResult = { data: FornecedorRelatorioRow[] };
 
 export type FornecedoresRelatorioFiltros = {
   situacoes?: SituacaoCadastroRelatorio[];
+  /** Inclui os códigos personalizados no relatório e no CSV. */
+  codigos?: boolean;
+  /** Inclui todos os contatos (e-mails e telefones) no relatório e no CSV. */
+  contatos?: boolean;
 };
 
 export type AuditoriaRelatorioRow = {
@@ -352,6 +400,10 @@ export type AuditoriaRelatorioRow = {
   acao: string;
   entidade: string;
   id_entidade_afetada: number | null;
+  /** Snapshot JSON anterior; `null` quando o evento não tem snapshot. */
+  dados_anteriores: unknown;
+  /** Snapshot JSON novo; `null` quando o evento não tem snapshot. */
+  dados_novos: unknown;
 };
 
 export type AuditoriaRelatorioResult = {
@@ -434,6 +486,55 @@ function formatarEndereco(
     .join(" - ");
 }
 
+/** Data `DATE` (meia-noite UTC) para `DD/MM/AAAA` sem deslocar o dia. */
+function dataCurta(data: Date): string {
+  const [ano, mes, dia] = data.toISOString().slice(0, 10).split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
+const ROTULOS_STATUS_INVENTARIO: Record<string, string> = {
+  ABERTO: "Aberto",
+  EM_CONTAGEM: "Em contagem",
+  AGUARDANDO_APROVACAO: "Aguardando aprovação",
+  FINALIZADO: "Finalizado",
+  CANCELADO: "Cancelado",
+};
+
+/** Tipo da referência a partir da chave `id_*` (mesma regra do diff). */
+function tipoDoIdAuditoria(campo: string): string {
+  const ultimo = campo.split(".").pop() ?? campo;
+  const bruto = ultimo.startsWith("id_") ? ultimo.slice(3) : ultimo;
+  if (bruto.startsWith("usuario")) return "usuario";
+  if (bruto.startsWith("funcionario")) return "funcionario";
+  return bruto;
+}
+
+function coletarIdsAuditoria(
+  valor: unknown,
+  adicionar: (tipo: string, id: number) => void,
+): void {
+  if (Array.isArray(valor)) {
+    for (const item of valor) coletarIdsAuditoria(item, adicionar);
+    return;
+  }
+  if (typeof valor !== "object" || valor === null) return;
+
+  for (const [campo, filho] of Object.entries(valor)) {
+    if (campo.startsWith("id_")) {
+      const numero =
+        typeof filho === "number"
+          ? filho
+          : typeof filho === "string" && filho.trim()
+            ? Number(filho)
+            : NaN;
+      if (Number.isInteger(numero) && numero > 0) {
+        adicionar(tipoDoIdAuditoria(campo), numero);
+      }
+    }
+    coletarIdsAuditoria(filho, adicionar);
+  }
+}
+
 export class RelatorioDAO {
   /**
    * Listagem simples de produtos para o relatório impresso/CSV.
@@ -461,6 +562,12 @@ export class RelatorioDAO {
           select: { url: true },
           take: 1,
         },
+        conversaoPadrao: { select: { nome: true } },
+        conversaoSaida: { select: { nome: true } },
+        produtoCodigos: {
+          select: { codigo: true, tipoCodigo: { select: { nome: true } } },
+          orderBy: [{ id_tipo_codigo: "asc" }, { codigo: "asc" }],
+        },
       },
       orderBy: { descricao: "asc" },
     });
@@ -473,8 +580,15 @@ export class RelatorioDAO {
         codigo: formatarCodigo(p.id_produto),
         descricao: p.descricao,
         quantidade: arredondar(quantidade),
+        reservado: arredondar(reservado),
         livre: arredondar(quantidade - reservado),
         situacao: p.ativo ? "Ativo" : "Inativo",
+        unidade_entrada: p.conversaoPadrao.nome,
+        unidade_saida: p.conversaoSaida.nome,
+        codigos: p.produtoCodigos.map((c) => ({
+          tipo: c.tipoCodigo.nome,
+          codigo: c.codigo,
+        })),
         foto_url: p.anexos[0]?.url ?? null,
       };
     });
@@ -550,7 +664,7 @@ export class RelatorioDAO {
     };
   }
 
-  /** Funcionários por nome, com CPF, cargo, condutor, situação e contato principal. */
+  /** Funcionários por nome, com CPF, cargo, condutor, situação e contatos. */
   async listarFuncionariosRelatorio(
     filtros: FuncionariosRelatorioFiltros = {},
   ): Promise<FuncionariosRelatorioResult> {
@@ -566,11 +680,14 @@ export class RelatorioDAO {
         ativo: true,
         condutor: true,
         pessoaFisica: { select: { nome: true, cpf: true } },
-        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        emails: {
+          select: { endereco: true, principal: true },
+          orderBy: [{ principal: "desc" }, { endereco: "asc" }],
+        },
         telefones: {
-          where: { principal: true, ativo: true },
-          select: { numero: true },
-          take: 1,
+          where: { ativo: true },
+          select: { numero: true, tipo: true, principal: true },
+          orderBy: [{ principal: "desc" }, { tipo: "asc" }, { numero: "asc" }],
         },
         anexos: {
           where: { ativo: true },
@@ -578,23 +695,47 @@ export class RelatorioDAO {
           select: { url: true },
           take: 1,
         },
+        funcionarioCodigos: {
+          select: { codigo: true, tipoCodigo: { select: { nome: true } } },
+          orderBy: [{ id_tipo_codigo: "asc" }, { codigo: "asc" }],
+        },
       },
       orderBy: { pessoaFisica: { nome: "asc" } },
     });
 
     return {
-      data: funcionarios.map((funcionario) => ({
-        id_funcionario: funcionario.id_funcionario,
-        codigo: formatarCodigo(funcionario.id_funcionario),
-        nome: funcionario.pessoaFisica.nome,
-        cpf: funcionario.pessoaFisica.cpf,
-        cargo: funcionario.cargo,
-        condutor: funcionario.condutor,
-        situacao: funcionario.ativo ? "Ativo" : "Inativo",
-        email: funcionario.emails[0]?.endereco ?? null,
-        telefone: funcionario.telefones[0]?.numero ?? null,
-        foto_url: funcionario.anexos[0]?.url ?? null,
-      })),
+      data: funcionarios.map((funcionario) => {
+        const principalEmail =
+          funcionario.emails.find((email) => email.principal)?.endereco ?? null;
+        const principalTelefone =
+          funcionario.telefones.find((telefone) => telefone.principal)?.numero ?? null;
+
+        return {
+          id_funcionario: funcionario.id_funcionario,
+          codigo: formatarCodigo(funcionario.id_funcionario),
+          nome: funcionario.pessoaFisica.nome,
+          cpf: funcionario.pessoaFisica.cpf,
+          cargo: funcionario.cargo,
+          condutor: funcionario.condutor,
+          situacao: funcionario.ativo ? "Ativo" : "Inativo",
+          email: principalEmail,
+          telefone: principalTelefone,
+          emails: funcionario.emails.map((email) => ({
+            endereco: email.endereco,
+            principal: email.principal,
+          })),
+          telefones: funcionario.telefones.map((telefone) => ({
+            numero: telefone.numero,
+            tipo: telefone.tipo,
+            principal: telefone.principal,
+          })),
+          codigos: funcionario.funcionarioCodigos.map((c) => ({
+            tipo: c.tipoCodigo.nome,
+            codigo: c.codigo,
+          })),
+          foto_url: funcionario.anexos[0]?.url ?? null,
+        };
+      }),
     };
   }
 
@@ -617,28 +758,55 @@ export class RelatorioDAO {
         endereco: {
           select: { logradouro: true, numero: true, bairro: true, cidade: true },
         },
-        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        emails: {
+          select: { endereco: true, principal: true },
+          orderBy: [{ principal: "desc" }, { endereco: "asc" }],
+        },
         telefones: {
-          where: { principal: true, ativo: true },
-          select: { numero: true },
-          take: 1,
+          where: { ativo: true },
+          select: { numero: true, tipo: true, principal: true },
+          orderBy: [{ principal: "desc" }, { tipo: "asc" }, { numero: "asc" }],
+        },
+        destinatarioCodigos: {
+          select: { codigo: true, tipoCodigo: { select: { nome: true } } },
+          orderBy: [{ id_tipo_codigo: "asc" }, { codigo: "asc" }],
         },
       },
       orderBy: { pessoaJuridica: { razao_social: "asc" } },
     });
 
     return {
-      data: destinatarios.map((destinatario) => ({
-        id_destinatario: destinatario.id_destinatario,
-        codigo: formatarCodigo(destinatario.id_destinatario),
-        razao_social: destinatario.pessoaJuridica.razao_social,
-        cnpj: destinatario.pessoaJuridica.cnpj,
-        tipo: ROTULOS_TIPO_DESTINATARIO[destinatario.tipo_destinatario],
-        situacao: destinatario.ativo ? "Ativo" : "Inativo",
-        endereco: formatarEndereco(destinatario.endereco),
-        email: destinatario.emails[0]?.endereco ?? null,
-        telefone: destinatario.telefones[0]?.numero ?? null,
-      })),
+      data: destinatarios.map((destinatario) => {
+        const principalEmail =
+          destinatario.emails.find((email) => email.principal)?.endereco ?? null;
+        const principalTelefone =
+          destinatario.telefones.find((telefone) => telefone.principal)?.numero ?? null;
+
+        return {
+          id_destinatario: destinatario.id_destinatario,
+          codigo: formatarCodigo(destinatario.id_destinatario),
+          razao_social: destinatario.pessoaJuridica.razao_social,
+          cnpj: destinatario.pessoaJuridica.cnpj,
+          tipo: ROTULOS_TIPO_DESTINATARIO[destinatario.tipo_destinatario],
+          situacao: destinatario.ativo ? "Ativo" : "Inativo",
+          endereco: formatarEndereco(destinatario.endereco),
+          email: principalEmail,
+          telefone: principalTelefone,
+          emails: destinatario.emails.map((email) => ({
+            endereco: email.endereco,
+            principal: email.principal,
+          })),
+          telefones: destinatario.telefones.map((telefone) => ({
+            numero: telefone.numero,
+            tipo: telefone.tipo,
+            principal: telefone.principal,
+          })),
+          codigos: destinatario.destinatarioCodigos.map((c) => ({
+            tipo: c.tipoCodigo.nome,
+            codigo: c.codigo,
+          })),
+        };
+      }),
     };
   }
 
@@ -659,27 +827,54 @@ export class RelatorioDAO {
         endereco: {
           select: { logradouro: true, numero: true, bairro: true, cidade: true },
         },
-        emails: { where: { principal: true }, select: { endereco: true }, take: 1 },
+        emails: {
+          select: { endereco: true, principal: true },
+          orderBy: [{ principal: "desc" }, { endereco: "asc" }],
+        },
         telefones: {
-          where: { principal: true, ativo: true },
-          select: { numero: true },
-          take: 1,
+          where: { ativo: true },
+          select: { numero: true, tipo: true, principal: true },
+          orderBy: [{ principal: "desc" }, { tipo: "asc" }, { numero: "asc" }],
+        },
+        fornecedorCodigos: {
+          select: { codigo: true, tipoCodigo: { select: { nome: true } } },
+          orderBy: [{ id_tipo_codigo: "asc" }, { codigo: "asc" }],
         },
       },
       orderBy: { pessoaJuridica: { razao_social: "asc" } },
     });
 
     return {
-      data: fornecedores.map((fornecedor) => ({
-        id_fornecedor: fornecedor.id_fornecedor,
-        codigo: formatarCodigo(fornecedor.id_fornecedor),
-        razao_social: fornecedor.pessoaJuridica.razao_social,
-        cnpj: fornecedor.pessoaJuridica.cnpj,
-        situacao: fornecedor.ativo ? "Ativo" : "Inativo",
-        endereco: formatarEndereco(fornecedor.endereco),
-        email: fornecedor.emails[0]?.endereco ?? null,
-        telefone: fornecedor.telefones[0]?.numero ?? null,
-      })),
+      data: fornecedores.map((fornecedor) => {
+        const principalEmail =
+          fornecedor.emails.find((email) => email.principal)?.endereco ?? null;
+        const principalTelefone =
+          fornecedor.telefones.find((telefone) => telefone.principal)?.numero ?? null;
+
+        return {
+          id_fornecedor: fornecedor.id_fornecedor,
+          codigo: formatarCodigo(fornecedor.id_fornecedor),
+          razao_social: fornecedor.pessoaJuridica.razao_social,
+          cnpj: fornecedor.pessoaJuridica.cnpj,
+          situacao: fornecedor.ativo ? "Ativo" : "Inativo",
+          endereco: formatarEndereco(fornecedor.endereco),
+          email: principalEmail,
+          telefone: principalTelefone,
+          emails: fornecedor.emails.map((email) => ({
+            endereco: email.endereco,
+            principal: email.principal,
+          })),
+          telefones: fornecedor.telefones.map((telefone) => ({
+            numero: telefone.numero,
+            tipo: telefone.tipo,
+            principal: telefone.principal,
+          })),
+          codigos: fornecedor.fornecedorCodigos.map((c) => ({
+            tipo: c.tipoCodigo.nome,
+            codigo: c.codigo,
+          })),
+        };
+      }),
     };
   }
 
@@ -1019,6 +1214,7 @@ export class RelatorioDAO {
       where,
       select: {
         id_nota_saida: true,
+        id_destinatario: true,
         data_criacao: true,
         status: true,
         destinatario: {
@@ -1060,6 +1256,7 @@ export class RelatorioDAO {
 
       return {
         id_nota_saida: nota.id_nota_saida,
+        id_destinatario: nota.id_destinatario,
         codigo: formatarCodigo(nota.id_nota_saida),
         data: nota.data_criacao,
         destinatario: nota.destinatario?.pessoaJuridica.razao_social ?? "—",
@@ -1170,6 +1367,8 @@ export class RelatorioDAO {
           acao: true,
           entidade: true,
           id_entidade_afetada: true,
+          dados_anteriores: true,
+          dados_novos: true,
           usuario: {
             select: {
               login: true,
@@ -1191,9 +1390,312 @@ export class RelatorioDAO {
         acao: registro.acao,
         entidade: registro.entidade,
         id_entidade_afetada: registro.id_entidade_afetada,
+        dados_anteriores: registro.dados_anteriores,
+        dados_novos: registro.dados_novos,
       })),
       total,
     };
+  }
+
+  /**
+   * Resolve descrições das entidades citadas na auditoria em uma consulta por
+   * tipo. A chave é `"tipo:id"`; o valor não inclui o `#id` (quem exibe decide).
+   */
+  async referenciasAuditoria(
+    linhas: AuditoriaRelatorioRow[],
+  ): Promise<ReferenciasAuditoria> {
+    const ids = new Map<string, Set<number>>();
+    const adicionar = (tipo: string, id: number) => {
+      const conjunto = ids.get(tipo);
+      if (conjunto) conjunto.add(id);
+      else ids.set(tipo, new Set([id]));
+    };
+
+    for (const linha of linhas) {
+      if (linha.id_entidade_afetada !== null) {
+        adicionar(
+          normalizarEntidade(linha.entidade),
+          linha.id_entidade_afetada,
+        );
+      }
+      coletarIdsAuditoria(linha.dados_anteriores, adicionar);
+      coletarIdsAuditoria(linha.dados_novos, adicionar);
+    }
+
+    const referencias: ReferenciasAuditoria = new Map();
+    for (const [tipo, conjunto] of ids) {
+      const lista = [...conjunto];
+      if (lista.length === 0) continue;
+
+      switch (tipo) {
+        case "produto": {
+          const registros = await prisma.produto.findMany({
+            where: { id_produto: { in: lista } },
+            select: { id_produto: true, descricao: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`produto:${registro.id_produto}`, registro.descricao);
+          }
+          break;
+        }
+        case "usuario": {
+          const registros = await prisma.usuario.findMany({
+            where: { id_usuario: { in: lista } },
+            select: {
+              id_usuario: true,
+              login: true,
+              funcionario: { select: { pessoaFisica: { select: { nome: true } } } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `usuario:${registro.id_usuario}`,
+              registro.funcionario.pessoaFisica.nome || registro.login,
+            );
+          }
+          break;
+        }
+        case "funcionario": {
+          const registros = await prisma.funcionario.findMany({
+            where: { id_funcionario: { in: lista } },
+            select: {
+              id_funcionario: true,
+              pessoaFisica: { select: { nome: true } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `funcionario:${registro.id_funcionario}`,
+              registro.pessoaFisica.nome,
+            );
+          }
+          break;
+        }
+        case "destinatario":
+        case "fornecedor": {
+          const registros =
+            tipo === "destinatario"
+              ? await prisma.destinatario.findMany({
+                  where: { id_destinatario: { in: lista } },
+                  select: {
+                    id_destinatario: true,
+                    pessoaJuridica: { select: { razao_social: true } },
+                  },
+                })
+              : await prisma.fornecedor.findMany({
+                  where: { id_fornecedor: { in: lista } },
+                  select: {
+                    id_fornecedor: true,
+                    pessoaJuridica: { select: { razao_social: true } },
+                  },
+                });
+          for (const registro of registros) {
+            const id =
+              "id_destinatario" in registro
+                ? registro.id_destinatario
+                : registro.id_fornecedor;
+            referencias.set(
+              `${tipo}:${id}`,
+              registro.pessoaJuridica.razao_social,
+            );
+          }
+          break;
+        }
+        case "nota_saida": {
+          const registros = await prisma.notaSaida.findMany({
+            where: { id_nota_saida: { in: lista } },
+            select: {
+              id_nota_saida: true,
+              destinatario: {
+                select: { pessoaJuridica: { select: { razao_social: true } } },
+              },
+            },
+          });
+          for (const registro of registros) {
+            const escola = registro.destinatario?.pessoaJuridica.razao_social;
+            if (escola) {
+              referencias.set(`nota_saida:${registro.id_nota_saida}`, escola);
+            }
+          }
+          break;
+        }
+        case "nota_entrada": {
+          const registros = await prisma.notaEntrada.findMany({
+            where: { id_nota_entrada: { in: lista } },
+            select: {
+              id_nota_entrada: true,
+              fornecedor: {
+                select: { pessoaJuridica: { select: { razao_social: true } } },
+              },
+            },
+          });
+          for (const registro of registros) {
+            const fornecedor = registro.fornecedor?.pessoaJuridica.razao_social;
+            if (fornecedor) {
+              referencias.set(
+                `nota_entrada:${registro.id_nota_entrada}`,
+                fornecedor,
+              );
+            }
+          }
+          break;
+        }
+        case "movimentacao": {
+          const registros = await prisma.movimentacaoEstoque.findMany({
+            where: { id_movimentacao: { in: lista } },
+            select: {
+              id_movimentacao: true,
+              produto: { select: { descricao: true } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `movimentacao:${registro.id_movimentacao}`,
+              registro.produto.descricao,
+            );
+          }
+          break;
+        }
+        case "item_nota_saida": {
+          const registros = await prisma.itemNotaSaida.findMany({
+            where: { id_item_nota_saida: { in: lista } },
+            select: {
+              id_item_nota_saida: true,
+              produto: { select: { descricao: true } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `item_nota_saida:${registro.id_item_nota_saida}`,
+              registro.produto.descricao,
+            );
+          }
+          break;
+        }
+        case "item_nota_entrada": {
+          const registros = await prisma.itemNotaEntrada.findMany({
+            where: { id_item_nota_entrada: { in: lista } },
+            select: {
+              id_item_nota_entrada: true,
+              produto: { select: { descricao: true } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `item_nota_entrada:${registro.id_item_nota_entrada}`,
+              registro.produto.descricao,
+            );
+          }
+          break;
+        }
+        case "expedicao": {
+          const registros = await prisma.expedicao.findMany({
+            where: { id_expedicao: { in: lista } },
+            select: {
+              id_expedicao: true,
+              data_prevista: true,
+              veiculo: { select: { placa: true } },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `expedicao:${registro.id_expedicao}`,
+              `${registro.veiculo.placa} · ${dataCurta(registro.data_prevista)}`,
+            );
+          }
+          break;
+        }
+        case "veiculo": {
+          const registros = await prisma.veiculo.findMany({
+            where: { id_veiculo: { in: lista } },
+            select: { id_veiculo: true, placa: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`veiculo:${registro.id_veiculo}`, registro.placa);
+          }
+          break;
+        }
+        case "pedido_escola": {
+          const registros = await prisma.pedidoEscola.findMany({
+            where: { id_pedido_escola: { in: lista } },
+            select: {
+              id_pedido_escola: true,
+              destinatario: {
+                select: { pessoaJuridica: { select: { razao_social: true } } },
+              },
+            },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `pedido_escola:${registro.id_pedido_escola}`,
+              registro.destinatario.pessoaJuridica.razao_social,
+            );
+          }
+          break;
+        }
+        case "inventario": {
+          const registros = await prisma.inventario.findMany({
+            where: { id_inventario: { in: lista } },
+            select: { id_inventario: true, data_inicio: true, status: true },
+          });
+          for (const registro of registros) {
+            referencias.set(
+              `inventario:${registro.id_inventario}`,
+              `${dataCurta(registro.data_inicio)} · ${
+                ROTULOS_STATUS_INVENTARIO[registro.status] ?? registro.status
+              }`,
+            );
+          }
+          break;
+        }
+        case "perfil": {
+          const registros = await prisma.perfil.findMany({
+            where: { id_perfil: { in: lista } },
+            select: { id_perfil: true, nome: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`perfil:${registro.id_perfil}`, registro.nome);
+          }
+          break;
+        }
+        case "permissao": {
+          const registros = await prisma.permissao.findMany({
+            where: { id_permissao: { in: lista } },
+            select: { id_permissao: true, nome: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`permissao:${registro.id_permissao}`, registro.nome);
+          }
+          break;
+        }
+        case "tipo_codigo": {
+          const registros = await prisma.tipoCodigo.findMany({
+            where: { id_tipo_codigo: { in: lista } },
+            select: { id_tipo_codigo: true, nome: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`tipo_codigo:${registro.id_tipo_codigo}`, registro.nome);
+          }
+          break;
+        }
+        case "conversao_padrao":
+        case "conversao_saida":
+        case "conversao_unidade": {
+          const registros = await prisma.conversaoUnidade.findMany({
+            where: { id_conversao: { in: lista } },
+            select: { id_conversao: true, nome: true },
+          });
+          for (const registro of registros) {
+            referencias.set(`${tipo}:${registro.id_conversao}`, registro.nome);
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    return referencias;
   }
 
   /** Usuários ativos para o filtro da auditoria, por nome (login como reserva). */

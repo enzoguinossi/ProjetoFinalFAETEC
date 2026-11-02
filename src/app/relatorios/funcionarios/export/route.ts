@@ -19,9 +19,13 @@ export async function GET(request: Request) {
   const { data, filtros } = await relatorioService.listarFuncionarios({
     situacao: url.searchParams.getAll("situacao"),
     fotos: url.searchParams.get("fotos"),
+    codigos: url.searchParams.get("codigos"),
+    contatos: url.searchParams.get("contatos"),
   });
 
-  return new Response(gerarCsvFuncionarios(data, filtros.fotos), {
+  return new Response(
+    gerarCsvFuncionarios(data, filtros.fotos, filtros.codigos, filtros.contatos),
+    {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="funcionarios-${hojeISO()}.csv"`,

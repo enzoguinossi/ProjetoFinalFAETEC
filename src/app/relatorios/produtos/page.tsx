@@ -1,20 +1,26 @@
 import { redirect } from "next/navigation";
 import Button from "@/components/Button";
+import FichaRelatorio from "@/components/relatorios/FichaRelatorio";
+import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { contagem, formatarQuantidade } from "@/lib/formatar";
+import { fichaProduto } from "@/lib/fichas-relatorio";
 import { metadadosEmissao, relatorioService } from "@/services/relatorio";
-import ImprimirButton from "./ImprimirButton";
 
 export const dynamic = "force-dynamic";
 
 type Params = {
   situacao?: string | string[];
   fotos?: string | string[];
+  codigos?: string | string[];
 };
 
-function formatarQuantidade(valor: number): string {
-  return valor.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
-}
+const ROTULOS_SITUACAO = {
+  ativas: "Ativas",
+  inativas: "Inativas",
+  todas: "Todas",
+} as const;
 
 export default async function RelatorioProdutosPage({
   searchParams,
@@ -24,169 +30,74 @@ export default async function RelatorioProdutosPage({
   const user = await requireUser();
   if (!(await usuarioPode(user, "relatorio.gerar"))) redirect("/dashboard");
 
-  const { filtros, data, totais } = await relatorioService.listarProdutos(
-    await searchParams,
-  );
+  const { filtros, data, totais } = await relatorioService.listarProdutos(await searchParams);
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
-  const query = new URLSearchParams({
-    situacao: filtros.situacao,
-  });
+  const query = new URLSearchParams({ situacao: filtros.situacao });
   if (filtros.fotos) query.set("fotos", "1");
+  if (filtros.codigos) query.set("codigos", "1");
+
+  const filtrosFormulario = (
+    <form method="get" action="/relatorios/produtos" className="flex flex-wrap items-end gap-3">
+      <label className="flex flex-col gap-1 text-sm text-ink">
+        Situação
+        <select
+          name="situacao"
+          defaultValue={filtros.situacao}
+          className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
+        >
+          <option value="ativas">Ativas</option>
+          <option value="inativas">Inativas</option>
+          <option value="todas">Todas</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-ink">
+        <input
+          type="checkbox"
+          name="fotos"
+          value="1"
+          defaultChecked={filtros.fotos}
+          className="size-4 accent-[#1b9956]"
+        />
+        Listar fotos
+      </label>
+      <label className="flex items-center gap-2 text-sm text-ink">
+        <input
+          type="checkbox"
+          name="codigos"
+          value="1"
+          defaultChecked={filtros.codigos}
+          className="size-4 accent-[#1b9956]"
+        />
+        Listar códigos
+      </label>
+      <Button label="Filtrar" type="submit" />
+    </form>
+  );
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink m-0">Lista de Produtos</h2>
-          <p className="text-sm text-[#697077] m-0">
-            Código, descrição, quantidade e saldo livre dos produtos.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ImprimirButton />
-          <Button
-            label="Exportar CSV"
-            href={`/relatorios/produtos/export?${query}`}
-            variant="ghost"
-          />
-          <Button label="Voltar" href="/relatorios" variant="ghost" />
-        </div>
-      </div>
-
-      <form
-        method="get"
-        action="/relatorios/produtos"
-        className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-border p-4"
-        data-print-hide
-      >
-        <label className="flex flex-col gap-1 text-sm text-ink">
-          Situação
-          <select
-            name="situacao"
-            defaultValue={filtros.situacao}
-            className="h-10 px-3 border border-[#c1c7cd] rounded-lg bg-white font-sans text-sm text-ink outline-none focus:border-brand"
-          >
-            <option value="ativas">Ativas</option>
-            <option value="inativas">Inativas</option>
-            <option value="todas">Todas</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="fotos"
-            value="1"
-            defaultChecked={filtros.fotos}
-            className="size-4 accent-[#1b9956]"
-          />
-          Listar fotos
-        </label>
-        <Button label="Filtrar" type="submit" />
-      </form>
-
-      <div className="relatorio-scroll">
-        <div className="relatorio-container">
-          <div className="relatorio-conteudo">
-            <header className="relatorio-header">
-              <h1 className="titulo-relatorio">Lista de Produtos</h1>
-              <div className="meta-info">
-                <p>
-                  Emissão: {emissao.data} {emissao.hora}
-                </p>
-                <p>
-                  {data.length} produto{data.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </header>
-
-            <table className="relatorio-tabela">
-              <thead>
-                <tr>
-                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
-                    Código
-                  </th>
-                  <th style={{ width: filtros.fotos ? "33%" : "40%" }}>Descrição</th>
-                  <th style={{ width: filtros.fotos ? "16%" : "20%" }} className="col-direita">
-                    Quantidade
-                  </th>
-                  <th style={{ width: filtros.fotos ? "14%" : "17%" }} className="col-direita">
-                    Qtd. Livre
-                  </th>
-                  <th style={{ width: filtros.fotos ? "13%" : "15%" }} className="col-centro">
-                    Situação
-                  </th>
-                  {filtros.fotos && (
-                    <th style={{ width: "17%" }} className="col-centro">
-                      Foto
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={filtros.fotos ? 6 : 5} className="relatorio-vazio">
-                      Nenhum produto encontrado.
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((produto) => (
-                    <tr key={produto.id_produto}>
-                      <td className="col-centro">{produto.codigo}</td>
-                      <td>{produto.descricao}</td>
-                      <td className="col-direita">
-                        {formatarQuantidade(produto.quantidade)}
-                      </td>
-                      <td className="col-direita">
-                        {formatarQuantidade(produto.livre)}
-                      </td>
-                      <td className="col-centro">{produto.situacao}</td>
-                      {filtros.fotos && (
-                        <td className="col-centro">
-                          {produto.foto_url ? (
-                            <img
-                              src={produto.foto_url}
-                              alt={`Foto de ${produto.descricao}`}
-                              width={64}
-                              height={64}
-                              style={{ width: 64, height: 64 }}
-                              className="mx-auto rounded object-cover"
-                            />
-                          ) : null}
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {data.length > 0 && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={2} className="col-direita">
-                      Total
-                    </td>
-                    <td className="col-direita">
-                      {formatarQuantidade(totais.quantidade)}
-                    </td>
-                    <td className="col-direita">
-                      {formatarQuantidade(totais.livre)}
-                    </td>
-                    <td />
-                    {filtros.fotos && <td />}
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-
-          <footer className="relatorio-footer">
-            <span>Emissor: {emissor}</span>
-            <span>Documento gerado para uso interno</span>
-          </footer>
-        </div>
-      </div>
-    </>
+    <RelatorioCadastro
+      titulo="Lista de Produtos"
+      descricao="Produtos cadastrados, com saldo, reserva, unidades e códigos personalizados."
+      exportHref={`/relatorios/produtos/export?${query}`}
+      filtros={filtrosFormulario}
+      meta={[
+        `Situação: ${ROTULOS_SITUACAO[filtros.situacao]}`,
+        `Emissão: ${emissao.data} ${emissao.hora}`,
+        contagem(data.length, "produto", "produtos"),
+      ]}
+      emissor={emissor}
+      quantidade={data.length}
+      vazio="Nenhum produto encontrado."
+      totais={[
+        { rotulo: "Total", valor: formatarQuantidade(totais.quantidade) },
+        { rotulo: "Livre", valor: formatarQuantidade(totais.livre) },
+      ]}
+    >
+      {data.map((produto) => (
+        <FichaRelatorio key={produto.id_produto} {...fichaProduto(produto, filtros)} />
+      ))}
+    </RelatorioCadastro>
   );
 }

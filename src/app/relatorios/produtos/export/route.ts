@@ -20,9 +20,10 @@ export async function GET(request: Request) {
   const { data, filtros } = await relatorioService.listarProdutos({
     situacao: url.searchParams.get("situacao"),
     fotos: url.searchParams.get("fotos"),
+    codigos: url.searchParams.get("codigos"),
   });
 
-  return new Response(gerarCsvProdutos(data, filtros.fotos), {
+  return new Response(gerarCsvProdutos(data, filtros.fotos, filtros.codigos), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="produtos-${hojeISO()}.csv"`,

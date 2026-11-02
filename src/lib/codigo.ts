@@ -9,6 +9,21 @@ export const TIPOS_CODIGO = [
 
 export type NomeTipoCodigo = (typeof TIPOS_CODIGO)[number];
 
+/** Rótulos exibidos para o tipo de código (o banco guarda o nome técnico). */
+export const ROTULOS_TIPO_CODIGO: Record<NomeTipoCodigo, string> = {
+  DIGITACAO: "Digitação",
+  EAN12: "EAN-12",
+  EAN13: "EAN-13",
+  COD_FORNECEDOR: "Cód. fornecedor",
+  COD_ESCOLA: "Cód. escola",
+  MATRICULA: "Matrícula",
+};
+
+/** Rótulo do tipo de código; nome desconhecido volta como veio. */
+export function rotuloTipoCodigo(nome: string): string {
+  return ROTULOS_TIPO_CODIGO[nome as NomeTipoCodigo] ?? nome;
+}
+
 export const ENTIDADES_CODIGO = [
   "PRODUTO",
   "DESTINATARIO",

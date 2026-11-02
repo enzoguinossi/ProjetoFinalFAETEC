@@ -110,6 +110,7 @@
 
 .relatorio-vazio {
   padding: 24px 4px;
+  margin: 0;
   text-align: center;
   color: #555555;
 }
@@ -125,6 +126,250 @@
   color: #000000;
 }
 
+/* ------------------------------------------------------------------ */
+/* Ficha de cadastro (Lista de Produtos, Funcionários e afins)         */
+/* ------------------------------------------------------------------ */
+
+.relatorio-fichas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ficha {
+  border: 1px solid #8f969b;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.ficha-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  background: #eef0f2;
+  border-bottom: 1px solid #c6cbcf;
+}
+
+.ficha-codigo {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 7.5pt;
+  color: #555;
+  letter-spacing: 0.5px;
+}
+
+.ficha-titulo {
+  flex: 1;
+  min-width: 0;
+  font-size: 9.5pt;
+  font-weight: bold;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.ficha-situacao {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 7pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #2f3437;
+  background: #fff;
+  border: 1px solid #b9bfc4;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.ficha-situacao-marca {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #21272a;
+  display: inline-block;
+}
+
+.ficha-inativo .ficha-situacao-marca {
+  background: transparent;
+  border: 1px solid #6b7280;
+}
+
+.ficha-corpo {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px 6px;
+}
+
+.ficha-foto {
+  flex: none;
+  width: 16mm;
+  height: 16mm;
+  object-fit: cover;
+  border: 1px solid #c9ced2;
+  border-radius: 2px;
+}
+
+.ficha-foto-vazia {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  color: #777;
+  font-size: 6.5pt;
+  text-align: center;
+}
+
+.ficha-campos {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ficha-linha {
+  display: grid;
+  gap: 4px 12px;
+}
+
+.ficha-rotulo {
+  display: block;
+  font-size: 6.5pt;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 700;
+}
+
+.ficha-valor {
+  display: block;
+  font-size: 8.5pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.ficha-codigos {
+  background: #fafafa;
+  border-top: 1px solid #e3e6e8;
+  padding: 4px 8px 5px;
+}
+
+.ficha-codigos-titulo {
+  font-size: 6.5pt;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.ficha-codigos-grade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ficha-codigo-tipo {
+  display: block;
+  font-size: 6pt;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.ficha-codigo-valor {
+  display: block;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 8pt;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ficha-contatos {
+  border-top: 1px solid #e3e6e8;
+  padding: 4px 8px 5px;
+}
+
+.ficha-contatos-titulo {
+  font-size: 6.5pt;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.ficha-contatos-grade {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 3px 18px;
+}
+
+.ficha-contatos-grupo-titulo {
+  font-size: 6pt;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.ficha-contato {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+
+.ficha-contato-tipo {
+  font-size: 6pt;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.ficha-contato-principal {
+  font-size: 6pt;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #2f3437;
+  font-weight: 700;
+  border: 1px solid #b9bfc4;
+  border-radius: 999px;
+  padding: 0 4px;
+}
+
+.ficha-contato-sep {
+  color: #c2c7cb;
+}
+
+.relatorio-totais-ficha {
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px solid #8f969b;
+  font-size: 8.5pt;
+  font-weight: bold;
+}
+
+.relatorio-totais-ficha b {
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin-right: 5px;
+}
+
 .relatorio-footer {
   border-top: 1px solid #888888;
   padding-top: 8px;
@@ -133,6 +378,564 @@
   justify-content: space-between;
   font-size: 8pt;
   color: #666666;
+}
+
+/*
+ * Movimentação de Estoque / Extrato de Produto(s): tabelas em faixas.
+ * Classes próprias (`relatorio-mov`), sem alterar a tabela genérica.
+ */
+.relatorio-mov {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 7.8pt;
+  margin-bottom: 8px;
+}
+
+.relatorio-mov th {
+  background: #333;
+  color: #fff;
+  text-transform: uppercase;
+  font-size: 6.6pt;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 4px 5px;
+  text-align: left;
+}
+
+.relatorio-mov td {
+  padding: 4px 5px;
+  vertical-align: top;
+  border-bottom: 1px solid #e1e4e6;
+}
+
+.relatorio-mov .col-direita {
+  text-align: right;
+}
+
+.mov-grupo td,
+.prod-grupo td {
+  background: #eef0f2;
+  border-top: 1px solid #8f969b;
+  border-bottom: 1px solid #c6cbcf;
+  padding: 5px 6px;
+}
+
+.mov-grupo-linha,
+.prod-grupo-linha {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.mov-tipo {
+  font-size: 6.2pt;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border: 1px solid #b9bfc4;
+  border-radius: 999px;
+  padding: 0 6px;
+  background: #fff;
+}
+
+.mov-doc,
+.prod-codigo {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+
+.mov-meta {
+  font-size: 7.4pt;
+  color: #555;
+}
+
+.mov-user {
+  margin-left: auto;
+  font-size: 7.4pt;
+  color: #555;
+}
+
+.mov-prod-codigo {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 6.8pt;
+  color: #666;
+  margin-right: 5px;
+}
+
+.mov-produto {
+  font-size: 8.3pt;
+}
+
+.mov-obs {
+  display: block;
+  font-size: 6.8pt;
+  font-style: italic;
+  color: #666;
+  margin-top: 1px;
+}
+
+.mov-qtd {
+  font-size: 8.5pt;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mov-saldo {
+  font-size: 7.8pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.mov-vazio {
+  padding: 10px 6px;
+  text-align: center;
+  color: #666;
+  background: #fbfbfb;
+}
+
+.prod-nome {
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+.prod-saldo {
+  margin-left: auto;
+  font-size: 7.4pt;
+  color: #444;
+}
+
+.prod-saldo b,
+.prod-total b {
+  font-size: 6.4pt;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #666;
+  margin-right: 4px;
+}
+
+.prod-total td {
+  background: #f6f7f8;
+  border-top: 1px solid #c6cbcf;
+  border-bottom: 1px solid #8f969b;
+  padding: 4px 6px;
+}
+
+.prod-total-linha {
+  display: flex;
+  justify-content: flex-end;
+  gap: 22px;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.relatorio-mov tr.mov-obs-linha td {
+  background: #fbfbfb;
+  border-bottom: 1px solid #eef0f2;
+  padding: 1px 6px 3px 52px;
+}
+
+/*
+ * Auditoria: eventos agrupados por dia, com o diff antes/depois.
+ */
+.auditoria-dia {
+  background: #eef0f2;
+  border-top: 1px solid #8f969b;
+  border-bottom: 1px solid #c6cbcf;
+  padding: 4px 6px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.auditoria-dia:first-of-type {
+  margin-top: 0;
+}
+
+.auditoria-dia strong {
+  font-size: 8.5pt;
+}
+
+.auditoria-dia span {
+  font-size: 7.2pt;
+  color: #555;
+}
+
+.auditoria-evento {
+  padding: 4px 0 6px;
+  border-bottom: 1px solid #e5e7e9;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.auditoria-evento-linha {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.auditoria-hora {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 7.4pt;
+  color: #555;
+}
+
+.auditoria-usuario {
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.auditoria-acao {
+  font-size: 6pt;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border: 1px solid #333;
+  border-radius: 999px;
+  padding: 0 5px;
+}
+
+.auditoria-entidade {
+  font-size: 7.6pt;
+}
+
+.auditoria-registro {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 7.2pt;
+  color: #555;
+}
+
+.auditoria-resumo {
+  margin-left: auto;
+  font-size: 7.2pt;
+  color: #555;
+}
+
+.auditoria-simples {
+  margin: 3px 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.auditoria-simples-linha {
+  font-size: 7.5pt;
+  color: #333;
+  overflow-wrap: anywhere;
+}
+
+.auditoria-simples-linha strong {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 6.9pt;
+  color: #666;
+  font-weight: 700;
+}
+
+.auditoria-colecao {
+  margin: 5px 0 0 16px;
+}
+
+.auditoria-colecao-titulo {
+  font-size: 6.8pt;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #555;
+  font-weight: 700;
+  margin-bottom: 1px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.auditoria-item {
+  padding: 3px 0 4px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.auditoria-item + .auditoria-item {
+  border-top: 1px dotted #e3e5e7;
+}
+
+.auditoria-item-cabecalho {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.auditoria-item-id {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 6.9pt;
+  color: #333;
+  font-weight: 700;
+}
+
+.auditoria-item-desc {
+  font-size: 7.4pt;
+  color: #555;
+}
+
+.auditoria-item-campos {
+  margin: 2px 0 0 4mm;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.auditoria-item-campo {
+  display: grid;
+  grid-template-columns: 28mm 1fr;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 7.4pt;
+  line-height: 1.4;
+}
+
+.auditoria-item-campo-rotulo {
+  font-weight: 700;
+  color: #333;
+}
+
+.auditoria-item-campo-valor {
+  color: #000;
+  overflow-wrap: anywhere;
+}
+
+.auditoria-ref {
+  font-size: 7pt;
+  color: #666;
+  overflow-wrap: anywhere;
+}
+
+.auditoria-selo {
+  display: inline-block;
+  font-size: 5.8pt;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border: 1px solid #b9bfc4;
+  border-radius: 999px;
+  padding: 0 4px;
+  color: #666;
+  background: #fff;
+}
+
+.auditoria-sem-diff {
+  margin: 2px 0 0 16px;
+  font-size: 7.2pt;
+  font-style: italic;
+  color: #666;
+}
+
+/*
+ * Relatórios em faixas (Vencimento/Pedidos) e cartões (Expedições/Entregas).
+ */
+.relatorio-faixa {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 7.8pt;
+  margin-bottom: 8px;
+}
+
+.relatorio-faixa th {
+  background: #333;
+  color: #fff;
+  text-transform: uppercase;
+  font-size: 6.6pt;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 4px 5px;
+  text-align: left;
+}
+
+.relatorio-faixa td {
+  padding: 4px 5px;
+  vertical-align: top;
+  border-bottom: 1px solid #e1e4e6;
+}
+
+.relatorio-faixa .col-direita {
+  text-align: right;
+}
+
+.faixa-grupo td {
+  background: #dfe3e6;
+  border-top: 1px solid #8f969b;
+  border-bottom: 1px solid #c6cbcf;
+  padding: 5px 6px;
+}
+
+.faixa-subgrupo td {
+  background: #f2f4f5;
+  border-top: 1px solid #c6cbcf;
+  border-bottom: 1px solid #e1e4e6;
+  padding: 4px 6px;
+}
+
+.faixa-grupo-linha,
+.faixa-subgrupo-linha {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.faixa-grupo-nome {
+  font-size: 8.5pt;
+  font-weight: 700;
+}
+
+.faixa-grupo-dir {
+  font-size: 7.2pt;
+  color: #555;
+}
+
+.faixa-subgrupo-nome {
+  font-size: 7.8pt;
+  font-weight: 700;
+}
+
+.faixa-subgrupo-dir {
+  font-size: 7.2pt;
+  color: #555;
+}
+
+.faixa-codigo {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 6.8pt;
+  color: #666;
+  margin-right: 5px;
+}
+
+.faixa-dia {
+  background: #eef0f2;
+  border-top: 1px solid #8f969b;
+  border-bottom: 1px solid #c6cbcf;
+  padding: 4px 6px;
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.faixa-dia:first-of-type {
+  margin-top: 0;
+}
+
+.badge-status {
+  display: inline-block;
+  font-size: 6pt;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 0 6px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.badge-status-forte {
+  background: #333;
+  color: #fff;
+  border: 1px solid #333;
+}
+
+.badge-status-contorno {
+  background: #fff;
+  color: #333;
+  border: 1px solid #333;
+}
+
+.badge-status-duplo {
+  background: #f2f4f5;
+  color: #333;
+  border: 3px double #333;
+  padding: 0 5px;
+  line-height: 1.3;
+}
+
+.registro {
+  border: 1px solid #8f969b;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.registro + .registro {
+  margin-top: 6px;
+}
+
+.registro-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 7px;
+  background: #eef0f2;
+  border-bottom: 1px solid #c6cbcf;
+}
+
+.registro-titulo {
+  font-size: 8.8pt;
+  font-weight: 700;
+}
+
+.registro-direita {
+  margin-left: auto;
+  font-size: 7.4pt;
+  color: #555;
+}
+
+.registro-corpo {
+  padding: 5px 7px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.registro-linha {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 7.6pt;
+}
+
+.registro-rotulo {
+  min-width: 28mm;
+  font-size: 6.4pt;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #666;
+  font-weight: 700;
+}
+
+.registro-obs {
+  font-size: 6.9pt;
+  color: #666;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.registro-fotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  margin-top: 3px;
+}
+
+.registro-fotos img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border: 1px solid #c9ced2;
+  border-radius: 2px;
 }
 
 /*
@@ -240,5 +1043,54 @@
 
   .relatorio-tabela tr {
     break-inside: avoid;
+  }
+
+  .relatorio-mov thead {
+    display: table-header-group;
+  }
+
+  .relatorio-mov tr {
+    break-inside: avoid;
+  }
+
+  .relatorio-mov tr.mov-grupo,
+  .relatorio-mov tr.prod-grupo {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .relatorio-mov tr.prod-total {
+    break-before: avoid;
+    page-break-before: avoid;
+  }
+
+  .auditoria-dia {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .relatorio-faixa thead {
+    display: table-header-group;
+  }
+
+  .relatorio-faixa tr {
+    break-inside: avoid;
+  }
+
+  .faixa-grupo,
+  .faixa-subgrupo,
+  .faixa-dia {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .registro {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .ficha {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

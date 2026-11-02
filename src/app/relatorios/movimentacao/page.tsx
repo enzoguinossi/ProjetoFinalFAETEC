@@ -4,12 +4,12 @@ import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFil
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import {
-  formatarDataHoraRelatorio,
   formatarDataISO,
   metadadosEmissao,
   relatorioService,
 } from "@/services/relatorio";
-import ImprimirButton from "../produtos/ImprimirButton";
+import ImprimirButton from "@/components/relatorios/ImprimirButton";
+import { TabelaDocumentos } from "./Tabelas";
 
 export const dynamic = "force-dynamic";
 
@@ -21,16 +21,6 @@ type Params = {
   fornecedor?: string | string[];
   tipo?: string | string[];
 };
-
-function formatarQuantidade(valor: number): string {
-  return valor.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
-}
-
-/** Quantidade da tabela: o sinal deixa claro o sentido do movimento. */
-function formatarQuantidadeAssinada(valor: number): string {
-  const texto = formatarQuantidade(valor);
-  return valor > 0 ? `+${texto}` : texto;
-}
 
 export default async function RelatorioMovimentacaoPage({
   searchParams,
@@ -60,10 +50,7 @@ export default async function RelatorioMovimentacaoPage({
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
-  // Extrato: exatamente um produto selecionado (compatível com `?produto=<id>`).
-  const produto = produtosSelecionados.length === 1 ? produtosSelecionados[0] : null;
-  const extrato = produto !== null;
-  const titulo = extrato ? "Extrato de Produto" : "Movimentação de Estoque";
+  const titulo = "Movimentação de Estoque";
 
   const campos: CampoFiltro[] = [
     { id: "periodo", rotulo: "Período", tipo: "periodo" },
@@ -131,9 +118,7 @@ export default async function RelatorioMovimentacaoPage({
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ink m-0">{titulo}</h2>
           <p className="text-sm text-[#697077] m-0">
-            {extrato
-              ? "Entradas, saídas e ajustes do produto no período selecionado."
-              : "Entradas, saídas e ajustes de estoque no período selecionado."}
+            Entradas, saídas e ajustes de estoque no período selecionado.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -167,7 +152,7 @@ export default async function RelatorioMovimentacaoPage({
               <div className="meta-info">
                 {produtosSelecionados.length > 0 && (
                   <p>
-                    {extrato ? "Produto" : "Produtos"}:{" "}
+                    {produtosSelecionados.length === 1 ? "Produto" : "Produtos"}:{" "}
                     {produtosSelecionados
                       .map((p) => `${p.codigo} - ${p.descricao}`)
                       .join(", ")}
@@ -197,77 +182,7 @@ export default async function RelatorioMovimentacaoPage({
               </div>
             </header>
 
-            <table className="relatorio-tabela">
-              <thead>
-                <tr>
-                  <th style={{ width: "11%" }} className="col-centro">
-                    Data
-                  </th>
-                  <th style={{ width: "20%" }}>Produto</th>
-                  <th style={{ width: "7%" }} className="col-centro">
-                    Tipo
-                  </th>
-                  <th style={{ width: "8%" }} className="col-centro">
-                    Documento
-                  </th>
-                  <th style={{ width: "16%" }}>Destinatário / Fornecedor</th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Quantidade
-                  </th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Saldo anterior
-                  </th>
-                  <th style={{ width: "9%" }} className="col-direita">
-                    Saldo posterior
-                  </th>
-                  <th style={{ width: "11%" }}>Usuário</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="relatorio-vazio">
-                      Nenhuma movimentação encontrada no período.
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((movimentacao) => (
-                    <tr key={movimentacao.id_movimentacao}>
-                      <td className="col-centro">
-                        {formatarDataHoraRelatorio(movimentacao.data_hora)}
-                      </td>
-                      <td title={movimentacao.produto}>
-                        {movimentacao.codigo} - {movimentacao.produto}
-                      </td>
-                      <td className="col-centro">{movimentacao.tipo}</td>
-                      <td className="col-centro">{movimentacao.documento}</td>
-                      <td title={movimentacao.destinatario_fornecedor}>
-                        {movimentacao.destinatario_fornecedor}
-                      </td>
-                      <td className="col-direita">
-                        {formatarQuantidadeAssinada(movimentacao.quantidade)}
-                      </td>
-                      <td className="col-direita">
-                        {movimentacao.saldo_anterior === null
-                          ? "—"
-                          : formatarQuantidade(movimentacao.saldo_anterior)}
-                      </td>
-                      <td className="col-direita">
-                        {movimentacao.saldo_posterior === null
-                          ? "—"
-                          : formatarQuantidade(movimentacao.saldo_posterior)}
-                      </td>
-                      <td>{movimentacao.usuario}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-
-            <div className="relatorio-totais">
-              <span>Entradas: {formatarQuantidade(totais.entradas)}</span>
-              <span>Saídas: {formatarQuantidade(totais.saidas)}</span>
-            </div>
+            <TabelaDocumentos data={data} totais={totais} />
           </div>
 
           <footer className="relatorio-footer">

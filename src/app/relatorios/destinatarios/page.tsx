@@ -1,26 +1,29 @@
 import { redirect } from "next/navigation";
-import Button from "@/components/Button";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
+import FichaRelatorio from "@/components/relatorios/FichaRelatorio";
+import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import {
   SITUACOES_CADASTRO_RELATORIO,
   TIPOS_DESTINATARIO_RELATORIO,
 } from "@/dao/relatorio";
+import { contagem } from "@/lib/formatar";
+import { fichaDestinatario } from "@/lib/fichas-relatorio";
 import {
   metadadosEmissao,
   relatorioService,
   rotuloSituacaoCadastro,
   rotuloTipoDestinatario,
 } from "@/services/relatorio";
-import ImprimirButton from "../produtos/ImprimirButton";
-import { formatarCnpj } from "@/lib/cnpj";
 
 export const dynamic = "force-dynamic";
 
 type Params = {
   situacao?: string | string[];
   tipo?: string | string[];
+  codigos?: string | string[];
+  contatos?: string | string[];
 };
 
 export default async function RelatorioDestinatariosPage({
@@ -54,11 +57,15 @@ export default async function RelatorioDestinatariosPage({
         rotulo: rotuloTipoDestinatario(tipo),
       })),
     },
+    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox" },
+    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox" },
   ];
 
   const valores = {
     situacao: [...filtros.situacoes],
     tipo: [...filtros.tipos],
+    codigos: filtros.codigos ? ["1"] : [],
+    contatos: filtros.contatos ? ["1"] : [],
   };
 
   const query = new URLSearchParams();
@@ -66,6 +73,8 @@ export default async function RelatorioDestinatariosPage({
     query.set("situacao", filtros.situacoes.join(","));
   }
   if (filtros.tipos.length > 0) query.set("tipo", filtros.tipos.join(","));
+  if (filtros.codigos) query.set("codigos", "1");
+  if (filtros.contatos) query.set("contatos", "1");
 
   const situacaoTexto =
     filtros.situacoes.length === 0
@@ -77,105 +86,34 @@ export default async function RelatorioDestinatariosPage({
       : filtros.tipos.map(rotuloTipoDestinatario).join(", ");
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink m-0">Destinatários</h2>
-          <p className="text-sm text-[#697077] m-0">
-            Escolas, creches, CMEI e CMEIA atendidos, com tipo, situação, endereço e contato principal.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ImprimirButton />
-          <Button
-            label="Exportar CSV"
-            href={`/relatorios/destinatarios/export?${query.toString()}`}
-            variant="ghost"
-          />
-          <Button label="Voltar" href="/relatorios" variant="ghost" />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+    <RelatorioCadastro
+      titulo="Destinatários"
+      descricao="Escolas, creches, CMEI e CMEIA atendidos, com tipo, situação, endereço e contato principal."
+      exportHref={`/relatorios/destinatarios/export?${query.toString()}`}
+      filtros={
         <BarraFiltros
           key={JSON.stringify(valores)}
           basePath="/relatorios/destinatarios"
           campos={campos}
           valores={valores}
         />
-      </div>
-
-      <div className="relatorio-scroll">
-        <div className="relatorio-container">
-          <div className="relatorio-conteudo">
-            <header className="relatorio-header">
-              <h1 className="titulo-relatorio">Destinatários</h1>
-              <div className="meta-info">
-                <p>Situação: {situacaoTexto}</p>
-                <p>Tipo: {tipoTexto}</p>
-                <p>
-                  Emissão: {emissao.data} {emissao.hora}
-                </p>
-                <p>
-                  {data.length} destinatário{data.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </header>
-
-            <table className="relatorio-tabela">
-              <thead>
-                <tr>
-                  <th style={{ width: "7%" }} className="col-centro">
-                    Código
-                  </th>
-                  <th style={{ width: "20%" }}>Razão social</th>
-                  <th style={{ width: "11%" }} className="col-centro">
-                    CNPJ
-                  </th>
-                  <th style={{ width: "7%" }} className="col-centro">
-                    Tipo
-                  </th>
-                  <th style={{ width: "7%" }} className="col-centro">
-                    Situação
-                  </th>
-                  <th style={{ width: "24%" }}>Endereço</th>
-                  <th style={{ width: "13%" }}>E-mail</th>
-                  <th style={{ width: "11%" }} className="col-centro">
-                    Telefone
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="relatorio-vazio">
-                      Nenhum destinatário encontrado.
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((linha) => (
-                    <tr key={linha.id_destinatario}>
-                      <td className="col-centro">{linha.codigo}</td>
-                      <td>{linha.razao_social}</td>
-                      <td className="col-centro">{linha.cnpj ? formatarCnpj(linha.cnpj) : "—"}</td>
-                      <td className="col-centro">{linha.tipo}</td>
-                      <td className="col-centro">{linha.situacao}</td>
-                      <td title={linha.endereco}>{linha.endereco}</td>
-                      <td title={linha.email ?? undefined}>{linha.email ?? "—"}</td>
-                      <td className="col-centro">{linha.telefone ?? "—"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <footer className="relatorio-footer">
-            <span>Emissor: {emissor}</span>
-            <span>Documento gerado para uso interno</span>
-          </footer>
-        </div>
-      </div>
-    </>
+      }
+      meta={[
+        `Situação: ${situacaoTexto}`,
+        `Tipo: ${tipoTexto}`,
+        `Emissão: ${emissao.data} ${emissao.hora}`,
+        contagem(data.length, "destinatário", "destinatários"),
+      ]}
+      emissor={emissor}
+      quantidade={data.length}
+      vazio="Nenhum destinatário encontrado."
+    >
+      {data.map((destinatario) => (
+        <FichaRelatorio
+          key={destinatario.id_destinatario}
+          {...fichaDestinatario(destinatario, filtros)}
+        />
+      ))}
+    </RelatorioCadastro>
   );
 }

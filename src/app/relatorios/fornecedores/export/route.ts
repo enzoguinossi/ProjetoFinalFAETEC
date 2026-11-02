@@ -16,11 +16,13 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const { data } = await relatorioService.listarFornecedores({
+  const { data, filtros } = await relatorioService.listarFornecedores({
     situacao: url.searchParams.getAll("situacao"),
+    codigos: url.searchParams.get("codigos"),
+    contatos: url.searchParams.get("contatos"),
   });
 
-  return new Response(gerarCsvFornecedores(data), {
+  return new Response(gerarCsvFornecedores(data, filtros.codigos, filtros.contatos), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="fornecedores-${hojeISO()}.csv"`,

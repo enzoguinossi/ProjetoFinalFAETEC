@@ -49,15 +49,23 @@ const linha: ProdutoRelatorioRow = {
   codigo: "000001",
   descricao: "Arroz",
   quantidade: 10,
+  reservado: 2.5,
   livre: 7.5,
   situacao: "Ativo",
+  unidade_entrada: "UNIDADE",
+  unidade_saida: "UNIDADE",
+  codigos: [],
   foto_url: null,
 };
 
 describe("serviço de relatórios", () => {
   describe("normalizarFiltrosProdutos", () => {
     it("usa ativas como padrão", () => {
-      expect(normalizarFiltrosProdutos()).toEqual({ situacao: "ativas", fotos: false });
+      expect(normalizarFiltrosProdutos()).toEqual({
+        situacao: "ativas",
+        fotos: false,
+        codigos: false,
+      });
     });
 
     it("aceita situação válida, inclusive em array, e ignora valor inválido", () => {
@@ -67,6 +75,7 @@ describe("serviço de relatórios", () => {
       );
       expect(normalizarFiltrosProdutos({ situacao: "qualquer" }).situacao).toBe("ativas");
       expect(normalizarFiltrosProdutos({ fotos: "1" }).fotos).toBe(true);
+      expect(normalizarFiltrosProdutos({ codigos: "1" }).codigos).toBe(true);
     });
   });
 
@@ -112,6 +121,27 @@ describe("serviço de relatórios", () => {
 
       const semFoto = gerarCsvProdutos([linha], false);
       expect(semFoto).not.toContain("Foto");
+    });
+
+    it("inclui a coluna Códigos somente quando solicitado", () => {
+      const comCodigos = gerarCsvProdutos(
+        [
+          {
+            ...linha,
+            codigos: [
+              { tipo: "EAN13", codigo: "789" },
+              { tipo: "COD_FORNECEDOR", codigo: "ABC-1" },
+            ],
+          },
+        ],
+        false,
+        true,
+      );
+      expect(comCodigos).toContain("Situação;Códigos");
+      expect(comCodigos).toContain("EAN13: 789 | COD_FORNECEDOR: ABC-1");
+
+      const semCodigos = gerarCsvProdutos([linha], false, false);
+      expect(semCodigos).not.toContain("Códigos");
     });
   });
 
@@ -424,6 +454,7 @@ describe("serviço de relatórios", () => {
     it("gera o CSV de Entregas com BOM, ponto e vírgula e decimal com vírgula", () => {
       const entrega: EntregaRelatorioRow = {
         id_nota_saida: 12,
+        id_destinatario: 3,
         codigo: "000012",
         data: new Date("2026-10-10T12:00:00.000Z"),
         destinatario: "Escola Municipal",
@@ -463,6 +494,7 @@ describe("serviço de relatórios", () => {
       const csv = gerarCsvEntregas([
         {
           id_nota_saida: 13,
+          id_destinatario: 3,
           codigo: "000013",
           data: new Date("2026-10-11T12:00:00.000Z"),
           destinatario: 'Escola "Central"; anexo',
@@ -498,30 +530,66 @@ describe("serviço de relatórios", () => {
 
   describe("normalizarFiltros dos cadastros", () => {
     it("normaliza a situação de funcionários e fornecedores (vazio não filtra)", () => {
-      expect(normalizarFiltrosFuncionarios()).toEqual({ situacoes: [], fotos: false });
+      expect(normalizarFiltrosFuncionarios()).toEqual({
+        situacoes: [],
+        fotos: false,
+        codigos: false,
+        contatos: false,
+      });
       expect(
-        normalizarFiltrosFuncionarios({ situacao: "inativos", fotos: "1" }),
-      ).toEqual({ situacoes: ["inativos"], fotos: true });
+        normalizarFiltrosFuncionarios({
+          situacao: "inativos",
+          fotos: "1",
+          codigos: "1",
+          contatos: "1",
+        }),
+      ).toEqual({
+        situacoes: ["inativos"],
+        fotos: true,
+        codigos: true,
+        contatos: true,
+      });
       expect(
         normalizarFiltrosFuncionarios({ situacao: ["ativos", "inativos", "ativos"] }),
-      ).toEqual({ situacoes: ["ativos", "inativos"], fotos: false });
+      ).toEqual({
+        situacoes: ["ativos", "inativos"],
+        fotos: false,
+        codigos: false,
+        contatos: false,
+      });
       expect(normalizarFiltrosFuncionarios({ situacao: "qualquer" })).toEqual({
         situacoes: [],
         fotos: false,
+        codigos: false,
+        contatos: false,
       });
       expect(normalizarFiltrosFornecedores({ situacao: "ativos" })).toEqual({
         situacoes: ["ativos"],
+        codigos: false,
+        contatos: false,
       });
     });
 
     it("normaliza situação e tipo dos destinatários", () => {
-      expect(normalizarFiltrosDestinatarios()).toEqual({ situacoes: [], tipos: [] });
+      expect(normalizarFiltrosDestinatarios()).toEqual({
+        situacoes: [],
+        tipos: [],
+        codigos: false,
+        contatos: false,
+      });
       expect(
         normalizarFiltrosDestinatarios({
           situacao: "ativos",
           tipo: ["CRECHE", "ESCOLA", "CRECHE", "qualquer"],
+          codigos: "1",
+          contatos: "1",
         }),
-      ).toEqual({ situacoes: ["ativos"], tipos: ["CRECHE", "ESCOLA"] });
+      ).toEqual({
+        situacoes: ["ativos"],
+        tipos: ["CRECHE", "ESCOLA"],
+        codigos: true,
+        contatos: true,
+      });
     });
 
     it("rotula as opções dos filtros", () => {
@@ -564,6 +632,9 @@ describe("serviço de relatórios", () => {
         situacao: "Ativo",
         email: "ana@nexus.test",
         telefone: "21999990001",
+        emails: [],
+        telefones: [],
+        codigos: [],
         foto_url: null,
       };
 
@@ -583,6 +654,44 @@ describe("serviço de relatórios", () => {
       expect(comFoto).toContain("/uploads/funcionarios/1/foto.webp");
     });
 
+    it("substitui E-mail/Telefone por E-mails/Telefones no CSV de funcionários", () => {
+      const csv = gerarCsvFuncionarios(
+        [
+          {
+            id_funcionario: 1,
+            codigo: "000001",
+            nome: "Ana",
+            cpf: null,
+            cargo: null,
+            condutor: false,
+            situacao: "Ativo",
+            email: "ana@nexus.test",
+            telefone: "21999990001",
+            emails: [
+              { endereco: "ana@nexus.test", principal: true },
+              { endereco: "ana.secundaria@nexus.test", principal: false },
+            ],
+            telefones: [
+              { numero: "21999990001", tipo: "CELULAR", principal: true },
+              { numero: "2133334444", tipo: "COMERCIAL", principal: false },
+            ],
+            codigos: [],
+            foto_url: null,
+          },
+        ],
+        false,
+        false,
+        true,
+      );
+
+      expect(csv).toContain("Situação;E-mails;Telefones");
+      expect(csv).toContain("ana@nexus.test (principal) | ana.secundaria@nexus.test");
+      expect(csv).toContain(
+        "(21) 99999-0001 (Celular, principal) | (21) 3333-4444 (Comercial)",
+      );
+      expect(csv).not.toContain("E-mail;Telefone");
+    });
+
     it("gera o CSV de destinatários com tipo, endereço e contato", () => {
       const destinatario: DestinatarioRelatorioRow = {
         id_destinatario: 1,
@@ -594,6 +703,9 @@ describe("serviço de relatórios", () => {
         endereco: "Rua A, 10 - Centro - Rio de Janeiro",
         email: "escola@nexus.test",
         telefone: "2133334444",
+        emails: [],
+        telefones: [],
+        codigos: [],
       };
 
       const csv = gerarCsvDestinatarios([destinatario]);
@@ -615,6 +727,9 @@ describe("serviço de relatórios", () => {
         endereco: "—",
         email: null,
         telefone: null,
+        emails: [],
+        telefones: [],
+        codigos: [],
       };
 
       const csv = gerarCsvFornecedores([fornecedor]);
@@ -624,6 +739,138 @@ describe("serviço de relatórios", () => {
         "\uFEFFCódigo;Razão social;CNPJ;Situação;Endereço;E-mail;Telefone\r\n" +
           "000002;Fornecedor B;;Inativo;—;;\r\n",
       );
+    });
+
+    it("anexa a coluna Códigos ao final do CSV dos cadastros", () => {
+      const comCodigos = gerarCsvFuncionarios(
+        [
+          {
+            id_funcionario: 1,
+            codigo: "000001",
+            nome: "Ana",
+            cpf: null,
+            cargo: null,
+            condutor: false,
+            situacao: "Ativo",
+            email: null,
+            telefone: null,
+            emails: [],
+            telefones: [],
+            codigos: [{ tipo: "MATRICULA", codigo: "12345" }],
+            foto_url: null,
+          },
+        ],
+        false,
+        true,
+      );
+      expect(comCodigos).toContain("Telefone;Códigos");
+      expect(comCodigos).toContain("MATRICULA: 12345");
+
+      const destinatario = gerarCsvDestinatarios(
+        [
+          {
+            id_destinatario: 1,
+            codigo: "000001",
+            razao_social: "Escola A",
+            cnpj: null,
+            tipo: "Escola",
+            situacao: "Ativo",
+            endereco: "Rua A",
+            email: null,
+            telefone: null,
+            emails: [],
+            telefones: [],
+            codigos: [{ tipo: "COD_ESCOLA", codigo: "ESC-9" }],
+          },
+        ],
+        true,
+      );
+      expect(destinatario).toContain("Telefone;Códigos");
+      expect(destinatario).toContain("COD_ESCOLA: ESC-9");
+
+      const fornecedor = gerarCsvFornecedores(
+        [
+          {
+            id_fornecedor: 1,
+            codigo: "000001",
+            razao_social: "Fornecedor A",
+            cnpj: null,
+            situacao: "Ativo",
+            endereco: "—",
+            email: null,
+            telefone: null,
+            emails: [],
+            telefones: [],
+            codigos: [{ tipo: "DIGITACAO", codigo: "F-1" }],
+          },
+        ],
+        true,
+      );
+      expect(fornecedor).toContain("Telefone;Códigos");
+      expect(fornecedor).toContain("DIGITACAO: F-1");
+    });
+
+    it("substitui E-mail/Telefone por E-mails/Telefones no CSV dos cadastros", () => {
+      const destinatario = gerarCsvDestinatarios(
+        [
+          {
+            id_destinatario: 1,
+            codigo: "000001",
+            razao_social: "Escola A",
+            cnpj: null,
+            tipo: "Escola",
+            situacao: "Ativo",
+            endereco: "Rua A",
+            email: "escola@nexus.test",
+            telefone: "2133334444",
+            emails: [
+              { endereco: "escola@nexus.test", principal: true },
+              { endereco: "secretaria@nexus.test", principal: false },
+            ],
+            telefones: [
+              { numero: "2133334444", tipo: "COMERCIAL", principal: true },
+              { numero: "21999990000", tipo: "CELULAR", principal: false },
+            ],
+            codigos: [{ tipo: "COD_ESCOLA", codigo: "ESC-9" }],
+          },
+        ],
+        true,
+        true,
+      );
+
+      expect(destinatario).toContain("Endereço;E-mails;Telefones;Códigos");
+      expect(destinatario).not.toContain("E-mail;Telefone");
+      expect(destinatario).toContain(
+        "escola@nexus.test (principal) | secretaria@nexus.test",
+      );
+      expect(destinatario).toContain(
+        "(21) 3333-4444 (Comercial, principal) | (21) 99999-0000 (Celular)",
+      );
+
+      const fornecedor = gerarCsvFornecedores(
+        [
+          {
+            id_fornecedor: 1,
+            codigo: "000001",
+            razao_social: "Fornecedor A",
+            cnpj: null,
+            situacao: "Ativo",
+            endereco: "—",
+            email: null,
+            telefone: null,
+            emails: [{ endereco: "fornecedor@nexus.test", principal: true }],
+            telefones: [
+              { numero: "2144445555", tipo: "COMERCIAL", principal: true },
+            ],
+            codigos: [],
+          },
+        ],
+        false,
+        true,
+      );
+      expect(fornecedor).toContain("Endereço;E-mails;Telefones");
+      expect(fornecedor).toContain("fornecedor@nexus.test (principal)");
+      expect(fornecedor).toContain("(21) 4444-5555 (Comercial, principal)");
     });
   });
 
@@ -687,6 +934,8 @@ describe("serviço de relatórios", () => {
         acao: "ALTERAR",
         entidade: "Produto",
         id_entidade_afetada: 10,
+        dados_anteriores: null,
+        dados_novos: null,
       };
       const semRegistro: AuditoriaRelatorioRow = {
         ...linha,
@@ -702,9 +951,79 @@ describe("serviço de relatórios", () => {
 
       expect(csv.startsWith("\uFEFF")).toBe(true);
       expect(csv).toBe(
-        "\uFEFFData/hora;Usuário;Ação;Entidade;Registro\r\n" +
-          "24/10/2026 12:30;Ana Auditora;ALTERAR;Produto;10\r\n" +
-          "24/10/2026 13:45;sem_nome;LOGIN;Usuario;—\r\n",
+        "\uFEFFData/hora;Usuário;Ação;Entidade;Registro;Descrição;Alterações\r\n" +
+          "24/10/2026 12:30;Ana Auditora;Alterar;Produto;#10;;\r\n" +
+          "24/10/2026 13:45;sem_nome;Login;Usuário;—;;\r\n",
+      );
+    });
+
+    it("inclui descrição e o diff redigido na coluna Alterações", () => {
+      const linha: AuditoriaRelatorioRow = {
+        id_registro_auditoria: 9,
+        data_hora: new Date("2026-10-24T17:00:00.000Z"),
+        usuario: "Ana Auditora",
+        acao: "ALTERAR",
+        entidade: "Usuario",
+        id_entidade_afetada: 3,
+        dados_anteriores: { nome: "Ana", senha_hash: "hash-antigo" },
+        dados_novos: { nome: "Ana Paula", senha_hash: "hash-novo" },
+      };
+
+      const csv = gerarCsvAuditoria([linha]);
+
+      expect(csv).toContain("Registro;Descrição;Alterações");
+      expect(csv).toContain("Ana Paula");
+      expect(csv).toContain(
+        "Nome: Ana → Ana Paula | Senha: [oculto] → [oculto]",
+      );
+      expect(csv).not.toContain("hash-antigo");
+      expect(csv).not.toContain("hash-novo");
+    });
+
+    it("não mostra diff em eventos de autenticação", () => {
+      const linha: AuditoriaRelatorioRow = {
+        id_registro_auditoria: 11,
+        data_hora: new Date("2026-10-24T19:00:00.000Z"),
+        usuario: "Enzo",
+        acao: "LOGIN",
+        entidade: "Usuario",
+        id_entidade_afetada: 3,
+        dados_anteriores: { login: "enzo@email.com" },
+        dados_novos: {},
+      };
+
+      const csv = gerarCsvAuditoria([linha]);
+
+      expect(csv).toContain("enzo@email.com");
+      expect(csv).not.toContain("Login:");
+      expect(csv).not.toContain("→");
+    });
+
+    it("descreve coleções no CSV com grupo, item e referência", () => {
+      const linha: AuditoriaRelatorioRow = {
+        id_registro_auditoria: 10,
+        data_hora: new Date("2026-10-24T18:00:00.000Z"),
+        usuario: "Ana Auditora",
+        acao: "ALTERAR",
+        entidade: "NotaSaida",
+        id_entidade_afetada: 1,
+        dados_anteriores: {
+          itens: [{ id_item_nota_saida: 34, qtd_entregue: 0 }],
+        },
+        dados_novos: {
+          itens: [{ id_item_nota_saida: 34, qtd_entregue: 4 }],
+        },
+      };
+      const referencias = new Map([
+        ["item_nota_saida:34", "Lápis de cor"],
+        ["nota_saida:1", "Escola A"],
+      ]);
+
+      const csv = gerarCsvAuditoria([linha], referencias);
+
+      expect(csv).toContain("Escola A");
+      expect(csv).toContain(
+        "Itens · Item #34 · Lápis de cor · Qtd. entregue: 0 → 4",
       );
     });
   });

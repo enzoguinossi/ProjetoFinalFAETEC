@@ -1,13 +1,13 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
-import Button from "@/components/Button";
+import BadgeStatus from "@/components/relatorios/BadgeStatus";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
-import RelatorioAmpliado from "@/components/relatorios/RelatorioAmpliado";
+import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { formatarCodigo } from "@/lib/formatar";
 import {
   formatarDataISO,
-  formatarQuantidadeCsv,
   metadadosEmissao,
   relatorioService,
 } from "@/services/relatorio";
@@ -18,7 +18,6 @@ import {
 } from "@/services/pedido";
 import type { StatusPedido } from "@prisma/client";
 import { listarEscolasSelecao, listarProdutosPedido } from "../../pedidos/actions";
-import ImprimirButton from "../produtos/ImprimirButton";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +122,40 @@ export default async function RelatorioPedidosPage({
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
   const totalGeral = linhas.reduce((soma, linha) => soma + linha.total, 0);
 
+  type GrupoEscola = {
+    id_destinatario: number;
+    nome: string;
+    pedidos: PedidoRelatorioRow[];
+    itens: number;
+  };
+  const porEscola = new Map<number, GrupoEscola>();
+  for (const linha of linhas) {
+    const grupo = porEscola.get(linha.id_destinatario) ?? {
+      id_destinatario: linha.id_destinatario,
+      nome: linha.escola,
+      pedidos: [],
+      itens: 0,
+    };
+    grupo.pedidos.push(linha);
+    grupo.itens += linha.itens.length;
+    porEscola.set(linha.id_destinatario, grupo);
+  }
+  const grupos = [...porEscola.values()]
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((grupo) => ({
+      ...grupo,
+      pedidos: [...grupo.pedidos].sort(
+        (a, b) =>
+          a.data.localeCompare(b.data) || a.codigo.localeCompare(b.codigo),
+      ),
+    }));
+
+  function tomStatus(status: string): "forte" | "contorno" | "duplo" {
+    if (status === "Aprovado") return "forte";
+    if (status === "Recusado") return "duplo";
+    return "contorno";
+  }
+
   const campos: CampoFiltro[] = [
     { id: "periodo", rotulo: "Período", tipo: "periodo" },
     {
@@ -213,102 +246,97 @@ export default async function RelatorioPedidosPage({
   ];
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink m-0">Pedidos por Escola</h2>
-          <p className="text-sm text-[#697077] m-0">
-            Solicitações das escolas no período, com status, itens, total e nota de saída.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ImprimirButton />
-          <Button
-            label="Exportar CSV"
-            href={`/relatorios/pedidos/export?${query.toString()}`}
-            variant="ghost"
-          />
-          <Button label="Voltar" href="/relatorios" variant="ghost" />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+    <RelatorioCadastro
+      titulo="Pedidos por Escola"
+      descricao="Solicitações das escolas no período, com status, itens, total e nota de saída."
+      exportHref={`/relatorios/pedidos/export?${query.toString()}`}
+      filtros={
         <BarraFiltros
           key={JSON.stringify(valores)}
           basePath="/relatorios/pedidos"
           campos={campos}
           valores={valores}
         />
-      </div>
-
-      <RelatorioAmpliado titulo="Pedidos por Escola" meta={meta} emissor={emissor}>
-        <table className="relatorio-tabela relatorio-tabela-ampliada">
-          <thead>
-            <tr>
-              <th style={{ width: "26%" }}>Escola</th>
-              <th style={{ width: "10%" }} className="col-centro">
-                Pedido
-              </th>
-              <th style={{ width: "9%" }} className="col-centro">
-                Data
-              </th>
-              <th style={{ width: "9%" }} className="col-centro">
-                Status
-              </th>
-              <th style={{ width: "30%" }} className="col-itens">
-                Itens
-              </th>
-              <th style={{ width: "8%" }} className="col-direita">
-                Total
-              </th>
-              <th style={{ width: "8%" }} className="col-centro">
-                Nota
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="relatorio-vazio">
-                  Nenhum pedido encontrado com os filtros informados.
+      }
+      meta={meta}
+      emissor={emissor}
+      quantidade={linhas.length}
+      vazio="Nenhum pedido encontrado com os filtros informados."
+      totais={[
+        { rotulo: "Pedidos", valor: String(linhas.length) },
+        { rotulo: "Itens", valor: formatarQuantidade(totalGeral) },
+      ]}
+    >
+      <table className="relatorio-faixa">
+        <thead>
+          <tr>
+            <th style={{ width: "78%" }}>Item</th>
+            <th style={{ width: "22%" }} className="col-direita">
+              Quantidade
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {grupos.map((grupo) => (
+            <Fragment key={grupo.id_destinatario}>
+              <tr className="faixa-grupo">
+                <td colSpan={2}>
+                  <div className="faixa-grupo-linha">
+                    <span className="faixa-grupo-nome">{grupo.nome}</span>
+                    <span className="faixa-grupo-dir">
+                      {grupo.pedidos.length} pedido
+                      {grupo.pedidos.length === 1 ? "" : "s"} · {grupo.itens} ite
+                      {grupo.itens === 1 ? "m" : "ns"}
+                    </span>
+                  </div>
                 </td>
               </tr>
-            ) : (
-              linhas.map((linha: PedidoRelatorioRow) => (
-                <tr key={linha.id_pedido_escola}>
-                  <td>{linha.escola}</td>
-                  <td className="col-centro">{linha.codigo}</td>
-                  <td className="col-centro">{linha.data}</td>
-                  <td className="col-centro">{linha.status}</td>
-                  <td>
-                    {linha.itens.length === 0
-                      ? "—"
-                      : linha.itens.map((item) => (
-                          <div key={item.descricao}>
-                            {item.descricao}: {formatarQuantidade(item.quantidade)}
-                          </div>
-                        ))}
-                  </td>
-                  <td className="col-direita">{formatarQuantidade(linha.total)}</td>
-                  <td className="col-centro">
-                    {linha.nota === null ? "Sem nota" : formatarCodigo(linha.nota)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={5}>
-                {linhas.length} pedido(s) —{" "}
-                {escolasSelecionadas.length > 0 ? "filtro por escola aplicado" : "todas as escolas"}
-              </td>
-              <td className="col-direita">{formatarQuantidadeCsv(totalGeral)}</td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-      </RelatorioAmpliado>
-    </>
+
+              {grupo.pedidos.map((pedido) => (
+                <Fragment key={pedido.id_pedido_escola}>
+                  <tr className="faixa-subgrupo">
+                    <td colSpan={2}>
+                      <div className="faixa-subgrupo-linha">
+                        <span className="faixa-subgrupo-nome">
+                          Pedido {pedido.codigo} · {pedido.data} ·{" "}
+                          <BadgeStatus tom={tomStatus(pedido.status)}>
+                            {pedido.status}
+                          </BadgeStatus>{" "}
+                          ·{" "}
+                          {pedido.nota === null
+                            ? "Sem nota"
+                            : `Nota ${formatarCodigo(pedido.nota)}`}
+                        </span>
+                        <span className="faixa-subgrupo-dir">
+                          {pedido.itens.length} ite
+                          {pedido.itens.length === 1 ? "m" : "ns"}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {pedido.itens.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="mov-vazio">
+                        —
+                      </td>
+                    </tr>
+                  ) : (
+                    pedido.itens.map((item) => (
+                      <tr key={`${pedido.id_pedido_escola}-${item.descricao}`}>
+                        <td>{item.descricao}</td>
+                        <td className="col-direita">
+                          {formatarQuantidade(item.quantidade)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </Fragment>
+              ))}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </RelatorioCadastro>
   );
 }

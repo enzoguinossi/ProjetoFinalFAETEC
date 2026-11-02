@@ -11,6 +11,7 @@ import {
   criarNotaEntrada,
   criarNotaSaida,
   criarProduto,
+  criarTipoCodigo,
   criarUsuario,
   criarConversao,
   criarVeiculo,
@@ -77,6 +78,15 @@ describe("relatorioDAO", () => {
         },
       });
 
+      const tipo = await criarTipoCodigo("EAN13");
+      await prismaTeste.produtoCodigo.create({
+        data: {
+          id_produto: arroz.id_produto,
+          id_tipo_codigo: tipo.id_tipo_codigo,
+          codigo: "7890000000017",
+        },
+      });
+
       const { data, totais } = await relatorioDAO.listarProdutosRelatorio();
 
       expect(data.map((p) => p.descricao)).toEqual(["Arroz", "Feijão"]);
@@ -84,17 +94,53 @@ describe("relatorioDAO", () => {
         id_produto: arroz.id_produto,
         codigo: String(arroz.id_produto).padStart(6, "0"),
         quantidade: 15,
+        reservado: 5,
         livre: 10,
         situacao: "Ativo",
+        unidade_entrada: "CX",
+        unidade_saida: "CX",
+        codigos: [{ tipo: "EAN13", codigo: "7890000000017" }],
         foto_url: "/uploads/produtos/atual.webp",
       });
       expect(data[1]).toMatchObject({
         quantidade: 2.5,
+        reservado: 0,
         livre: 2.5,
+        unidade_entrada: "UNIDADE",
+        unidade_saida: "UNIDADE",
+        codigos: [],
         foto_url: null,
       });
       expect(data[0]).not.toHaveProperty("unidade");
       expect(totais).toEqual({ quantidade: 17.5, livre: 12.5 });
+    });
+
+    it("lista todos os códigos do produto, ordenados por tipo e código", async () => {
+      const produto = await criarProduto({ descricao: "Arroz" });
+      const ean = await criarTipoCodigo("EAN13");
+      const digitacao = await criarTipoCodigo("DIGITACAO");
+
+      await prismaTeste.produtoCodigo.create({
+        data: {
+          id_produto: produto.id_produto,
+          id_tipo_codigo: ean.id_tipo_codigo,
+          codigo: "7890000000024",
+        },
+      });
+      await prismaTeste.produtoCodigo.create({
+        data: {
+          id_produto: produto.id_produto,
+          id_tipo_codigo: digitacao.id_tipo_codigo,
+          codigo: "INTERNO-1",
+        },
+      });
+
+      const { data } = await relatorioDAO.listarProdutosRelatorio();
+
+      expect(data[0]?.codigos).toEqual([
+        { tipo: "EAN13", codigo: "7890000000024" },
+        { tipo: "DIGITACAO", codigo: "INTERNO-1" },
+      ]);
     });
 
     it("filtra por situação inativas e todas", async () => {
@@ -717,6 +763,7 @@ describe("relatorioDAO", () => {
       ]);
       expect(resultado.data[1]).toMatchObject({
         codigo: String(notaA.id_nota_saida).padStart(6, "0"),
+        id_destinatario: escola.destinatario.id_destinatario,
         destinatario: "Escola Municipal",
         status: "Baixa parcial",
         itens: 2,
@@ -1059,6 +1106,16 @@ describe("relatorioDAO", () => {
           principal: false,
         },
       });
+      // Telefone inativo não entra na lista.
+      await prismaTeste.funcionarioTelefone.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          numero: "21999990003",
+          tipo: "COMERCIAL",
+          principal: false,
+          ativo: false,
+        },
+      });
 
       await prismaTeste.anexo.create({
         data: {
@@ -1079,6 +1136,15 @@ describe("relatorioDAO", () => {
         },
       });
 
+      const tipoMatricula = await criarTipoCodigo("MATRICULA");
+      await prismaTeste.funcionarioCodigo.create({
+        data: {
+          id_funcionario: ana.funcionario.id_funcionario,
+          id_tipo_codigo: tipoMatricula.id_tipo_codigo,
+          codigo: "MAT-1",
+        },
+      });
+
       const todos = await relatorioDAO.listarFuncionariosRelatorio();
       expect(todos.data.map((f) => f.nome)).toEqual(["Ana", "Bruno"]);
       expect(todos.data[0]).toMatchObject({
@@ -1090,6 +1156,15 @@ describe("relatorioDAO", () => {
         situacao: "Ativo",
         email: "ana@nexus.test",
         telefone: "21999990001",
+        emails: [
+          { endereco: "ana@nexus.test", principal: true },
+          { endereco: "ana.secundario@nexus.test", principal: false },
+        ],
+        telefones: [
+          { numero: "21999990001", tipo: "CELULAR", principal: true },
+          { numero: "21999990002", tipo: "FIXO", principal: false },
+        ],
+        codigos: [{ tipo: "MATRICULA", codigo: "MAT-1" }],
         foto_url: "/uploads/funcionarios/ana.webp",
       });
       expect(todos.data[1]).toMatchObject({
@@ -1097,6 +1172,9 @@ describe("relatorioDAO", () => {
         situacao: "Inativo",
         email: null,
         telefone: null,
+        emails: [],
+        telefones: [],
+        codigos: [],
         foto_url: null,
       });
 
@@ -1144,12 +1222,46 @@ describe("relatorioDAO", () => {
           principal: true,
         },
       });
+      await prismaTeste.destinatarioEmail.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          endereco: "secretaria@nexus.test",
+          principal: false,
+        },
+      });
       await prismaTeste.destinatarioTelefone.create({
         data: {
           id_destinatario: escola.destinatario.id_destinatario,
           numero: "2133334444",
           tipo: "COMERCIAL",
           principal: true,
+        },
+      });
+      await prismaTeste.destinatarioTelefone.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          numero: "21999990002",
+          tipo: "CELULAR",
+          principal: false,
+        },
+      });
+      // Telefone inativo não entra na lista.
+      await prismaTeste.destinatarioTelefone.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          numero: "2133339999",
+          tipo: "FIXO",
+          principal: false,
+          ativo: false,
+        },
+      });
+
+      const tipoEscola = await criarTipoCodigo("COD_ESCOLA");
+      await prismaTeste.destinatarioCodigo.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          id_tipo_codigo: tipoEscola.id_tipo_codigo,
+          codigo: "ESC-9",
         },
       });
 
@@ -1162,6 +1274,9 @@ describe("relatorioDAO", () => {
         cnpj: null,
         email: null,
         telefone: null,
+        emails: [],
+        telefones: [],
+        codigos: [],
       });
       expect(todos.data[1]).toMatchObject({
         codigo: String(escola.destinatario.id_destinatario).padStart(6, "0"),
@@ -1171,6 +1286,15 @@ describe("relatorioDAO", () => {
         endereco: `${escola.endereco.logradouro}, 10 - Centro - Rio de Janeiro`,
         email: "escola@nexus.test",
         telefone: "2133334444",
+        emails: [
+          { endereco: "escola@nexus.test", principal: true },
+          { endereco: "secretaria@nexus.test", principal: false },
+        ],
+        telefones: [
+          { numero: "2133334444", tipo: "COMERCIAL", principal: true },
+          { numero: "21999990002", tipo: "CELULAR", principal: false },
+        ],
+        codigos: [{ tipo: "COD_ESCOLA", codigo: "ESC-9" }],
       });
 
       const ativos = await relatorioDAO.listarDestinatariosRelatorio({
@@ -1217,12 +1341,46 @@ describe("relatorioDAO", () => {
           principal: true,
         },
       });
+      await prismaTeste.fornecedorEmail.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          endereco: "comercial@nexus.test",
+          principal: false,
+        },
+      });
       await prismaTeste.fornecedorTelefone.create({
         data: {
           id_fornecedor: comEndereco.fornecedor.id_fornecedor,
           numero: "2144445555",
           tipo: "COMERCIAL",
           principal: true,
+        },
+      });
+      await prismaTeste.fornecedorTelefone.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          numero: "21988880000",
+          tipo: "CELULAR",
+          principal: false,
+        },
+      });
+      // Telefone inativo não entra na lista.
+      await prismaTeste.fornecedorTelefone.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          numero: "2144449999",
+          tipo: "FIXO",
+          principal: false,
+          ativo: false,
+        },
+      });
+
+      const tipoDigitacao = await criarTipoCodigo("DIGITACAO");
+      await prismaTeste.fornecedorCodigo.create({
+        data: {
+          id_fornecedor: comEndereco.fornecedor.id_fornecedor,
+          id_tipo_codigo: tipoDigitacao.id_tipo_codigo,
+          codigo: "F-1",
         },
       });
 
@@ -1239,11 +1397,23 @@ describe("relatorioDAO", () => {
         endereco: `${comEndereco.endereco!.logradouro}, 20 - Centro - Rio de Janeiro`,
         email: "fornecedor@nexus.test",
         telefone: "2144445555",
+        emails: [
+          { endereco: "fornecedor@nexus.test", principal: true },
+          { endereco: "comercial@nexus.test", principal: false },
+        ],
+        telefones: [
+          { numero: "2144445555", tipo: "COMERCIAL", principal: true },
+          { numero: "21988880000", tipo: "CELULAR", principal: false },
+        ],
+        codigos: [{ tipo: "DIGITACAO", codigo: "F-1" }],
       });
       expect(todos.data[1]).toMatchObject({
         id_fornecedor: semEndereco.fornecedor.id_fornecedor,
         situacao: "Inativo",
         endereco: "—",
+        emails: [],
+        telefones: [],
+        codigos: [],
       });
 
       const ativos = await relatorioDAO.listarFornecedoresRelatorio({
@@ -1301,6 +1471,13 @@ describe("relatorioDAO", () => {
         "Usuario",
         null,
       );
+      await prismaTeste.registroAuditoria.update({
+        where: { id_registro_auditoria: alteracao.id_registro_auditoria },
+        data: {
+          dados_anteriores: { nome: "Antigo" },
+          dados_novos: { nome: "Novo" },
+        },
+      });
       await criarRegistro(
         ana.id_usuario,
         "2026-09-30T23:59:59.000Z",
@@ -1338,6 +1515,8 @@ describe("relatorioDAO", () => {
         acao: "ALTERAR",
         entidade: "Produto",
         id_entidade_afetada: 10,
+        dados_anteriores: { nome: "Antigo" },
+        dados_novos: { nome: "Novo" },
       });
 
       const porUsuario = await relatorioDAO.listarAuditoriaRelatorio({
@@ -1378,6 +1557,52 @@ describe("relatorioDAO", () => {
         antigo.id_registro_auditoria,
       ]);
       expect(combinado.total).toBe(1);
+    });
+
+    it("resolve as referências em lote (produto, usuário, nota e unidades)", async () => {
+      const produto = await criarProduto({ descricao: "Lápis de cor" });
+      const { usuario: ana } = await criarUsuario({ nome: "Ana" });
+      const { destinatario } = await criarDestinatario({ razaoSocial: "Escola A" });
+      const nota = await criarNotaSaida({
+        idDestinatario: destinatario.id_destinatario,
+      });
+      const entrada = await criarConversao("CX");
+      const saida = await criarConversao("DZ", 12);
+
+      const referencias = await relatorioDAO.referenciasAuditoria([
+        {
+          id_registro_auditoria: 1,
+          data_hora: new Date("2026-10-01T12:00:00.000Z"),
+          usuario: "Ana",
+          acao: "ALTERAR",
+          entidade: "Produto",
+          id_entidade_afetada: produto.id_produto,
+          dados_anteriores: {
+            id_produto: produto.id_produto,
+            id_conversao_padrao: entrada.id_conversao,
+          },
+          dados_novos: {
+            id_usuario: ana.id_usuario,
+            id_conversao_saida: saida.id_conversao,
+          },
+        },
+        {
+          id_registro_auditoria: 2,
+          data_hora: new Date("2026-10-02T12:00:00.000Z"),
+          usuario: "Ana",
+          acao: "ALTERAR",
+          entidade: "NotaSaida",
+          id_entidade_afetada: nota.id_nota_saida,
+          dados_anteriores: null,
+          dados_novos: null,
+        },
+      ]);
+
+      expect(referencias.get(`produto:${produto.id_produto}`)).toBe("Lápis de cor");
+      expect(referencias.get(`usuario:${ana.id_usuario}`)).toBe("Ana");
+      expect(referencias.get(`nota_saida:${nota.id_nota_saida}`)).toBe("Escola A");
+      expect(referencias.get(`conversao_padrao:${entrada.id_conversao}`)).toBe("CX");
+      expect(referencias.get(`conversao_saida:${saida.id_conversao}`)).toBe("DZ");
     });
 
     it("usa o login quando o usuário não tem nome e lista os filtros distintos", async () => {

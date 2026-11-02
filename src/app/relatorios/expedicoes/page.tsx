@@ -1,9 +1,12 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
-import Button from "@/components/Button";
+import BadgeStatus from "@/components/relatorios/BadgeStatus";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
-import RelatorioAmpliado from "@/components/relatorios/RelatorioAmpliado";
+import CartaoRegistro from "@/components/relatorios/CartaoRegistro";
+import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
+import { formatarCodigo } from "@/lib/formatar";
 import { STATUS_EXPEDICAO_RELATORIO } from "@/dao/relatorio";
 import {
   formatarDataISO,
@@ -11,7 +14,6 @@ import {
   relatorioService,
   rotuloStatusExpedicao,
 } from "@/services/relatorio";
-import ImprimirButton from "../produtos/ImprimirButton";
 
 export const dynamic = "force-dynamic";
 
@@ -127,151 +129,128 @@ export default async function RelatorioExpedicoesPage({
       ? "Todas"
       : filtros.status.map(rotuloStatusExpedicao).join(", ");
 
-  return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink m-0">Expedições por Período</h2>
-          <p className="text-sm text-[#697077] m-0">
-            Expedições com data prevista no período, com veículo, condutor, notas e
-            itens.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ImprimirButton />
-          <Button
-            label="Exportar CSV"
-            href={`/relatorios/expedicoes/export?${query.toString()}`}
-            variant="ghost"
-          />
-          <Button label="Voltar" href="/relatorios" variant="ghost" />
-        </div>
-      </div>
+  const ordenadas = [...data].sort(
+    (a, b) =>
+      a.data_prevista.localeCompare(b.data_prevista) ||
+      a.id_expedicao - b.id_expedicao,
+  );
+  const dias: { dia: string; itens: typeof data }[] = [];
+  for (const linha of ordenadas) {
+    const ultimo = dias[dias.length - 1];
+    if (ultimo?.dia === linha.data_prevista) ultimo.itens.push(linha);
+    else dias.push({ dia: linha.data_prevista, itens: [linha] });
+  }
 
-      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+  function tomStatus(status: string): "forte" | "contorno" | "duplo" {
+    if (status === "Concluída") return "forte";
+    if (status === "Planejada") return "duplo";
+    return "contorno";
+  }
+
+  return (
+    <RelatorioCadastro
+      titulo="Expedições por Período"
+      descricao="Expedições com data prevista no período, com veículo, condutor, notas e itens."
+      exportHref={`/relatorios/expedicoes/export?${query.toString()}`}
+      filtros={
         <BarraFiltros
           key={JSON.stringify(valores)}
           basePath="/relatorios/expedicoes"
           campos={campos}
           valores={valores}
         />
-      </div>
+      }
+      meta={[
+        ...(expedicoesSelecionadas.length > 0
+          ? [
+              `${expedicoesSelecionadas.length === 1 ? "Expedição" : "Expedições"}: ${expedicoesSelecionadas
+                .map((e) => e.codigo)
+                .join(", ")}`,
+            ]
+          : []),
+        ...(destinatariosSelecionados.length > 0
+          ? [
+              `Destinatário${destinatariosSelecionados.length === 1 ? "" : "s"}: ${destinatariosSelecionados
+                .map((d) => d.nome)
+                .join(", ")}`,
+            ]
+          : []),
+        ...(condutoresSelecionados.length > 0
+          ? [
+              `Condutor${condutoresSelecionados.length === 1 ? "" : "es"}: ${condutoresSelecionados
+                .map((c) => c.nome)
+                .join(", ")}`,
+            ]
+          : []),
+        `Status: ${statusTexto}`,
+        `Período: ${formatarDataISO(filtros.de)} a ${formatarDataISO(filtros.ate)}`,
+        `Emissão: ${emissao.data} ${emissao.hora}`,
+        `${data.length} expediç${data.length === 1 ? "ão" : "ões"}`,
+      ]}
+      emissor={emissor}
+      quantidade={data.length}
+      vazio="Nenhuma expedição encontrada no período."
+      totais={[
+        { rotulo: "Notas", valor: String(totais.notas) },
+        { rotulo: "Esperados", valor: formatarQuantidade(totais.esperados) },
+        { rotulo: "Entregues", valor: formatarQuantidade(totais.entregues) },
+      ]}
+    >
+      {dias.map((grupo) => (
+        <Fragment key={grupo.dia}>
+          <div className="faixa-dia">
+            <span>{formatarDataISO(grupo.dia)}</span>
+            <span>
+              {grupo.itens.length} expediç{grupo.itens.length === 1 ? "ão" : "ões"}
+            </span>
+          </div>
 
-      <RelatorioAmpliado
-        titulo="Expedições por Período"
-        meta={[
-          ...(expedicoesSelecionadas.length > 0
-            ? [
-                `${expedicoesSelecionadas.length === 1 ? "Expedição" : "Expedições"}: ${expedicoesSelecionadas
-                  .map((e) => e.codigo)
-                  .join(", ")}`,
-              ]
-            : []),
-          ...(destinatariosSelecionados.length > 0
-            ? [
-                `Destinatário${destinatariosSelecionados.length === 1 ? "" : "s"}: ${destinatariosSelecionados
-                  .map((d) => d.nome)
-                  .join(", ")}`,
-              ]
-            : []),
-          ...(condutoresSelecionados.length > 0
-            ? [
-                `Condutor${condutoresSelecionados.length === 1 ? "" : "es"}: ${condutoresSelecionados
-                  .map((c) => c.nome)
-                  .join(", ")}`,
-              ]
-            : []),
-          `Status: ${statusTexto}`,
-          `Período: ${formatarDataISO(filtros.de)} a ${formatarDataISO(filtros.ate)}`,
-          `Emissão: ${emissao.data} ${emissao.hora}`,
-          `${data.length} expediç${data.length === 1 ? "ão" : "ões"}`,
-        ]}
-        emissor={emissor}
-      >
-        <table className="relatorio-tabela relatorio-tabela-ampliada">
-          <thead>
-            <tr>
-              <th style={{ width: filtros.fotos ? "7%" : "9%" }} className="col-centro">
-                Data prevista
-              </th>
-              <th style={{ width: "8%" }} className="col-centro">
-                Status
-              </th>
-              <th style={{ width: "7%" }} className="col-centro">
-                Veículo
-              </th>
-              <th style={{ width: filtros.fotos ? "12%" : "16%" }}>Condutor</th>
-              <th style={{ width: "5%" }} className="col-centro">
-                Notas
-              </th>
-              <th style={{ width: filtros.fotos ? "18%" : "24%" }}>Destinatários</th>
-              <th style={{ width: "10%" }} className="col-direita">
-                Itens esperados
-              </th>
-              <th style={{ width: "10%" }} className="col-direita">
-                Itens entregues
-              </th>
-              {filtros.fotos && <th style={{ width: "23%" }}>Fotos</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {data.length === 0 ? (
-              <tr>
-                <td colSpan={filtros.fotos ? 9 : 8} className="relatorio-vazio">
-                  Nenhuma expedição encontrada no período.
-                </td>
-              </tr>
-            ) : (
-              data.map((linha) => (
-                <tr key={linha.id_expedicao}>
-                  <td className="col-centro">
-                    {formatarDataISO(linha.data_prevista)}
-                  </td>
-                  <td className="col-centro">{linha.status}</td>
-                  <td className="col-centro">{linha.veiculo}</td>
-                  <td title={linha.condutor}>{linha.condutor}</td>
-                  <td className="col-centro">{linha.notas}</td>
-                  <td title={linha.destinatarios}>{linha.destinatarios}</td>
-                  <td className="col-direita">
-                    {formatarQuantidade(linha.itens_esperados)}
-                  </td>
-                  <td className="col-direita">
-                    {formatarQuantidade(linha.itens_entregues)}
-                  </td>
-                  {filtros.fotos && (
-                    <td>
-                      <div className="flex flex-wrap gap-1">
-                        {linha.fotos.slice(0, 4).map((url) => (
-                          <a key={url} href={url} target="_blank" rel="noreferrer">
-                            <img
-                              src={url}
-                              alt={`Foto da expedição ${linha.id_expedicao}`}
-                              width={40}
-                              height={40}
-                              style={{ width: 40, height: 40 }}
-                              className="rounded border border-[#dddddd] object-cover"
-                            />
-                          </a>
-                        ))}
-                        {linha.fotos.length > 4 && (
-                          <span>+{linha.fotos.length - 4}</span>
-                        )}
-                      </div>
-                    </td>
+          {grupo.itens.map((linha) => (
+            <CartaoRegistro
+              key={linha.id_expedicao}
+              titulo={`Expedição ${formatarCodigo(linha.id_expedicao)}`}
+              badge={
+                <BadgeStatus tom={tomStatus(linha.status)}>{linha.status}</BadgeStatus>
+              }
+              direita={`${linha.veiculo} · ${linha.condutor}`}
+            >
+              <div className="registro-linha">
+                <span className="registro-rotulo">Notas</span>
+                <span>{linha.notas}</span>
+              </div>
+              <div className="registro-linha">
+                <span className="registro-rotulo">Itens</span>
+                <span>
+                  {formatarQuantidade(linha.itens_esperados)} esperados ·{" "}
+                  {formatarQuantidade(linha.itens_entregues)} entregues
+                </span>
+              </div>
+              <div className="registro-linha">
+                <span className="registro-rotulo">Destinatários</span>
+                <span>{linha.destinatarios}</span>
+              </div>
+
+              {filtros.fotos && linha.fotos.length > 0 && (
+                <div className="registro-fotos">
+                  {linha.fotos.slice(0, 4).map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      <img
+                        src={url}
+                        alt={`Foto da expedição ${linha.id_expedicao}`}
+                        width={40}
+                        height={40}
+                      />
+                    </a>
+                  ))}
+                  {linha.fotos.length > 4 && (
+                    <span className="registro-obs">+{linha.fotos.length - 4}</span>
                   )}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        <div className="relatorio-totais">
-          <span>Notas: {totais.notas}</span>
-          <span>Itens esperados: {formatarQuantidade(totais.esperados)}</span>
-          <span>Itens entregues: {formatarQuantidade(totais.entregues)}</span>
-        </div>
-      </RelatorioAmpliado>
-
-    </>
+                </div>
+              )}
+            </CartaoRegistro>
+          ))}
+        </Fragment>
+      ))}
+    </RelatorioCadastro>
   );
 }

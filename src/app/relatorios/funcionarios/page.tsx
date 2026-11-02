@@ -1,22 +1,25 @@
 import { redirect } from "next/navigation";
-import Button from "@/components/Button";
 import BarraFiltros, { type CampoFiltro } from "@/components/relatorios/BarraFiltros";
+import FichaRelatorio from "@/components/relatorios/FichaRelatorio";
+import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { SITUACOES_CADASTRO_RELATORIO } from "@/dao/relatorio";
+import { contagem } from "@/lib/formatar";
+import { fichaFuncionario } from "@/lib/fichas-relatorio";
 import {
   metadadosEmissao,
   relatorioService,
   rotuloSituacaoCadastro,
 } from "@/services/relatorio";
-import ImprimirButton from "../produtos/ImprimirButton";
-import { formatarCpf } from "@/lib/cpf";
 
 export const dynamic = "force-dynamic";
 
 type Params = {
   situacao?: string | string[];
   fotos?: string | string[];
+  codigos?: string | string[];
+  contatos?: string | string[];
 };
 
 export default async function RelatorioFuncionariosPage({
@@ -42,11 +45,15 @@ export default async function RelatorioFuncionariosPage({
       })),
     },
     { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
+    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox" },
+    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox" },
   ];
 
   const valores = {
     situacao: [...filtros.situacoes],
     fotos: filtros.fotos ? ["1"] : [],
+    codigos: filtros.codigos ? ["1"] : [],
+    contatos: filtros.contatos ? ["1"] : [],
   };
 
   const query = new URLSearchParams();
@@ -54,6 +61,8 @@ export default async function RelatorioFuncionariosPage({
     query.set("situacao", filtros.situacoes.join(","));
   }
   if (filtros.fotos) query.set("fotos", "1");
+  if (filtros.codigos) query.set("codigos", "1");
+  if (filtros.contatos) query.set("contatos", "1");
 
   const situacaoTexto =
     filtros.situacoes.length === 0
@@ -61,123 +70,30 @@ export default async function RelatorioFuncionariosPage({
       : filtros.situacoes.map(rotuloSituacaoCadastro).join(", ");
 
   return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ink m-0">Funcionários</h2>
-          <p className="text-sm text-[#697077] m-0">
-            Funcionários cadastrados, com cargo, condutor, situação e contato principal.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ImprimirButton />
-          <Button
-            label="Exportar CSV"
-            href={`/relatorios/funcionarios/export?${query.toString()}`}
-            variant="ghost"
-          />
-          <Button label="Voltar" href="/relatorios" variant="ghost" />
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border bg-white p-4" data-print-hide>
+    <RelatorioCadastro
+      titulo="Funcionários"
+      descricao="Funcionários cadastrados, com cargo, condutor, situação e contatos."
+      exportHref={`/relatorios/funcionarios/export?${query.toString()}`}
+      filtros={
         <BarraFiltros
           key={JSON.stringify(valores)}
           basePath="/relatorios/funcionarios"
           campos={campos}
           valores={valores}
         />
-      </div>
-
-      <div className="relatorio-scroll">
-        <div className="relatorio-container">
-          <div className="relatorio-conteudo">
-            <header className="relatorio-header">
-              <h1 className="titulo-relatorio">Funcionários</h1>
-              <div className="meta-info">
-                <p>Situação: {situacaoTexto}</p>
-                <p>
-                  Emissão: {emissao.data} {emissao.hora}
-                </p>
-                <p>
-                  {data.length} funcionário{data.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </header>
-
-            <table className="relatorio-tabela">
-              <thead>
-                <tr>
-                  <th style={{ width: filtros.fotos ? "6%" : "7%" }} className="col-centro">
-                    Código
-                  </th>
-                  <th style={{ width: filtros.fotos ? "23%" : "27%" }}>Nome</th>
-                  <th style={{ width: filtros.fotos ? "10%" : "11%" }} className="col-centro">
-                    CPF
-                  </th>
-                  <th style={{ width: filtros.fotos ? "13%" : "16%" }}>Cargo</th>
-                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
-                    Condutor
-                  </th>
-                  <th style={{ width: filtros.fotos ? "7%" : "8%" }} className="col-centro">
-                    Situação
-                  </th>
-                  <th style={{ width: filtros.fotos ? "12%" : "13%" }}>E-mail</th>
-                  <th style={{ width: filtros.fotos ? "9%" : "10%" }} className="col-centro">
-                    Telefone
-                  </th>
-                  {filtros.fotos && (
-                    <th style={{ width: "13%" }} className="col-centro">
-                      Foto
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {data.length === 0 ? (
-                  <tr>
-                    <td colSpan={filtros.fotos ? 9 : 8} className="relatorio-vazio">
-                      Nenhum funcionário encontrado.
-                    </td>
-                  </tr>
-                ) : (
-                  data.map((linha) => (
-                    <tr key={linha.id_funcionario}>
-                      <td className="col-centro">{linha.codigo}</td>
-                      <td>{linha.nome}</td>
-                      <td className="col-centro">{linha.cpf ? formatarCpf(linha.cpf) : "—"}</td>
-                      <td>{linha.cargo ?? "—"}</td>
-                      <td className="col-centro">{linha.condutor ? "Sim" : "Não"}</td>
-                      <td className="col-centro">{linha.situacao}</td>
-                      <td title={linha.email ?? undefined}>{linha.email ?? "—"}</td>
-                      <td className="col-centro">{linha.telefone ?? "—"}</td>
-                      {filtros.fotos && (
-                        <td className="col-centro">
-                          {linha.foto_url ? (
-                            <img
-                              src={linha.foto_url}
-                              alt={`Foto de ${linha.nome}`}
-                              width={64}
-                              height={64}
-                              style={{ width: 64, height: 64 }}
-                              className="mx-auto rounded object-cover"
-                            />
-                          ) : null}
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <footer className="relatorio-footer">
-            <span>Emissor: {emissor}</span>
-            <span>Documento gerado para uso interno</span>
-          </footer>
-        </div>
-      </div>
-    </>
+      }
+      meta={[
+        `Situação: ${situacaoTexto}`,
+        `Emissão: ${emissao.data} ${emissao.hora}`,
+        contagem(data.length, "funcionário", "funcionários"),
+      ]}
+      emissor={emissor}
+      quantidade={data.length}
+      vazio="Nenhum funcionário encontrado."
+    >
+      {data.map((funcionario) => (
+        <FichaRelatorio key={funcionario.id_funcionario} {...fichaFuncionario(funcionario, filtros)} />
+      ))}
+    </RelatorioCadastro>
   );
 }

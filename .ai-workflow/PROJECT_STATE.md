@@ -1,54 +1,90 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-01 (ficha de empresa + remoção de coordenadas + seed demo).
+> Última consolidação: 2026-11-02 (relatórios em faixa: cadastro + movimentação).
 
 ## Objetivo atual
 
-Repaginar os cadastros no estilo “ficha” e manter o **seed de demonstração dev-only**. A
-`main` recebeu o commit `KAN-139` da repaginação/seed e foi empurrada; o worktree
-`C:\Users\Enzo\Documents\Code\projetofinalfaetec-visual`, branch
-`KAN-139-repaginacao-produto`, está limpo.
+Substituir as tabelas dos relatórios de cadastro pelo layout “ficha” aprovado (cabeçalho
+com código/descrição/situação, corpo com foto e campos, grade de 4 colunas com todos os
+códigos personalizados) e adaptar a movimentação/extrato ao modelo em faixas, com
+componentes compartilhados. Base anterior: repaginação dos cadastros + seed demo no commit
+`KAN-139` (worktree principal, `main`).
 
-## Entregue nesta rodada (commit `KAN-139`)
+## Entregue nesta rodada (run `RUN-20261102-01`, sem commit)
 
-1. **Produto** (`ProdutoForm`/`ProdutoView`): banda com foto 96px, saldo/reservado,
-   `Ativo`, seções, códigos/insumos compactos e rodapé fixo.
-2. **Funcionário** (`FuncionarioForm` criar/editar/visualizar): mesma ficha, foto/iniciais,
-   `Ativo`, `Condutor`, contatos/códigos compactos.
-3. **Destinatário e fornecedor** (`EmpresaFicha` compartilhado): banda com iniciais,
-   `Ativo`, chip do tipo, seções Identificação/Endereço/Contato/Códigos; **CNPJ
-   (Consultar)** e **CEP (Buscar)** com loading, auto-preenchimento, erros e preservação de
-   número/complemento; a situação da Receita é só aviso.
-4. **Latitude/longitude removidas** do `Endereco` no schema, `EnderecoFields`,
-   DTOs/actions, DAOs, `lib/form-data`, `tests/lib/form-data.test` e docs/diagramas
-   (RF004, ENTENDIMENTO, classes/DER). O banco dev `nexus` já está sem as colunas.
-5. **Seed demo dev-only**: `prisma/seed-demo-data.ts` + `prisma/seed-demo.ts` +
-   `npm run db:seed:demo`; 10 funcionários, 10 destinatários, 10 fornecedores, 10 veículos
-   e 10 produtos (4devs/Bluesoft). Aditivo/idempotente; `prisma/seed.ts` intacto.
-   Totais no dev: 11 funcionários, 10 destinatários, 11 fornecedores, 10 veículos, 12
-   produtos (10 demo + dataset de teste existente). Super Admin/login preservados.
-6. **Regras/docs:** `AGENTS.md` §17 desktop only (1360×768) e §6 seed demo dev-only;
-   `CHANGELOG` atualizado.
+1. **Componentes:** `FichaRelatorio` e `RelatorioCadastro` em `src/components/relatorios/`
+   + `src/types/relatorio.ts` e `src/lib/fichas-relatorio.ts` (adaptadores por entidade).
+2. **Produtos:** Quantidade/Reservado/Qtd. livre e Un. de entrada/Un. de saída; foto
+   opcional (1 anexo ativo) com quadro “Sem foto”; todos os códigos em grade de 4 colunas;
+   totalizador Total/Livre.
+3. **Funcionários:** CPF/Cargo/Condutor e E-mail/Telefone; foto opcional.
+4. **Destinatários:** CNPJ/Tipo/Telefone e Endereço/E-mail; sem foto.
+5. **Fornecedores:** CNPJ/Telefone e Endereço/E-mail; sem foto.
+6. **Filtro “Listar códigos”** nos quatro relatórios, refletindo na tela e no CSV
+   (coluna opcional “Códigos” com `TIPO: valor`).
+7. **Filtro “Listar contatos”** em funcionários, destinatários e fornecedores
+   (runs `RUN-20261102-02/03`): faixa “Contatos” entre o corpo e os códigos, com todos os
+   e-mails e telefones ativos, principal primeiro e marcado, tipo do telefone e formatação.
+   Com o filtro ligado, o corpo perde “E-mail”/“Telefone” (sem duplicação); o CSV
+   **substitui** `E-mail`/`Telefone` por `E-mails`/`Telefones` na mesma posição.
+8. **Movimentação e Extrato são relatórios separados** (runs `RUN-20261102-04/05`):
+   - `/relatorios/movimentacao` é sempre a movimentação agrupada por documento (o filtro de
+     produto apenas filtra; não vira extrato);
+   - `/relatorios/extrato` é um relatório próprio, com período + produto(s) opcionais:
+     **sem produto, agrupa todos os produtos com movimentação no período**; com seleção,
+     inclui o produto sem movimento; cada grupo tem saldo inicial, movimentações e subtotal
+     (saldo final/entradas/saídas); CSV próprio acompanha os filtros (período obrigatório);
+   - observação do movimento impressa; helper puro `relatorio-movimentacao.ts`.
+9. **Seed de movimentações** (`prisma/seed-movimentacoes.ts` + `npm run db:seed:mov`, run
+   `RUN-20261102-07`): 3 entradas + 3 saídas por produto ativo pelo fluxo
+   pedido → remessa → expedição → entrega → baixa; dev-only (`nexus`), marcador
+   `[seed-mov]` e retomada por etapa. Executado: 12 produtos, 3 notas de entrada,
+   9 pedidos/remessas/expedições, 36+36 movimentos.
+10. **Auditoria legível** (runs `RUN-20261102-08/09`): cada evento mostra o antes/depois a
+    partir de `dados_anteriores`/`dados_novos`, agrupado por dia; coleções (`itens`, `saldos`,
+    `movimentacoes`, `notas_expedicao`) viram blocos por item, sem JSON, com **uma linha
+    por atributo alterado**; entidades e referências exibem rótulo + descrição
+    (`Nota de saída #10 · Escola…`, produto, usuário);
+    status/datas formatados; sensíveis redigidos (`[oculto]`); CSV com Entidade, Descrição e
+    Alterações legíveis. Módulo de auditoria com pesquisa/filtros avançados fica para depois.
+11. **Padronizações:** `ImprimirButton` movido para `components/relatorios/`; helpers
+    `formatarQuantidade` e `contagem`; `ROTULOS_TIPO_CODIGO`; helper `montarCsv`.
+12. **Sem schema novo**; quantidades seguem sem unidade (AGENTS §8).
 
 ## Verificação
 
-- `tsc --noEmit`, `lint`, `build` verdes; **490/490 testes**; `figma:check` verde.
-- `nexus_test` atualizado pelo setup dos testes; `nexus_prod` intocado.
-- Colunas de `endereco` no `nexus` conferidas: sem `latitude`/`longitude`.
-- Screenshots desktop 1366×768 em `out/visual/` (produto, funcionário, destinatário,
-  fornecedor).
+- `npm run lint` → exit 0.
+- `npm run build` → exit 0.
+- `tests/lib/relatorio-movimentacao.test.ts` + `tests/services/relatorio.test.ts` +
+  `tests/dao/relatorio.test.ts` → 84/84; com os helpers de auditoria
+  (`tests/lib/auditoria-diff.test.ts` e `auditoria.test.ts`) → 102/102.
+  (`npm test` padrão continua bloqueado pelo `prisma db push` do `globalSetup` sob agente;
+  suíte completa rodou 497/497 com o push desligado.)
+- Seed de movimentações executado no `nexus`; conferência independente: 12 produtos,
+  3 notas de entrada, 9 pedidos/remessas/expedições e **3 entradas + 3 saídas por produto**
+  (36+36 movimentos), sem divergências; reexecução idempotente.
+- Inspeção visual em desktop 1440×900 com o CSS real: fichas, 8 códigos, faixa de contatos
+  (3 e-mails + 3 telefones, caso de uma coluna), funcionário sem duplicação, movimentação
+  por documento, Extrato por produto e auditoria com antes/depois. A inspeção achou e corrigiu
+  a linha de observação do Extrato (classe `mov-obs` com `display:block` quebrava o `colSpan`),
+  o “1 itens” e o alinhamento/redação do diff de auditoria.
+- Auditoria conferida na tela real (`/relatorios/auditoria`, dev server): nota com escola,
+  “Usuário da tentativa” resolvido, coleções com descrição dos produtos, login sem diff e
+  sem linhas vazias; sem JSON na folha. Após o ajuste de layout, cada item tem cabeçalho e
+  uma linha por atributo (`Qtd. entregue 0 → 40`, `Saldo 250 → 210`).
 
 ## Pendências
 
-1. **Veículo** — último cadastro da repaginação (mesmo shell; sem endereço/contato).
-2. **Release** `1.31.10.2026` + push (aprovação).
-4. **Produção**: backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
+1. **Jira/commit:** definir a issue para o commit (nenhuma associada; não houve commit).
+2. **Relatórios restantes no padrão antigo:** vencimento, pedidos (com status em badge),
+   expedições e entregas — proposta em faixas/cartões aprovada, ainda não implementada.
+3. **Docs:** atualizar `docs/dominio/IMPLEMENTACAO.md` com o modelo de ficha, as rotas de
+   movimentação/extrato, a auditoria com diff e o seed de movimentações.
+4. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
+   (helpers de data/filtros) e trocar os SVGs inline por `lucide-react`.
+5. **Release** `1.xx.xx.2026` + push (aprovação).
+6. **Produção:** backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
    gates, `db push`, build/start/smoke.
-5. **RFs restantes**: RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
+7. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
    fora do escopo.
-
-## Próximas ações
-
-1. Repaginar veículo.
-2. Preparar a release e a produção.

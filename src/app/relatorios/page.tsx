@@ -27,8 +27,8 @@ const relatorios: CartaoRelatorio[] = [
   {
     titulo: "Extrato de Produto",
     descricao:
-      "Movimentações de estoque de um produto em um período. Abra a tela e escolha o produto no filtro.",
-    href: "/relatorios/movimentacao",
+      "Movimentações de estoque de todos os produtos ou dos selecionados no período, com saldo inicial e final.",
+    href: "/relatorios/extrato",
   },
   {
     titulo: "Expedições por Período",

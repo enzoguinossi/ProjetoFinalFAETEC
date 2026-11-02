@@ -39,6 +39,7 @@ export type ResultadoImportacaoPedido =
 
 export type PedidoRelatorioRow = {
   id_pedido_escola: number;
+  id_destinatario: number;
   codigo: string;
   data: string;
   escola: string;
@@ -294,6 +295,7 @@ export class PedidoService {
       }));
       return {
         id_pedido_escola: pedido.id_pedido_escola,
+        id_destinatario: pedido.destinatario.id_destinatario,
         codigo: String(pedido.id_pedido_escola).padStart(6, "0"),
         data: formatarDataRelatorio(pedido.data_criacao),
         escola: pedido.destinatario.pessoaJuridica.razao_social,
