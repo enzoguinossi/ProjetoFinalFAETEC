@@ -1,15 +1,39 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `1.02.11.2026`, tag `v1.02.11.2026`).
+> Última consolidação: 2026-11-02 (release `2.02.11.2026`, tag `v2.02.11.2026`; produção
+> Windows com Inno Setup).
 
 ## Objetivo atual
 
-Padronizar todos os relatórios: cadastro em “ficha”, movimentação/extrato por documento/
-produto, auditoria legível com antes/depois e os quatro relatórios restantes em faixas/cartões.
-Base anterior: repaginação dos cadastros + seed demo no commit `KAN-139` (worktree principal,
-`main`). Rodada entregue na release `1.02.11.2026` (commit `ceccd10`, tag `v1.02.11.2026`),
-publicada em `origin/main`.
+Preparar a instalação e a operação do Nexus em produção no Windows (KAN-170): health check,
+uploads fora da aplicação, bootstrap do zero (Node 24, MySQL 8.4 LTS, NSSM, Caddy), bandeja
+.NET 8, instalador Inno Setup e runbook. A entrega anterior (relatórios padronizados) está na
+release `1.02.11.2026`.
+
+## Produção Windows (KAN-170, runs `RUN-20261102-14..26`)
+
+1. **Health e uploads:** `GET /api/health` público (200/`db=true`, 503 sem banco) e
+   `UPLOADS_DIR` em `src/lib/uploads.ts` (fallback `public/uploads`); `/api/health` liberado
+   no `proxy.ts`.
+2. **Bootstrap do zero:** `bootstrap.ps1` em 8 fases, idempotente/retomável, instala VC++,
+   Node 24.19.0, Git, NSSM e Caddy; pausa (exit 2) para o MySQL Installer 8.4 LTS
+   (Server only) e retoma com `-Resume`; `pos-instalacao-mysql.ps1` aplica `my.ini`, cria
+   `nexus_prod`/`nexus_app` e grava `backup.cnf`.
+3. **Serviços:** `NexusApp` (NetworkService) e `NexusCaddy` (LocalService) no NSSM, com
+   auto-start, restart e logs rotativos; Next em `127.0.0.1:3000`; Caddy em 80/443 com
+   CA interna via `certutil` e `admin off`.
+4. **Bandeja:** `NexusTray` (.NET 8 self-contained) com status verde/amarelo/vermelho,
+   abrir, reiniciar via `restart.ps1`, logs, backup e pasta de dados.
+5. **Instalador:** Inno Setup 7, `NexusSetup-<versão>.exe`, wizard de hostname, execução do
+   bootstrap com checagem de `ResultCode`, atalhos de URL e desinstalador que preserva
+   `C:\ProgramData\Nexus`.
+6. **Operação:** `atualizar.ps1` (backup, troca de tag, build, schema, smoke, rollback),
+   `backup.ps1` (diário 02:00, log, dump/uploads/.env/Caddyfile) e `smoke.ps1`.
+7. **Segurança:** ACLs restritas (`backups`/`config` só admins/system; `uploads`/`logs` para
+   NetworkService; `caddy` para LocalService); `.env` protegido antes da escrita; sem tag
+   chumbada no manifesto (o build passa `-Tag`).
+8. **Documentação:** `docs/processo/PRODUCAO.md` (runbook) indexado em `docs/README.md`.
 
 ## Entregue (runs `RUN-20261102-01..11`)
 
@@ -63,6 +87,15 @@ publicada em `origin/main`.
 
 ## Verificação
 
+- `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
+- Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
+- Parser do Windows PowerShell 5.1 → OK nos 11 `.ps1` de `deploy/windows`.
+- Instalador compilado com Inno Setup 7 (`NexusSetup-2.02.11.2026.exe`, 46,1 MB); tag
+  `v2.02.11.2026` contém `/api/health`; SHA-256
+  `24A4AA6B65E67CDA70FAD67E582A44A28F32304351234D5A88CFFF613E5EE0C9`.
+- Revisão independente `RUN-20261102-22`: bloqueante B1 (ACLs herdadas) e altos A1–A6
+  corrigidos nos runs `23..25`; pendências reais no §15 do runbook.
+
 - `npm run lint` → exit 0.
 - `npm run build` → exit 0.
 - `tests/lib/relatorio-movimentacao.test.ts` + `tests/services/relatorio.test.ts` +
@@ -92,14 +125,17 @@ publicada em `origin/main`.
 
 ## Pendências
 
-1. **Worklog KAN-157:** registrar via `addOrEditJiraIssueWorklog` o tempo efetivo informado
-   pelo usuário (a regra do projeto proíbe estimar).
-2. **Comentário no Jira:** só com aprovação prévia do conteúdo.
-3. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
+1. **Testar o instalador** na máquina do usuário e na do colega (VM/máquina limpa): MySQL
+   8.4 LTS, hostname/DNS, CA do Caddy nos clientes, login e smoke.
+2. **Limitações conhecidas do runbook (§15):** retenção de `backups\uploads`/`my.ini-*.bak`;
+   backup sem `caddy\data`; bandeja só no logon de quem instalou; `.env` não mesclado;
+   hashes vazios no manifesto; firewall/DNS fora do escopo; `db push` sem migrations; CA
+   permanece no trust store após desinstalar.
+3. **Produção:** executar o `NexusSetup` na máquina do galpão, concluir o primeiro acesso
+   (Super Admin), criar o usuário do representante e validar impressão/backup.
+4. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
    usuário; o resolvedor de descrições já é reutilizável.
-4. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
+5. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
    (helpers de data/filtros) e trocar os SVGs inline por `lucide-react`.
-5. **Produção:** backfill `foto_url` → `anexo`, achatamento do estoque, dedupe das notas,
-   gates, `db push`, build/start/smoke.
 6. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
    fora do escopo.
