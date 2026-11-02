@@ -3,3 +3,6 @@ NexusTray/bin/
 NexusTray/obj/
 NexusTray/dist/
 *.user
+
+# Instalador gerado por build-instalador.ps1
+out/
