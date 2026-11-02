@@ -152,9 +152,10 @@ Antes de alterar o schema:
 Não altere o schema apenas para facilitar uma implementação de frontend.
 
 O seed de referência (`prisma/seed.ts` + `npm run db:seed`) é o único usado em produção. O
-**seed de demonstração** (`prisma/seed-demo.ts` + `npm run db:seed:demo`) é **exclusivo do
-banco de desenvolvimento `nexus`**, é aditivo/idempotente e recusa `nexus_prod`/produção;
-nunca o inclua no `db:setup`/release.
+**seed de demonstração** (`prisma/seed-demo.ts` + `npm run db:seed:demo`) e o **seed de
+movimentações** (`prisma/seed-movimentacoes.ts` + `npm run db:seed:mov`) são **exclusivos do
+banco de desenvolvimento `nexus`**, são aditivos/idempotentes e recusam
+`nexus_prod`/produção; nunca os inclua no `db:setup`/release.
 
 ---
 

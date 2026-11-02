@@ -15,6 +15,7 @@
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "db:seed:mov": "tsx prisma/seed-movimentacoes.ts",
     "db:setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "db:dedupe-notas": "tsx scripts/dedupe-itens-nota.ts",
