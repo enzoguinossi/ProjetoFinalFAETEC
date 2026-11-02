@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type ListParams } from "@/types";
+import { buildPagination, type ListParams, type TipoDestinatario } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
@@ -43,8 +43,8 @@ export class DestinatarioDAO {
   async create(
     data: {
       razao_social: string; nome_fantasia?: string; cnpj?: string;
-      tipo_destinatario: "ESCOLA" | "CRECHE";
-      endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
+      tipo_destinatario: TipoDestinatario;
+      endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,
@@ -98,8 +98,8 @@ export class DestinatarioDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; nome_fantasia?: string; cnpj?: string; tipo_destinatario?: "ESCOLA" | "CRECHE"; ativo?: boolean;
-      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
+      razao_social?: string; nome_fantasia?: string; cnpj?: string; tipo_destinatario?: TipoDestinatario; ativo?: boolean;
+      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,

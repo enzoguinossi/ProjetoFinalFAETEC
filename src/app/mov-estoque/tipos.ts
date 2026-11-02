@@ -1,5 +1,7 @@
 /** Tipos compartilhados entre a página, o cliente e as Server Actions de movimentação. */
 
+import type { TipoDestinatario } from "@/types";
+
 export type ConversaoUnidadeItem = {
   id_conversao: number;
   nome: string;
@@ -97,7 +99,7 @@ export type NotaEntradaFormData = {
 export type DestinatarioSelecaoRow = {
   id_destinatario: number;
   razao_social: string;
-  tipo: string;
+  tipo: TipoDestinatario;
 };
 
 export type ItemSaidaPayload = {

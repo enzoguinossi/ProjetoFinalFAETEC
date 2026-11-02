@@ -151,6 +151,11 @@ Antes de alterar o schema:
 
 Não altere o schema apenas para facilitar uma implementação de frontend.
 
+O seed de referência (`prisma/seed.ts` + `npm run db:seed`) é o único usado em produção. O
+**seed de demonstração** (`prisma/seed-demo.ts` + `npm run db:seed:demo`) é **exclusivo do
+banco de desenvolvimento `nexus`**, é aditivo/idempotente e recusa `nexus_prod`/produção;
+nunca o inclua no `db:setup`/release.
+
 ---
 
 # 7. Convenções de dados
@@ -668,6 +673,11 @@ A interface deve priorizar:
 O sistema possui requisito de desempenho para buscas por código de barras e Kanban em rede local.
 
 Não adicione complexidade visual ou interações sofisticadas sem necessidade funcional.
+
+**Desktop only:** o sistema é usado em desktop, com resolução mínima **1360×768**. Não
+desenvolva, teste nem tire screenshots em viewport mobile; não adicione breakpoints novos
+(`sm:`/`md:`) para telas pequenas. O layout usa a largura disponível (sidebar de 256px;
+conteúdo ≥ 1104px) e pode rolar verticalmente dentro do modal.
 
 **Fotos:** use os componentes compartilhados `FotosField` (edição: upload, URL externa no
 cadastro, limite `max` e remoção via `remover_anexos`) e `FotosGaleria` (visualização

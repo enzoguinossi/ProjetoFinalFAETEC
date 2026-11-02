@@ -118,7 +118,7 @@ Valores iniciais de nome:
   - EAN12           → código de barras de 12 dígitos
   - EAN13           → código de barras de 13 dígitos
   - COD_FORNECEDOR  → código que o fornecedor usa para o produto
-  - COD_ESCOLA       → código da escola/creche
+  - COD_ESCOLA       → código da escola/creche/CMEI/CMEIA
   - MATRICULA        → matrícula funcional do funcionário
 ```
 
@@ -227,7 +227,7 @@ fornecedor
 destinatario
 ├── ID_destinatario        INT PK auto_increment
 ├── ID_pessoa_juridica     INT FK UNIQUE NOT NULL
-├── tipo_destinatario      ENUM('ESCOLA','CRECHE')
+├── tipo_destinatario      ENUM('ESCOLA','CRECHE','CMEI','CMEIA')
 ├── ID_endereco            INT FK → endereco NOT NULL  ← obrigatório
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
@@ -274,9 +274,7 @@ endereco
 ├── bairro              VARCHAR
 ├── cidade              VARCHAR NOT NULL
 ├── uf                  CHAR(2)                    ← opcional
-├── cep                 VARCHAR
-├── latitude            FLOAT          ← para mapa futuro
-└── longitude           FLOAT          ← para mapa futuro
+└── cep                 VARCHAR
 ```
 
 Quem usa:

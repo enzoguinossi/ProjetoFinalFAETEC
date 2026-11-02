@@ -20,7 +20,7 @@
 
 | ID | Título | Descrição | Prioridade |
 |----|--------|-----------|------------|
-| RF004 | Gerenciar Destinatários | O sistema deve permitir o cadastro de 105 a 108 escolas e creches municipais. Destinatário estende Pessoa Jurídica (CNPJ opcional). Endereço em tabela separada com logradouro, número, complemento, bairro, cidade, CEP, latitude e longitude. Código da escola via código personalizado do tipo COD_ESCOLA. | Essencial |
+| RF004 | Gerenciar Destinatários | O sistema deve permitir o cadastro de 105 a 108 escolas, creches, CMEI e CMEIA municipais. Destinatário estende Pessoa Jurídica (CNPJ opcional). Endereço em tabela separada com logradouro, número, complemento, bairro, cidade e CEP. Código da escola via código personalizado do tipo COD_ESCOLA. | Essencial |
 | RF005 | Gerenciar Funcionários | O sistema deve permitir o cadastro de funcionários, que estendem Pessoa Física (nome, CPF opcional). Um funcionário pode ou não ser Usuário (ter login). Um funcionário pode ser marcado como Condutor através de um checkbox no formulário. O funcionário tem **uma foto** no cadastro, guardada como anexo ativo (`anexo.ID_funcionario`), exibida no formulário e na visualização. | Essencial |
 | RF006 | Gerenciar Fornecedores | O sistema deve permitir o cadastro de fornecedores, que estendem Pessoa Jurídica (CNPJ opcional). Endereço opcional em tabela separada. | Essencial |
 | RF007 | Gerenciar Veículos | O sistema deve permitir o cadastro de veículos com placa, modelo e status (DISPONIVEL, INDISPONIVEL, EM_EXPEDICAO). | Essencial |

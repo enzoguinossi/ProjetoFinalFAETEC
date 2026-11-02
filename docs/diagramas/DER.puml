@@ -111,6 +111,8 @@ entity "usuario" as usuario {
 enum TipoDestinatario {
   ESCOLA
   CRECHE
+  CMEI
+  CMEIA
 }
 
 enum TipoTelefone {
@@ -170,8 +172,6 @@ entity "endereco" as endereco {
   * cidade : VARCHAR
   uf : CHAR(2)
   cep : VARCHAR
-  latitude : FLOAT
-  longitude : FLOAT
 }
 
 ' =========================================================

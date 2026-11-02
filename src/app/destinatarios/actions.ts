@@ -10,12 +10,14 @@ import { mensagemDeErro } from "@/dao/_errors";
 import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-data";
 import { formatarCodigo } from "@/lib/formatar";
 import { validarCnpj } from "@/lib/cnpj";
-import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
+import { validarCep } from "@/lib/cep";
+import { resultadoVazio, TIPO_DESTINATARIO, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
 
 export type DestinatarioListRow = {
   id_destinatario: number;
   codigo: string;
   razao: string;
+  tipo_destinatario: TipoDestinatario;
 };
 
 export type DestinatarioFormData = {
@@ -23,7 +25,7 @@ export type DestinatarioFormData = {
   razao_social: string;
   nome_fantasia: string | null;
   cnpj: string | null;
-  tipo_destinatario: "ESCOLA" | "CRECHE";
+  tipo_destinatario: TipoDestinatario;
   ativo: boolean;
   endereco: {
     logradouro: string;
@@ -33,8 +35,6 @@ export type DestinatarioFormData = {
     cidade: string;
     uf: string | null;
     cep: string | null;
-    latitude: number | null;
-    longitude: number | null;
   };
   codigos: { tipo: string; valor: string }[];
   emails: { endereco: string; principal: boolean }[];
@@ -61,6 +61,23 @@ function lerNomeFantasia(formData: FormData): string | undefined {
   return valor || undefined;
 }
 
+/** CEP vazio é opcional; preenchido precisa ter 8 dígitos. */
+function lerCep(formData: FormData): { cep?: string } | { error: string } {
+  const bruto = String(formData.get("cep") ?? "").trim();
+  if (!bruto) return {};
+  const resultado = validarCep(bruto);
+  if (!resultado.ok) return { error: resultado.erro };
+  return { cep: resultado.cep };
+}
+
+/** Tipo inválido cai no fallback seguro `ESCOLA`. */
+function lerTipoDestinatario(formData: FormData): TipoDestinatario {
+  const valor = String(formData.get("tipo_destinatario") ?? "").trim();
+  return (TIPO_DESTINATARIO as readonly string[]).includes(valor)
+    ? (valor as TipoDestinatario)
+    : "ESCOLA";
+}
+
 export async function listarDestinatarios(
   params: ListParams = {},
 ): Promise<PaginatedResult<DestinatarioListRow>> {
@@ -74,6 +91,7 @@ export async function listarDestinatarios(
       id_destinatario: d.id_destinatario,
       codigo: formatarCodigo(d.id_destinatario),
       razao: d.pessoaJuridica.razao_social,
+      tipo_destinatario: d.tipo_destinatario,
     })),
   };
 }
@@ -105,8 +123,6 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
       cidade: d.endereco.cidade,
       uf: d.endereco.uf,
       cep: d.endereco.cep,
-      latitude: d.endereco.latitude,
-      longitude: d.endereco.longitude,
     },
     codigos: d.destinatarioCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
     emails: d.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
@@ -122,6 +138,9 @@ export async function createDestinatario(formData: FormData) {
     const cnpjResult = lerCnpj(formData);
     if ("error" in cnpjResult) return { error: cnpjResult.error };
 
+    const cepResult = lerCep(formData);
+    if ("error" in cepResult) return { error: cepResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -133,7 +152,7 @@ export async function createDestinatario(formData: FormData) {
         razao_social: razao_social.trim(),
         nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
-        tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+        tipo_destinatario: lerTipoDestinatario(formData),
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,
         endereco: lerEnderecoDoFormData(formData),
@@ -159,6 +178,9 @@ export async function updateDestinatario(formData: FormData) {
     const cnpjResult = lerCnpj(formData);
     if ("error" in cnpjResult) return { error: cnpjResult.error };
 
+    const cepResult = lerCep(formData);
+    if ("error" in cepResult) return { error: cepResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("DESTINATARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -170,7 +192,7 @@ export async function updateDestinatario(formData: FormData) {
         razao_social: (formData.get("razao_social") as string)?.trim(),
         nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
-        tipo_destinatario: formData.get("tipo_destinatario") as "ESCOLA" | "CRECHE",
+        tipo_destinatario: lerTipoDestinatario(formData),
         ativo,
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,

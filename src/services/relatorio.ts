@@ -504,7 +504,7 @@ export function rotuloSituacaoCadastro(situacao: SituacaoCadastroRelatorio): str
   return ROTULOS_SITUACAO_CADASTRO[situacao];
 }
 
-/** Rótulo do tipo de destinatário (Escola/Creche). */
+/** Rótulo do tipo de destinatário (Escola/Creche/CMEI/CMEIA). */
 export function rotuloTipoDestinatario(tipo: TipoDestinatarioRelatorio): string {
   return ROTULOS_TIPO_DESTINATARIO[tipo];
 }

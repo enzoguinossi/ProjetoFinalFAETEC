@@ -235,12 +235,19 @@ export const ROTULOS_SITUACAO_CADASTRO = {
   inativos: "Inativos",
 } as const;
 
-export const TIPOS_DESTINATARIO_RELATORIO = ["ESCOLA", "CRECHE"] as const;
+export const TIPOS_DESTINATARIO_RELATORIO = [
+  "ESCOLA",
+  "CRECHE",
+  "CMEI",
+  "CMEIA",
+] as const;
 export type TipoDestinatarioRelatorio = (typeof TIPOS_DESTINATARIO_RELATORIO)[number];
 
 export const ROTULOS_TIPO_DESTINATARIO = {
   ESCOLA: "Escola",
   CRECHE: "Creche",
+  CMEI: "CMEI",
+  CMEIA: "CMEIA",
 } as const;
 
 export type ProdutoVencimentoRelatorioRow = {

@@ -126,8 +126,6 @@ package "Contato" as Contato {
     + cidade: String
     + uf: String
     + cep: String
-    + latitude: Float
-    + longitude: Float
   }
 
   class FuncionarioTelefone {

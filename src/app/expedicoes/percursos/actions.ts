@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
-import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
+import { resultadoVazio, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
 
 export type PercursoListRow = {
   id_percurso: number;
@@ -17,7 +17,7 @@ export type PercursoListRow = {
 export type PercursoDestinatarioForm = {
   id_destinatario: number;
   razao_social: string;
-  tipo: "ESCOLA" | "CRECHE";
+  tipo: TipoDestinatario;
   ordem_visita: number;
 };
 
@@ -31,7 +31,7 @@ export type PercursoFormData = {
 export type DestinatarioPercursoRow = {
   id_destinatario: number;
   razao_social: string;
-  tipo: "ESCOLA" | "CRECHE";
+  tipo: TipoDestinatario;
 };
 
 export type DestinatarioPercursoParams = {

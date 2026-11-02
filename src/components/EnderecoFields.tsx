@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { UFS } from "@/lib/uf";
+import { CEP_MAX_CARACTERES, formatarCep, validarCep } from "@/lib/cep";
 import type { EnderecoCep, ResultadoCep } from "@/services/cep";
-import { ui } from "@/lib/ui";
 import { useAviso } from "@/components/AvisoProvider";
 
 export type EnderecoValue = {
@@ -14,8 +14,6 @@ export type EnderecoValue = {
   cidade: string;
   uf: string;
   cep: string;
-  latitude: string;
-  longitude: string;
 };
 
 export type EnderecoInitial = Partial<{
@@ -28,7 +26,6 @@ interface Props {
   sugestao?: EnderecoInitial | null;
   disabled?: boolean;
   required?: boolean;
-  showCoords?: boolean;
   onLookup: (cep: string) => Promise<ResultadoCep>;
 }
 
@@ -42,8 +39,15 @@ const CAMPOS_SUGESTAO: (keyof EnderecoValue)[] = [
   "uf",
 ];
 
-const roClass = "flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base";
-const colClass = "flex flex-1 flex-col gap-2";
+/** Número e complemento do usuário nunca são sobrescritos por uma consulta. */
+const CAMPOS_PRESERVADOS: (keyof EnderecoValue)[] = ["numero", "complemento"];
+
+const INPUT_CLASS =
+  "h-10 w-full box-border rounded-lg border border-border-input bg-white px-4 font-sans text-base outline-none transition-[border-color] duration-[120ms] focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)]";
+const roClass =
+  "flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base";
+const colClass = "flex flex-1 flex-col gap-1.5";
+const labelClass = "font-sans text-sm font-medium leading-5 text-ink-strong";
 
 function Campo({
   label,
@@ -56,7 +60,7 @@ function Campo({
 }) {
   return (
     <div className={className}>
-      <label className={ui.label}>{label}</label>
+      <label className={labelClass}>{label}</label>
       {children}
     </div>
   );
@@ -70,9 +74,7 @@ function toValue(initial?: EnderecoInitial | null): EnderecoValue {
     bairro: initial?.bairro ?? "",
     cidade: initial?.cidade ?? "",
     uf: initial?.uf ?? "",
-    cep: initial?.cep ?? "",
-    latitude: initial?.latitude ?? "",
-    longitude: initial?.longitude ?? "",
+    cep: formatarCep(initial?.cep ?? ""),
   };
 }
 
@@ -81,16 +83,16 @@ export default function EnderecoFields({
   sugestao = null,
   disabled = false,
   required = false,
-  showCoords = false,
   onLookup,
 }: Props) {
   const [value, setValue] = useState<EnderecoValue>(toValue(initial));
   const [buscando, setBuscando] = useState(false);
+  const [preenchido, setPreenchido] = useState(false);
   const [sugestaoAplicada, setSugestaoAplicada] = useState<EnderecoInitial | null>(null);
   const mostrarAviso = useAviso();
 
   // Ajuste de estado na renderização quando chega uma nova sugestão (ex.: consulta de CNPJ):
-  // mescla os campos informados sem descartar o que o usuário já digitou nos demais.
+  // mescla os campos informados; número e complemento só entram se estiverem vazios.
   if (sugestao !== sugestaoAplicada) {
     setSugestaoAplicada(sugestao);
     if (sugestao) {
@@ -98,7 +100,9 @@ export default function EnderecoFields({
         const proximo = { ...prev };
         for (const campo of CAMPOS_SUGESTAO) {
           const sugerido = sugestao[campo];
-          if (sugerido != null) proximo[campo] = sugerido;
+          if (sugerido == null) continue;
+          if (CAMPOS_PRESERVADOS.includes(campo) && prev[campo]) continue;
+          proximo[campo] = campo === "cep" ? formatarCep(String(sugerido)) : sugerido;
         }
         return proximo;
       });
@@ -110,14 +114,14 @@ export default function EnderecoFields({
   }
 
   async function buscarCep() {
-    const digitos = value.cep.replace(/\D/g, "");
-    if (digitos.length !== 8) {
-      mostrarAviso("CEP deve conter 8 dígitos.", "erro");
+    const validacao = validarCep(value.cep);
+    if (!validacao.ok) {
+      mostrarAviso(validacao.erro, "erro");
       return;
     }
     setBuscando(true);
     try {
-      const result = await onLookup(digitos);
+      const result = await onLookup(validacao.cep);
       if ("error" in result) {
         mostrarAviso(result.error, "erro");
         return;
@@ -125,12 +129,13 @@ export default function EnderecoFields({
       const e: EnderecoCep = result.endereco;
       setValue((prev) => ({
         ...prev,
-        cep: e.cep,
+        cep: formatarCep(e.cep),
         logradouro: e.logradouro || prev.logradouro,
         bairro: e.bairro || prev.bairro,
         cidade: e.cidade || prev.cidade,
         uf: e.uf || prev.uf,
       }));
+      setPreenchido(true);
     } catch {
       mostrarAviso("Não foi possível consultar o CEP.", "erro");
     } finally {
@@ -147,13 +152,12 @@ export default function EnderecoFields({
         required={requiredField}
         value={value[key]}
         onChange={(e) => set(key, e.target.value)}
-        className={ui.input}
+        className={INPUT_CLASS}
       />
     );
 
   return (
-    <>
-      {/* CEP + UF */}
+    <div className="flex flex-col gap-4">
       <div className="flex gap-4">
         <Campo label="CEP" className={`${colClass} flex-[2]`}>
           {disabled ? (
@@ -163,25 +167,37 @@ export default function EnderecoFields({
               <input
                 name="cep"
                 value={value.cep}
-                onChange={(e) => set("cep", e.target.value)}
+                onChange={(e) => {
+                  set("cep", formatarCep(e.target.value));
+                  setPreenchido(false);
+                }}
                 placeholder="00000-000"
                 inputMode="numeric"
-                maxLength={9}
-                className={ui.input}
+                maxLength={CEP_MAX_CARACTERES}
+                className={INPUT_CLASS}
               />
               <button
                 type="button"
                 onClick={buscarCep}
                 disabled={buscando}
                 title="Buscar endereço pelo CEP"
-                className="flex h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border-input bg-white text-brand cursor-pointer disabled:cursor-wait disabled:opacity-60"
+                className="flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border-input bg-white px-3 font-sans text-sm text-brand transition-colors hover:bg-[rgba(27,153,86,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-wait disabled:opacity-60"
               >
-                {buscando ? "…" : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="7" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                )}
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                {buscando ? "Buscando…" : "Buscar"}
               </button>
             </div>
           )}
@@ -194,7 +210,7 @@ export default function EnderecoFields({
               name="uf"
               value={value.uf}
               onChange={(e) => set("uf", e.target.value)}
-              className={ui.select}
+              className={`${INPUT_CLASS} cursor-pointer`}
             >
               <option value="">Selecione...</option>
               {UFS.map((u) => (
@@ -205,41 +221,23 @@ export default function EnderecoFields({
         </Campo>
       </div>
 
+      {preenchido && !disabled && (
+        <span className="-mt-2 font-sans text-xs text-[#697077]">
+          Endereço preenchido.
+        </span>
+      )}
+
       <Campo label="Logradouro">{text("logradouro", required)}</Campo>
 
-      {/* Número + Complemento */}
       <div className="flex gap-4">
         <Campo label="Número">{text("numero")}</Campo>
         <Campo label="Complemento">{text("complemento")}</Campo>
       </div>
 
-      {/* Bairro + Cidade */}
       <div className="flex gap-4">
         <Campo label="Bairro">{text("bairro")}</Campo>
         <Campo label="Cidade">{text("cidade", required)}</Campo>
       </div>
-
-      {/* Coordenadas */}
-      {showCoords && (
-        <div className="flex gap-4">
-          <Campo label="Latitude">
-            {disabled ? (
-              <p className={roClass}>{value.latitude || "—"}</p>
-            ) : (
-              <input name="latitude" type="number" step="any" value={value.latitude}
-                onChange={(e) => set("latitude", e.target.value)} className={ui.input} />
-            )}
-          </Campo>
-          <Campo label="Longitude">
-            {disabled ? (
-              <p className={roClass}>{value.longitude || "—"}</p>
-            ) : (
-              <input name="longitude" type="number" step="any" value={value.longitude}
-                onChange={(e) => set("longitude", e.target.value)} className={ui.input} />
-            )}
-          </Campo>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

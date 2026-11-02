@@ -1,5 +1,6 @@
 import type { Column } from "@/components/DataTable";
 import { formatarCnpj } from "@/lib/cnpj";
+import { ROTULOS_TIPO_DESTINATARIO, type TipoDestinatario } from "@/types";
 import type { DestinatarioSelecaoRow, FornecedorSelecaoRow } from "./tipos";
 
 export const COLUNAS_FORNECEDOR: Column<FornecedorSelecaoRow>[] = [
@@ -12,11 +13,6 @@ export const COLUNAS_FORNECEDOR: Column<FornecedorSelecaoRow>[] = [
   },
 ];
 
-const ROTULOS_TIPO_DESTINATARIO: Record<string, string> = {
-  ESCOLA: "Escola",
-  CRECHE: "Creche",
-};
-
 export const COLUNAS_DESTINATARIO: Column<DestinatarioSelecaoRow>[] = [
   { key: "razao_social", label: "Razão social", width: "3fr", align: "left" },
   {
@@ -24,6 +20,7 @@ export const COLUNAS_DESTINATARIO: Column<DestinatarioSelecaoRow>[] = [
     label: "Tipo",
     width: "1fr",
     align: "center",
-    render: (value) => ROTULOS_TIPO_DESTINATARIO[String(value)] ?? String(value),
+    render: (value) =>
+      ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
   },
 ];

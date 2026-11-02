@@ -30,6 +30,12 @@ interface Props {
   name?: string;
   /** Nome do input de URL (padrão `foto_url`). */
   urlName?: string;
+  /**
+   * `identity` = preview compacto para a faixa de identidade do produto
+   * (foto de ~72px, “Trocar”/“Remover” e URL revelada por “Usar URL”).
+   * O padrão continua sendo o usado por funcionário e tentativa de entrega.
+   */
+  variant?: "default" | "identity";
 }
 
 /**
@@ -46,12 +52,14 @@ export default function FotosField({
   label = "Foto",
   name = "foto_arquivo",
   urlName = "foto_url",
+  variant = "default",
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [existentes] = useState<FotoExistente[]>(initial);
   const [removidos, setRemovidos] = useState<number[]>([]);
   const [arquivos, setArquivos] = useState<ArquivoNovo[]>([]);
   const [aviso, setAviso] = useState("");
+  const [mostrarUrl, setMostrarUrl] = useState(false);
   const proximoId = useRef(1);
   const previews = useRef<Set<string>>(new Set());
 
@@ -159,6 +167,140 @@ export default function FotosField({
       atuais.includes(idAnexo)
         ? atuais.filter((id) => id !== idAnexo)
         : [...atuais, idAnexo],
+    );
+  }
+
+  const fotoNova = arquivos[0];
+  const fotoExistente = visiveis[0];
+  const previewAtual = fotoNova?.preview ?? fotoExistente?.url ?? null;
+
+  function removerAtual() {
+    if (fotoNova) {
+      removerArquivo(fotoNova.chave);
+      return;
+    }
+    if (fotoExistente) alternarExistente(fotoExistente.id_anexo);
+  }
+
+  if (variant === "identity") {
+    return (
+      <div className="flex flex-col gap-2">
+        <input type="hidden" name="remover_anexos" value={removidos.join(",")} />
+
+        <div className="flex items-start gap-3">
+          {previewAtual ? (
+            <a
+              href={fotoExistente?.url ?? fotoNova?.preview}
+              target="_blank"
+              rel="noreferrer"
+              title="Ver foto"
+              className="block h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-white"
+            >
+              <img
+                src={previewAtual}
+                alt={label}
+                className="h-full w-full object-cover"
+              />
+            </a>
+          ) : (
+            <div
+              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-[#c1c7cd] bg-white text-[#8a8f9a]"
+              aria-hidden="true"
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="9" cy="10" r="1.6" />
+                <path d="m21 15-4.5-4.5L7 20" />
+              </svg>
+            </div>
+          )}
+
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              name={name}
+              multiple={max > 1}
+              className="hidden"
+              onChange={selecionarArquivos}
+              aria-label={`Selecionar ${label.toLowerCase()}`}
+            />
+
+            {!readOnly && (
+              <div className="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => inputRef.current?.click()}
+                  className="inline-flex h-8 items-center rounded-md border border-border bg-white px-2.5 font-sans text-xs font-semibold text-ink transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-default disabled:opacity-40"
+                >
+                  {previewAtual ? "Trocar" : "Adicionar foto"}
+                </button>
+                {previewAtual && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={removerAtual}
+                    className="inline-flex h-8 items-center rounded-md px-2 font-sans text-xs font-semibold text-[#b42318] transition-colors hover:bg-[#fff1f0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-default disabled:opacity-40"
+                  >
+                    Remover
+                  </button>
+                )}
+                {allowUrl && (
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setMostrarUrl((atual) => !atual)}
+                    aria-expanded={mostrarUrl}
+                    className="inline-flex h-8 items-center rounded-md px-2 font-sans text-xs font-semibold text-brand transition-colors hover:bg-[rgba(27,153,86,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:cursor-default disabled:opacity-40"
+                  >
+                    {mostrarUrl ? "Ocultar URL" : "Usar URL"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            <span className="font-sans text-xs text-[#697077]">
+              JPG, PNG ou WEBP até 5 MB.
+            </span>
+
+            {allowUrl && !readOnly && (
+              <div className={mostrarUrl ? "block" : "hidden"}>
+                <input
+                  className="h-8 w-full rounded-md border border-border-input bg-white px-2 font-sans text-xs text-ink outline-none transition-[border-color] duration-150 focus:border-brand"
+                  name={urlName}
+                  placeholder="URL da imagem (opcional)"
+                  disabled={disabled}
+                />
+              </div>
+            )}
+
+            {aviso && (
+              <span className="font-sans text-xs text-[#8a5a00]">{aviso}</span>
+            )}
+            {disabled && !readOnly && (
+              <span className="font-sans text-xs text-[#8a5a00]">
+                Sem permissão para alterar a foto.
+              </span>
+            )}
+            {removidos.length > 0 && (
+              <span className="font-sans text-xs text-[#8a5a00]">
+                Foto marcada para remoção ao salvar.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
     );
   }
 

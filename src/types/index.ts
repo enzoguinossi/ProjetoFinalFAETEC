@@ -23,8 +23,16 @@ export type TipoNotaEntrada = (typeof TIPO_NOTA_ENTRADA)[number];
 export const TIPO_TELEFONE = ["CELULAR", "FIXO", "COMERCIAL"] as const;
 export type TipoTelefone = (typeof TIPO_TELEFONE)[number];
 
-export const TIPO_DESTINATARIO = ["ESCOLA", "CRECHE"] as const;
+export const TIPO_DESTINATARIO = ["ESCOLA", "CRECHE", "CMEI", "CMEIA"] as const;
 export type TipoDestinatario = (typeof TIPO_DESTINATARIO)[number];
+
+/** Rótulos exatos exibidos para o tipo de destinatário. */
+export const ROTULOS_TIPO_DESTINATARIO: Record<TipoDestinatario, string> = {
+  ESCOLA: "Escola",
+  CRECHE: "Creche",
+  CMEI: "CMEI",
+  CMEIA: "CMEIA",
+};
 
 export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_EXPEDICAO"] as const;
 export type StatusVeiculo = (typeof STATUS_VEICULO)[number];

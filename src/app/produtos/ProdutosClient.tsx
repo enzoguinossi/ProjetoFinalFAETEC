@@ -74,7 +74,7 @@ export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms
         carregando={carregando}
       />
 
-      <Modal open={modalMode === "create"} onClose={fecharModal} width="728px">
+      <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">
         <ProdutoForm
           conversoes={conversoes}
           tiposCodigo={tiposCodigo}
@@ -83,7 +83,7 @@ export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms
         />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="728px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
           <ProdutoForm
             conversoes={conversoes}
@@ -96,7 +96,7 @@ export default function ProdutosClient({ inicial, conversoes, tiposCodigo, perms
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="728px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
           <ProdutoView
             conversoes={conversoes}

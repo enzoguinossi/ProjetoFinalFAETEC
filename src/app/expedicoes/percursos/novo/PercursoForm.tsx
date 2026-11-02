@@ -8,6 +8,7 @@ import { ui } from "@/lib/ui";
 import { salvarPercurso, listarDestinatariosParaPercurso } from "../actions";
 import type { DestinatarioPercursoRow, PercursoFormData } from "../actions";
 import type { Column } from "@/components/DataTable";
+import { ROTULOS_TIPO_DESTINATARIO, type TipoDestinatario } from "@/types";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -19,7 +20,7 @@ interface Props {
 type ItemSelecionado = {
   id_destinatario: number;
   razao_social: string;
-  tipo: "ESCOLA" | "CRECHE";
+  tipo: TipoDestinatario;
   ordem_visita: number;
 };
 
@@ -30,14 +31,12 @@ const COLUNAS_DESTINATARIO: Column<DestinatarioPercursoRow>[] = [
     label: "Tipo",
     width: "1fr",
     align: "center",
-    render: (value) => (value === "CRECHE" ? "Creche" : "Escola"),
+    render: (value) =>
+      ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
   },
 ];
 
-const ROTULO_TIPO: Record<string, string> = {
-  ESCOLA: "Escola",
-  CRECHE: "Creche",
-};
+const ROTULO_TIPO = ROTULOS_TIPO_DESTINATARIO;
 
 function renumerar(lista: ItemSelecionado[]): ItemSelecionado[] {
   return lista.map((item, indice) => ({ ...item, ordem_visita: indice + 1 }));

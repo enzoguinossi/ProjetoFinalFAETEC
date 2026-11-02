@@ -41,7 +41,7 @@ export class FornecedorDAO {
   async create(
     data: {
       razao_social: string; nome_fantasia?: string; cnpj?: string;
-      endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
+      endereco?: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,
@@ -101,7 +101,7 @@ export class FornecedorDAO {
     id: number,
     data: {
       razao_social?: string; nome_fantasia?: string; cnpj?: string; ativo?: boolean;
-      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; latitude?: number; longitude?: number };
+      endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,

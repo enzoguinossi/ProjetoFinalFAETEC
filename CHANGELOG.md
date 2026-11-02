@@ -14,6 +14,20 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Added
+- **Tipos de destinatário CMEI e CMEIA (RUN-20261101-98):** `TipoDestinatario` passou a
+  `ESCOLA`, `CRECHE`, `CMEI` e `CMEIA` (rótulos exatos) no schema, tipos, ficha, listagem,
+  filtros/relatórios, percursos e seletores de saída. O seed de demonstração ficou com
+  3 escolas, 3 creches, 2 CMEI e 2 CMEIA.
+- **Repaginação dos cadastros (ficha) e remoção de latitude/longitude:** produto, funcionário,
+  destinatário e fornecedor passaram a usar a ficha com banda de identidade, seções, listas
+  compactas de contatos/códigos e rodapé fixo. Produto e funcionário têm foto na banda;
+  destinatário/fornecedor usam iniciais e preservam **CNPJ (Consultar)** e **CEP (Buscar)**,
+  que preenchem os dados sem sobrescrever número/complemento. `endereco.latitude` e
+  `endereco.longitude` foram removidas do schema, DTOs, DAOs, formulário e testes.
+- **Seed de demonstração dev-only:** `prisma/seed-demo.ts` + `npm run db:seed:demo`,
+  separado do seed de referência, com 10 funcionários, 10 destinatários, 10 fornecedores,
+  10 veículos e 10 produtos (dados do 4devs/Bluesoft). Aditivo/idempotente e recusado em
+  produção.
 - **Fotos em `anexo` e tentativa de entrega (RUN-20261031-89/90, RF020/RF021):** `anexo`
   virou tabela de **dono polimórfico** — exatamente um entre `ID_produto`, `ID_funcionario` e
   `ID_expedicao_nota` (cascade), mais `ID_usuario`; `anexo.ID_nota_saida` e

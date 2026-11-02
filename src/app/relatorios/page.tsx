@@ -57,7 +57,7 @@ const relatorios: CartaoRelatorio[] = [
   {
     titulo: "Destinatários",
     descricao:
-      "Escolas e creches atendidas, com CNPJ, tipo, situação, endereço e contato principal.",
+      "Escolas, creches, CMEI e CMEIA atendidos, com CNPJ, tipo, situação, endereço e contato principal.",
     href: "/relatorios/destinatarios",
   },
   {

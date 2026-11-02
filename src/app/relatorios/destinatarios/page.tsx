@@ -82,7 +82,7 @@ export default async function RelatorioDestinatariosPage({
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ink m-0">Destinatários</h2>
           <p className="text-sm text-[#697077] m-0">
-            Escolas e creches atendidas, com tipo, situação, endereço e contato principal.
+            Escolas, creches, CMEI e CMEIA atendidos, com tipo, situação, endereço e contato principal.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

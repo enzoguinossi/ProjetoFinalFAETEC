@@ -197,8 +197,6 @@ model Endereco {
   cidade        String         @map("cidade")
   uf            String?        @map("uf") @db.Char(2)
   cep           String?        @map("cep")
-  latitude      Float?         @map("latitude")
-  longitude     Float?         @map("longitude")
   destinatarios Destinatario[]
   fornecedores  Fornecedor[]
 
@@ -767,6 +765,8 @@ model MensagemMural {
 enum TipoDestinatario {
   ESCOLA
   CRECHE
+  CMEI
+  CMEIA
 }
 
 enum TipoTelefone {

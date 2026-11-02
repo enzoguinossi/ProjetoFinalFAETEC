@@ -1,3 +1,5 @@
+import { apenasDigitosCep } from "@/lib/cep";
+
 /** Lê um campo JSON do FormData. Retorna null quando ausente ou inválido. */
 export function lerJson(formData: FormData, campo: string): unknown {
   const raw = formData.get(campo);
@@ -22,14 +24,7 @@ export type EnderecoFormData = {
   cidade: string;
   uf?: string;
   cep?: string;
-  latitude?: number;
-  longitude?: number;
 };
-
-function numeroOuUndefined(formData: FormData, campo: string): number | undefined {
-  const valor = formData.get(campo);
-  return valor ? Number(valor) : undefined;
-}
 
 /** Lê os campos de endereço do FormData (create: logradouro/cidade como string). */
 export function lerEnderecoDoFormData(formData: FormData): EnderecoFormData {
@@ -40,9 +35,7 @@ export function lerEnderecoDoFormData(formData: FormData): EnderecoFormData {
     bairro: (formData.get("bairro") as string) || undefined,
     cidade: (formData.get("cidade") as string) || "",
     uf: (formData.get("uf") as string) || undefined,
-    cep: (formData.get("cep") as string) || undefined,
-    latitude: numeroOuUndefined(formData, "latitude"),
-    longitude: numeroOuUndefined(formData, "longitude"),
+    cep: apenasDigitosCep(String(formData.get("cep") ?? "")) || undefined,
   };
 }
 

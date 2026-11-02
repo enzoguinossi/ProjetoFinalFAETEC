@@ -31,6 +31,10 @@ export type ProdutoFormData = {
   /** Anexos ativos do produto (o primeiro é a foto atual). */
   fotos: { id_anexo: number; url: string }[];
   ativo: boolean;
+  /** Saldo atual em base (somente leitura; não editável no formulário). */
+  saldo: number;
+  /** Saldo reservado em base (somente leitura). */
+  saldo_reservado: number;
   codigos: { tipo: string; valor: string }[];
   insumos: { id: number; descricao: string; qtd: number }[];
 };
@@ -120,6 +124,8 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
     foto_url: p.anexos[0]?.url ?? null,
     fotos: p.anexos.map((anexo) => ({ id_anexo: anexo.id_anexo, url: anexo.url })),
     ativo: p.ativo,
+    saldo: Number(p.saldo),
+    saldo_reservado: Number(p.saldo_reservado),
     codigos: p.produtoCodigos.map((c) => ({
       tipo: c.tipoCodigo.nome,
       valor: c.codigo,

@@ -4,6 +4,7 @@ import { useState } from "react";
 import DataTable from "@/components/DataTable";
 import CodigoForm from "@/components/CodigoForm";
 import Button from "@/components/Button";
+import CompactList, { type CompactListAction } from "@/components/form/CompactList";
 
 export type CodigoEntry = { tipo: string; valor: string };
 
@@ -17,6 +18,11 @@ interface Props {
   value: CodigoEntry[];
   onChange: (next: CodigoEntry[]) => void;
   disabled?: boolean;
+  /**
+   * `table` = tabela usada pelos demais cadastros (padrão).
+   * `compact` = lista compacta dentro da ficha do produto (sem `DataTable`).
+   */
+  variant?: "table" | "compact";
 }
 
 const columns = [
@@ -24,11 +30,28 @@ const columns = [
   { key: "valor" as const, label: "Código", width: "2fr", align: "center" as const },
 ];
 
+/** Lista compacta da ficha: sem título próprio (a seção fornece o título). */
+const colunasCompactas = [
+  {
+    key: "tipo",
+    label: "Tipo",
+    width: "1.4fr",
+    render: (codigo: CodigoEntry) => codigo.tipo,
+  },
+  {
+    key: "valor",
+    label: "Código",
+    width: "2fr",
+    render: (codigo: CodigoEntry) => codigo.valor,
+  },
+];
+
 export default function CodigosSection({
   tiposCodigo,
   value,
   onChange,
   disabled = false,
+  variant = "table",
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
@@ -51,6 +74,12 @@ export default function CodigosSection({
 
   function remover(i: number) {
     onChange(value.filter((_, idx) => idx !== i));
+  }
+
+  function indiceDe(codigo: CodigoEntry): number {
+    return value.findIndex(
+      (c) => c.valor === codigo.valor && c.tipo === codigo.tipo,
+    );
   }
 
   const actions = disabled
@@ -76,6 +105,62 @@ export default function CodigosSection({
           },
         },
       ];
+
+  const acoesCompactas: CompactListAction<CodigoEntry>[] | undefined = disabled
+    ? undefined
+    : [
+        {
+          icon: "/icons/actions/Editar.svg",
+          label: "Editar",
+          onClick: (codigo) => {
+            const i = indiceDe(codigo);
+            if (i >= 0) {
+              setEditandoIdx(i);
+              setModalOpen(true);
+            }
+          },
+        },
+        {
+          icon: "/icons/actions/Lixeira.svg",
+          label: "Excluir",
+          onClick: (codigo) => {
+            const i = indiceDe(codigo);
+            if (i >= 0) remover(i);
+          },
+        },
+      ];
+
+  const formularioCodigo = (
+    <CodigoForm
+      key={editandoIdx ?? "novo"}
+      open={modalOpen}
+      onClose={() => setModalOpen(false)}
+      onConfirm={confirmar}
+      tiposCodigo={tiposCodigo}
+      initialTipo={editandoIdx !== null ? value[editandoIdx]?.tipo : undefined}
+      initialValor={editandoIdx !== null ? value[editandoIdx]?.valor : ""}
+      editing={editandoIdx !== null}
+    />
+  );
+
+  if (variant === "compact") {
+    return (
+      <div className="flex flex-col gap-2">
+        <CompactList
+          items={value}
+          columns={colunasCompactas}
+          rowKey={(codigo) => `${codigo.tipo}:${codigo.valor}`}
+          actions={acoesCompactas}
+          onAdd={disabled ? undefined : { label: "Novo código", onClick: iniciarNovo }}
+          empty="Nenhum código cadastrado."
+          search={(codigo) => `${codigo.tipo} ${codigo.valor}`}
+          searchPlaceholder="Buscar código..."
+          noun={{ singular: "código", plural: "códigos" }}
+        />
+        {formularioCodigo}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -106,16 +191,7 @@ export default function CodigosSection({
         pageSize={5}
       />
 
-      <CodigoForm
-        key={editandoIdx ?? "novo"}
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onConfirm={confirmar}
-        tiposCodigo={tiposCodigo}
-        initialTipo={editandoIdx !== null ? value[editandoIdx]?.tipo : undefined}
-        initialValor={editandoIdx !== null ? value[editandoIdx]?.valor : ""}
-        editing={editandoIdx !== null}
-      />
+      {formularioCodigo}
     </div>
   );
 }

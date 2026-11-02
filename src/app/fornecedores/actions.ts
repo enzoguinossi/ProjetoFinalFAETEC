@@ -10,6 +10,7 @@ import { mensagemDeErro } from "@/dao/_errors";
 import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-data";
 import { formatarCodigo } from "@/lib/formatar";
 import { validarCnpj } from "@/lib/cnpj";
+import { validarCep } from "@/lib/cep";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type FornecedorListRow = {
@@ -32,8 +33,6 @@ export type FornecedorFormData = {
     cidade: string;
     uf: string | null;
     cep: string | null;
-    latitude: number | null;
-    longitude: number | null;
   } | null;
   codigos: { tipo: string; valor: string }[];
   emails: { endereco: string; principal: boolean }[];
@@ -58,6 +57,15 @@ function lerCnpj(formData: FormData): { cnpj?: string } | { error: string } {
 function lerNomeFantasia(formData: FormData): string | undefined {
   const valor = String(formData.get("nome_fantasia") ?? "").trim();
   return valor || undefined;
+}
+
+/** CEP vazio é opcional; preenchido precisa ter 8 dígitos. */
+function lerCep(formData: FormData): { cep?: string } | { error: string } {
+  const bruto = String(formData.get("cep") ?? "").trim();
+  if (!bruto) return {};
+  const resultado = validarCep(bruto);
+  if (!resultado.ok) return { error: resultado.erro };
+  return { cep: resultado.cep };
 }
 
 export async function listarFornecedores(
@@ -103,8 +111,6 @@ export async function getFornecedor(id: number): Promise<FornecedorFormData | nu
       cidade: f.endereco.cidade,
       uf: f.endereco.uf,
       cep: f.endereco.cep,
-      latitude: f.endereco.latitude,
-      longitude: f.endereco.longitude,
     } : null,
     codigos: f.fornecedorCodigos.map((c) => ({ tipo: c.tipoCodigo.nome, valor: c.codigo })),
     emails: f.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })),
@@ -119,6 +125,9 @@ export async function createFornecedor(formData: FormData) {
 
     const cnpjResult = lerCnpj(formData);
     if ("error" in cnpjResult) return { error: cnpjResult.error };
+
+    const cepResult = lerCep(formData);
+    if ("error" in cepResult) return { error: cepResult.error };
 
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
@@ -159,6 +168,9 @@ export async function updateFornecedor(formData: FormData) {
 
     const cnpjResult = lerCnpj(formData);
     if ("error" in cnpjResult) return { error: cnpjResult.error };
+
+    const cepResult = lerCep(formData);
+    if ("error" in cepResult) return { error: cepResult.error };
 
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FORNECEDOR", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };

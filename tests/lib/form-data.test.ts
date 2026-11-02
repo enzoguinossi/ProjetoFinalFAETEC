@@ -54,9 +54,7 @@ describe("lerEnderecoDoFormData", () => {
     fd.set("bairro", "Centro");
     fd.set("cidade", "Rio de Janeiro");
     fd.set("uf", "RJ");
-    fd.set("cep", "20040002");
-    fd.set("latitude", "-22.9");
-    fd.set("longitude", "-43.2");
+    fd.set("cep", "20040-002");
 
     expect(lerEnderecoDoFormData(fd)).toEqual({
       logradouro: "Rua A",
@@ -66,8 +64,6 @@ describe("lerEnderecoDoFormData", () => {
       cidade: "Rio de Janeiro",
       uf: "RJ",
       cep: "20040002",
-      latitude: -22.9,
-      longitude: -43.2,
     });
   });
 
@@ -80,8 +76,6 @@ describe("lerEnderecoDoFormData", () => {
       cidade: "",
       uf: undefined,
       cep: undefined,
-      latitude: undefined,
-      longitude: undefined,
     });
   });
 });

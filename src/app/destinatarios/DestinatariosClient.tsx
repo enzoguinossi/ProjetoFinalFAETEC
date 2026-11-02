@@ -6,7 +6,12 @@ import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DestinatarioForm from "./novo/DestinatarioForm";
 import type { Column } from "@/components/DataTable";
-import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import {
+  ROTULOS_TIPO_DESTINATARIO,
+  type PaginatedResult,
+  type PermissoesEntidade,
+  type TipoDestinatario,
+} from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarDestinatarios,
@@ -24,7 +29,15 @@ interface Props {
 
 const columns: Column<DestinatarioListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "razao", label: "Razão Social", width: "5fr", align: "left" },
+  { key: "razao", label: "Razão Social", width: "4fr", align: "left" },
+  {
+    key: "tipo_destinatario",
+    label: "Tipo",
+    width: "1fr",
+    align: "center",
+    render: (value) =>
+      ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
+  },
 ];
 
 export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Props) {

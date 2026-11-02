@@ -3,11 +3,16 @@
 import { useState } from "react";
 import { getProduto } from "../actions";
 import type { ProdutoFormData } from "../actions";
-import DataTable from "@/components/DataTable";
-import type { Column, Action } from "@/components/DataTable";
+import { formatarCodigo } from "@/lib/formatar";
 import CodigosSection from "@/components/CodigosSection";
 import Modal from "@/components/Modal";
 import Button from "@/components/Button";
+import FormShell from "@/components/form/FormShell";
+import FormSection from "@/components/form/FormSection";
+import { FormGrid } from "@/components/form/FormField";
+import IdentityBand from "@/components/form/IdentityBand";
+import SaldoReadout from "@/components/form/SaldoReadout";
+import CompactList from "@/components/form/CompactList";
 
 interface Conversao {
   id_conversao: number;
@@ -31,10 +36,24 @@ interface Props {
 
 type InsumoEntry = { id: number; descricao: string; qtd: string };
 
-const INPUT_CLASS =
-  "h-10 px-4 border border-border-input rounded-lg font-sans text-base outline-none w-full box-border bg-white";
-const CHECKBOX_LABEL_CLASS =
-  "flex items-center gap-2 font-sans text-base font-normal text-ink-strong leading-[1.4] [&_input[type=checkbox]]:size-[1.125rem] [&_input[type=checkbox]]:accent-brand";
+function ViewField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-sans text-xs leading-4 text-[#697077]">{label}</span>
+      <span className="font-sans text-sm leading-5 text-ink-strong">
+        {value ?? "—"}
+      </span>
+    </div>
+  );
+}
+
+/** Data `YYYY-MM-DD` como `DD/MM/AAAA` (sem deslocamento de fuso). */
+function formatarData(valor: string | null): string | null {
+  if (!valor) return null;
+  const [ano, mes, dia] = valor.split("-");
+  if (!ano || !mes || !dia) return valor;
+  return `${dia}/${mes}/${ano}`;
+}
 
 export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: Props) {
   const [insumoViewData, setInsumoViewData] = useState<ProdutoFormData | null>(null);
@@ -45,110 +64,152 @@ export default function ProdutoView({ conversoes, tiposCodigo, data, onClose }: 
     qtd: String(i.qtd),
   }));
 
-  const insumoColumns: Column<InsumoEntry>[] = [
-    { key: "descricao", label: "Produto", width: "3fr", align: "left" },
-    { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
-  ];
+  const unidadeEntrada =
+    conversoes.find((c) => c.id_conversao === data.id_conversao_padrao)?.nome ?? "—";
+  const unidadeSaida =
+    conversoes.find((c) => c.id_conversao === data.id_conversao_saida)?.nome ?? "—";
+  const foto = data.fotos[0]?.url ?? data.foto_url ?? null;
 
-  const insumoActions: Action<InsumoEntry>[] = [
-    {
-      icon: "/icons/actions/Olho.svg",
-      label: "Visualizar",
-      onClick: async (row) => {
-        const produto = await getProduto(row.id);
-        if (produto) setInsumoViewData(produto);
-      },
-    },
-  ];
+  async function visualizarInsumo(item: InsumoEntry) {
+    const produto = await getProduto(item.id);
+    if (produto) setInsumoViewData(produto);
+  }
 
   return (
     <>
-      <div className="flex flex-col gap-[11px] p-0 w-full box-border">
-        <div className="flex flex-col gap-2">
-          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Descrição do produto</label>
-          <input className={INPUT_CLASS} value={data.descricao} readOnly tabIndex={-1} />
-        </div>
+      <FormShell
+        identity={
+          <IdentityBand
+            media={
+              foto ? (
+                <a
+                  href={foto}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Ver foto"
+                  className="block h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-white"
+                >
+                  <img
+                    src={foto}
+                    alt="Foto do produto"
+                    className="h-full w-full object-cover"
+                  />
+                </a>
+              ) : (
+                <div
+                  className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-border bg-[#eef1f4] text-[#697077]"
+                  aria-hidden="true"
+                >
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <circle cx="9" cy="10" r="1.6" />
+                    <path d="m21 15-4.5-4.5L7 20" />
+                  </svg>
+                </div>
+              )
+            }
+            title={data.descricao}
+            meta={`Código ${formatarCodigo(data.id_produto)}`}
+            chips={[
+              ...(data.perecivel
+                ? [{ label: "Perecível", tone: "warning" as const }]
+                : []),
+              ...(data.composto
+                ? [{ label: "Composto", tone: "brand" as const }]
+                : []),
+            ]}
+            aside={
+              <div className="flex flex-row items-center gap-3">
+                <SaldoReadout
+                  saldo={data.saldo}
+                  reservado={data.saldo_reservado}
+                />
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 font-sans text-xs leading-4 ${
+                    data.ativo
+                      ? "bg-[rgba(27,153,86,0.12)] text-[#15844a]"
+                      : "bg-[#eef1f4] text-[#697077]"
+                  }`}
+                >
+                  {data.ativo ? "Ativo" : "Inativo"}
+                </span>
+              </div>
+            }
+          />
+        }
+        actions={<Button label="Fechar" variant="cancel" onClick={onClose} />}
+      >
+        <FormSection title="Dados do produto">
+          <FormGrid columns={3}>
+            <ViewField label="Conversão Padrão de Entrada" value={unidadeEntrada} />
+            <ViewField label="Unidade Padrão de Saída" value={unidadeSaida} />
+            <ViewField label="Perecível" value={data.perecivel ? "Sim" : "Não"} />
+            <ViewField label="Composto" value={data.composto ? "Sim" : "Não"} />
+            {data.perecivel && (
+              <ViewField label="Validade" value={formatarData(data.data_validade)} />
+            )}
+          </FormGrid>
+        </FormSection>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Conversão Padrão de Entrada</label>
-            <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_padrao} disabled>
-              {conversoes.map((c) => (
-                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Unidade Padrão de Saída</label>
-            <select className={`${INPUT_CLASS} flex-1`} value={data.id_conversao_saida} disabled>
-              {conversoes.map((c) => (
-                <option key={c.id_conversao} value={c.id_conversao}>{c.nome}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-[5px]">
-            <label className={CHECKBOX_LABEL_CLASS}>
-              <input type="checkbox" checked={data.perecivel} readOnly disabled />
-              Perecível
-            </label>
-            <label className={CHECKBOX_LABEL_CLASS}>
-              <input type="checkbox" checked={data.composto} readOnly disabled />
-              Composto
-            </label>
-          </div>
-          {data.perecivel && (
-            <div className="flex flex-col gap-2 min-w-[200px]">
-              <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Validade</label>
-              <input
-                className={INPUT_CLASS}
-                type="date"
-                value={data.data_validade ?? ""}
-                readOnly
-                tabIndex={-1}
-              />
-            </div>
-          )}
-        </div>
-
-        <CodigosSection
-          tiposCodigo={tiposCodigo}
-          value={data.codigos}
-          onChange={() => {}}
-          disabled
-        />
+        <FormSection title="Códigos">
+          <CodigosSection
+            variant="compact"
+            tiposCodigo={tiposCodigo}
+            value={data.codigos}
+            onChange={() => {}}
+            disabled
+          />
+        </FormSection>
 
         {data.composto && (
-          <div className="flex flex-col gap-2">
-            <h3 className="font-display text-xl font-[590] tracking-[-0.028125rem] leading-[1.5625rem] text-ink-strong m-0">Insumos</h3>
-            <DataTable columns={insumoColumns} data={insumos} actions={insumoActions} idField="descricao" pageSize={5} />
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <label className="font-sans text-base font-normal text-ink-strong leading-[1.4]">Foto</label>
-          <input className={INPUT_CLASS} value={data.foto_url ?? ""} placeholder="Sem imagem" readOnly tabIndex={-1} />
-          {data.foto_url && (
-            <img
-              src={data.foto_url}
-              alt="Pré-visualização"
-              className="mt-2 max-w-40 max-h-40 rounded-lg object-cover"
+          <FormSection title="Insumos">
+            <CompactList
+              items={insumos}
+              rowKey={(insumo) => String(insumo.id)}
+              columns={[
+                {
+                  key: "descricao",
+                  label: "Produto",
+                  width: "3fr",
+                  render: (insumo) => insumo.descricao,
+                },
+                {
+                  key: "qtd",
+                  label: "Quantidade",
+                  width: "1.2fr",
+                  align: "right",
+                  render: (insumo) => insumo.qtd,
+                },
+              ]}
+              actions={[
+                {
+                  icon: "/icons/actions/Olho.svg",
+                  label: "Visualizar",
+                  onClick: visualizarInsumo,
+                },
+              ]}
+              empty="Nenhum insumo cadastrado."
+              search={(insumo) => insumo.descricao}
+              searchPlaceholder="Buscar insumo..."
+              noun={{ singular: "insumo", plural: "insumos" }}
             />
-          )}
-        </div>
-
-        <div className="flex justify-end gap-[10px] pt-1">
-          <Button label="Fechar" variant="cancel" onClick={onClose} />
-        </div>
-      </div>
+          </FormSection>
+        )}
+      </FormShell>
 
       <Modal
         open={insumoViewData !== null}
         onClose={() => setInsumoViewData(null)}
-        width="728px"
+        width="860px"
       >
         {insumoViewData && (
           <ProdutoView

@@ -81,7 +81,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       ? {
           id_destinatario: initialData.id_destinatario,
           razao_social: initialData.destinatario ?? "",
-          tipo: "",
+          tipo: "ESCOLA",
         }
       : null,
   );
