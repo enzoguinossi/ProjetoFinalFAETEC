@@ -174,17 +174,20 @@ verificada** — ver §15.
    apenas letras, números, ponto e hífen; é convertido para minúsculas.
 3. Permite marcar o ícone na **Área de Trabalho** (opcional). O diretório de instalação é
    fixo: `C:\Program Files\Nexus\Instalador`.
-4. Ao concluir os arquivos, executa o `instalar-gui.ps1` em uma janela visível (o bootstrap
-   precisa do console para pedir as senhas do MySQL) e aguarda o término.
+4. Ao concluir os arquivos, o `CurStepChanged(ssPostInstall)` do `instalador.iss` executa o
+   `instalar-gui.ps1` em uma janela visível (o bootstrap precisa do console para pedir as
+   senhas do MySQL) com `Exec`/`ewWaitUntilTerminated` e **verifica o `ResultCode`**: se o
+   `Exec` falhar ou o código não for 0, mostra um `MsgBox` de erro com o código e o caminho
+   dos logs.
+
+O `.iss` **não usa `[Run]`**: a execução do `instalar-gui.ps1` — que chama o `bootstrap.ps1`
+— fica no `[Code]`, em `CurStepChanged(ssPostInstall)`, justamente para poder checar o
+código de saída.
 
 O `instalar-gui.ps1` grava o andamento em
 `C:\ProgramData\Nexus\logs\instalador-<timestamp>.log` e mostra MessageBox de sucesso,
 falha ou pausa para o MySQL. O bootstrap grava o log detalhado em
 `C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log`.
-
-> **Atenção:** o `[Run]` do Inno Setup não verifica o código de saída do
-> `instalar-gui.ps1`; o assistente pode chegar ao fim mesmo quando o bootstrap falha. O
-> sinal real é a MessageBox de erro e o log — não confie apenas na tela final. Ver §15.
 
 ### 5.2 Pausa para o MySQL 8.4 LTS
 
@@ -618,10 +621,9 @@ O bootstrap grava:
 }
 ```
 
-Se o arquivo faltar ou estiver inválido, a bandeja usa os padrões do código. **Atenção:** o
-padrão de `backupScript` aponta para `C:\ProgramData\Nexus\scripts\backup.ps1`, que não
-existe (o script real fica em `C:\Program Files\Nexus\scripts`). Mantenha o `tray.json` no
-lugar para o botão de backup funcionar. Ver §15.
+Se o arquivo faltar ou estiver inválido, a bandeja usa os padrões do código; o padrão de
+`backupScript` é `C:\Program Files\Nexus\scripts\backup.ps1`. Mantenha o `tray.json` no
+lugar para preservar os caminhos desta instalação.
 
 ### 9.4 Limitações
 
@@ -690,11 +692,11 @@ Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
 | `NexusCaddy` não sobe | Caddyfile inválido, porta ocupada ou CA | `& "C:\Program Files\Nexus\caddy\caddy.exe" validate --config "C:\ProgramData\Nexus\config\Caddyfile" --adapter caddyfile` e `caddy.err.log` |
 | bandeja vermelha com serviço rodando | health inacessível ou banco fora | confira o health local e o `app.err.log`; a bandeja mostra "banco indisponível" quando `db=false` |
 | bandeja não aparece | tarefa registrada para outro usuário ou não houve logon | veja `Get-ScheduledTask NexusTray`; rode `C:\Program Files\Nexus\NexusTray\NexusTray.exe` elevado ou registre a tarefa para o usuário desejado |
-| "Fazer backup agora" falha | `tray.json` ausente/inválido (fallback aponta para `C:\ProgramData\Nexus\scripts`) | restaure o `tray.json` ou aponte `backupScript` para `C:\Program Files\Nexus\scripts\backup.ps1` |
+| "Fazer backup agora" falha | `backup.ps1` ausente ou `tray.json` com `backupScript` inválido | confira `C:\Program Files\Nexus\scripts\backup.ps1`; o padrão do código já aponta para esse caminho — restaure o `tray.json` ou corrija o `backupScript` |
 | backup falha no `mysqldump` | `backup.cnf` ausente, senha do `nexus_app` mudou ou MySQL fora | rode a fase 2 do bootstrap; confira o erro redigido no console |
 | atualização falha e volta a versão anterior | build, `db push`, health ou smoke falharam | leia `deploy-<tag>.log` e `app.failed-<tag>`; se o banco mudou, restaure o dump (§8.5) |
 | atualização não encontra hostname | `bootstrap.state.json` e `Caddyfile` ausentes | rode o bootstrap ou informe o hostname no `Caddyfile`; o `atualizar.ps1` não aceita `-Hostname` |
-| instalador termina como sucesso, mas o sistema não funciona | falha do bootstrap não altera o código do Inno `[Run]` | confira `instalador-*.log` e `bootstrap-*.log`; não confie só na tela final |
+| instalador mostra `MsgBox` de erro ou o sistema não funciona após a instalação | o bootstrap não concluiu; o `instalador.iss` verifica o `ResultCode` e mostra `MsgBox` | confira `instalador-*.log` e `bootstrap-*.log`, corrija a causa e rode a instalação de novo |
 | disco enche | `backups\uploads` e `my.ini-*.bak` sem retenção; `app.failed-*` acumulam | limpe manualmente os diretórios antigos após conferir os backups |
 
 ### 11.1 Onde olhar primeiro
@@ -839,65 +841,55 @@ Para uma remoção **total** (depois de copiar o que precisa):
 
 ## 15. Atenções conhecidas (divergências entre scripts)
 
-Estas são divergências **reais** encontradas nos scripts desta branch. Nenhuma foi
-corrigida aqui (documentação não altera código de produto); elas estão registradas para a
-operação e para uma correção futura.
+As divergências abaixo continuam **reais** nos scripts desta branch. As correções de código
+são feitas fora deste documento; o que já foi resolvido sai da lista. As divergências do
+fallback de backup da bandeja e da verificação do código de saída do instalador foram
+corrigidas no `RUN-20261102-20` e não aparecem mais aqui.
 
-1. **Fallback do backup na bandeja aponta para o lugar errado.**
-   `NexusTray/TrayConfig.cs` usa `C:\ProgramData\Nexus\scripts\backup.ps1` como padrão, mas
-   o bootstrap copia o script para `C:\Program Files\Nexus\scripts\backup.ps1`. O
-   `tray.json` gerado corrige o caminho; se ele faltar/estiver inválido, "Fazer backup
-   agora" falha.
-
-2. **A retenção do backup não cobre uploads.**
+1. **A retenção do backup não cobre uploads.**
    `backup.ps1` poda apenas `backups\db\*.zip` e `backups\config\.env-*`. A cópia de
    `backups\uploads` (e os `my.ini-*.bak`) não é podada e pode crescer sem limite.
 
-3. **O backup não inclui o Caddy.**
+2. **O backup não inclui o Caddy.**
    Não há cópia do `Caddyfile` nem de `C:\ProgramData\Nexus\caddy\data` (CA e chave
    privada). Após uma perda total, o Caddy gera uma CA nova e as estações precisam confiar
    nela de novo.
 
-4. **O instalador não transforma falha do bootstrap em falha do wizard.**
-   O `[Run]` do `instalador.iss` chama o `instalar-gui.ps1` com `waituntilterminated`, mas
-   não verifica o código de saída. O assistente pode exibir a conclusão mesmo quando o
-   bootstrap retornou erro; o sinal confiável é a MessageBox e o log.
-
-5. **A bandeja é registrada só para o usuário que instalou.**
+3. **A bandeja é registrada só para o usuário que instalou.**
    `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários do servidor não a veem.
 
-6. **O `.env` não é mesclado na atualização.**
+4. **O `.env` não é mesclado na atualização.**
    `atualizar.ps1` copia o `.env` anterior inteiro. Variáveis novas introduzidas por uma
    release não são adicionadas automaticamente; compare com `.env.example` e ajuste à mão
    (reaplicando a ACL).
 
-7. **`app.failed-*` e `app.prev-manual-*` não são limpos.**
+5. **`app.failed-*` e `app.prev-manual-*` não são limpos.**
    O `atualizar.ps1` mantém a versão anterior e mais uma `app.prev-*`, mas não remove
    `app.failed-*`; o bootstrap também deixa `app.prev-manual-*`. Monitore o disco.
 
-8. **Hashes do manifesto vazios.**
+6. **Hashes do manifesto vazios.**
    `manifesto.json` tem `sha256: ""` para Node, NSSM e VC++; Caddy/Git usam "latest" quando
    a URL não está fixada. A instalação depende do TLS, sem verificação de integridade.
    Preencha os hashes para instalações reproduzíveis.
 
-9. **Nenhuma regra de firewall é criada.**
+7. **Nenhuma regra de firewall é criada.**
    Os scripts não chamam `New-NetFirewallRule`/`netsh`. Sem liberar TCP 80/443, as estações
    não acessam o sistema.
 
-10. **O hostname precisa resolver no próprio servidor.**
-    A fase 5 e o `smoke.ps1` testam `https://<hostname>/login`; os scripts não criam entrada
-    em `hosts` nem registro DNS. Sem resolução, a instalação falha no fim.
+8. **O hostname precisa resolver no próprio servidor.**
+   A fase 5 e o `smoke.ps1` testam `https://<hostname>/login`; os scripts não criam entrada
+   em `hosts` nem registro DNS. Sem resolução, a instalação falha no fim.
 
-11. **A porta 2019 (admin do Caddy) não é verificada.**
-    A pré-checagem cobre 3306/3000/80/443. Se a 2019 estiver ocupada, o Caddy e o
-    `caddy trust` podem falhar.
+9. **A porta 2019 (admin do Caddy) não é verificada.**
+   A pré-checagem cobre 3306/3000/80/443. Se a 2019 estiver ocupada, o Caddy e o
+   `caddy trust` podem falhar.
 
-12. **`db push` não é migration.**
+10. **`db push` não é migration.**
     O `atualizar.ps1` aplica `prisma db push` e roda `db:seed` em toda atualização. Mudanças
     destrutivas podem exigir `--accept-data-loss`/SQL revisado e scripts de preparação; o
     caminho alvo é SQL revisado em releases futuras.
 
-13. **A desinstalação preserva a CA no trust store.**
+11. **A desinstalação preserva a CA no trust store.**
     `desinstalar.ps1` remove `C:\ProgramData\Caddy`, mas preserva
     `C:\ProgramData\Nexus\caddy` e não remove o certificado raiz da Caddy do repositório de
     confiança do Windows. Para remoção total, exclua-o manualmente (§13).
