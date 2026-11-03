@@ -85,6 +85,10 @@ try {
     if (-not (Test-Path -LiteralPath $BackupCnf)) {
         Stop-BackupFailure "Arquivo de credenciais não encontrado: $BackupCnf. Rode a fase 2 do bootstrap."
     }
+    $cnfPort = Get-CnfValue -Path $BackupCnf -Section "client" -Key "port"
+    if ([string]$cnfPort -ne [string]$script:NexusMySqlPort) {
+        Stop-BackupFailure "O backup.cnf usa a porta '$cnfPort'; esperado $($script:NexusMySqlPort). Rode a fase 2 do bootstrap."
+    }
 
     $mysqlDump = Find-MysqldumpExe
     # --no-tablespaces evita exigir o privilégio global PROCESS no MySQL 8.

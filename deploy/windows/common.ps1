@@ -16,6 +16,12 @@ $script:NexusCaddyDir = Join-Path $script:NexusDataDir "caddy"
 $script:NexusCaddyDataDir = Join-Path $script:NexusCaddyDir "data"
 $script:NexusCaddyConfigDir = Join-Path $script:NexusCaddyDir "config"
 $script:NexusCaddyLogsDir = Join-Path $script:NexusCaddyDir "logs"
+$script:NexusMySqlPort = 3214
+$script:NexusMySqlService = "NexusMySQL84"
+$script:NexusMySqlDir = Join-Path $script:NexusProgramRoot "mysql"
+$script:NexusMySqlRoot = "C:\ProgramData\MySQL\MySQL Server 8.4"
+$script:NexusMySqlDataDir = Join-Path $script:NexusMySqlRoot "Data"
+$script:NexusMySqlConfig = Join-Path $script:NexusMySqlRoot "my.ini"
 
 $script:NexusTranscriptPath = $null
 $script:NexusTranscriptActive = $false
@@ -60,6 +66,7 @@ function Invoke-Download {
         [Parameter(Mandatory = $true)][string]$Url,
         [Parameter(Mandatory = $true)][string]$Destination,
         [string]$Sha256 = "",
+        [string]$Md5 = "",
         [string]$Label = "arquivo",
         [int]$Attempts = 3
     )
@@ -112,6 +119,16 @@ function Invoke-Download {
             Fail "Hash SHA-256 de $Label não confere. Esperado: $expected; obtido: $actual."
         }
         Write-Ok "Hash de $Label verificado."
+    }
+
+    if ($Md5) {
+        $expected = $Md5.Trim().ToLowerInvariant()
+        $actual = (Get-FileHash -LiteralPath $Destination -Algorithm MD5).Hash.ToLowerInvariant()
+        if ($actual -ne $expected) {
+            Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+            Fail "Hash MD5 de $Label não confere. Esperado: $expected; obtido: $actual."
+        }
+        Write-Ok "MD5 de $Label verificado."
     }
 }
 
@@ -585,12 +602,16 @@ function Update-SessionPath {
 }
 
 function Find-MysqlExe {
+    $fixed = Join-Path $script:NexusMySqlDir "bin\mysql.exe"
+    if (Test-Path -LiteralPath $fixed) { return $fixed }
+
     $fixed = "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe"
     if (Test-Path -LiteralPath $fixed) { return $fixed }
 
     $base = "C:\Program Files\MySQL"
     if (Test-Path -LiteralPath $base) {
-        $candidate = Get-ChildItem -Path $base -Directory -Filter "MySQL Server 8.4*" -ErrorAction SilentlyContinue |
+        $candidate = Get-ChildItem -Path $base -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^MySQL Server 8\.(4|0)' } |
             Sort-Object Name -Descending |
             ForEach-Object { Join-Path $_.FullName "bin\mysql.exe" } |
             Where-Object { Test-Path -LiteralPath $_ } |
@@ -600,16 +621,20 @@ function Find-MysqlExe {
 
     $command = Get-Command mysql.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
-    Fail "mysql.exe não encontrado. Instale o MySQL Server 8.4 (Server only)."
+    Fail "mysql.exe não encontrado em $script:NexusMySqlDir\bin nem em instalações padrão do MySQL 8.0/8.4."
 }
 
 function Find-MysqldumpExe {
+    $fixed = Join-Path $script:NexusMySqlDir "bin\mysqldump.exe"
+    if (Test-Path -LiteralPath $fixed) { return $fixed }
+
     $fixed = "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqldump.exe"
     if (Test-Path -LiteralPath $fixed) { return $fixed }
 
     $base = "C:\Program Files\MySQL"
     if (Test-Path -LiteralPath $base) {
-        $candidate = Get-ChildItem -Path $base -Directory -Filter "MySQL Server 8.4*" -ErrorAction SilentlyContinue |
+        $candidate = Get-ChildItem -Path $base -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^MySQL Server 8\.(4|0)' } |
             Sort-Object Name -Descending |
             ForEach-Object { Join-Path $_.FullName "bin\mysqldump.exe" } |
             Where-Object { Test-Path -LiteralPath $_ } |
@@ -619,7 +644,7 @@ function Find-MysqldumpExe {
 
     $command = Get-Command mysqldump.exe -ErrorAction SilentlyContinue
     if ($command) { return $command.Source }
-    Fail "mysqldump.exe não encontrado. Instale o MySQL Server 8.4 (Server only)."
+    Fail "mysqldump.exe não encontrado em $script:NexusMySqlDir\bin nem em instalações padrão do MySQL 8.0/8.4."
 }
 
 function ConvertFrom-SecureStringPlain {

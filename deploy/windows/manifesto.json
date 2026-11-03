@@ -5,10 +5,10 @@
     "sha256": ""
   },
   "mysql": {
-    "version": "8.4",
+    "version": "8.4.13",
     "channel": "lts",
-    "installer": "MySQL Installer 8.4 LTS - Server only",
-    "url": "",
+    "url": "https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13-winx64.zip",
+    "md5": "7b94489d5524dea9b27097068bea25a8",
     "sha256": ""
   },
   "nssm": {

@@ -4,17 +4,19 @@
     Desinstala os serviços, tarefas e arquivos do Nexus no Windows.
 
 .DESCRIPTION
-    Para e remove os serviços NexusApp e NexusCaddy, remove as tarefas NexusTray
-    e NexusBackup, encerra a bandeja e apaga C:\Program Files\Nexus\app,
-    C:\Program Files\Nexus\NexusTray, C:\Program Files\Nexus\caddy,
+    Para e remove os serviços NexusApp, NexusCaddy e NexusMySQL84, remove as
+    tarefas NexusTray e NexusBackup, encerra a bandeja e apaga
+    C:\Program Files\Nexus\app, C:\Program Files\Nexus\NexusTray,
+    C:\Program Files\Nexus\mysql, C:\Program Files\Nexus\caddy,
     C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts,
     C:\ProgramData\Nexus\caddy e, se existir, C:\ProgramData\Caddy.
     Também remove as versões antigas app.prev-*, app.failed-* e
-    app.prev-manual-* em C:\Program Files\Nexus.
+    app.prev-manual-* em C:\Program Files\Nexus e as regras de firewall do Nexus.
 
-    C:\ProgramData\Nexus é PRESERVADO (banco, uploads, configuração, backups e
-    logs), exceto o subdiretório caddy, que é removido. MySQL, Node.js e Git
-    não são desinstalados.
+    C:\ProgramData\Nexus e C:\ProgramData\MySQL\MySQL Server 8.4 são
+    PRESERVADOS (banco, uploads, configuração, backups e logs), exceto o
+    subdiretório caddy de C:\ProgramData\Nexus. Node.js e Git não são
+    desinstalados.
 #>
 [CmdletBinding()]
 param()
@@ -26,6 +28,9 @@ $DataRoot = "C:\ProgramData\Nexus"
 $LogsDir = Join-Path $DataRoot "logs"
 $NexusCaddyData = Join-Path $DataRoot "caddy"
 $CaddyData = "C:\ProgramData\Caddy"
+$MySqlService = "NexusMySQL84"
+$MySqlDir = Join-Path $ProgramRoot "mysql"
+$FirewallRuleNames = @("Nexus HTTP", "Nexus HTTPS", "Nexus MySQL (LAN)", "Nexus Next (LAN)")
 $NssmExe = Join-Path $ProgramRoot "tools\nssm\nssm.exe"
 $ScExe = Join-Path $env:SystemRoot "System32\sc.exe"
 $SchtasksExe = Join-Path $env:SystemRoot "System32\schtasks.exe"
@@ -119,6 +124,69 @@ function Remove-NexusService {
     }
 }
 
+function Stop-MySqlService {
+    $service = Get-Service -Name $MySqlService -ErrorAction SilentlyContinue
+    if (-not $service) {
+        Write-Log "Serviço $MySqlService não existe."
+        return
+    }
+    if ($service.Status -eq "Stopped") {
+        Write-Log "Serviço $MySqlService já está parado."
+        return
+    }
+
+    Write-Log "Parando serviço $MySqlService..."
+    try {
+        Stop-Service -Name $MySqlService -Force -ErrorAction Stop
+    }
+    catch {
+        Write-Log "[AVISO] Falha ao parar $MySqlService`: $($_.Exception.Message)"
+    }
+
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+        $current = Get-Service -Name $MySqlService -ErrorAction SilentlyContinue
+        if (-not $current -or $current.Status -eq "Stopped") { return }
+        Start-Sleep -Seconds 1
+    }
+    Write-Log "[AVISO] O serviço $MySqlService não parou em 60 segundos."
+    $script:Failures++
+}
+
+function Remove-MySqlService {
+    $service = Get-Service -Name $MySqlService -ErrorAction SilentlyContinue
+    if (-not $service) {
+        Write-Log "Serviço $MySqlService já removido."
+        return
+    }
+
+    Write-Log "Removendo serviço $MySqlService..."
+    $code = Invoke-Native -Exe $ScExe -Arguments @("delete", $MySqlService)
+    if ($code -ne 0) {
+        Write-Log "[AVISO] Não foi possível remover o serviço $MySqlService (código $code)."
+        $script:Failures++
+    }
+}
+
+function Remove-NexusFirewallRules {
+    if (-not (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue)) {
+        Write-Log "[AVISO] NetSecurity indisponível; regras de firewall mantidas."
+        return
+    }
+    foreach ($name in $FirewallRuleNames) {
+        $rules = @(Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue)
+        if ($rules.Count -eq 0) { continue }
+        try {
+            $rules | Remove-NetFirewallRule -Confirm:$false -ErrorAction Stop
+            Write-Log "Regra de firewall removida: $name."
+        }
+        catch {
+            Write-Log "[AVISO] Falha ao remover a regra ${name}: $($_.Exception.Message)"
+            $script:Failures++
+        }
+    }
+}
+
 function Remove-NexusTask {
     param([Parameter(Mandatory = $true)][string]$Name)
 
@@ -191,6 +259,7 @@ try {
     # A bandeja depende do NexusApp; o Caddy depende do NexusApp.
     Stop-NexusService -Name "NexusCaddy"
     Stop-NexusService -Name "NexusApp"
+    Stop-MySqlService
 
     $trayProcesses = Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue
     if ($trayProcesses) {
@@ -210,10 +279,11 @@ try {
 
     Remove-NexusService -Name "NexusCaddy"
     Remove-NexusService -Name "NexusApp"
+    Remove-MySqlService
 
     if ($script:Failures -gt 0) {
-        Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray e versões antigas serão preservados."
-        Write-Log "C:\ProgramData\Nexus preservado."
+        Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray, versões antigas e binários do MySQL serão preservados."
+        Write-Log "C:\ProgramData\Nexus e C:\ProgramData\MySQL\MySQL Server 8.4 preservados."
         exit 1
     }
 
@@ -225,13 +295,16 @@ try {
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "caddy") -Label "Caddy"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "tools") -Label "Ferramentas (NSSM)"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "scripts") -Label "Scripts de operação"
+    Remove-NexusDirectory -Path $MySqlDir -Label "Binários do MySQL dedicado"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "app") -Label "Aplicação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusTray") -Label "Bandeja"
     Remove-NexusDirectory -Path $NexusCaddyData -Label "Dados do Caddy (Nexus)"
     Remove-NexusDirectory -Path $CaddyData -Label "Dados legados do Caddy"
+    Remove-NexusFirewallRules
 
     Write-Log "C:\ProgramData\Nexus preservado (exceto caddy): banco, uploads, configuração, backups e logs."
-    Write-Log "MySQL, Node.js e Git não foram desinstalados."
+    Write-Log "C:\ProgramData\MySQL\MySQL Server 8.4 preservado (dados do MySQL dedicado)."
+    Write-Log "Node.js e Git não foram desinstalados."
 
     if ($script:Failures -gt 0) {
         Write-Log "Desinstalação concluída com $($script:Failures) falha(s)."

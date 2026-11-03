@@ -4,10 +4,10 @@
     Smoke test da instalação do Nexus.
 
 .DESCRIPTION
-    Verifica os serviços MySQL84/NexusApp/NexusCaddy, o health local com
-    db=true, a página https://<hostname>/login e, opcionalmente, a versão.
-    Não ignora validação de certificado: o HTTPS exige a CA do Caddy confiada
-    no repositório do Windows.
+    Verifica os serviços NexusMySQL84/NexusApp/NexusCaddy, a porta 3214, o
+    health local com db=true, a página https://<hostname>/login, as regras de
+    firewall e, opcionalmente, a versão. Não ignora validação de certificado:
+    o HTTPS exige a CA do Caddy confiada no repositório do Windows.
 
 .PARAMETER Hostname
     Nome DNS configurado no Caddyfile.
@@ -68,7 +68,7 @@ function Test-UsersAce {
 
 Write-Step "Smoke test do Nexus"
 
-foreach ($serviceName in @("MySQL84", "NexusApp", "NexusCaddy")) {
+foreach ($serviceName in @($script:NexusMySqlService, "NexusApp", "NexusCaddy")) {
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($service -and $service.Status.ToString() -eq "Running") {
         Write-Ok "$serviceName em execução."
@@ -79,6 +79,14 @@ foreach ($serviceName in @("MySQL84", "NexusApp", "NexusCaddy")) {
         Write-Warn "${serviceName}: $status."
         Add-Failure "serviço $serviceName não está em execução"
     }
+}
+
+if (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000) {
+    Write-Ok "MySQL dedicado aceitando conexões em 127.0.0.1:$($script:NexusMySqlPort)."
+}
+else {
+    Write-Warn "A porta $($script:NexusMySqlPort) não está aceitando conexões."
+    Add-Failure "porta $($script:NexusMySqlPort) não está ouvindo"
 }
 
 $aclChecks = @(
@@ -109,6 +117,45 @@ foreach ($check in $aclChecks) {
     }
     else {
         Write-Ok "ACL restrita: $($check.Label)."
+    }
+}
+
+$firewallChecks = @(
+    @{ Name = "Nexus HTTP"; Port = 80; Action = "Allow" },
+    @{ Name = "Nexus HTTPS"; Port = 443; Action = "Allow" },
+    @{ Name = "Nexus MySQL (LAN)"; Port = $script:NexusMySqlPort; Action = "Block" },
+    @{ Name = "Nexus Next (LAN)"; Port = 3000; Action = "Block" }
+)
+if (-not (Get-Command Get-NetFirewallRule -ErrorAction SilentlyContinue)) {
+    Write-Warn "NetSecurity indisponível; não foi possível validar as regras de firewall."
+    Add-Failure "módulo NetSecurity indisponível para validar firewall"
+}
+else {
+    foreach ($check in $firewallChecks) {
+        $rule = Get-NetFirewallRule -DisplayName $check.Name -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if (-not $rule) {
+            Write-Warn "Regra de firewall ausente: $($check.Name)."
+            Add-Failure "regra de firewall ausente: $($check.Name)"
+            continue
+        }
+
+        $portFilter = $rule | Get-NetFirewallPortFilter
+        $addressFilter = $rule | Get-NetFirewallAddressFilter
+        $remote = @($addressFilter.RemoteAddress)
+        $ruleOk = ([string]$rule.Enabled -eq "True") -and
+            ([string]$rule.Direction -eq "Inbound") -and
+            ([string]$rule.Action -eq $check.Action) -and
+            ([string]$portFilter.LocalPort -eq [string]$check.Port) -and
+            ($remote -contains "LocalSubnet")
+
+        if ($ruleOk) {
+            Write-Ok "Firewall: $($check.Name) $($check.Action) na porta $($check.Port) para LocalSubnet."
+        }
+        else {
+            Write-Warn "Firewall: $($check.Name) não corresponde ao esperado ($($check.Action), porta $($check.Port), LocalSubnet)."
+            Add-Failure "regra de firewall divergente: $($check.Name)"
+        }
     }
 }
 

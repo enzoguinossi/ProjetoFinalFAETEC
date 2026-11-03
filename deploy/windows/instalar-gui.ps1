@@ -4,10 +4,11 @@
     Executa o bootstrap do Nexus em uma janela visível.
 
 .DESCRIPTION
-    O bootstrap pede as senhas do MySQL via Read-Host, por isso precisa de um
-    console visível (nunca -WindowStyle Hidden). Este wrapper registra o
-    andamento em C:\ProgramData\Nexus\logs\instalador-<timestamp>.log e mostra
-    MessageBox de sucesso, de falha ou de pausa para instalar o MySQL 8.4 LTS.
+    O bootstrap instala o MySQL 8.4 dedicado e pede as senhas via Read-Host,
+    por isso precisa de um console visível (nunca -WindowStyle Hidden). Este
+    wrapper registra o andamento em
+    C:\ProgramData\Nexus\logs\instalador-<timestamp>.log e mostra MessageBox de
+    sucesso ou de falha.
 
 .PARAMETER Hostname
     Nome DNS usado pelo Caddy (ex.: nexus.galpao.local).
@@ -87,15 +88,12 @@ function Show-Message {
 }
 
 function Invoke-Bootstrap {
-    param([switch]$Resume)
-
     $argumentLine = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Hostname "{1}"' -f $Bootstrap, $Hostname
     if ($TrayExe) { $argumentLine += ' -TrayExe "{0}"' -f $TrayExe }
     if ($RepoUrl) { $argumentLine += ' -RepoUrl "{0}"' -f $RepoUrl }
     if ($Tag) { $argumentLine += ' -Tag "{0}"' -f $Tag }
-    if ($Resume) { $argumentLine += ' -Resume' }
 
-    Write-Log ("Executando bootstrap{0}." -f $(if ($Resume) { " (-Resume)" } else { "" }))
+    Write-Log "Executando bootstrap."
     $process = Start-Process -FilePath $PsExe -ArgumentList $argumentLine `
         -WorkingDirectory $PSScriptRoot -WindowStyle Normal -PassThru -Wait
     Write-Log ("Bootstrap terminou com código {0}." -f $process.ExitCode)
@@ -129,22 +127,6 @@ Write-Host ""
 
 try {
     $exitCode = Invoke-Bootstrap
-
-    while ($exitCode -eq 2) {
-        Write-Log "Bootstrap pausado: o serviço MySQL84 ainda não existe."
-        $message = "O MySQL 8.4 LTS (Server only) ainda não está instalado.`n`n" +
-            "Instale o MySQL Installer 8.4 LTS escolhendo apenas o MySQL Server 8.4 " +
-            "(Server only), volte a esta janela e clique em Sim para continuar.`n`n" +
-            "Clique em Não para cancelar a instalação."
-        $answer = Show-Message -Text $message -Title "Nexus - MySQL 8.4 necessário" -Icon Warning -Buttons YesNo
-        if ([string]$answer -ne "Yes") {
-            Write-Log "Usuário cancelou a instalação na pausa do MySQL."
-            $message = "Instalação cancelada: o MySQL 8.4 LTS (Server only) é obrigatório.`n`nLog: $LogPath"
-            Show-Message -Text $message -Title "Nexus - instalação cancelada" -Icon Error | Out-Null
-            exit 1
-        }
-        $exitCode = Invoke-Bootstrap -Resume
-    }
 
     if ($exitCode -eq 0) {
         Write-Log "Instalação concluída com sucesso."

@@ -1,14 +1,15 @@
 ﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Instalação do Nexus em Windows, do zero (sem Node, Git ou MySQL).
+    Instalação do Nexus em Windows, do zero (sem Node, Git ou MySQL instalados).
 
 .DESCRIPTION
     Executa as fases 0 a 7 com estado em
     C:\ProgramData\Nexus\bootstrap.state.json. É idempotente e retomável.
 
-    A fase 2 pausa quando o serviço MySQL84 ainda não existe. Instale o
-    MySQL Installer 8.4 LTS (Server only) e execute novamente com -Resume.
+    A fase 2 instala automaticamente o MySQL 8.4.13 LTS dedicado do Nexus
+    (serviço NexusMySQL84, porta 3214, bind 127.0.0.1), sem instalar nem
+    alterar o MySQL existente na porta 3306.
 
 .PARAMETER Hostname
     Nome DNS usado pelo Caddy (ex.: nexus.escola.local).
@@ -229,7 +230,7 @@ function Write-BackupCnf {
     $lines = @(
         "[client]",
         "host=127.0.0.1",
-        "port=3306",
+        "port=$script:NexusMySqlPort",
         "user=nexus_app",
         $passwordLine,
         "default-character-set=utf8mb4",
@@ -240,6 +241,44 @@ function Write-BackupCnf {
     }
     Protect-File -Path $BackupCnf
     Write-Utf8NoBom -Path $BackupCnf -Lines $lines
+}
+
+function Read-MySqlCredentials {
+    Suspend-Transcript
+    try {
+        $root = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado"
+        $app = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
+        return @{ Root = $root; App = $app }
+    }
+    finally {
+        Resume-Transcript
+    }
+}
+
+function Set-NexusFirewallRules {
+    if (-not (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue)) {
+        Fail "O módulo NetSecurity não está disponível para criar as regras de firewall."
+    }
+
+    $rules = @(
+        @{ Name = "Nexus HTTP"; Port = 80; Action = "Allow" },
+        @{ Name = "Nexus HTTPS"; Port = 443; Action = "Allow" },
+        @{ Name = "Nexus MySQL (LAN)"; Port = $script:NexusMySqlPort; Action = "Block" },
+        @{ Name = "Nexus Next (LAN)"; Port = 3000; Action = "Block" }
+    )
+    foreach ($rule in $rules) {
+        Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue |
+            Remove-NetFirewallRule -Confirm:$false -ErrorAction SilentlyContinue
+        New-NetFirewallRule `
+            -DisplayName $rule.Name `
+            -Direction Inbound `
+            -Action $rule.Action `
+            -Protocol TCP `
+            -LocalPort $rule.Port `
+            -RemoteAddress LocalSubnet `
+            -Profile Any `
+            -Enabled True | Out-Null
+    }
 }
 
 try {
@@ -264,7 +303,7 @@ try {
         Write-Ok "Internet disponível."
 
         $ports = @(
-            @{ Port = 3306; Service = "MySQL84" },
+            @{ Port = $script:NexusMySqlPort; Service = $script:NexusMySqlService },
             @{ Port = 3000; Service = "NexusApp" },
             @{ Port = 80; Service = "NexusCaddy" },
             @{ Port = 443; Service = "NexusCaddy" }
@@ -275,11 +314,23 @@ try {
             }
             $ownerService = Get-Service -Name $entry.Service -ErrorAction SilentlyContinue
             if (-not $ownerService -or $ownerService.Status.ToString() -ne "Running") {
-                Fail "A porta $($entry.Port) está em uso por outro processo. Libere-a antes de continuar."
+                $owner = "processo desconhecido"
+                $connection = Get-NetTCPConnection -LocalPort $entry.Port -State Listen -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+                if ($connection) {
+                    $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+                    if ($process) {
+                        $owner = "$($process.ProcessName) (PID $($process.Id))"
+                    }
+                    else {
+                        $owner = "PID $($connection.OwningProcess)"
+                    }
+                }
+                Fail "A porta $($entry.Port) está em uso por $owner. Libere-a antes de continuar."
             }
             Write-Warn "Porta $($entry.Port) em uso pelo serviço $($entry.Service); será reutilizada."
         }
-        Write-Ok "Portas 3306, 3000, 80 e 443 verificadas."
+        Write-Ok "Portas $($script:NexusMySqlPort), 3000, 80 e 443 verificadas."
 
         try {
             $response = Invoke-WebRequest -Uri "https://nodejs.org" -Method Head -UseBasicParsing -TimeoutSec 20
@@ -395,99 +446,123 @@ try {
     }
 
     if ($startPhase -le 2) {
-        Write-Step "Fase 2/7 - MySQL 8.4 LTS"
+        Write-Step "Fase 2/7 - MySQL 8.4 dedicado"
         Assert-Admin
 
-        $mysqlService = Get-Service -Name "MySQL84" -ErrorAction SilentlyContinue
-        if (-not $mysqlService) {
-            $state.completedPhase = 1
-            $state.paused = $true
-            $state.pausedPhase = 2
-            Save-BootstrapState -State $state
-            Stop-NexusTranscript
-            Write-Host ""
-            Write-Warn "O serviço MySQL84 ainda não existe."
-            Write-Host "  1. Baixe o MySQL Installer 8.4 LTS em https://dev.mysql.com/downloads/installer/"
-            Write-Host "  2. Escolha 'MySQL Server 8.4' (Server only) e conclua o instalador gráfico."
-            Write-Host "  3. Defina a senha do root e guarde-a."
-            Write-Host "  4. Retome a instalação com:"
-            Write-Host "     .\bootstrap.ps1 -Hostname $Hostname -Resume"
-            Write-Host ""
-            Write-Host "STATUS: PAUSADO (código 2). Nada foi perdido; o estado está em $StatePath." -ForegroundColor Yellow
-            exit 2
-        }
+        $rootSecure = $null
+        $appSecure = $null
+        $appPlain = $null
+        try {
+            $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
+            $installedNow = $false
+            if (-not $mysqlService) {
+                $credentials = Read-MySqlCredentials
+                $rootSecure = $credentials.Root
+                $appSecure = $credentials.App
+                Write-Ok "Instalando o MySQL dedicado (serviço $($script:NexusMySqlService), porta $($script:NexusMySqlPort))..."
+                & (Join-Path $PSScriptRoot "instalar-mysql.ps1") `
+                    -RootPassword $rootSecure `
+                    -AppPassword $appSecure `
+                    -Port $script:NexusMySqlPort
+                if ($LASTEXITCODE -ne 0) {
+                    Fail "A instalação do MySQL dedicado falhou (código $LASTEXITCODE). Consulte $LogsDir."
+                }
+                $installedNow = $true
+                $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
+            }
 
-        if ($mysqlService.Status.ToString() -ne "Running") {
-            Start-Service -Name "MySQL84"
-        }
-        if (-not (Wait-ServiceState -Name "MySQL84" -Status "Running" -TimeoutSeconds 120)) {
-            Fail "O serviço MySQL84 não iniciou."
-        }
-        $deadline = (Get-Date).AddSeconds(60)
-        while (-not (Test-TcpPort -Port 3306 -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
-            Start-Sleep -Seconds 2
-        }
-        if (-not (Test-TcpPort -Port 3306 -TimeoutMs 2000)) {
-            Fail "O MySQL84 está em execução, mas não aceita conexões na porta 3306."
-        }
-        Write-Ok "Serviço MySQL84 em execução."
+            if (-not $mysqlService) {
+                Fail "O serviço $($script:NexusMySqlService) não foi criado."
+            }
+            if ($mysqlService.Status.ToString() -ne "Running") {
+                Start-Service -Name $script:NexusMySqlService
+            }
+            if (-not (Wait-ServiceState -Name $script:NexusMySqlService -Status "Running" -TimeoutSeconds 120)) {
+                Fail "O serviço $($script:NexusMySqlService) não iniciou."
+            }
+            $deadline = (Get-Date).AddSeconds(120)
+            while (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
+                Start-Sleep -Seconds 2
+            }
+            if (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000)) {
+                Fail "O $($script:NexusMySqlService) está em execução, mas não aceita conexões na porta $($script:NexusMySqlPort)."
+            }
+            Write-Ok "$($script:NexusMySqlService) em execução em 127.0.0.1:$($script:NexusMySqlPort)."
 
-        $mysqlExe = Find-MysqlExe
-        $needsSetup = $true
-        if (Test-Path -LiteralPath $BackupCnf) {
-            $testOut = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".out")
-            $testErr = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".err")
-            try {
-                $testArgs = "--defaults-extra-file=`"$BackupCnf`" --protocol=TCP -h 127.0.0.1 -P 3306 -D nexus_prod -e `"SELECT 1;`""
-                $testProcess = Start-Process -FilePath $mysqlExe -ArgumentList $testArgs -Wait -PassThru -NoNewWindow `
-                    -RedirectStandardOutput $testOut -RedirectStandardError $testErr
-                if ($testProcess.ExitCode -eq 0) {
-                    $needsSetup = $false
-                    Write-Ok "Banco nexus_prod acessível com o usuário nexus_app."
+            $mysqlExe = Join-Path $script:NexusMySqlDir "bin\mysql.exe"
+            if (-not (Test-Path -LiteralPath $mysqlExe -PathType Leaf)) {
+                Fail "mysql.exe não encontrado em $mysqlExe."
+            }
+
+            $needsSetup = $true
+            if (-not $installedNow -and (Test-Path -LiteralPath $BackupCnf)) {
+                $cnfPort = Get-CnfValue -Path $BackupCnf -Section "client" -Key "port"
+                if ([string]$cnfPort -ne [string]$script:NexusMySqlPort) {
+                    Write-Warn "O backup.cnf usa a porta '$cnfPort'; ele será regravado para $($script:NexusMySqlPort)."
                 }
                 else {
-                    Write-Warn "O usuário nexus_app não conseguiu conectar; a configuração do banco será refeita."
+                    $testOut = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".out")
+                    $testErr = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".err")
+                    try {
+                        $testArgs = "--defaults-extra-file=`"$BackupCnf`" --protocol=TCP -h 127.0.0.1 -P $script:NexusMySqlPort -D nexus_prod -e `"SELECT 1;`""
+                        $testProcess = Start-Process -FilePath $mysqlExe -ArgumentList $testArgs -Wait -PassThru -NoNewWindow `
+                            -RedirectStandardOutput $testOut -RedirectStandardError $testErr
+                        if ($testProcess.ExitCode -eq 0) {
+                            $needsSetup = $false
+                            Write-Ok "Banco nexus_prod acessível com o usuário nexus_app."
+                        }
+                        else {
+                            Write-Warn "O usuário nexus_app não conseguiu conectar; a configuração do banco será refeita."
+                        }
+                    }
+                    finally {
+                        Remove-Item -LiteralPath $testOut, $testErr -Force -ErrorAction SilentlyContinue
+                    }
                 }
             }
-            finally {
-                Remove-Item -LiteralPath $testOut, $testErr -Force -ErrorAction SilentlyContinue
-            }
-        }
+            if ($installedNow) { $needsSetup = $true }
 
-        if ($needsSetup) {
-            Suspend-Transcript
-            $rootSecure = Read-Host -AsSecureString "Senha do usuário root do MySQL"
-            $appSecure = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
-            $rootPlain = ConvertFrom-SecureStringPlain -Secure $rootSecure
-            $appPlain = ConvertFrom-SecureStringPlain -Secure $appSecure
-            Assert-MysqlRootPassword -Plain $rootPlain
-            Assert-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
-
-            try {
+            if ($needsSetup) {
+                if (-not $rootSecure) {
+                    $credentials = Read-MySqlCredentials
+                    $rootSecure = $credentials.Root
+                    $appSecure = $credentials.App
+                }
+                if (-not $installedNow) {
+                    Write-Ok "Verificando a instalação existente do MySQL dedicado..."
+                    & (Join-Path $PSScriptRoot "instalar-mysql.ps1") `
+                        -RootPassword $rootSecure `
+                        -AppPassword $appSecure `
+                        -Port $script:NexusMySqlPort
+                    if ($LASTEXITCODE -ne 0) {
+                        Fail "A verificação do MySQL dedicado falhou (código $LASTEXITCODE). Consulte $LogsDir."
+                    }
+                }
+                Write-Ok "Configurando o banco nexus_prod e o usuário nexus_app..."
                 & (Join-Path $PSScriptRoot "pos-instalacao-mysql.ps1") `
                     -RootPassword $rootSecure `
                     -AppPassword $appSecure `
                     -Hostname $Hostname
                 $mysqlSetupCode = $LASTEXITCODE
-                if ($mysqlSetupCode -eq 0) {
-                    Write-BackupCnf -Password $appPlain
+                if ($mysqlSetupCode -ne 0) {
+                    Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
                 }
+                $appPlain = ConvertFrom-SecureStringPlain -Secure $appSecure
+                Assert-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
+                Write-BackupCnf -Password $appPlain
+                Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
             }
-            finally {
-                Resume-Transcript
-                $rootPlain = $null
-                $appPlain = $null
-            }
-            if ($mysqlSetupCode -ne 0) {
-                Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
-            }
-            Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
-        }
 
-        $state.completedPhase = 2
-        $state.paused = $false
-        $state.pausedPhase = $null
-        Save-BootstrapState -State $state
+            $state.completedPhase = 2
+            $state.paused = $false
+            $state.pausedPhase = $null
+            Save-BootstrapState -State $state
+        }
+        finally {
+            $rootSecure = $null
+            $appSecure = $null
+            $appPlain = $null
+        }
     }
 
     if ($startPhase -le 3) {
@@ -627,7 +702,21 @@ try {
         }
         # O serviço LocalService do Caddy precisa ler o arquivo de configuração.
         Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
-        Write-Ok "ACLs restritas aplicadas em $DataDir e $ProgramRoot."
+
+        if (Test-Path -LiteralPath $script:NexusMySqlDir) {
+            Set-AclReadExecute -Path $script:NexusMySqlDir -Identity "S-1-5-20"
+        }
+        if (Test-Path -LiteralPath $script:NexusMySqlRoot) {
+            Set-AclRestricted -Path $script:NexusMySqlRoot -ModifyIdentities @("S-1-5-20")
+            if (Test-Path -LiteralPath $script:NexusMySqlDataDir) {
+                Set-AclRestricted -Path $script:NexusMySqlDataDir -ModifyIdentities @("S-1-5-20")
+            }
+            if (Test-Path -LiteralPath $script:NexusMySqlConfig) {
+                Protect-File -Path $script:NexusMySqlConfig -ReadIdentities @("S-1-5-20")
+            }
+        }
+        Set-NexusFirewallRules
+        Write-Ok "ACLs restritas e regras de firewall aplicadas."
 
         $appEnv = Join-Path $AppDir ".env"
         if (Test-Path -LiteralPath $appEnv) {
@@ -716,7 +805,7 @@ try {
                 Fail "Senha de nexus_app não encontrada em $BackupCnf. Refaça a fase 2."
             }
 
-            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:3306/nexus_prod"' -f $appPassword) -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:{1}/nexus_prod"' -f $appPassword, $script:NexusMySqlPort) -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
@@ -818,7 +907,7 @@ try {
             -Stdout (Join-Path $LogsDir "app.out.log") `
             -Stderr (Join-Path $LogsDir "app.err.log") `
             -Description "Nexus - aplicação Next.js" `
-            -DependOnService "MySQL84"
+            -DependOnService $script:NexusMySqlService
         Write-Ok "Serviço NexusApp configurado (NT AUTHORITY\NetworkService)."
 
         $caddyParameters = "run --config $Caddyfile --adapter caddyfile"

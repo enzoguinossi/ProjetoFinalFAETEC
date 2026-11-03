@@ -1,11 +1,12 @@
 ﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Pós-instalação do MySQL 8.4 LTS para o Nexus.
+    Pós-instalação do MySQL 8.4 dedicado do Nexus (porta 3214).
 
 .DESCRIPTION
-    Ajusta o my.ini (bind local, utf8mb4, fuso -03:00, X Plugin desligado),
-    reinicia o serviço MySQL84 e cria o banco nexus_prod e o usuário nexus_app.
+    Ajusta o my.ini do serviço NexusMySQL84 (bind local, porta 3214, utf8mb4,
+    fuso -03:00, X Plugin desligado), reinicia o serviço e cria o banco
+    nexus_prod e o usuário nexus_app.
 
     As senhas entram por SecureString e são entregues ao mysql.exe por arquivos
     temporários com ACL restrita (--defaults-extra-file); nunca por -p, log ou
@@ -23,7 +24,7 @@ $ErrorActionPreference = "Stop"
 Assert-Admin
 
 if (-not $RootPassword) {
-    $RootPassword = Read-Host -AsSecureString "Senha do usuário root do MySQL"
+    $RootPassword = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado"
 }
 if (-not $AppPassword) {
     $AppPassword = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
@@ -80,34 +81,24 @@ function Set-IniValue {
     $Lines.Insert($sectionStart + 1, "$Key=$Value")
 }
 
-Write-Step "Pós-instalação do MySQL 8.4"
+$serviceName = $script:NexusMySqlService
+$port = $script:NexusMySqlPort
+$mysqlExe = Join-Path $script:NexusMySqlDir "bin\mysql.exe"
+$myIni = $script:NexusMySqlConfig
 
-$mysqlService = Get-Service -Name "MySQL84" -ErrorAction SilentlyContinue
+Write-Step "Pós-instalação do MySQL 8.4 dedicado"
+
+$mysqlService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if (-not $mysqlService) {
-    Fail "O serviço MySQL84 não existe. Instale o MySQL Server 8.4 (Server only) antes."
+    Fail "O serviço $serviceName não existe. Rode instalar-mysql.ps1 antes."
 }
-Set-Service -Name "MySQL84" -StartupType Automatic
+Set-Service -Name $serviceName -StartupType Automatic
 
-$mysqlExe = Find-MysqlExe
-$mysqlHome = Split-Path -Parent (Split-Path -Parent $mysqlExe)
-
-$myIni = $null
-foreach ($candidate in @(
-    "C:\ProgramData\MySQL\MySQL Server 8.4\my.ini",
-    (Join-Path $mysqlHome "my.ini")
-)) {
-    if (Test-Path -LiteralPath $candidate) {
-        $myIni = $candidate
-        break
-    }
+if (-not (Test-Path -LiteralPath $mysqlExe -PathType Leaf)) {
+    Fail "mysql.exe não encontrado em $mysqlExe."
 }
-if (-not $myIni -and (Test-Path -LiteralPath "C:\ProgramData\MySQL")) {
-    $found = Get-ChildItem -Path "C:\ProgramData\MySQL" -Recurse -Filter "my.ini" -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-    if ($found) { $myIni = $found.FullName }
-}
-if (-not $myIni) {
-    Fail "my.ini do MySQL 8.4 não encontrado."
+if (-not (Test-Path -LiteralPath $myIni -PathType Leaf)) {
+    Fail "my.ini não encontrado em $myIni."
 }
 Write-Ok "my.ini: $myIni"
 
@@ -126,8 +117,11 @@ foreach ($line in [System.IO.File]::ReadAllLines($myIni, $encoding)) {
     $lines.Add($line)
 }
 
+$datadir = $script:NexusMySqlDataDir.Replace("\", "/")
+Set-IniValue -Lines $lines -Section "mysqld" -Key "port" -Value ([string]$port)
 Set-IniValue -Lines $lines -Section "mysqld" -Key "bind-address" -Value "127.0.0.1"
 Set-IniValue -Lines $lines -Section "mysqld" -Key "mysqlx" -Value "0"
+Set-IniValue -Lines $lines -Section "mysqld" -Key "datadir" -Value $datadir
 Set-IniValue -Lines $lines -Section "mysqld" -Key "character-set-server" -Value "utf8mb4"
 Set-IniValue -Lines $lines -Section "mysqld" -Key "collation-server" -Value "utf8mb4_0900_ai_ci"
 Set-IniValue -Lines $lines -Section "mysqld" -Key "default-time-zone" -Value "'-03:00'"
@@ -138,20 +132,21 @@ try {
 catch {
     Fail "Não foi possível gravar $myIni. Backup em $myIniBackup. Detalhe: $($_.Exception.Message)"
 }
-Write-Ok "my.ini ajustado (bind local, utf8mb4, fuso -03:00, mysqlx desligado)."
+Protect-File -Path $myIni -ReadIdentities @("S-1-5-20")
+Write-Ok "my.ini ajustado (porta $port, bind local, utf8mb4, fuso -03:00, mysqlx desligado)."
 
-Restart-Service -Name "MySQL84" -Force
-if (-not (Wait-ServiceState -Name "MySQL84" -Status "Running" -TimeoutSeconds 120)) {
-    Fail "O MySQL84 não reiniciou. Verifique $myIni e restaure o backup $myIniBackup se necessário."
+Restart-Service -Name $serviceName -Force
+if (-not (Wait-ServiceState -Name $serviceName -Status "Running" -TimeoutSeconds 120)) {
+    Fail "O $serviceName não reiniciou. Verifique $myIni e restaure o backup $myIniBackup se necessário."
 }
 $deadline = (Get-Date).AddSeconds(60)
-while (-not (Test-TcpPort -Port 3306 -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
+while (-not (Test-TcpPort -Port $port -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 2
 }
-if (-not (Test-TcpPort -Port 3306 -TimeoutMs 2000)) {
-    Fail "O MySQL84 não voltou a aceitar conexões na porta 3306."
+if (-not (Test-TcpPort -Port $port -TimeoutMs 2000)) {
+    Fail "O $serviceName não voltou a aceitar conexões na porta $port."
 }
-Write-Ok "MySQL84 reiniciado."
+Write-Ok "$serviceName reiniciado na porta $port."
 
 $tempRoot = Join-Path $env:TEMP ("nexus-mysql-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
@@ -174,7 +169,7 @@ try {
         "[client]",
         "user=root",
         "host=127.0.0.1",
-        "port=3306",
+        "port=$port",
         ("password=" + (ConvertTo-MysqlOptionValue $rootPlain)),
         "default-character-set=utf8mb4",
         ""
@@ -194,7 +189,7 @@ FLUSH PRIVILEGES;
     Protect-File -Path $sqlFile
     Write-Utf8NoBom -Path $sqlFile -Lines @($sql)
 
-    $rootArgs = "--defaults-extra-file=`"$rootCnf`" --protocol=TCP -h 127.0.0.1 -P 3306 --default-character-set=utf8mb4"
+    $rootArgs = "--defaults-extra-file=`"$rootCnf`" --protocol=TCP -h 127.0.0.1 -P $port --default-character-set=utf8mb4"
     $process = Start-Process -FilePath $mysqlExe -ArgumentList $rootArgs `
         -RedirectStandardInput $sqlFile -RedirectStandardOutput $sqlOut -RedirectStandardError $sqlErr `
         -Wait -PassThru -NoNewWindow
@@ -212,7 +207,7 @@ FLUSH PRIVILEGES;
         "[client]",
         "user=nexus_app",
         "host=127.0.0.1",
-        "port=3306",
+        "port=$port",
         ("password=" + (ConvertTo-MysqlOptionValue $appPlain)),
         "default-character-set=utf8mb4",
         ""
@@ -221,7 +216,7 @@ FLUSH PRIVILEGES;
     Protect-File -Path $appCnf
     Write-Utf8NoBom -Path $appCnf -Lines $appLines
 
-    $appArgs = "--defaults-extra-file=`"$appCnf`" --protocol=TCP -h 127.0.0.1 -P 3306 -D nexus_prod -e `"SELECT 1;`""
+    $appArgs = "--defaults-extra-file=`"$appCnf`" --protocol=TCP -h 127.0.0.1 -P $port -D nexus_prod -e `"SELECT 1;`""
     $appProcess = Start-Process -FilePath $mysqlExe -ArgumentList $appArgs `
         -RedirectStandardOutput $appOut -RedirectStandardError $appErr `
         -Wait -PassThru -NoNewWindow
@@ -243,5 +238,5 @@ finally {
     $appPlain = $null
 }
 
-Write-Ok "MySQL pronto para o Nexus em $Hostname."
+Write-Ok "MySQL pronto para o Nexus em $Hostname (porta $port)."
 exit 0

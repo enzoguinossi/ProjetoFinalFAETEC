@@ -48,6 +48,7 @@ Source: "build-instalador.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "common.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "desinstalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "instalar-gui.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "instalar-mysql.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "pos-instalacao-mysql.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "restart.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "smoke.ps1"; DestDir: "{app}"; Flags: ignoreversion
