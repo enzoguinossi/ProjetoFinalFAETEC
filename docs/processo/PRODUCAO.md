@@ -54,7 +54,7 @@ estações da rede
 | Componente | Versão/origem | Onde está definido |
 | --- | --- | --- |
 | Node.js | **24.19.0** (instalação exata; outra versão é substituída) | `manifesto.json` |
-| NSSM | **2.24** | `manifesto.json` |
+| NSSM | **2.24**, **embutido no instalador** (`tools\nssm\nssm.exe`); fallback URL/mirrors | `manifesto.json` + payload do Inno Setup |
 | MySQL | **8.4.13 LTS**, **ZIP oficial** (`mysql-8.4.13-winx64.zip`), validado por **MD5** | `manifesto.json` |
 | Serviço MySQL | **`NexusMySQL84`**, porta **3214**, bind `127.0.0.1` | `instalar-mysql.ps1` |
 | VC++ Redistributable | **14.x** (`vc_redist.x64.exe`) | `manifesto.json` |
@@ -63,9 +63,10 @@ estações da rede
 | Bandeja | **.NET 8**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
 | Instalador | **Inno Setup 7**; se o `ISCC.exe` não existir, baixa o pacote NuGet **7.1.0** | `build-instalador.ps1` |
 
-> **Atenção:** os campos `sha256` do `manifesto.json` estão vazios para Node, NSSM e VC++;
-> o MySQL usa **MD5** para o ZIP; Caddy e Git caem no "latest" quando a URL não está fixada.
-> Os downloads sem hash são protegidos apenas pelo TLS. Ver §15.
+> **Atenção:** os campos `sha256` do `manifesto.json` estão vazios para Node, VC++ e Caddy;
+> o MySQL usa **MD5** para o ZIP; o NSSM tem `exe_sha256` e vai embutido no instalador, com
+> fallback para a URL oficial e o mirror do repositório. Caddy e Git caem no "latest" quando a
+> URL não está fixada. Os downloads sem hash são protegidos apenas pelo TLS. Ver §15.
 
 ---
 
@@ -191,9 +192,10 @@ a 3214 e a 3000 ficam bloqueadas para a sub-rede. Se as estações estiverem for
 - Execução em **PowerShell elevado** (Administrador): a instalação, a atualização e a
   desinstalação exigem elevação; o backup manual também, por causa da ACL do `backup.cnf`.
 - Pelo menos **5 GB livres em `C:`**.
-- **Internet** durante a instalação/atualização: o `bootstrap` baixa Node, Git, NSSM,
-  Caddy, VC++ e clona a tag do GitHub. A checagem inicial usa `nodejs.org:443`; acesso ao
-  GitHub também é necessário.
+- **Internet** durante a instalação/atualização: o `bootstrap` baixa Node, Git, Caddy, VC++ e
+  clona a tag do GitHub. O **NSSM vai embutido no instalador**; a URL oficial e o mirror são
+  apenas fallback. A checagem inicial usa `nodejs.org:443`; acesso ao GitHub também é
+  necessário.
 - Relógio do servidor com no máximo **10 minutos** de diferença do horário da internet.
 - **Hostname DNS** válido (ex.: `nexus.galpao.local`), sem `http://`, porta ou caminho.
   Ele precisa resolver **no próprio servidor** e nas estações clientes.
@@ -295,10 +297,10 @@ quem usa o arquivo é o `bootstrap.ps1` (teste da fase 2) e o `backup.ps1`, roda
 | **0 — Pré-checagem** | confere Administrador, 64 bits, 5 GB livres em `C:`, internet (`nodejs.org:443`), portas **3214**/3000/80/443 e relógio (tolerância de 10 min); a 3306 não é verificada |
 | **1 — Runtime** | instala VC++ x64, **Node.js 24.19.0** (se a versão instalada for diferente) e Git for Windows (se ausente); atualiza o PATH da sessão |
 | **2 — MySQL dedicado** | pede as senhas no console e chama o `instalar-mysql.ps1`: baixa o ZIP 8.4.13, valida MD5, instala em `C:\Program Files\Nexus\mysql`, cria `NexusMySQL84` na 3214 e define o root; em seguida roda o `pos-instalacao-mysql.ps1` para criar `nexus_prod`/`nexus_app`; grava `backup.cnf` com porta 3214. **Não há pausa**; a 3306 não é tocada |
-| **3 — Ferramentas, diretórios e ACLs** | instala **NSSM 2.24** e **Caddy**; gera o `Caddyfile` com `admin off`; valida o Caddyfile; cria `C:\ProgramData\Nexus\caddy\{data,config,logs}`; aplica ACLs restritas (incluindo `C:\Program Files\Nexus\mysql` e `C:\ProgramData\MySQL\MySQL Server 8.4`) e cria as quatro regras de firewall |
+| **3 — Ferramentas, diretórios e ACLs** | usa o **NSSM 2.24 embutido** (valida `exe_sha256`; se faltar, baixa da URL oficial/mirrors) e instala o **Caddy**; gera o `Caddyfile` com `admin off`; valida o Caddyfile; cria `C:\ProgramData\Nexus\caddy\{data,config,logs}`; aplica ACLs restritas (incluindo `C:\Program Files\Nexus\mysql` e `C:\ProgramData\MySQL\MySQL Server 8.4`) e cria as quatro regras de firewall |
 | **4 — Aplicação** | clona/atualiza a tag do GitHub em `C:\Program Files\Nexus\app`; **valida que a tag contém `src/app/api/health/route.ts` e que o `package.json` bate com a tag**; grava o `.env` (`DATABASE_URL` na **3214**, `UPLOADS_DIR`, `NODE_ENV=production`, `PORT=3000`, `JWT_SECRET` gerado se ausente); roda `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`; ajusta ACLs do `.env` e do cache |
 | **5 — Serviços** | cria/reconfigura `NexusApp` (`NetworkService`, dependente de `NexusMySQL84`) e `NexusCaddy` (`LocalService`, dependente de `NexusApp`) via NSSM; inicia o app; valida `http://127.0.0.1:3000/api/health` com `db=true`; inicia o Caddy; instala a CA local com `certutil -addstore -f Root` (até 30 tentativas) e valida `https://<hostname>/login` |
-| **6 — Bandeja e backup** | copia `backup.ps1`, `common.ps1` e `restart.ps1` para `C:\Program Files\Nexus\scripts`; registra `NexusBackup` (diária, 02:00); copia o `NexusTray.exe`, grava o `tray.json` (com `restartScript`) e registra `NexusTray` no logon do usuário atual |
+| **6 — Bandeja e backup** | copia `backup.ps1`, `common.ps1` e `restart.ps1` para `C:\Program Files\Nexus\scripts`; registra `NexusBackup` (diária, 02:00); copia o `NexusTray.exe`, grava o `tray.json` (com `restartScript`), registra `NexusTray` no logon do usuário atual e **inicia a tarefa imediatamente** (em atualização, para tarefa/processo antes de copiar) |
 | **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão esperada (tag sem o `v`), incluindo `NexusMySQL84`/3214, ACLs e as quatro regras de firewall, e imprime URL, caminhos, versão e o comando de atualização |
 
 O estado é gravado em `C:\ProgramData\Nexus\bootstrap.state.json` ao fim de cada fase. Se
@@ -1066,14 +1068,15 @@ feitas fora deste documento.
    `app.failed-*`; o bootstrap também deixa `app.prev-manual-*`. A desinstalação remove
    esses diretórios, mas durante a operação eles acumulam. Monitore o disco.
 
-6. **Hashes do manifesto vazios.**
-   `manifesto.json` tem `sha256: ""` para Node, NSSM, VC++ e MySQL; o MySQL usa **MD5**;
-   Caddy/Git usam "latest" quando a URL não está fixada. Os downloads sem hash dependem do
-   TLS; preencha-os para instalações reproduzíveis.
+6. **Hashes do manifesto.**
+   `manifesto.json` ainda tem `sha256: ""` para Node, VC++ e Caddy; o MySQL usa **MD5**; o
+   NSSM tem `exe_sha256` e vai embutido. Caddy/Git usam "latest" quando a URL não está
+   fixada. Preencha os hashes restantes para instalações reproduzíveis.
 
-7. **O hostname precisa resolver no próprio servidor.**
-   A fase 5 e o `smoke.ps1` testam `https://<hostname>/login`; os scripts não criam entrada
-   em `hosts` nem registro DNS. Sem resolução, a instalação falha no fim.
+7. **Hostname e DNS.**
+   O bootstrap adiciona `127.0.0.1 <hostname>` ao `hosts` do próprio servidor se o nome não
+   resolver (necessário para o smoke HTTPS local). As estações clientes ainda precisam de
+   DNS/hosts e da CA do Caddy confiável; isso não é feito pelo instalador.
 
 8. **`db push` não é migration.**
    O `atualizar.ps1` aplica `prisma db push` e roda `db:seed` em toda atualização. Mudanças

@@ -1,8 +1,8 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `10.02.11.2026`, tag `v10.02.11.2026`; produção
-> Windows com MySQL 3214, bandeja validada e Inno Setup).
+> Última consolidação: 2026-11-02 (release `11.02.11.2026`, tag `v11.02.11.2026`; NSSM
+> embutido no instalador).
 
 ## Objetivo atual
 
@@ -45,6 +45,9 @@ release `1.02.11.2026`.
 10. **Senha do MySQL:** sem mínimo/composição (até 256); bloqueia apenas `@`, `/`, `?`, `#`,
     `"`, `\`, `;`, espaço/tab e caracteres de controle; o prompt repete em vez de encerrar
     quando a senha é inválida (root e `nexus_app`).
+11. **NSSM embutido (KAN-170):** `nssm.exe` 2.24 (win64) vai no payload do Inno Setup
+    (`tools\nssm\nssm.exe`), validado por SHA-256; o bootstrap usa o embutido e só baixa da
+    URL oficial/mirrors se faltar. O mirror é a cópia versionada na tag do repositório.
 
 ## Entregue (runs `RUN-20261102-01..11`)
 
@@ -101,12 +104,16 @@ release `1.02.11.2026`.
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
 - Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
 - Parser do Windows PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows`.
-- Instalador compilado com Inno Setup 7 (`NexusSetup-10.02.11.2026.exe`, 46,1 MB); tag
-  `v10.02.11.2026` contém `/api/health`; SHA-256
-  `DD8482FB014D85D8A2385BAE902A194F6FF9F9440F6E909F82544B3C61D4463A`.
-- Instalação real validada na máquina: MySQL 8.4.13 na 3214, `NexusApp`/`NexusCaddy`
-  Running, health `10.02.11.2026` com `db=true`, HTTPS 200, smoke OK, bandeja
-  `NexusTray.exe` em execução (sessão 1) e tarefa `NexusTray` Running.
+- Instalador compilado com Inno Setup 7 (`NexusSetup-11.02.11.2026.exe`, 46,2 MB); tag
+  `v11.02.11.2026` contém `/api/health`; SHA-256
+  `1F963EEFD9E2BEE61D0D4FA6773F1FA1B9310BD162404162B10B5C6442EDFA9E`.
+  O ISCC comprimiu `tools\nssm\nssm.exe`; o mirror
+  `raw.githubusercontent.com/.../v11.02.11.2026/deploy/windows/tools/nssm/nssm.exe`
+  respondeu 331.264 bytes com SHA-256
+  `F689EE9AF94B00E9E3F0BB072B34CAAF207F32DCB4F5782FC9CA351DF9A06C97`.
+- Instalação real validada na máquina (10.02): MySQL 8.4.13 na 3214,
+  `NexusApp`/`NexusCaddy` Running, health `10.02.11.2026` com `db=true`, HTTPS 200, smoke OK,
+  bandeja `NexusTray.exe` em execução (sessão 1) e tarefa `NexusTray` Running.
 - MySQL 8.4.13 dedicado na 3214 (`NexusMySQL84`), sem tocar na 3306; regras de firewall
   criadas/validadas pelo `smoke.ps1`.
 - Revisão independente `RUN-20261102-22`: bloqueante B1 (ACLs herdadas) e altos A1–A6
@@ -141,8 +148,9 @@ release `1.02.11.2026`.
 
 ## Pendências
 
-1. **Testar o instalador** na máquina do usuário e na do colega (VM/máquina limpa): MySQL
-   8.4.13 na **3214** (`NexusMySQL84`), hostname/DNS, CA do Caddy nos clientes, login e smoke.
+1. **Testar o instalador 11.02** na máquina do usuário e na do colega (VM/máquina limpa):
+   MySQL 8.4.13 na **3214** (`NexusMySQL84`), hostname/DNS, CA do Caddy nos clientes, login e
+   smoke. Testar com `nssm.cc` bloqueado para confirmar o NSSM embutido.
 2. **Bandeja e usuário padrão:** a tarefa `NexusTray` roda no logon do usuário que instalou,
    com `RunLevel Highest`; o `.exe` tem `requireAdministrator`. Se o representante usar uma
    conta **padrão**, a bandeja não inicia elevada. Para esse cenário, será necessário um tray
@@ -151,7 +159,7 @@ release `1.02.11.2026`.
    backup sem `caddy\data`; bandeja só no logon de quem instalou; `.env` não mesclado;
    hashes incompletos no manifesto; DNS fora do escopo; `db push` sem migrations; CA permanece
    no trust store; conflito de caminho se já existir um MySQL 8.4 usando o diretório padrão.
-3. **Produção:** executar o `NexusSetup` na máquina do galpão, concluir o primeiro acesso
+4. **Produção:** executar o `NexusSetup` na máquina do galpão, concluir o primeiro acesso
    (Super Admin), criar o usuário do representante e validar impressão/backup.
 4. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
    usuário; o resolvedor de descrições já é reutilizável.
