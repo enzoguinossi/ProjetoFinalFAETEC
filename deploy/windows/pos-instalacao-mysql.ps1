@@ -108,28 +108,34 @@ Copy-Item -LiteralPath $myIni -Destination $myIniBackup -Force
 Protect-File -Path $myIniBackup
 Write-Ok "Backup do my.ini: $myIniBackup"
 
-$encoding = [System.Text.Encoding]::Default
-$lines = New-Object System.Collections.Generic.List[string]
-foreach ($line in [System.IO.File]::ReadAllLines($myIni, $encoding)) {
-    $lines.Add($line)
-}
-
+$basedir = $script:NexusMySqlDir.Replace("\", "/")
 $datadir = $script:NexusMySqlDataDir.Replace("\", "/")
-Set-IniValue -Lines $lines -Section "mysqld" -Key "port" -Value ([string]$port)
-Set-IniValue -Lines $lines -Section "mysqld" -Key "bind-address" -Value "127.0.0.1"
-Set-IniValue -Lines $lines -Section "mysqld" -Key "mysqlx" -Value "0"
-Set-IniValue -Lines $lines -Section "mysqld" -Key "datadir" -Value $datadir
-Set-IniValue -Lines $lines -Section "mysqld" -Key "character-set-server" -Value "utf8mb4"
-Set-IniValue -Lines $lines -Section "mysqld" -Key "collation-server" -Value "utf8mb4_0900_ai_ci"
-Set-IniValue -Lines $lines -Section "mysqld" -Key "default-time-zone" -Value "'-03:00'"
+$myIniLines = @(
+    "[mysqld]",
+    "port=$port",
+    "bind-address=127.0.0.1",
+    "mysqlx=0",
+    "basedir=$basedir",
+    "datadir=$datadir",
+    "character-set-server=utf8mb4",
+    "collation-server=utf8mb4_0900_ai_ci",
+    "default-time-zone='-03:00'",
+    "",
+    "[client]",
+    "port=$port",
+    ""
+)
 
 try {
-    [System.IO.File]::WriteAllLines($myIni, [string[]]$lines.ToArray(), $encoding)
+    if (-not (Test-Path -LiteralPath $myIni)) {
+        Write-Utf8NoBom -Path $myIni -Lines @("")
+    }
+    Protect-File -Path $myIni -ReadIdentities @("S-1-5-20")
+    Write-Utf8NoBom -Path $myIni -Lines $myIniLines
 }
 catch {
     Fail "Não foi possível gravar $myIni. Backup em $myIniBackup. Detalhe: $($_.Exception.Message)"
 }
-Protect-File -Path $myIni -ReadIdentities @("S-1-5-20")
 Write-Ok "my.ini ajustado (porta $port, bind local, utf8mb4, fuso -03:00, mysqlx desligado)."
 
 Restart-Service -Name $serviceName -Force

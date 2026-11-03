@@ -46,6 +46,13 @@ function Fail {
     param([Parameter(Mandatory = $true)][string]$Message)
     Write-Host ""
     Write-Host "[ERRO] $Message" -ForegroundColor Red
+    try {
+        $failLog = Join-Path $env:TEMP "nexus-fail.log"
+        Add-Content -LiteralPath $failLog -Value ("[{0}] {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message) -Encoding UTF8 -ErrorAction Stop
+    }
+    catch {
+        # O log de erro não pode mascarar a falha original.
+    }
     exit 1
 }
 
@@ -207,9 +214,10 @@ function Test-Health {
     try {
         $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 20
         $result.StatusCode = [int]$response.StatusCode
-        if ($response.Content) {
+        $text = ([string]$response.Content).TrimStart()
+        if ($text.StartsWith("{")) {
             try {
-                $json = $response.Content | ConvertFrom-Json
+                $json = $text | ConvertFrom-Json
                 if ($json.PSObject.Properties.Name -contains "db") {
                     $result.Db = [bool]$json.db
                 }
@@ -218,7 +226,7 @@ function Test-Health {
                 }
             }
             catch {
-                # A rota /login devolve HTML; não é JSON e não precisa ser.
+                # Conteúdo JSON inválido; a checagem de status continua valendo.
             }
         }
         $result.Ok = ($result.StatusCode -eq 200)

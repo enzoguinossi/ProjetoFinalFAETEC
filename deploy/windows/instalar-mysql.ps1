@@ -163,7 +163,9 @@ $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if (-not $service) {
     Write-Ok "Criando o serviço $serviceName..."
     # MySQL 8.4 removeu `mysqld --install`; o serviço precisa ser criado pelo SCM.
-    $binPath = '"{0}" --defaults-file="{1}"' -f $mysqld, $myIni
+    # O nome do serviço no fim do binPath é o que coloca o mysqld em modo de serviço
+    # (o SCM espera SERVICE_RUNNING; sem ele o processo roda como console e fica START_PENDING).
+    $binPath = '"{0}" --defaults-file="{1}" {2}' -f $mysqld, $myIni, $serviceName
     try {
         New-Service `
             -Name $serviceName `

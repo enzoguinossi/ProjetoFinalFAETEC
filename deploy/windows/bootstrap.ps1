@@ -45,7 +45,20 @@ param(
     [switch]$Force
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
+
+trap {
+    try {
+        $trapLog = Join-Path $env:TEMP "nexus-fail.log"
+        $trapText = "[{0}] EXCEÇÃO: {1}`r`n{2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $_.Exception.Message, $_.ScriptStackTrace
+        Add-Content -LiteralPath $trapLog -Value $trapText -Encoding UTF8 -ErrorAction Stop
+    }
+    catch {
+        # O log de erro não pode mascarar a exceção original.
+    }
+    throw
+}
+
 . (Join-Path $PSScriptRoot "common.ps1")
 
 $Hostname = $Hostname.Trim().ToLowerInvariant()
@@ -156,9 +169,17 @@ Start-NexusTranscript -Path $transcriptPath
 
 function Invoke-Nssm {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
-    & $NssmExe @Arguments
-    if ($LASTEXITCODE -ne 0) {
-        Fail ("NSSM falhou: " + ($Arguments -join " "))
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $NssmExe @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    if ($code -ne 0) {
+        Fail ("NSSM falhou: " + ($Arguments -join " ") + " (código $code)")
     }
 }
 
@@ -621,7 +642,7 @@ try {
             }
         }
         Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue
-        $nssmVersion = ([string](& $NssmExe version 2>&1 | Select-Object -First 1)).Trim()
+        $nssmVersion = [string]$manifest.nssm.version
         Write-Ok "NSSM instalado: $nssmVersion"
 
         if (-not (Test-Path -LiteralPath $CaddyExe)) {
@@ -802,19 +823,19 @@ try {
         Write-Ok "Tag $Tag contém /api/health e versão $expectedTagVersion."
 
         $envPath = Join-Path $AppDir ".env"
-        $appPassword = $null
+        $appPasswordPlain = $null
         $jwtSecret = $null
         $generatedJwt = $false
         Suspend-Transcript
         try {
             if (Test-Path -LiteralPath $BackupCnf) {
-                $appPassword = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
+                $appPasswordPlain = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
             }
-            if (-not $appPassword) {
+            if (-not $appPasswordPlain) {
                 Fail "Senha de nexus_app não encontrada em $BackupCnf. Refaça a fase 2."
             }
 
-            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:{1}/nexus_prod"' -f $appPassword, $script:NexusMySqlPort) -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:{1}/nexus_prod"' -f $appPasswordPlain, $script:NexusMySqlPort) -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
             Set-EnvFile -Path $envPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
@@ -827,7 +848,7 @@ try {
         }
         finally {
             Resume-Transcript
-            $appPassword = $null
+            $appPasswordPlain = $null
             $jwtSecret = $null
         }
         if ($generatedJwt) {

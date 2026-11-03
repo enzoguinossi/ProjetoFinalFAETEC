@@ -13,6 +13,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [6.02.11.2026] - 2026-11-02
+
+Esta seção consolida as correções do serviço MySQL 8.4 e do bootstrap no Windows.
+
+### Fixed
+- **Serviço MySQL 8.4 e bootstrap (KAN-170):** o serviço `NexusMySQL84` é criado com o
+  nome do serviço no `binPath` (modo de serviço do `mysqld`), o `pos-instalacao-mysql.ps1`
+  reescreve o `my.ini` (sem depender de lista vazia no PowerShell 5.1), as chamadas ao NSSM
+  não tratam o banner em `stderr` como erro fatal, a colisão entre `$appPassword` e
+  `$AppPassword` foi removida, e o hostname é adicionado ao `hosts` local quando não há DNS
+  para o smoke HTTPS. O `Fail` e exceções agora gravam em `nexus-fail.log`.
+
 ## [5.02.11.2026] - 2026-11-02
 
 Esta seção corrige a criação do serviço do MySQL 8.4 no Windows.
