@@ -1091,6 +1091,8 @@ try {
                     New-Item -ItemType Directory -Force -Path $trayDir | Out-Null
                 }
                 $trayTarget = Join-Path $trayDir "NexusTray.exe"
+                Get-ScheduledTask -TaskName "NexusTray" -ErrorAction SilentlyContinue |
+                    Stop-ScheduledTask -ErrorAction SilentlyContinue
                 $trayRunning = Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue
                 if ($trayRunning) {
                     Write-Ok "Parando a bandeja para atualizar o executável..."
