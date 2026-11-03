@@ -1,8 +1,8 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `4.02.11.2026`, tag `v4.02.11.2026`; produção
-> Windows com MySQL 3214, senha flexível e Inno Setup).
+> Última consolidação: 2026-11-02 (release `10.02.11.2026`, tag `v10.02.11.2026`; produção
+> Windows com MySQL 3214, bandeja validada e Inno Setup).
 
 ## Objetivo atual
 
@@ -26,7 +26,9 @@ release `1.02.11.2026`.
    (LocalService) no NSSM, com auto-start, restart e logs rotativos; Next em
    `127.0.0.1:3000`; Caddy em 80/443 com CA interna via `certutil` e `admin off`.
 4. **Bandeja:** `NexusTray` (.NET 8 self-contained) com status verde/amarelo/vermelho,
-   abrir, reiniciar via `restart.ps1`, logs, backup e pasta de dados.
+   abrir, reiniciar via `restart.ps1`, logs, backup e pasta de dados. A tarefa é registrada
+   no logon do usuário que instalou e **iniciada ao final da fase 6**; em atualização, a
+   tarefa/processo é parada antes de copiar o novo executável.
 5. **Instalador:** Inno Setup 7, `NexusSetup-<versão>.exe`, wizard de hostname, execução do
    bootstrap com checagem de `ResultCode`, atalhos de URL e desinstalador que preserva
    `C:\ProgramData\Nexus`.
@@ -99,9 +101,12 @@ release `1.02.11.2026`.
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
 - Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
 - Parser do Windows PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows`.
-- Instalador compilado com Inno Setup 7 (`NexusSetup-4.02.11.2026.exe`, 46,1 MB); tag
-  `v4.02.11.2026` contém `/api/health`; SHA-256
-  `C87A7B93B7E45F61834E4999D58B71DA4D93FA3F20725F9FC3ABE04926E1C4C0`.
+- Instalador compilado com Inno Setup 7 (`NexusSetup-10.02.11.2026.exe`, 46,1 MB); tag
+  `v10.02.11.2026` contém `/api/health`; SHA-256
+  `DD8482FB014D85D8A2385BAE902A194F6FF9F9440F6E909F82544B3C61D4463A`.
+- Instalação real validada na máquina: MySQL 8.4.13 na 3214, `NexusApp`/`NexusCaddy`
+  Running, health `10.02.11.2026` com `db=true`, HTTPS 200, smoke OK, bandeja
+  `NexusTray.exe` em execução (sessão 1) e tarefa `NexusTray` Running.
 - MySQL 8.4.13 dedicado na 3214 (`NexusMySQL84`), sem tocar na 3306; regras de firewall
   criadas/validadas pelo `smoke.ps1`.
 - Revisão independente `RUN-20261102-22`: bloqueante B1 (ACLs herdadas) e altos A1–A6
@@ -138,7 +143,11 @@ release `1.02.11.2026`.
 
 1. **Testar o instalador** na máquina do usuário e na do colega (VM/máquina limpa): MySQL
    8.4.13 na **3214** (`NexusMySQL84`), hostname/DNS, CA do Caddy nos clientes, login e smoke.
-2. **Limitações conhecidas do runbook (§15):** retenção de `backups\uploads`/`my.ini-*.bak`;
+2. **Bandeja e usuário padrão:** a tarefa `NexusTray` roda no logon do usuário que instalou,
+   com `RunLevel Highest`; o `.exe` tem `requireAdministrator`. Se o representante usar uma
+   conta **padrão**, a bandeja não inicia elevada. Para esse cenário, será necessário um tray
+   `asInvoker` e uma tarefa elevada separada para o restart.
+3. **Limitações conhecidas do runbook (§15):** retenção de `backups\uploads`/`my.ini-*.bak`;
    backup sem `caddy\data`; bandeja só no logon de quem instalou; `.env` não mesclado;
    hashes incompletos no manifesto; DNS fora do escopo; `db push` sem migrations; CA permanece
    no trust store; conflito de caminho se já existir um MySQL 8.4 usando o diretório padrão.
