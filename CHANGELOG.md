@@ -13,6 +13,10 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [4.02.11.2026] - 2026-11-02
+
+Esta seção consolida a senha do MySQL sem mínimo, com repetição do prompt.
+
 ### Fixed
 - **Senha do MySQL sem mínimo e com repetição (KAN-170):** a senha de `nexus_app` passou
   a aceitar qualquer tamanho (até 256 caracteres) e composição; apenas `@`, `/`, `?`, `#`,
