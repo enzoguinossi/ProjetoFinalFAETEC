@@ -13,6 +13,15 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [7.02.11.2026] - 2026-11-02
+
+Esta seção inicia a bandeja imediatamente após a instalação.
+
+### Fixed
+- **Bandeja NexusTray (KAN-170):** a tarefa `NexusTray` continua registrada no logon do
+  usuário que instalou, mas o bootstrap agora a inicia ao final da fase 6 e confirma o
+  processo; se não iniciar, avisa e mantém o gatilho para o próximo logon.
+
 ## [6.02.11.2026] - 2026-11-02
 
 Esta seção consolida as correções do serviço MySQL 8.4 e do bootstrap no Windows.

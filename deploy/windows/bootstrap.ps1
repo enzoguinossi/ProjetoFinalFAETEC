@@ -1110,6 +1110,29 @@ try {
                         -Principal $trayPrincipal -Settings $traySettings `
                         -Description "Bandeja do Nexus (logon de $currentUser)" -Force | Out-Null
                     Write-Ok "Bandeja copiada para $trayTarget e registrada no logon de $currentUser."
+
+                    # Inicia agora; o gatilho de logon só vale no próximo logon.
+                    try {
+                        Start-ScheduledTask -TaskName "NexusTray" -ErrorAction Stop
+                        $trayStarted = $false
+                        for ($attempt = 0; $attempt -lt 10; $attempt++) {
+                            Start-Sleep -Seconds 1
+                            if (Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue) {
+                                $trayStarted = $true
+                                break
+                            }
+                        }
+                        if ($trayStarted) {
+                            Write-Ok "Bandeja em execução."
+                        }
+                        else {
+                            $taskInfo = Get-ScheduledTaskInfo -TaskName "NexusTray" -ErrorAction SilentlyContinue
+                            Write-Warn "A bandeja foi registrada, mas não iniciou agora (resultado $($taskInfo.LastTaskResult)); ela inicia no próximo logon."
+                        }
+                    }
+                    catch {
+                        Write-Warn "A bandeja foi registrada, mas não foi possível iniciá-la agora: $($_.Exception.Message). Ela inicia no próximo logon."
+                    }
                 }
                 catch {
                     Write-Warn "Não foi possível registrar a tarefa NexusTray: $($_.Exception.Message)"
