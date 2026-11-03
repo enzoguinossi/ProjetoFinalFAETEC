@@ -14,6 +14,10 @@
   "nssm": {
     "version": "2.24",
     "url": "https://nssm.cc/release/nssm-2.24.zip",
+    "mirrors": [
+      "https://raw.githubusercontent.com/enzoguinossi/ProjetoFinalFAETEC/v11.02.11.2026/deploy/windows/tools/nssm/nssm.exe"
+    ],
+    "exe_sha256": "F689EE9AF94B00E9E3F0BB072B34CAAF207F32DCB4F5782FC9CA351DF9A06C97",
     "sha256": ""
   },
   "vcredist": {

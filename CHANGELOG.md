@@ -13,6 +13,16 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [11.02.11.2026] - 2026-11-02
+
+Esta seção elimina a dependência de `nssm.cc` durante a instalação.
+
+### Changed
+- **NSSM embutido e fallback (KAN-170):** o `nssm.exe` 2.24 (win64) passa a ir no payload do
+  Inno Setup (`tools\nssm\nssm.exe`); o bootstrap usa o arquivo embutido, valida o SHA-256 e
+  só baixa da URL oficial ou dos mirrors (`manifesto.nssm.mirrors`) se ele faltar. O mirror
+  aponta para a cópia versionada no repositório/tag.
+
 ## [10.02.11.2026] - 2026-11-02
 
 Esta seção corrige a reinstalação da bandeja com o processo em execução.

@@ -620,25 +620,75 @@ try {
         }
 
         if (-not (Test-Path -LiteralPath $NssmExe)) {
-            $nssmZip = Join-Path $env:TEMP "nexus-nssm-2.24.zip"
-            Invoke-Download -Url $manifest.nssm.url -Destination $nssmZip -Sha256 ([string]$manifest.nssm.sha256) -Label "NSSM 2.24"
-            $nssmTemp = Join-Path $env:TEMP ("nexus-nssm-" + [guid]::NewGuid().ToString("N"))
-            try {
-                Expand-Archive -LiteralPath $nssmZip -DestinationPath $nssmTemp -Force
-                $nssmBinary = Get-ChildItem -Path $nssmTemp -Recurse -Filter "nssm.exe" -ErrorAction SilentlyContinue |
-                    Where-Object { $_.FullName -match '\\win64\\' } |
-                    Select-Object -First 1
-                if (-not $nssmBinary) {
-                    Fail "nssm.exe (win64) não encontrado no pacote baixado."
+            $expectedHash = ([string]$manifest.nssm.exe_sha256).ToUpperInvariant()
+            $nssmBundled = Join-Path $PSScriptRoot "tools\nssm\nssm.exe"
+
+            if (Test-Path -LiteralPath $nssmBundled -PathType Leaf) {
+                Write-Ok "Usando o NSSM embutido no instalador."
+                if ($expectedHash) {
+                    $actualHash = (Get-FileHash -LiteralPath $nssmBundled -Algorithm SHA256).Hash
+                    if ($actualHash -ne $expectedHash) {
+                        Fail "O hash do NSSM embutido não confere (esperado $expectedHash, obtido $actualHash)."
+                    }
                 }
                 if (-not (Test-Path -LiteralPath $NssmDir)) {
                     New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
                 }
-                Copy-Item -LiteralPath $nssmBinary.FullName -Destination $NssmExe -Force
+                Copy-Item -LiteralPath $nssmBundled -Destination $NssmExe -Force
             }
-            finally {
-                Remove-Item -LiteralPath $nssmTemp -Recurse -Force -ErrorAction SilentlyContinue
-                Remove-Item -LiteralPath $nssmZip -Force -ErrorAction SilentlyContinue
+            else {
+                $nssmUrls = New-Object System.Collections.Generic.List[string]
+                if ($manifest.nssm.url) { $nssmUrls.Add([string]$manifest.nssm.url) }
+                foreach ($mirror in @($manifest.nssm.mirrors)) {
+                    if ($mirror) { $nssmUrls.Add([string]$mirror) }
+                }
+                $nssmTemp = Join-Path $env:TEMP ("nexus-nssm-" + [guid]::NewGuid().ToString("N"))
+                New-Item -ItemType Directory -Force -Path $nssmTemp | Out-Null
+                try {
+                    foreach ($url in $nssmUrls) {
+                        $extension = if ($url -match '\.exe(\?|$)') { ".exe" } else { ".zip" }
+                        $download = Join-Path $nssmTemp ("nssm-" + [guid]::NewGuid().ToString("N") + $extension)
+                        try {
+                            Write-Ok "Baixando NSSM de $url..."
+                            Invoke-Download -Url $url -Destination $download -Label "NSSM 2.24"
+                            $candidate = $download
+                            if ($download -notmatch '\.exe$') {
+                                $extract = Join-Path $nssmTemp ("extract-" + [guid]::NewGuid().ToString("N"))
+                                Expand-Archive -LiteralPath $download -DestinationPath $extract -Force
+                                $binary = Get-ChildItem -Path $extract -Recurse -Filter "nssm.exe" -ErrorAction SilentlyContinue |
+                                    Where-Object { $_.FullName -match '\\win64\\' } |
+                                    Select-Object -First 1
+                                if (-not $binary) {
+                                    Write-Warn "Pacote de $url não contém win64\nssm.exe."
+                                    continue
+                                }
+                                $candidate = $binary.FullName
+                            }
+                            if ($expectedHash) {
+                                $actualHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash
+                                if ($actualHash -ne $expectedHash) {
+                                    Write-Warn "Hash de $url não confere; tentando o próximo."
+                                    continue
+                                }
+                            }
+                            if (-not (Test-Path -LiteralPath $NssmDir)) {
+                                New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
+                            }
+                            Copy-Item -LiteralPath $candidate -Destination $NssmExe -Force
+                            Write-Ok "NSSM obtido de $url."
+                            break
+                        }
+                        catch {
+                            Write-Warn "Falha ao obter NSSM de $url`: $($_.Exception.Message)"
+                        }
+                    }
+                    if (-not (Test-Path -LiteralPath $NssmExe)) {
+                        Fail "Não foi possível obter o NSSM (embutido/URL oficial/mirrors). Copie o nssm.exe para $NssmExe e rode novamente."
+                    }
+                }
+                finally {
+                    Remove-Item -LiteralPath $nssmTemp -Recurse -Force -ErrorAction SilentlyContinue
+                }
             }
         }
         Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue

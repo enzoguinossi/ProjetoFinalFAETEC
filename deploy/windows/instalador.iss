@@ -54,6 +54,8 @@ Source: "restart.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "smoke.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Caddyfile"; DestDir: "{app}"; Flags: ignoreversion
 Source: "manifesto.json"; DestDir: "{app}"; Flags: ignoreversion
+; NSSM 2.24 (win64) embutido: não depende de nssm.cc durante a instalação.
+Source: "tools\nssm\nssm.exe"; DestDir: "{app}\tools\nssm"; Flags: ignoreversion
 ; Obrigatório: a bandeja é copiada pelo bootstrap para {commonpf}\Nexus\NexusTray.
 Source: "NexusTray\dist\NexusTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 
