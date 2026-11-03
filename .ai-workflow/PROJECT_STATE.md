@@ -1,8 +1,8 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `3.02.11.2026`, tag `v3.02.11.2026`; produção
-> Windows com MySQL 3214 e Inno Setup).
+> Última consolidação: 2026-11-02 (release `4.02.11.2026`, tag `v4.02.11.2026`; produção
+> Windows com MySQL 3214, senha flexível e Inno Setup).
 
 ## Objetivo atual
 
@@ -40,6 +40,9 @@ release `1.02.11.2026`.
    `DATABASE_URL`/`backup.cnf`/`mysqldump` na 3214; regras `Nexus HTTP`/`Nexus HTTPS`
    (Allow) e `Nexus MySQL (LAN)`/`Nexus Next (LAN)` (Block) para `LocalSubnet`, validadas
    pelo `smoke.ps1`.
+10. **Senha do MySQL:** sem mínimo/composição (até 256); bloqueia apenas `@`, `/`, `?`, `#`,
+    `"`, `\`, `;`, espaço/tab e caracteres de controle; o prompt repete em vez de encerrar
+    quando a senha é inválida (root e `nexus_app`).
 
 ## Entregue (runs `RUN-20261102-01..11`)
 
@@ -96,9 +99,9 @@ release `1.02.11.2026`.
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
 - Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
 - Parser do Windows PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows`.
-- Instalador compilado com Inno Setup 7 (`NexusSetup-3.02.11.2026.exe`, 46,1 MB); tag
-  `v3.02.11.2026` contém `/api/health`; SHA-256
-  `25462FBAF1C82E1CD90D9006CD5C04C2766C6E4EEA4A079D4DC122DE46DECA9`.
+- Instalador compilado com Inno Setup 7 (`NexusSetup-4.02.11.2026.exe`, 46,1 MB); tag
+  `v4.02.11.2026` contém `/api/health`; SHA-256
+  `C87A7B93B7E45F61834E4999D58B71DA4D93FA3F20725F9FC3ABE04926E1C4C0`.
 - MySQL 8.4.13 dedicado na 3214 (`NexusMySQL84`), sem tocar na 3306; regras de firewall
   criadas/validadas pelo `smoke.ps1`.
 - Revisão independente `RUN-20261102-22`: bloqueante B1 (ACLs herdadas) e altos A1–A6
