@@ -38,12 +38,10 @@ $mysqld = Join-Path $mysqlDir "bin\mysqld.exe"
 $mysql = Join-Path $mysqlDir "bin\mysql.exe"
 $scExe = Join-Path $env:SystemRoot "System32\sc.exe"
 
-if (-not $RootPassword) {
-    $RootPassword = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado"
-}
-if (-not $AppPassword) {
-    $AppPassword = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
-}
+$credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
+$RootPassword = $credentials.Root
+$AppPassword = $credentials.App
+
 $appPlain = ConvertFrom-SecureStringPlain -Secure $AppPassword
 Assert-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
 $appPlain = $null

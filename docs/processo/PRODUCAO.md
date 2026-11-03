@@ -252,7 +252,8 @@ A fase 2 do bootstrap chama o [`instalar-mysql.ps1`](../../deploy/windows/instal
    `nexus_prod` e o usuário `nexus_app@localhost` e valida a conexão na 3214.
 
 No console do bootstrap, são pedidas duas senhas — a do **root do MySQL dedicado** e a do
-**`nexus_app`** (12+ caracteres; letras, números, `.`, `_`, `-`). Elas só são pedidas quando o
+**`nexus_app`** (qualquer senha de até 256 caracteres; não pode conter `@`, `/`, `?`, `#`,
+`"`, `\`, `;`, espaço, tab ou caracteres de controle). Elas só são pedidas quando o
 serviço ainda não existe ou quando o `backup.cnf` existente não conecta; a instalação é
 idempotente e **não há pausa** para instalar o MySQL. O `instalar-mysql.ps1` também pode ser
 executado isoladamente em PowerShell elevado (ele instala/repara o serviço; o
@@ -271,12 +272,14 @@ O backup do `my.ini` feito pelo pós-instalação fica em
 | Senha | Regra real | Onde é usada |
 | --- | --- | --- |
 | **root do MySQL dedicado** | não vazia, sem quebra de linha; passada por arquivo de opções temporário, nunca por `-p` | inicialização do `NexusMySQL84`, criação do banco/usuário e restauração |
-| **`nexus_app`** | **12 a 64 caracteres**, apenas letras, números, ponto, hífen e sublinhado — **sem `@`, `:`, `/`, espaço, aspas ou acento** | `DATABASE_URL`, `backup.cnf` e `mysqldump` |
+| **`nexus_app`** | **até 256 caracteres**, qualquer composição; **sem `@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço, tab ou caracteres de controle** | `DATABASE_URL`, `backup.cnf` e `mysqldump` |
 
-A restrição do `nexus_app` existe porque a `DATABASE_URL` é montada como
-`mysql://nexus_app:<senha>@127.0.0.1:3214/nexus_prod` e o parser de `src/lib/prisma.ts`
-usa `:` e `@` como separadores. A senha do root **não** entra nessa URL; por isso não tem a
-mesma restrição de caracteres.
+A restrição do `nexus_app` existe porque a senha entra na `DATABASE_URL`
+(`mysql://nexus_app:<senha>@127.0.0.1:3214/nexus_prod`), no `.env` e no `backup.cnf`;
+`@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço/tab e caracteres de controle quebram esses
+formatos. Os demais símbolos — incluindo `:`, `%`, `!`, `&`, `=`, `+` e acentos — são
+permitidos. A senha do root **não** entra nessa URL; por isso exige apenas não ser vazia e
+não conter quebra de linha.
 
 As senhas são pedidas no console do bootstrap (`Read-Host -AsSecureString`), sem pausa e sem
 caixa de diálogo; o transcript é suspenso durante a leitura e os arquivos temporários do
@@ -890,7 +893,8 @@ O `bootstrap.ps1` **remove a herança de `C:\ProgramData`** e aplica ACLs explí
 - **Transcripts**: suspensos durante a leitura das senhas; não registram a digitação.
 - **`JWT_SECRET`**: gerado com 48 bytes aleatórios (base64) quando ausente; preservado nas
   atualizações. Nunca reutilize o segredo de desenvolvimento.
-- **Senhas**: `nexus_app` com 12–64 caracteres do conjunto seguro; root sem quebra de linha.
+- **Senhas**: `nexus_app` com até 256 caracteres, sem os símbolos que quebram URL/opções
+  (`@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço, tab ou controle); root sem quebra de linha.
   Não use `-p<senha>` na linha de comando.
 
 O `smoke.ps1` verifica que `backups`, `config` e `app\.env` não tenham ACE para

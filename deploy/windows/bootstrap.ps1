@@ -243,18 +243,6 @@ function Write-BackupCnf {
     Write-Utf8NoBom -Path $BackupCnf -Lines $lines
 }
 
-function Read-MySqlCredentials {
-    Suspend-Transcript
-    try {
-        $root = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado"
-        $app = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
-        return @{ Root = $root; App = $app }
-    }
-    finally {
-        Resume-Transcript
-    }
-}
-
 function Set-NexusFirewallRules {
     if (-not (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue)) {
         Fail "O módulo NetSecurity não está disponível para criar as regras de firewall."
@@ -548,7 +536,6 @@ try {
                     Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
                 }
                 $appPlain = ConvertFrom-SecureStringPlain -Secure $appSecure
-                Assert-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
                 Write-BackupCnf -Password $appPlain
                 Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
             }

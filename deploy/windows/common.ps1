@@ -667,14 +667,41 @@ function ConvertTo-MysqlOptionValue {
     return ('"{0}"' -f $escaped)
 }
 
-function Assert-MysqlRootPassword {
+function Test-MysqlRootPassword {
     param([string]$Plain)
-    if (-not $Plain -or $Plain.Length -lt 1) {
-        Fail "A senha do root do MySQL não pode ficar vazia."
+    if ([string]::IsNullOrEmpty($Plain)) {
+        return "A senha do root do MySQL não pode ficar vazia."
     }
     if ($Plain -match "[`r`n]") {
-        Fail "A senha do root do MySQL contém caracteres inválidos."
+        return "A senha do root do MySQL não pode conter quebra de linha."
     }
+    return $null
+}
+
+function Assert-MysqlRootPassword {
+    param([string]$Plain)
+    $message = Test-MysqlRootPassword -Plain $Plain
+    if ($message) { Fail $message }
+}
+
+function Test-SafeAppPassword {
+    param(
+        [string]$Plain,
+        [string]$Label = "Senha de nexus_app"
+    )
+    if ([string]::IsNullOrEmpty($Plain)) {
+        return "$Label não pode ficar vazia."
+    }
+    if ($Plain.Length -gt 256) {
+        return "$Label deve ter no máximo 256 caracteres."
+    }
+    if ($Plain -match '[\x00-\x1F\x7F]') {
+        return ($Label + ' não pode conter espaço, tab ou caracteres de controle.')
+    }
+    if ($Plain -match '[@/?#"\\; ]') {
+        return ($Label + ' não pode conter @, /, ?, #, ", \, ;, espaço, tab ou caracteres de controle.')
+    }
+    return $null
 }
 
 function Assert-SafeAppPassword {
@@ -682,14 +709,50 @@ function Assert-SafeAppPassword {
         [string]$Plain,
         [string]$Label = "Senha de nexus_app"
     )
-    if (-not $Plain -or $Plain.Length -lt 12) {
-        Fail "$Label deve ter pelo menos 12 caracteres."
+    $message = Test-SafeAppPassword -Plain $Plain -Label $Label
+    if ($message) { Fail $message }
+}
+
+function Read-MySqlCredentials {
+    param(
+        [Security.SecureString]$RootPassword,
+        [Security.SecureString]$AppPassword
+    )
+
+    Suspend-Transcript
+    try {
+        $root = $RootPassword
+        while ($true) {
+            if (-not $root) {
+                $root = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado (Ctrl+C para cancelar)"
+            }
+            $plain = ConvertFrom-SecureStringPlain -Secure $root
+            $message = Test-MysqlRootPassword -Plain $plain
+            $plain = $null
+            if (-not $message) { break }
+            Write-Warn $message
+            Write-Host "Tente novamente (Ctrl+C para cancelar)." -ForegroundColor Yellow
+            $root = $null
+        }
+
+        $app = $AppPassword
+        while ($true) {
+            if (-not $app) {
+                $app = Read-Host -AsSecureString 'Senha do usuário nexus_app (sem mínimo; não use @ / ? # " \ ; espaço, tab ou controle)'
+            }
+            $plain = ConvertFrom-SecureStringPlain -Secure $app
+            $message = Test-SafeAppPassword -Plain $plain -Label "Senha de nexus_app"
+            $plain = $null
+            if (-not $message) { break }
+            Write-Warn $message
+            Write-Host "Tente novamente (Ctrl+C para cancelar)." -ForegroundColor Yellow
+            $app = $null
+        }
+
+        return @{ Root = $root; App = $app }
     }
-    if ($Plain.Length -gt 64) {
-        Fail "$Label deve ter no máximo 64 caracteres."
-    }
-    if ($Plain -notmatch '^[A-Za-z0-9._-]+$') {
-        Fail "$Label deve usar apenas letras, números, ponto, hífen e sublinhado (sem @, :, /, espaços ou aspas)."
+    finally {
+        Resume-Transcript
     }
 }
 

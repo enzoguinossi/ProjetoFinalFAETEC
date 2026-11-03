@@ -23,12 +23,9 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "common.ps1")
 Assert-Admin
 
-if (-not $RootPassword) {
-    $RootPassword = Read-Host -AsSecureString "Senha do usuário root do MySQL dedicado"
-}
-if (-not $AppPassword) {
-    $AppPassword = Read-Host -AsSecureString "Senha para o usuário nexus_app (12+ caracteres; letras, números, . _ -)"
-}
+$credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
+$RootPassword = $credentials.Root
+$AppPassword = $credentials.App
 
 $rootPlain = ConvertFrom-SecureStringPlain -Secure $RootPassword
 $appPlain = ConvertFrom-SecureStringPlain -Secure $AppPassword

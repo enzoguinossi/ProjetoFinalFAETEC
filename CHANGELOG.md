@@ -13,6 +13,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Fixed
+- **Senha do MySQL sem mínimo e com repetição (KAN-170):** a senha de `nexus_app` passou
+  a aceitar qualquer tamanho (até 256 caracteres) e composição; apenas `@`, `/`, `?`, `#`,
+  `"`, `\`, `;`, espaço, tab e caracteres de controle continuam bloqueados. O prompt agora
+  avisa e repete a leitura em vez de encerrar, inclusive quando uma senha inválida é
+  recebida por parâmetro; o root continua exigindo apenas senha não vazia e sem quebra de
+  linha.
+
 ## [3.02.11.2026] - 2026-11-02
 
 Esta seção consolida o MySQL 8.4 dedicado do Nexus na porta 3214 e as regras de firewall.
