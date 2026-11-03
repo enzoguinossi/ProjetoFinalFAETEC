@@ -13,6 +13,15 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [8.02.11.2026] - 2026-11-02
+
+Esta seção corrige a atualização da aplicação em uma instalação existente.
+
+### Fixed
+- **Atualização da aplicação (KAN-170):** o bootstrap agora para `NexusApp`/`NexusCaddy`
+  antes de `npm ci`/`npm run build`, evitando o bloqueio de arquivos em `node_modules`/
+  `.next`; a fase 5 religa os serviços.
+
 ## [7.02.11.2026] - 2026-11-02
 
 Esta seção inicia a bandeja imediatamente após a instalação.

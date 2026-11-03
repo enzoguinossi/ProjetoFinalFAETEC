@@ -857,6 +857,16 @@ try {
         Protect-File -Path $envPath -ReadIdentities @("S-1-5-20")
         Write-Ok "Arquivo .env criado com ACL restrita (NetworkService lê; Administrators/SYSTEM controlam)."
 
+        # A aplicação em execução trava node_modules/.next durante npm ci/build.
+        $runningApp = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+        if ($runningApp -and $runningApp.Status.ToString() -ne "Stopped") {
+            Write-Ok "Parando NexusApp/NexusCaddy para atualizar a aplicação..."
+            Stop-Service -Name "NexusApp" -Force -ErrorAction SilentlyContinue
+            if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
+                Fail "O serviço NexusApp não parou para atualizar a aplicação."
+            }
+        }
+
         Push-Location $AppDir
         try {
             Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
