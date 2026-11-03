@@ -13,6 +13,17 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [5.02.11.2026] - 2026-11-02
+
+Esta seção corrige a criação do serviço do MySQL 8.4 no Windows.
+
+### Fixed
+- **Serviço do MySQL 8.4 (KAN-170):** o MySQL 8.4 removeu `mysqld --install`; o instalador
+  agora cria o `NexusMySQL84` pelo SCM (`New-Service` + `sc.exe config`), mantendo o
+  `--initialize-insecure`. O bootstrap também adiciona o hostname ao `hosts` local
+  (`127.0.0.1`) quando não há DNS, para o smoke HTTPS; as senhas podem ser passadas por
+  parâmetro para execução não interativa.
+
 ## [4.02.11.2026] - 2026-11-02
 
 Esta seção consolida a senha do MySQL sem mínimo, com repetição do prompt.

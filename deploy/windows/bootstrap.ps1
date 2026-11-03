@@ -40,6 +40,8 @@ param(
     [switch]$Resume,
     [switch]$SkipTray,
     [string]$TrayExe = "",
+    [Security.SecureString]$RootPassword,
+    [Security.SecureString]$AppPassword,
     [switch]$Force
 )
 
@@ -243,6 +245,25 @@ function Write-BackupCnf {
     Write-Utf8NoBom -Path $BackupCnf -Lines $lines
 }
 
+function Ensure-HostnameHostsEntry {
+    param([Parameter(Mandatory = $true)][string]$Hostname)
+    $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
+    $pattern = "(^|\s){0}(\s|$)" -f [regex]::Escape($Hostname)
+    if (Select-String -LiteralPath $hostsPath -Pattern $pattern -ErrorAction SilentlyContinue) {
+        return
+    }
+    try {
+        $addresses = [System.Net.Dns]::GetHostAddresses($Hostname) |
+            Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork }
+        if ($addresses) { return }
+    }
+    catch {
+        # Nome sem DNS: o próprio servidor resolve pelo hosts.
+    }
+    Add-Content -LiteralPath $hostsPath -Value ("127.0.0.1`t{0}" -f $Hostname) -Encoding ASCII
+    Write-Ok "Hostname $Hostname adicionado ao hosts local (127.0.0.1)."
+}
+
 function Set-NexusFirewallRules {
     if (-not (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue)) {
         Fail "O módulo NetSecurity não está disponível para criar as regras de firewall."
@@ -273,6 +294,7 @@ try {
     if ($startPhase -le 0) {
         Write-Step "Fase 0/7 - Pré-checagem"
         Assert-Admin
+        Ensure-HostnameHostsEntry -Hostname $Hostname
 
         if (-not [Environment]::Is64BitOperatingSystem) {
             Fail "Este projeto exige Windows 64 bits."
@@ -444,7 +466,7 @@ try {
             $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
             $installedNow = $false
             if (-not $mysqlService) {
-                $credentials = Read-MySqlCredentials
+                $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
                 $rootSecure = $credentials.Root
                 $appSecure = $credentials.App
                 Write-Ok "Instalando o MySQL dedicado (serviço $($script:NexusMySqlService), porta $($script:NexusMySqlPort))..."
@@ -512,7 +534,7 @@ try {
 
             if ($needsSetup) {
                 if (-not $rootSecure) {
-                    $credentials = Read-MySqlCredentials
+                    $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
                     $rootSecure = $credentials.Root
                     $appSecure = $credentials.App
                 }

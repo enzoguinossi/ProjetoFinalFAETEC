@@ -162,10 +162,19 @@ else {
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 if (-not $service) {
     Write-Ok "Criando o serviço $serviceName..."
-    $installArgs = '--defaults-file="{0}" --install {1}' -f $myIni, $serviceName
-    $install = Start-Process -FilePath $mysqld -ArgumentList $installArgs -Wait -PassThru -NoNewWindow
-    if ($install.ExitCode -ne 0) {
-        Fail "mysqld --install $serviceName falhou (código $($install.ExitCode))."
+    # MySQL 8.4 removeu `mysqld --install`; o serviço precisa ser criado pelo SCM.
+    $binPath = '"{0}" --defaults-file="{1}"' -f $mysqld, $myIni
+    try {
+        New-Service `
+            -Name $serviceName `
+            -BinaryPathName $binPath `
+            -DisplayName "Nexus MySQL 8.4" `
+            -Description "MySQL 8.4 dedicado do Nexus (porta $Port)" `
+            -StartupType Automatic `
+            -ErrorAction Stop | Out-Null
+    }
+    catch {
+        Fail "Não foi possível criar o serviço $serviceName via New-Service: $($_.Exception.Message)"
     }
 }
 
