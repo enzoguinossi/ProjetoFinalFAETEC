@@ -13,6 +13,19 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Changed
+- **MySQL dedicado na 3214 e firewall (KAN-170):** a instalação Windows passou a usar uma
+  instância MySQL **8.4.13 LTS** própria — serviço `NexusMySQL84`, `127.0.0.1:3214`,
+  binários em `C:\Program Files\Nexus\mysql` e dados/configuração em
+  `C:\ProgramData\MySQL\MySQL Server 8.4` — instalada automaticamente pelo
+  `instalar-mysql.ps1` no bootstrap, **sem pausa** e sem tocar no MySQL existente na 3306.
+  `DATABASE_URL`, `backup.cnf`, `mysqldump` e a restauração usam a 3214, e o `NexusApp`
+  depende do `NexusMySQL84`. O bootstrap cria as regras `Nexus HTTP`/`Nexus HTTPS` (Allow) e
+  `Nexus MySQL (LAN)`/`Nexus Next (LAN)` (Block) para `LocalSubnet`; o `smoke.ps1` valida as
+  quatro. A desinstalação remove serviço, binários e regras, preservando os dados de
+  `C:\ProgramData\MySQL\MySQL Server 8.4` e de `C:\ProgramData\Nexus` (exceto `caddy`); o
+  runbook foi atualizado.
+
 ## [2.02.11.2026] - 2026-11-02
 
 Esta seção consolida a instalação e a operação em produção no Windows (KAN-170): health
