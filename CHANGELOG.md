@@ -13,6 +13,10 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [3.02.11.2026] - 2026-11-02
+
+Esta seção consolida o MySQL 8.4 dedicado do Nexus na porta 3214 e as regras de firewall.
+
 ### Changed
 - **MySQL dedicado na 3214 e firewall (KAN-170):** a instalação Windows passou a usar uma
   instância MySQL **8.4.13 LTS** própria — serviço `NexusMySQL84`, `127.0.0.1:3214`,
