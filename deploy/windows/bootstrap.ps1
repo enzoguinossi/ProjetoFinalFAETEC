@@ -1091,7 +1091,26 @@ try {
                     New-Item -ItemType Directory -Force -Path $trayDir | Out-Null
                 }
                 $trayTarget = Join-Path $trayDir "NexusTray.exe"
-                Copy-Item -LiteralPath $traySource -Destination $trayTarget -Force
+                $trayRunning = Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue
+                if ($trayRunning) {
+                    Write-Ok "Parando a bandeja para atualizar o executável..."
+                    $trayRunning | Stop-Process -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 3
+                }
+                $trayCopied = $false
+                for ($attempt = 0; $attempt -lt 5; $attempt++) {
+                    try {
+                        Copy-Item -LiteralPath $traySource -Destination $trayTarget -Force -ErrorAction Stop
+                        $trayCopied = $true
+                        break
+                    }
+                    catch {
+                        Start-Sleep -Seconds 2
+                    }
+                }
+                if (-not $trayCopied) {
+                    Fail "Não foi possível atualizar o NexusTray.exe; o arquivo continua em uso."
+                }
 
                 # Configuração da bandeja: caminhos reais desta instalação, sem segredos.
                 $trayJsonPath = Join-Path $trayDir "tray.json"

@@ -1,6 +1,6 @@
 {
   "name": "nexus",
-  "version": "8.02.11.2026",
+  "version": "9.02.11.2026",
   "private": true,
   "type": "module",
   "scripts": {

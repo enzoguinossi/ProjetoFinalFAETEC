@@ -13,6 +13,14 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [9.02.11.2026] - 2026-11-02
+
+Esta seção permite atualizar a bandeja com o processo em execução.
+
+### Fixed
+- **Atualização da bandeja (KAN-170):** o bootstrap para o `NexusTray` em execução antes de
+  copiar o novo `NexusTray.exe` (com retry) e registra/inicia a tarefa em seguida.
+
 ## [8.02.11.2026] - 2026-11-02
 
 Esta seção corrige a atualização da aplicação em uma instalação existente.
