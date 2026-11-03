@@ -1,8 +1,8 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `2.02.11.2026`, tag `v2.02.11.2026`; produção
-> Windows com Inno Setup).
+> Última consolidação: 2026-11-02 (release `3.02.11.2026`, tag `v3.02.11.2026`; produção
+> Windows com MySQL 3214 e Inno Setup).
 
 ## Objetivo atual
 
@@ -17,12 +17,14 @@ release `1.02.11.2026`.
    `UPLOADS_DIR` em `src/lib/uploads.ts` (fallback `public/uploads`); `/api/health` liberado
    no `proxy.ts`.
 2. **Bootstrap do zero:** `bootstrap.ps1` em 8 fases, idempotente/retomável, instala VC++,
-   Node 24.19.0, Git, NSSM e Caddy; pausa (exit 2) para o MySQL Installer 8.4 LTS
-   (Server only) e retoma com `-Resume`; `pos-instalacao-mysql.ps1` aplica `my.ini`, cria
-   `nexus_prod`/`nexus_app` e grava `backup.cnf`.
-3. **Serviços:** `NexusApp` (NetworkService) e `NexusCaddy` (LocalService) no NSSM, com
-   auto-start, restart e logs rotativos; Next em `127.0.0.1:3000`; Caddy em 80/443 com
-   CA interna via `certutil` e `admin off`.
+   Node 24.19.0, Git, NSSM e Caddy; instala o **MySQL 8.4.13 LTS dedicado** (`instalar-mysql.ps1`)
+   na porta **3214**, serviço `NexusMySQL84`, binários em `C:\Program Files\Nexus\mysql` e
+   dados/config em `C:\ProgramData\MySQL\MySQL Server 8.4`; **sem pausa** e sem tocar no
+   MySQL existente na 3306. `pos-instalacao-mysql.ps1` cria `nexus_prod`/`nexus_app` e grava
+   `backup.cnf`.
+3. **Serviços:** `NexusApp` (NetworkService, dependente de `NexusMySQL84`) e `NexusCaddy`
+   (LocalService) no NSSM, com auto-start, restart e logs rotativos; Next em
+   `127.0.0.1:3000`; Caddy em 80/443 com CA interna via `certutil` e `admin off`.
 4. **Bandeja:** `NexusTray` (.NET 8 self-contained) com status verde/amarelo/vermelho,
    abrir, reiniciar via `restart.ps1`, logs, backup e pasta de dados.
 5. **Instalador:** Inno Setup 7, `NexusSetup-<versão>.exe`, wizard de hostname, execução do
@@ -34,6 +36,10 @@ release `1.02.11.2026`.
    NetworkService; `caddy` para LocalService); `.env` protegido antes da escrita; sem tag
    chumbada no manifesto (o build passa `-Tag`).
 8. **Documentação:** `docs/processo/PRODUCAO.md` (runbook) indexado em `docs/README.md`.
+9. **MySQL 3214 e firewall:** MySQL 8.4.13 dedicado, dados/config na pasta padrão do MySQL 8.4,
+   `DATABASE_URL`/`backup.cnf`/`mysqldump` na 3214; regras `Nexus HTTP`/`Nexus HTTPS`
+   (Allow) e `Nexus MySQL (LAN)`/`Nexus Next (LAN)` (Block) para `LocalSubnet`, validadas
+   pelo `smoke.ps1`.
 
 ## Entregue (runs `RUN-20261102-01..11`)
 
@@ -89,10 +95,12 @@ release `1.02.11.2026`.
 
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
 - Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
-- Parser do Windows PowerShell 5.1 → OK nos 11 `.ps1` de `deploy/windows`.
-- Instalador compilado com Inno Setup 7 (`NexusSetup-2.02.11.2026.exe`, 46,1 MB); tag
-  `v2.02.11.2026` contém `/api/health`; SHA-256
-  `24A4AA6B65E67CDA70FAD67E582A44A28F32304351234D5A88CFFF613E5EE0C9`.
+- Parser do Windows PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows`.
+- Instalador compilado com Inno Setup 7 (`NexusSetup-3.02.11.2026.exe`, 46,1 MB); tag
+  `v3.02.11.2026` contém `/api/health`; SHA-256
+  `25462FBAF1C82E1CD90D9006CD5C04C2766C6E4EEA4A079D4DC122DE46DECA9`.
+- MySQL 8.4.13 dedicado na 3214 (`NexusMySQL84`), sem tocar na 3306; regras de firewall
+  criadas/validadas pelo `smoke.ps1`.
 - Revisão independente `RUN-20261102-22`: bloqueante B1 (ACLs herdadas) e altos A1–A6
   corrigidos nos runs `23..25`; pendências reais no §15 do runbook.
 
@@ -126,11 +134,11 @@ release `1.02.11.2026`.
 ## Pendências
 
 1. **Testar o instalador** na máquina do usuário e na do colega (VM/máquina limpa): MySQL
-   8.4 LTS, hostname/DNS, CA do Caddy nos clientes, login e smoke.
+   8.4.13 na **3214** (`NexusMySQL84`), hostname/DNS, CA do Caddy nos clientes, login e smoke.
 2. **Limitações conhecidas do runbook (§15):** retenção de `backups\uploads`/`my.ini-*.bak`;
    backup sem `caddy\data`; bandeja só no logon de quem instalou; `.env` não mesclado;
-   hashes vazios no manifesto; firewall/DNS fora do escopo; `db push` sem migrations; CA
-   permanece no trust store após desinstalar.
+   hashes incompletos no manifesto; DNS fora do escopo; `db push` sem migrations; CA permanece
+   no trust store; conflito de caminho se já existir um MySQL 8.4 usando o diretório padrão.
 3. **Produção:** executar o `NexusSetup` na máquina do galpão, concluir o primeiro acesso
    (Super Admin), criar o usuário do representante e validar impressão/backup.
 4. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
