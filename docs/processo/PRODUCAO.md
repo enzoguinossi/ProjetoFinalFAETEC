@@ -37,7 +37,7 @@ estações da rede
 
 | Peça | Papel |
 | --- | --- |
-| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~393,8 MB); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
+| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~380,9 MB); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
 | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
@@ -63,7 +63,7 @@ estações da rede
 | VC++ Redistributable | **14.x**, `vc_redist.x64.exe` | `manifesto.json` / payload |
 | Bandeja | **.NET 10**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
 | Instalador | **Inno Setup 7**; `ISCC.exe` local ou NuGet **7.1.0** no build | `build-instalador.ps1` |
-| Setup | **393,8 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~400 MB | `deploy/windows/out/` |
+| Setup | **380,9 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~400 MB | `deploy/windows/out/` |
 
 > O destino **não usa** Git, npm, `next build`, `db push` ou Prisma CLI. O cliente Prisma já
 > vem no `app.zip`; o schema é aplicado por SQL com `mysql.exe`.
@@ -985,7 +985,7 @@ Para remoção total, depois de copiar o que precisa:
       8.4.13, Caddy 2.11.9, VC++, NSSM, `app\app.zip`, `sql\{schema,seed,migracoes\001}`;
       os hashes definidos no manifesto são verificados.
 - [ ] `deploy/windows/build-instalador.ps1` (chama `preparar-payload`) gera
-      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~393,8 MB).
+      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~380,9 MB).
 - [ ] O setup contém `payload\` e `sql\`; nenhum download/Git/npm/Prisma é necessário no
       destino.
 
@@ -1071,7 +1071,7 @@ Para remoção total, depois de copiar o que precisa:
     remoção total, apague `C:\ProgramData\Nexus` e exclua a CA em `certlm.msc`.
 
 12. **O setup é grande e o payload não é versionado.**
-    O `NexusSetup-1.07.11.2026.exe` tem ~393,8 MB; `deploy/windows/payload` é ignorado pelo
+    O `NexusSetup-1.07.11.2026.exe` tem ~380,9 MB; `deploy/windows/payload` é ignorado pelo
     Git e precisa ser montado no build. O destino é offline, mas o build exige internet e os
     arquivos de origem (app.zip, NSSM, SQL).
 

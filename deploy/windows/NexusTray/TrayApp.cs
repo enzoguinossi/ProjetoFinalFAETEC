@@ -93,7 +93,7 @@ internal sealed class TrayApp : ApplicationContext
             Visible = true,
             ContextMenuStrip = _menu
         };
-        _notifyIcon.DoubleClick += (_, _) => OpenUrl(_config.BaseUrl);
+        _notifyIcon.DoubleClick += OnTrayDoubleClick;
 
         SetStateIcon(TrayState.Red);
         UpdateMenuEnabled();
@@ -114,6 +114,27 @@ internal sealed class TrayApp : ApplicationContext
     private void OnTimerTick(object? sender, EventArgs e)
     {
         _ = PollAsync();
+    }
+
+    private void OnTrayDoubleClick(object? sender, EventArgs e)
+    {
+        TraySnapshot snapshot = _lastSnapshot.GetValueOrDefault();
+        bool ready = _lastSnapshot.HasValue
+            && snapshot.Services.AllRunning
+            && snapshot.Health.Ok;
+
+        if (ready)
+        {
+            OpenUrl(_config.BaseUrl);
+            return;
+        }
+
+        // Não abrir uma URL morta: oferece o menu para iniciar o Nexus.
+        ShowBalloon(
+            "Nexus",
+            "O Nexus não está em execução. Use Iniciar Nexus no menu da bandeja.",
+            ToolTipIcon.Info);
+        _menu.Show(Cursor.Position);
     }
 
     private async Task PollAsync()
