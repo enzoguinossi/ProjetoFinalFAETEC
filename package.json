@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:standalone": "next build",
+    "package:standalone": "node scripts/empacotar-standalone.mjs",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",

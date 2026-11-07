@@ -150,8 +150,8 @@ async function main() {
   // ou fator alterados pela interface.
   const conversoes = [
     { nome: "UNIDADE", fator: 1, descricao: "Unidade avulsa", padrao: true },
-    { nome: "PACOTE", fator: 10, descricao: "Pacote com 10 unidades", padrao: false },
-    { nome: "CAIXA", fator: 50, descricao: "Caixa com 50 unidades", padrao: false },
+    { nome: "PCT10", fator: 10, descricao: "Pacote com 10 unidades", padrao: false },
+    { nome: "CX50", fator: 50, descricao: "Caixa com 50 unidades", padrao: false },
   ];
 
   for (const c of conversoes) {

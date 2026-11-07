@@ -10,6 +10,10 @@ const pkg: { version?: string } = JSON.parse(
 const tunnelHost = process.env.TUNNEL_HOST?.trim();
 
 const nextConfig: NextConfig = {
+  // Gera `.next/standalone` com o servidor e as dependências rastreadas; o
+  // `scripts/empacotar-standalone.mjs` completa o pacote com `.next/static` e
+  // `public` (sem uploads) para o instalador autocontido.
+  output: "standalone",
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "",
   },

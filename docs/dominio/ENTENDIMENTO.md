@@ -321,14 +321,14 @@ Tabela standalone (não vinculada a um produto específico):
 ```
 conversao_unidade
 ├── ID_conversao       INT PK auto_increment
-├── nome               VARCHAR NOT NULL UNIQUE  ← nome livre (o seed cria UNIDADE, PACOTE e CAIXA)
+├── nome               VARCHAR NOT NULL UNIQUE  ← nome livre (o seed cria UNIDADE, PCT10 e CX50)
 ├── fator              FLOAT NOT NULL          ← 1, 10, 50 no seed
 ├── descricao          VARCHAR
 └── padrao             BOOLEAN NOT NULL DEFAULT FALSE  ← exatamente uma TRUE (UNIDADE)
 ```
 
 Regras:
-- O nome é livre — o cliente cria conforme necessidade (ex: "CAIXA" com fator 50)
+- O nome é livre — o cliente cria conforme necessidade (ex: "CX50" com fator 50)
 - A conversão é **auxílio de lançamento**, nunca a unidade do produto ou do saldo: o fator
   multiplica a quantidade digitada para obter o **total** que entra no estoque (ex.: 10 × 20
   = 200), e o saldo do produto, a reserva, a baixa e a movimentação ficam em **base** — `UNIDADE`, fator 1
