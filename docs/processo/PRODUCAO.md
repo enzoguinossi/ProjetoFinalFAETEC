@@ -1,13 +1,17 @@
-# Produção — instalação, atualização e operação (Windows)
+# Produção — instalador autocontido 1.07 (Windows)
 
-Runbook da instalação do **Nexus** em um servidor Windows, cobrindo o instalador
-`NexusSetup-<versão>.exe`, o `bootstrap.ps1`, os serviços do Windows, a bandeja, o backup
-e a atualização. Ele descreve **o que os scripts de [`deploy/windows/`](../../deploy/windows/)
-fazem hoje** — se um script mudar, este documento precisa ser revisto.
+Runbook da instalação do **Nexus** em um servidor Windows usando o pacote
+**`NexusSetup-1.07.11.2026.exe`**. O instalador é **autocontido**: Node.js portátil, MySQL
+8.4.13, Caddy, VC++, NSSM, a aplicação Next **standalone** e o SQL de produção entram no
+payload. **Nada é baixado na máquina de destino** e não há Git, npm, `next build`, `db push`
+nem Prisma CLI no servidor.
 
-> **Escopo.** É o runbook do servidor de produção (Windows 64 bits). O desenvolvimento
-> local continua em [`README.md`](../../README.md) e as convenções do projeto em
-> [`AGENTS.md`](../../AGENTS.md). Regras de negócio não são repetidas aqui: consulte
+Este documento descreve **o que os scripts de [`deploy/windows/`](../../deploy/windows/)
+fazem hoje**; se um script mudar, ele precisa ser revisto.
+
+> **Escopo.** Servidor Windows 64 bits. O desenvolvimento local continua em
+> [`README.md`](../../README.md) e as convenções do projeto em [`AGENTS.md`](../../AGENTS.md).
+> Regras de negócio não são repetidas aqui: consulte
 > [`docs/dominio/REGRAS_NEGOCIO.md`](../dominio/REGRAS_NEGOCIO.md).
 
 ---
@@ -18,55 +22,52 @@ fazem hoje** — se um script mudar, este documento precisa ser revisto.
 estações da rede
       │  HTTPS 443 (CA interna do Caddy)
       ▼
-┌─────────────────────┐        ┌──────────────────────┐        ┌──────────────────────┐
-│ NexusCaddy (Caddy)  │ ─────► │ NexusApp (Next.js)   │ ─────► │ NexusMySQL84         │
-│ 0.0.0.0:80/443      │  HTTP  │ 127.0.0.1:3000       │  3214  │ 127.0.0.1:3214       │
-│ LocalService        │        │ NetworkService       │        │ NetworkService       │
-└─────────────────────┘        └──────────────────────┘        └──────────────────────┘
+┌─────────────────────┐        ┌──────────────────────────┐        ┌──────────────────────┐
+│ NexusCaddy (Caddy)  │ ─────► │ NexusApp                 │ ─────► │ NexusMySQL84         │
+│ 0.0.0.0:80/443      │  HTTP  │ node.exe server.js       │  3214  │ 127.0.0.1:3214       │
+│ LocalService        │        │ 127.0.0.1:3000           │        │ NetworkService       │
+└─────────────────────┘        └──────────────────────────┘        └──────────────────────┘
         ▲                                ▲
         │ certutil -addstore -f Root     │ .env + UPLOADS_DIR
         │ (CA local)                     ▼
         │                        C:\ProgramData\Nexus\uploads
         │
-   C:\ProgramData\Nexus\logs  ·  C:\ProgramData\Nexus\backups
-   C:\ProgramData\Nexus\caddy\{data,config,logs}
+   C:\ProgramData\Nexus\{logs,backups,caddy,mysql}
 ```
-
-> O MySQL existente na porta **3306** (se houver) **não é tocado**: o Nexus usa uma instância
-> dedicada, `NexusMySQL84`, na **3214**. Ver §2.3, §5.2 e §15.
 
 | Peça | Papel |
 | --- | --- |
-| `NexusSetup-<versão>.exe` | instalador **Inno Setup 7**; não embute o código da aplicação — o bootstrap clona a tag do GitHub durante a instalação |
+| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~393,8 MB); embute o payload e executa o bootstrap |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
-| [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o **MySQL 8.4.13 LTS dedicado** (ZIP, `NexusMySQL84`, porta 3214) |
-| [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` na instância dedicada |
-| [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) | atualização com indisponibilidade total, backup, cópia de scripts/configuração, validação de tag e rollback |
-| [`backup.ps1`](../../deploy/windows/backup.ps1) | backup do banco (via `mysqldump` dedicado), dos uploads, do `.env` e do `Caddyfile` |
-| [`restart.ps1`](../../deploy/windows/restart.ps1) | reinício controlado do `NexusApp` com o `NexusCaddy` parado; usado pela bandeja |
-| [`smoke.ps1`](../../deploy/windows/smoke.ps1) | smoke test dos serviços, da porta 3214, das ACLs, do firewall, do health e do HTTPS |
-| [`desinstalar.ps1`](../../deploy/windows/desinstalar.ps1) | remove serviços (incluindo `NexusMySQL84`), tarefas, binários e regras; **preserva** `C:\ProgramData\Nexus` e `C:\ProgramData\MySQL\MySQL Server 8.4` |
-| `NexusTray` | bandeja em **.NET 8** (WinForms, self-contained) para acompanhar o serviço, reiniciá-lo e fazer backup |
-| [`common.ps1`](../../deploy/windows/common.ps1) | funções e caminhos compartilhados pelos scripts |
+| [`instalar-gui.ps1`](../../deploy/windows/instalar-gui.ps1) | wrapper do instalador; executa o bootstrap em janela visível e mostra sucesso/falha |
+| [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
+| [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
+| [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) | aplica `schema.sql`/`seed.sql` (Fresh) ou migração 001 + seed (Update), sem Prisma |
+| [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) | atualização por **pacote** (`app\app.zip` + `sql\`), com backup e rollback |
+| [`backup.ps1`](../../deploy/windows/backup.ps1) | backup do banco, uploads, `.env` e `Caddyfile` |
+| [`restart.ps1`](../../deploy/windows/restart.ps1) | reinício controlado do `NexusApp`; usado pela bandeja |
+| [`smoke.ps1`](../../deploy/windows/smoke.ps1) | smoke test de runtime, serviços, porta, ACLs, firewall, health e HTTPS |
+| [`desinstalar.ps1`](../../deploy/windows/desinstalar.ps1) | remove serviços, runtimes, tarefas, regras e app; preserva `C:\ProgramData\Nexus` |
+| `NexusTray` | bandeja .NET 8 self-contained; status, reinício, backup e pastas |
+| [`common.ps1`](../../deploy/windows/common.ps1) | caminhos e funções compartilhadas |
 
 ### 1.1 Versões e componentes
 
 | Componente | Versão/origem | Onde está definido |
 | --- | --- | --- |
-| Node.js | **24.19.0** (instalação exata; outra versão é substituída) | `manifesto.json` |
-| NSSM | **2.24**, **embutido no instalador** (`tools\nssm\nssm.exe`); fallback URL/mirrors | `manifesto.json` + payload do Inno Setup |
-| MySQL | **8.4.13 LTS**, **ZIP oficial** (`mysql-8.4.13-winx64.zip`), validado por **MD5** | `manifesto.json` |
+| App Next | **standalone**, `server.js` + `.next/static` + `public` + client Prisma; versão `1.07.11.2026` | `next.config.ts`, `package.json`, `app.zip` |
+| Node.js | **24.19.0** portátil, ZIP `node-v24.19.0-win-x64.zip` | `manifesto.json` / payload |
+| MySQL | **8.4.13 LTS**, ZIP `mysql-8.4.13-winx64.zip` (MD5) | `manifesto.json` / payload |
 | Serviço MySQL | **`NexusMySQL84`**, porta **3214**, bind `127.0.0.1` | `instalar-mysql.ps1` |
-| VC++ Redistributable | **14.x** (`vc_redist.x64.exe`) | `manifesto.json` |
-| Caddy | **latest** (manifesto sem URL) ou a URL fixada no manifesto | `manifesto.json` |
-| Git for Windows | já instalado ou **latest** (manifesto sem URL) | `manifesto.json` |
+| Caddy | **2.11.9**, ZIP `caddy_2.11.9_windows_amd64.zip` (SHA-512) | `manifesto.json` / payload |
+| NSSM | **2.24**, `nssm.exe` (SHA-256) | `manifesto.json` / payload |
+| VC++ Redistributable | **14.x**, `vc_redist.x64.exe` | `manifesto.json` / payload |
 | Bandeja | **.NET 8**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
-| Instalador | **Inno Setup 7**; se o `ISCC.exe` não existir, baixa o pacote NuGet **7.1.0** | `build-instalador.ps1` |
+| Instalador | **Inno Setup 7**; `ISCC.exe` local ou NuGet **7.1.0** no build | `build-instalador.ps1` |
+| Setup | **393,8 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~400 MB | `deploy/windows/out/` |
 
-> **Atenção:** os campos `sha256` do `manifesto.json` estão vazios para Node, VC++ e Caddy;
-> o MySQL usa **MD5** para o ZIP; o NSSM tem `exe_sha256` e vai embutido no instalador, com
-> fallback para a URL oficial e o mirror do repositório. Caddy e Git caem no "latest" quando a
-> URL não está fixada. Os downloads sem hash são protegidos apenas pelo TLS. Ver §15.
+> O destino **não usa** Git, npm, `next build`, `db push` ou Prisma CLI. O cliente Prisma já
+> vem no `app.zip`; o schema é aplicado por SQL com `mysql.exe`.
 
 ---
 
@@ -76,74 +77,60 @@ estações da rede
 
 | Caminho | Conteúdo |
 | --- | --- |
-| `app\` | clone Git da tag em produção; `.env`, `node_modules`, `.next` |
-| `Instalador\` | scripts entregues pelo `.exe`: `bootstrap.ps1`, `atualizar.ps1`, `backup.ps1`, `restart.ps1`, `smoke.ps1`, `common.ps1`, `desinstalar.ps1`, `instalar-gui.ps1`, `build-instalador.ps1`, `Caddyfile`, `manifesto.json`, `NexusTray.exe` |
-| `scripts\` | `backup.ps1`, `common.ps1` e `restart.ps1` copiados pelo bootstrap; usados pela tarefa `NexusBackup` e pela bandeja |
-| `NexusTray\` | `NexusTray.exe` e `tray.json` (caminhos reais, sem segredos) |
-| `caddy\` | `caddy.exe` |
-| `tools\nssm\` | `nssm.exe` |
-| `app.prev-<tag>\` | versão anterior mantida pelo `atualizar.ps1` (até duas) |
-| `app.failed-<tag>\` | versão que falhou na atualização, mantida para diagnóstico |
-| `app.prev-manual-<timestamp>\` | diretório antigo movido pelo `bootstrap.ps1 -Force` |
-| `mysql\` | binários do MySQL 8.4.13 dedicado (`mysqld.exe`, `mysql.exe`, `mysqldump.exe`) |
+| `app\` | aplicação standalone extraída de `app.zip`: `server.js`, `.next`, `node_modules`, `public`, `package.json` e `.env` |
+| `node\` | Node.js 24.19.0 portátil (`node.exe`) |
+| `mysql\` | binários do MySQL 8.4.13 (`bin\mysqld.exe`, `bin\mysql.exe`, `bin\mysqldump.exe`) |
+| `caddy\` | `caddy.exe` (2.11.9) |
+| `tools\nssm\` | `nssm.exe` (2.24) |
+| `scripts\` | `backup.ps1`, `common.ps1` e `restart.ps1` copiados pelo bootstrap |
+| `NexusTray\` | `NexusTray.exe` e `tray.json` |
+| `Instalador\` | scripts do instalador e `payload\` (Node, MySQL, Caddy, VC++, NSSM, `app\app.zip`, `sql`) |
+| `Instalador\sql\` | cópia de `schema.sql`, `seed.sql` e `migracoes\001-unidades-pct10-cx50.sql` |
+| `app.prev-<versão>\` | versão anterior mantida pelo `atualizar.ps1` (até duas) |
+| `app.prev-manual-<timestamp>\` | aplicação anterior movida pelo bootstrap/instalação |
+| `app.failed-<versão>\` | versão que falhou na atualização, para diagnóstico |
 
 ### 2.2 `C:\ProgramData\Nexus`
 
 | Caminho | Conteúdo |
 | --- | --- |
-| `bootstrap.state.json` | fase concluída, hostname e tag |
-| `uploads\` | raiz física dos uploads (`UPLOADS_DIR`); `NetworkService` pode modificar |
-| `logs\` | `app.out.log`/`app.err.log`, `bootstrap-*.log`, `instalador-*.log`, `deploy-*.log`, `desinstalar-*.log`, `backup-*.log`, `restart-*.log`; `NetworkService` pode modificar |
-| `backups\db\` | dumps `nexus_prod-<timestamp>.zip` ou, acima de ~1,8 GB, `nexus_prod-<timestamp>.sql` |
+| `bootstrap.state.json` | fase concluída, hostname, versão do app e estado |
+| `mysql\data\` | diretório de dados do `NexusMySQL84` |
+| `mysql\my.ini` | configuração do `NexusMySQL84` (porta 3214, bind local, utf8mb4, fuso `-03:00`) |
+| `uploads\` | raiz física dos uploads (`UPLOADS_DIR`) |
+| `logs\` | `app.out/err.log`, `bootstrap-*.log`, `instalador-*.log`, `deploy-*.log`, `backup-*.log`, `restart-*.log`, `desinstalar-*.log` |
+| `backups\db\` | dumps `nexus_prod-<timestamp>.zip` ou `.sql` (acima de ~1,8 GB) |
 | `backups\uploads\` | cópia dos uploads |
-| `backups\config\` | `.env-<timestamp>`, `Caddyfile-<timestamp>` e backups do `my.ini` (`my.ini-<timestamp>.bak`) |
-| `config\Caddyfile` | Caddyfile gerado a partir do template, com o hostname real; leitura para `LocalService` |
+| `backups\config\` | `.env-<timestamp>`, `Caddyfile-<timestamp>`, `my.ini-*.bak` |
+| `config\Caddyfile` | Caddyfile gerado com o hostname; leitura para `LocalService` |
 | `config\backup.cnf` | credenciais do `nexus_app` para o `mysqldump`; **sem leitura pelo app** |
-| `caddy\data\` | dados do Caddy (`XDG_DATA_HOME`); a CA local fica em `caddy\data\caddy\pki\authorities\local\` |
-| `caddy\config\` | configuração do Caddy (`XDG_CONFIG_HOME`) |
-| `caddy\logs\` | `caddy.out.log`, `caddy.err.log` e `access.log` |
+| `caddy\{data,config,logs}\` | dados, configuração e logs do Caddy; a CA local fica em `caddy\data\caddy\pki\authorities\local\` |
 
-O diretório raiz `C:\ProgramData\Nexus` é restrito a **Administrators/SYSTEM**; apenas
-`uploads` e `logs` recebem `Modify` para o `NetworkService`, e `caddy\{data,config,logs}`
-recebem `Modify` para o `LocalService`. `backups` e `config` continuam só para
-Administrators/SYSTEM. Ver §12.1.
+### 2.3 Legado (somente migração)
 
-### 2.3 MySQL dedicado (fora de `Nexus`)
-
-| Caminho | Conteúdo |
+| Caminho | Uso |
 | --- | --- |
-| `C:\Program Files\Nexus\mysql\` | binários do MySQL **8.4.13** dedicado (`bin\mysqld.exe`, `bin\mysql.exe`, `bin\mysqldump.exe`) |
-| `C:\ProgramData\MySQL\MySQL Server 8.4\Data\` | diretório de dados do `NexusMySQL84` |
-| `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini` | configuração do `NexusMySQL84`: porta **3214**, bind `127.0.0.1`, `datadir`, `basedir`, utf8mb4 e fuso `-03:00` |
+| `C:\ProgramData\MySQL\MySQL Server 8.4\Data` | dados do MySQL da instalação anterior (10.02); o `instalar-mysql.ps1` copia para `C:\ProgramData\Nexus\mysql\data` e **preserva o original** |
+| `C:\Program Files\MySQL\MySQL Server 8.4` | se existir, é uma instalação MySQL independente (por exemplo, 3306); o Nexus **não a instala, para nem altera** |
 
-> O MySQL que já existir na porta **3306** (por exemplo, uma instalação em
-> `C:\Program Files\MySQL\MySQL Server 8.4`) **não é instalado, parado nem alterado** pelo
-> Nexus. O único ponto de contato é o caminho padrão de dados/configuração
-> `C:\ProgramData\MySQL\MySQL Server 8.4`, que é o mesmo usado por um MySQL 8.4 comum — ver
-> §15 se ele já existir.
-
-> A desinstalação remove `C:\Program Files\Nexus\mysql` e `C:\ProgramData\Nexus\caddy`, mas
-> **preserva** `C:\ProgramData\MySQL\MySQL Server 8.4` e o restante de
-> `C:\ProgramData\Nexus`. Ver §13.
+> `C:\ProgramData\MySQL\MySQL Server 8.4` **não é caminho ativo** do Nexus 1.07: serve apenas
+> de origem para a migração do `Data`. O caminho ativo é `C:\ProgramData\Nexus\mysql\data`.
 
 ---
 
-## 3. Serviços, tarefas e portas
+## 3. Serviços, tarefas, portas e firewall
 
 ### 3.1 Serviços
 
 | Nome | Criado por | Conta | Início | Depende de | Logs |
 | --- | --- | --- | --- | --- | --- |
-| `NexusMySQL84` | `instalar-mysql.ps1` | `NT AUTHORITY\NetworkService` | automático | — | erro em `C:\ProgramData\MySQL\MySQL Server 8.4\Data\*.err` |
+| `NexusMySQL84` | `instalar-mysql.ps1` | `NT AUTHORITY\NetworkService` | automático | — | `C:\ProgramData\Nexus\mysql\data\*.err` |
 | `NexusApp` | `bootstrap.ps1` (NSSM) | `NT AUTHORITY\NetworkService` | automático | `NexusMySQL84` | `C:\ProgramData\Nexus\logs\app.out.log` e `app.err.log` |
 | `NexusCaddy` | `bootstrap.ps1` (NSSM) | `NT AUTHORITY\LocalService` | automático | `NexusApp` | `C:\ProgramData\Nexus\caddy\logs\caddy.out.log`/`caddy.err.log` + `access.log` |
 
 O NSSM configura `AppExit Default Restart` (reinício após 5 s), rotação de log em 10 MiB e
-parada com 15 s para o console. Se o `NexusMySQL84` não subir, o `NexusApp` também não sobe
-por causa da dependência; sem o app, o `NexusCaddy` não sobe.
-
-O MySQL existente na **3306** não aparece nesta tabela: ele não é criado, parado nem alterado
-pelo Nexus.
+parada com 15 s para o console. Se o `NexusMySQL84` não subir, o `NexusApp` não sobe; sem o
+app, o `NexusCaddy` também não sobe.
 
 ### 3.2 Tarefas agendadas
 
@@ -153,25 +140,23 @@ pelo Nexus.
 | `NexusTray` | **logon do usuário que executou a instalação** | esse usuário, `RunLevel Highest` | `C:\Program Files\Nexus\NexusTray\NexusTray.exe` |
 
 A bandeja roda elevada (`requireAdministrator`) para executar o `restart.ps1` (que usa NSSM)
-sem pedir UAC. Ela **não** é registrada para "todos os usuários" — ver §9 e §15.
+sem pedir UAC. Ela não é registrada para "todos os usuários" — ver §9 e §15.
 
 ### 3.3 Portas
 
 | Porta | Serviço | Escuta | Observação |
 | --- | --- | --- | --- |
-| `3214` | `NexusMySQL84` | `127.0.0.1` | `bind-address=127.0.0.1`; X Plugin desligado (`mysqlx=0`) |
-| `3000` | `NexusApp` | `127.0.0.1` | `next start -H 127.0.0.1 -p 3000` |
-| `80`/`443` | `NexusCaddy` | todas as interfaces | HTTPS com CA interna; a 80 atende o redirecionamento automático do Caddy |
+| `3214` | `NexusMySQL84` | `127.0.0.1` | `bind-address=127.0.0.1`; `mysqlx=0` |
+| `3000` | `NexusApp` | `127.0.0.1` | `node.exe server.js` com `HOSTNAME=127.0.0.1` |
+| `80`/`443` | `NexusCaddy` | todas as interfaces | HTTPS com CA interna; a 80 atende o redirecionamento do Caddy |
 
-O Caddy usa `admin off`: **não há API administrativa**. O `bootstrap.ps1` verifica 3214,
-3000, 80 e 443 antes de instalar. A porta **3306** é ignorada: pode estar ocupada por outro
-MySQL.
+O bootstrap verifica **3214**, 3000, 80 e 443. A porta **3306** não é usada pelo Nexus e pode
+estar ocupada por outro MySQL.
 
 ### 3.4 Firewall
 
-O `bootstrap.ps1` recria as quatro regras de entrada abaixo (`Set-NexusFirewallRules`); o
-`smoke.ps1` valida nome, direção, ação, porta e `LocalSubnet`, e o `desinstalar.ps1` as
-remove.
+O bootstrap recria quatro regras de entrada (`Set-NexusFirewallRules`); o `smoke.ps1` valida
+nome, direção, ação, porta e `LocalSubnet`; o `desinstalar.ps1` as remove.
 
 | Regra | Porta | Ação | Escopo |
 | --- | --- | --- | --- |
@@ -180,333 +165,279 @@ remove.
 | `Nexus MySQL (LAN)` | `3214` | **Block** | `LocalSubnet` |
 | `Nexus Next (LAN)` | `3000` | **Block** | `LocalSubnet` |
 
-As regras são de **entrada**, perfil `Any`. O acesso ao sistema continua somente por 80/443;
-a 3214 e a 3000 ficam bloqueadas para a sub-rede. Se as estações estiverem fora do
-`LocalSubnet`, as regras precisam ser revistas.
+As regras são de **entrada**, perfil `Any`. O acesso ao sistema é somente por 80/443; a 3214
+e a 3000 ficam bloqueadas para a sub-rede. Se as estações estiverem fora do `LocalSubnet`,
+as regras precisam ser revistas.
 
 ---
 
 ## 4. Pré-requisitos
 
-- Windows **64 bits** (Windows 10/11 ou Windows Server compatível), com PowerShell 5.1.
-- Execução em **PowerShell elevado** (Administrador): a instalação, a atualização e a
-  desinstalação exigem elevação; o backup manual também, por causa da ACL do `backup.cnf`.
-- Pelo menos **5 GB livres em `C:`**.
-- **Internet** durante a instalação/atualização: o `bootstrap` baixa Node, Git, Caddy, VC++ e
-  clona a tag do GitHub. O **NSSM vai embutido no instalador**; a URL oficial e o mirror são
-  apenas fallback. A checagem inicial usa `nodejs.org:443`; acesso ao GitHub também é
-  necessário.
-- Relógio do servidor com no máximo **10 minutos** de diferença do horário da internet.
-- **Hostname DNS** válido (ex.: `nexus.galpao.local`), sem `http://`, porta ou caminho.
-  Ele precisa resolver **no próprio servidor** e nas estações clientes.
-- Portas **3214**, 3000, 80 e 443 livres (ou já usadas pelos próprios serviços do Nexus). A
-  **3306** não é usada pelo Nexus e pode estar ocupada por outro MySQL.
-- Acesso à internet e à tag do GitHub no momento da instalação — o pacote do instalador
-  **não** contém o código da aplicação. O bootstrap manual exige `-Tag`.
-- Um MySQL 8.4.13 dedicado é baixado como ZIP oficial e instalado pelo bootstrap; não é
-  necessário instalar o MySQL Installer da Oracle.
+- Windows **64 bits** (10/11 ou Server compatível), com Windows PowerShell 5.1.
+- **PowerShell elevado** para instalar, atualizar, desinstalar e restaurar.
+- Pelo menos **5 GB livres em `C:`** (o payload ocupa ~400 MB e o MySQL cresce depois).
+- Portas **3214**, 3000, 80 e 443 livres (ou já usadas pelos próprios serviços do Nexus).
+  A 3306 é independente e pode estar ocupada.
+- **Hostname DNS** válido, sem `http://`, porta ou caminho. O bootstrap cria uma entrada
+  `127.0.0.1 <hostname>` no `hosts` do servidor quando o nome não resolve; as estações
+  precisam de DNS/hosts próprio.
+- **Sem internet no destino**: o setup carrega Node, MySQL, Caddy, VC++, NSSM, app e SQL.
+- Senhas do **root do MySQL dedicado** e do **`nexus_app`** (12–64 caracteres; letras,
+  números, `.`, `_`, `-`; sem `@`, `:`, `/`, espaço ou aspas).
+- Um MySQL existente na **3306** não precisa ser removido nem parado; o Nexus usa a 3214.
 
-> **Firewall:** o bootstrap **cria** as regras `Nexus HTTP`/`Nexus HTTPS` (Allow para
-> `LocalSubnet`) e `Nexus MySQL (LAN)`/`Nexus Next (LAN)` (Block para `LocalSubnet`). O
-> `smoke.ps1` valida as quatro; não é preciso liberar a 3214/3000. Ver §3.4.
+> **Payload:** a instalação depende de `C:\Program Files\Nexus\Instalador\payload` (ou
+> `payload\` ao lado do `bootstrap.ps1`). Sem ele, a fase 0 falha com mensagem clara.
 
 ---
 
-## 5. Instalação pelo instalador (`NexusSetup-<versão>.exe`)
+## 5. Instalação pelo instalador (`NexusSetup-1.07.11.2026.exe`)
 
 ### 5.1 O que o wizard pergunta
 
 1. Verifica se o Windows é **64 bits**; se não for, aborta.
-2. Pede o **hostname** (nome DNS), com o valor inicial `nexus.galpao.local`. O campo aceita
-   apenas letras, números, ponto e hífen; é convertido para minúsculas.
-3. Permite marcar o ícone na **Área de Trabalho** (opcional). O diretório de instalação é
-   fixo: `C:\Program Files\Nexus\Instalador`.
-4. Ao concluir os arquivos, o `CurStepChanged(ssPostInstall)` do `instalador.iss` executa o
-   `instalar-gui.ps1` em uma janela visível (o bootstrap precisa do console para pedir as
-   senhas do MySQL) com `Exec`/`ewWaitUntilTerminated` e **verifica o `ResultCode`**: se o
-   `Exec` falhar ou o código não for 0, mostra um `MsgBox` de erro com o código e o caminho
-   dos logs.
+2. Pede o **hostname** (nome DNS), com valor inicial `nexus.galpao.local`. Aceita apenas
+   letras, números, ponto e hífen; converte para minúsculas.
+3. Permite marcar o ícone na **Área de Trabalho** (opcional). O diretório é fixo:
+   `C:\Program Files\Nexus\Instalador`.
+4. Ao concluir os arquivos, `CurStepChanged(ssPostInstall)` executa o `instalar-gui.ps1` em
+   janela visível com `Exec`/`ewWaitUntilTerminated`; o código de saída é verificado e uma
+   falha mostra `MsgBox` com o código e o caminho dos logs.
 
-O `.iss` **não usa `[Run]`**: a execução do `instalar-gui.ps1` — que chama o `bootstrap.ps1`
-— fica no `[Code]`, em `CurStepChanged(ssPostInstall)`, justamente para poder checar o
-código de saída.
+O `.iss` **não usa `[Run]`** e **não tem `[UninstallDelete]`**: instalação e desinstalação
+ficam no `[Code]`, para checar o `ResultCode`. O `instalar-gui.ps1` grava
+`C:\ProgramData\Nexus\logs\instalador-<timestamp>.log`; o bootstrap grava
+`bootstrap-<timestamp>.log`.
 
-O `instalar-gui.ps1` grava o andamento em
-`C:\ProgramData\Nexus\logs\instalador-<timestamp>.log` e mostra MessageBox de sucesso ou de
-falha. O bootstrap grava o log detalhado em
-`C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log`. Não há pausa para instalar o MySQL:
-o bootstrap instala a instância dedicada automaticamente e pede as senhas no console.
+O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL também para
+`Instalador\sql`.
 
-### 5.2 MySQL 8.4.13 LTS dedicado (automático)
-
-O MySQL **não** precisa ser instalado antes, e o MySQL existente na **3306 não é tocado**.
-A fase 2 do bootstrap chama o [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1):
-
-1. Baixa o **ZIP oficial** `mysql-8.4.13-winx64.zip` e valida o **MD5** do manifesto.
-2. Extrai os binários para `C:\Program Files\Nexus\mysql`.
-3. Grava `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini` com porta **3214**, bind
-   `127.0.0.1`, `mysqlx=0`, `basedir`/`datadir`, utf8mb4 e fuso `-03:00`.
-4. Se `Data` estiver vazio, inicializa com `mysqld --initialize-insecure`.
-5. Cria o serviço **`NexusMySQL84`**, configura como `NT AUTHORITY\NetworkService`, inicia
-   e espera aceitar conexões em `127.0.0.1:3214`.
-6. Define a senha do **root** por SQL em arquivo temporário protegido; nunca por `-p`.
-7. O `pos-instalacao-mysql.ps1` ajusta o `my.ini`, reinicia o `NexusMySQL84`, cria o banco
-   `nexus_prod` e o usuário `nexus_app@localhost` e valida a conexão na 3214.
-
-No console do bootstrap, são pedidas duas senhas — a do **root do MySQL dedicado** e a do
-**`nexus_app`** (qualquer senha de até 256 caracteres; não pode conter `@`, `/`, `?`, `#`,
-`"`, `\`, `;`, espaço, tab ou caracteres de controle). Elas só são pedidas quando o
-serviço ainda não existe ou quando o `backup.cnf` existente não conecta; a instalação é
-idempotente e **não há pausa** para instalar o MySQL. O `instalar-mysql.ps1` também pode ser
-executado isoladamente em PowerShell elevado (ele instala/repara o serviço; o
-`pos-instalacao-mysql.ps1` continua sendo necessário para criar o banco/usuário).
-
-O backup do `my.ini` feito pelo pós-instalação fica em
-`C:\ProgramData\Nexus\backups\config\my.ini-<timestamp>.bak`.
-
-> **Atenção:** o caminho `C:\ProgramData\MySQL\MySQL Server 8.4` é o mesmo usado por uma
-> instalação MySQL 8.4 comum. Se a máquina já tiver um MySQL 8.4 usando esse diretório,
-> haverá conflito de `Data`/`my.ini`. Não rode o Nexus nessa máquina sem antes isolar/backup
-> da instância existente — ver §15.
-
-### 5.3 Senhas
-
-| Senha | Regra real | Onde é usada |
-| --- | --- | --- |
-| **root do MySQL dedicado** | não vazia, sem quebra de linha; passada por arquivo de opções temporário, nunca por `-p` | inicialização do `NexusMySQL84`, criação do banco/usuário e restauração |
-| **`nexus_app`** | **até 256 caracteres**, qualquer composição; **sem `@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço, tab ou caracteres de controle** | `DATABASE_URL`, `backup.cnf` e `mysqldump` |
-
-A restrição do `nexus_app` existe porque a senha entra na `DATABASE_URL`
-(`mysql://nexus_app:<senha>@127.0.0.1:3214/nexus_prod`), no `.env` e no `backup.cnf`;
-`@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço/tab e caracteres de controle quebram esses
-formatos. Os demais símbolos — incluindo `:`, `%`, `!`, `&`, `=`, `+` e acentos — são
-permitidos. A senha do root **não** entra nessa URL; por isso exige apenas não ser vazia e
-não conter quebra de linha.
-
-As senhas são pedidas no console do bootstrap (`Read-Host -AsSecureString`), sem pausa e sem
-caixa de diálogo; o transcript é suspenso durante a leitura e os arquivos temporários do
-MySQL nascem com ACL restrita. O `backup.cnf` fica com acesso apenas para
-Administrators/SYSTEM e grava a porta **3214**: o `NexusApp` (`NetworkService`) **não** o lê;
-quem usa o arquivo é o `bootstrap.ps1` (teste da fase 2) e o `backup.ps1`, rodando como
-`SYSTEM` ou em PowerShell elevado.
-
-### 5.4 O que o bootstrap faz (fases 0–7)
+### 5.2 Fases do bootstrap
 
 | Fase | O que faz |
 | --- | --- |
-| **0 — Pré-checagem** | confere Administrador, 64 bits, 5 GB livres em `C:`, internet (`nodejs.org:443`), portas **3214**/3000/80/443 e relógio (tolerância de 10 min); a 3306 não é verificada |
-| **1 — Runtime** | instala VC++ x64, **Node.js 24.19.0** (se a versão instalada for diferente) e Git for Windows (se ausente); atualiza o PATH da sessão |
-| **2 — MySQL dedicado** | pede as senhas no console e chama o `instalar-mysql.ps1`: baixa o ZIP 8.4.13, valida MD5, instala em `C:\Program Files\Nexus\mysql`, cria `NexusMySQL84` na 3214 e define o root; em seguida roda o `pos-instalacao-mysql.ps1` para criar `nexus_prod`/`nexus_app`; grava `backup.cnf` com porta 3214. **Não há pausa**; a 3306 não é tocada |
-| **3 — Ferramentas, diretórios e ACLs** | usa o **NSSM 2.24 embutido** (valida `exe_sha256`; se faltar, baixa da URL oficial/mirrors) e instala o **Caddy**; gera o `Caddyfile` com `admin off`; valida o Caddyfile; cria `C:\ProgramData\Nexus\caddy\{data,config,logs}`; aplica ACLs restritas (incluindo `C:\Program Files\Nexus\mysql` e `C:\ProgramData\MySQL\MySQL Server 8.4`) e cria as quatro regras de firewall |
-| **4 — Aplicação** | clona/atualiza a tag do GitHub em `C:\Program Files\Nexus\app`; **valida que a tag contém `src/app/api/health/route.ts` e que o `package.json` bate com a tag**; grava o `.env` (`DATABASE_URL` na **3214**, `UPLOADS_DIR`, `NODE_ENV=production`, `PORT=3000`, `JWT_SECRET` gerado se ausente); roda `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`; ajusta ACLs do `.env` e do cache |
-| **5 — Serviços** | cria/reconfigura `NexusApp` (`NetworkService`, dependente de `NexusMySQL84`) e `NexusCaddy` (`LocalService`, dependente de `NexusApp`) via NSSM; inicia o app; valida `http://127.0.0.1:3000/api/health` com `db=true`; inicia o Caddy; instala a CA local com `certutil -addstore -f Root` (até 30 tentativas) e valida `https://<hostname>/login` |
-| **6 — Bandeja e backup** | copia `backup.ps1`, `common.ps1` e `restart.ps1` para `C:\Program Files\Nexus\scripts`; registra `NexusBackup` (diária, 02:00); copia o `NexusTray.exe`, grava o `tray.json` (com `restartScript`), registra `NexusTray` no logon do usuário atual e **inicia a tarefa imediatamente** (em atualização, para tarefa/processo antes de copiar) |
-| **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão esperada (tag sem o `v`), incluindo `NexusMySQL84`/3214, ACLs e as quatro regras de firewall, e imprime URL, caminhos, versão e o comando de atualização |
+| **0 — Pré-checagem offline** | confere Administrador, payload obrigatório, 64 bits, 5 GB livres, portas 3214/3000/80/443; cria entrada no `hosts` se o hostname não resolver; **não acessa a internet** |
+| **1 — Runtime embutido** | instala VC++ (se ausente), extrai Node 24.19.0 para `C:\Program Files\Nexus\node`, copia NSSM 2.24 e Caddy 2.11.9 do payload |
+| **2 — MySQL dedicado** | pede as senhas quando necessário e chama `instalar-mysql.ps1`: extrai MySQL 8.4.13, migra o `Data` legado, grava `C:\ProgramData\Nexus\mysql\my.ini`, cria/reconfigura `NexusMySQL84` na 3214; depois o `pos-instalacao-mysql.ps1` cria `nexus_prod`/`nexus_app` e o bootstrap grava o `backup.cnf` |
+| **3 — Diretórios e ACLs** | cria `ProgramData\Nexus\{mysql,uploads,logs,backups,config,caddy}`, aplica ACLs restritas, gera o `Caddyfile` e cria as quatro regras de firewall |
+| **4 — Banco e aplicação** | para o Caddy e o App; extrai `app.zip` em `C:\Program Files\Nexus\app` (preserva `.env`), grava/atualiza o `.env`, aplica o SQL de produção (`aplicar-sql.ps1`, modo Auto) e ajusta o cache |
+| **5 — Serviços** | configura `NexusApp` (`node.exe server.js`, env, dependência do MySQL) e `NexusCaddy`; valida health local, inicia o Caddy, instala a CA com `certutil` e valida HTTPS |
+| **6 — Bandeja e backup** | copia scripts, registra `NexusBackup` (02:00), copia o tray, grava `tray.json` e registra/inicia `NexusTray` no logon do usuário |
+| **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão do `package.json` do app e imprime URL, caminhos, versão e o comando de atualização |
 
-O estado é gravado em `C:\ProgramData\Nexus\bootstrap.state.json` ao fim de cada fase. Se
-algo falhar, corrija a causa e rode de novo com `-Resume`; se o hostname mudou, o bootstrap
-recusa continuar sem `-Force`.
+O estado fica em `C:\ProgramData\Nexus\bootstrap.state.json`. A instalação é idempotente e
+retomável com `-Resume`; se o hostname mudar, o bootstrap recusa continuar sem `-Force`.
 
-### 5.5 Primeira execução e Super Admin
+### 5.3 MySQL 8.4.13 dedicado e migração do legado
 
-O `db:seed` de referência **não cria usuários**: ele popula apenas tipos de código,
-permissões, perfis-template (Operador/Auxiliar) e unidades de conversão. O Super Admin é
-criado pelo próprio sistema:
+O `instalar-mysql.ps1`:
 
-1. Acesse `https://<hostname>`.
-2. Sem administrador cadastrado, o `/login` redireciona para `/primeiro-acesso`.
-3. Preencha **nome**, **login** e **senha** (mínimo de 4 caracteres). A ação cria o usuário
-   com a flag `super_admin` e já autentica.
-4. Depois disso, `/primeiro-acesso` redireciona para `/login` (já existe administrador) e
-   o Super Admin entra normalmente.
+1. Extrai o ZIP **embutido** (`payload\mysql\mysql-8.4.13-winx64.zip`) para
+   `C:\Program Files\Nexus\mysql`, validando o **MD5** do manifesto.
+2. Se `C:\ProgramData\MySQL\MySQL Server 8.4\Data` existir e o novo
+   `C:\ProgramData\Nexus\mysql\data` estiver vazio, copia o `Data` legado com `robocopy /E`
+   e **preserva o original**.
+3. Grava `C:\ProgramData\Nexus\mysql\my.ini` com `port=3214`, `bind-address=127.0.0.1`,
+   `mysqlx=0`, `basedir`, `datadir`, utf8mb4 e `default-time-zone='-03:00'`.
+4. Inicializa o `Data` novo com `--initialize-insecure` quando vazio; se o `Data` foi migrado,
+   mantém a senha existente.
+5. Cria o serviço `NexusMySQL84` pelo SCM (`New-Service`, pois MySQL 8.4 removeu
+   `mysqld --install`), configura `NT AUTHORITY\NetworkService`, inicia e espera a 3214.
+6. Define a senha do root pelo `mysql.exe` com arquivo temporário protegido; nunca por `-p`.
 
-O Super Admin tem todas as permissões e ignora as verificações normais; ele não é uma
-permissão configurável na interface (ver `AGENTS.md` §12).
+Quando o banco precisa ser criado/reconfigurado, o `pos-instalacao-mysql.ps1` ajusta o
+`my.ini` (com backup em `C:\ProgramData\Nexus\backups\config\my.ini-<timestamp>.bak`),
+reinicia o `NexusMySQL84`, cria o banco `nexus_prod` e o usuário `nexus_app@localhost` com
+`GRANT ALL PRIVILEGES ON nexus_prod.*`, valida a conexão na 3214; em seguida o bootstrap
+grava o `backup.cnf`.
 
-### 5.6 Validação da instalação
+**Senhas:** o bootstrap pede root/app no console com `Read-Host -AsSecureString` quando o
+serviço/banco precisa ser criado. Em um upgrade 10.02→1.07 com `Data` legado e `backup.cnf`
+válido, as credenciais existentes podem ser reutilizadas; se o `backup.cnf` não conectar, as
+senhas são pedidas. Não há pausa para instalar o MySQL.
 
-Ao final, o bootstrap executa:
+> **Atenção:** `C:\ProgramData\MySQL\MySQL Server 8.4` é o caminho do MySQL antigo (10.02) e
+> pode coincidir com uma instalação MySQL 8.4 comum. Não rode o Nexus nessa máquina sem
+> backup/isolamento da instância existente. Ver §15.
+
+### 5.4 SQL de produção, seed e migração
+
+Em uma instalação nova, o banco é criado vazio pelo `pos-instalacao-mysql.ps1`; em um upgrade
+o banco existente é reutilizado. O `bootstrap` chama o
+[`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) com `-Mode Auto`:
+
+- **Fresh** (banco sem tabelas): aplica `schema.sql` (DDL completo, 48 tabelas) e
+  `seed.sql`;
+- **Update** (banco com tabelas, como no 10.02): aplica
+  `migracoes\001-unidades-pct10-cx50.sql` e depois `seed.sql`.
+
+O SQL usa `mysql.exe` com `--defaults-extra-file` (senha nunca em `-p`). Ao final valida:
+
+- **81 permissões**;
+- **2 perfis** (`Operador` e `Auxiliar`);
+- **3 conversões** `UNIDADE` (fator 1, padrão), `PCT10` (10) e `CX50` (50).
+
+A migração 001 renomeia `PACOTE`→`PCT10` e `CAIXA`→`CX50`, preservando `ID_conversao` e os
+vínculos de produto; é idempotente e roda antes do seed. O seed é idempotente e não cria
+usuários, produtos, pedidos nem dados operacionais.
+
+`Fresh` recusa sobrescrever banco com tabelas; `Update` não recria tabelas. Mudanças de schema
+em releases futuras exigem uma **nova migração** — ver §15.
+
+### 5.5 Aplicação standalone e serviço `NexusApp`
+
+O `app.zip` contém `server.js` na raiz, `.next/static`, `public` sem `uploads`, `node_modules`
+e o client Prisma. O bootstrap para o `NexusCaddy`, move a aplicação anterior para
+`app.prev-manual-<timestamp>`, extrai o novo `app.zip` e preserva o `.env` anterior quando
+existe.
+
+O `.env` fica em `C:\Program Files\Nexus\app\.env` com ACL restrita e contém:
+
+```text
+DATABASE_URL="mysql://nexus_app:<senha>@127.0.0.1:3214/nexus_prod"
+UPLOADS_DIR=C:\ProgramData\Nexus\uploads
+NODE_ENV=production
+PORT=3000
+HOSTNAME=127.0.0.1
+JWT_SECRET="<segredo>"
+```
+
+O serviço `NexusApp` executa **`C:\Program Files\Nexus\node\node.exe server.js`**, com
+`AppDirectory` `C:\Program Files\Nexus\app`, as mesmas variáveis no ambiente do NSSM e
+`NEXT_TELEMETRY_DISABLED=1`. **Não usa `next start`** e não precisa de Node global/PATH.
+
+### 5.6 Primeira execução e Super Admin
+
+O seed não cria usuários. Acesse `https://<hostname>`:
+
+1. Sem administrador, o `/login` redireciona para `/primeiro-acesso`.
+2. Preencha nome, login e senha (mínimo 4 caracteres). A ação cria o `super_admin` e autentica.
+3. Depois, `/primeiro-acesso` redireciona para `/login`.
+
+O Super Admin tem todas as permissões e ignora as verificações normais (ver `AGENTS.md` §12).
+
+### 5.7 Validação da instalação
+
+O bootstrap executa o smoke com a versão do `package.json` do app:
 
 ```powershell
-# exemplo; o bootstrap usa a versão da tag
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
   -NoProfile -ExecutionPolicy Bypass `
   -File "C:\Program Files\Nexus\Instalador\smoke.ps1" `
-  -Hostname nexus.galpao.local -ExpectedVersion 3.02.11.2026
+  -Hostname nexus.galpao.local -ExpectedVersion 1.07.11.2026
 ```
 
-O smoke test confere:
+O smoke confere:
 
-- `NexusMySQL84`, `NexusApp` e `NexusCaddy` em execução;
-- a porta **3214** aceitando conexões em `127.0.0.1`;
-- ACLs de `backups`, `config` e `app\.env` **sem `BUILTIN\Users`** (S-1-5-32-545);
-- as quatro regras de firewall (`Nexus HTTP`/`HTTPS` Allow; `Nexus MySQL (LAN)`/`Nexus Next
-  (LAN)` Block, todas em `LocalSubnet`);
-- `GET http://127.0.0.1:3000/api/health` → HTTP 200 com `db=true`;
-- `https://<hostname>/login` → HTTP 200 (com validação de certificado; exige a CA do Caddy
-  confiada no Windows via `certutil`);
-- versão do health igual à esperada, quando `-ExpectedVersion` é informado.
+- Node portátil `v24.19.0` e `mysqld.exe` embutido;
+- serviços `NexusMySQL84`, `NexusApp` e `NexusCaddy`;
+- porta **3214**;
+- ACLs de `backups`, `config` e `app\.env` sem `BUILTIN\Users`;
+- as quatro regras de firewall;
+- `GET http://127.0.0.1:3000/api/health` com `db=true`;
+- `https://<hostname>/login` com certificado válido (CA do Caddy);
+- versão do health igual à esperada.
 
-Saída esperada: `SMOKE: OK` e código 0. Qualquer falha retorna código 1 e lista os itens.
-O mesmo teste pode ser rodado depois, a qualquer momento; rode em **PowerShell elevado**
-para conseguir ler as ACLs restritas de `backups` e `config`.
+Saída esperada: `SMOKE: OK` (código 0). Falha retorna 1 e lista as verificações. Rode o smoke
+em **PowerShell elevado** para ler as ACLs restritas.
 
 ---
 
 ## 6. Instalação manual (sem o `.exe`)
 
-O `.exe` é apenas um empacotador dos scripts. A instalação manual usa o `bootstrap.ps1`
-diretamente, a partir de `C:\Program Files\Nexus\Instalador` (instalação já existente) ou
-de um checkout do repositório (`deploy\windows`).
+O `.exe` é um empacotador; a instalação manual usa o `bootstrap.ps1` e o **payload** ao lado
+dele (`Instalador\payload` ou `deploy\windows\payload`). Rode em PowerShell elevado:
 
 ```powershell
-# PowerShell elevado
 cd "C:\Program Files\Nexus\Instalador"   # ou o checkout: cd deploy\windows
-# tag de exemplo; use a tag publicada do release
 powershell -NoProfile -ExecutionPolicy Bypass -File .\bootstrap.ps1 `
-  -Hostname nexus.galpao.local -Tag v3.02.11.2026
+  -Hostname nexus.galpao.local
 ```
-
-O bootstrap instala o MySQL dedicado automaticamente e pede as senhas do root/`nexus_app`
-no console; não há pausa nem instalador gráfico do MySQL. O MySQL existente na 3306 não é
-tocado.
 
 Parâmetros:
 
 | Parâmetro | Efeito |
 | --- | --- |
-| `-Hostname` | obrigatório; nome DNS usado pelo Caddy |
-| `-Resume` | retoma da última fase concluída (exige `bootstrap.state.json`) |
-| `-Force` | ignora o estado e reinstala sobre o diretório existente; permite trocar o hostname |
-| `-SkipTray` | não copia nem registra a bandeja |
+| `-Hostname` | obrigatório; nome DNS do Caddy |
+| `-Resume` | retoma da última fase concluída |
+| `-SkipTray` | não copia/registra a bandeja |
 | `-TrayExe` | caminho explícito do `NexusTray.exe`; se informado e ausente, falha |
-| `-RepoUrl` | URL do repositório; padrão: `manifesto.json` |
-| `-Tag` | obrigatória no bootstrap manual (ex.: `v3.02.11.2026`); o instalador passa a tag do build |
+| `-RootPassword` / `-AppPassword` | `SecureString` opcional; se ausentes, o console pede |
+| `-Force` | ignora o estado e reinstala sobre o diretório existente |
 
-Exemplo de retomada:
-
-```powershell
-# use a mesma tag publicada do release
-.\bootstrap.ps1 -Hostname nexus.galpao.local -Tag v3.02.11.2026 -Resume
-```
-
-Se o diretório `C:\Program Files\Nexus\app` existir, não for um repositório Git e tiver
-arquivos, o bootstrap recusa continuar sem `-Force`; com `-Force`, move o diretório para
-`C:\Program Files\Nexus\app.prev-manual-<timestamp>` e reinstala.
-
-Logs: `C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log` e o resumo no console. A
-instalação manual **não** copia `atualizar.ps1`/`smoke.ps1` para
-`C:\Program Files\Nexus\scripts` — apenas `backup.ps1`, `common.ps1` e `restart.ps1`; os
-demais continuam no checkout de origem.
+O bootstrap **não aceita `-Tag`, `-RepoUrl`, Git ou download**: a versão vem do `app.zip` do
+payload. Sem payload, a fase 0 falha. Logs em
+`C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log`.
 
 ---
 
 ## 7. Atualização
 
-### 7.1 Antes de atualizar
+### 7.1 Upgrade 10.02 → 1.07 (troca de runtime)
 
-1. Leia o `CHANGELOG.md` da versão e confirme se há mudança de schema, script de preparação
-   ou variável de ambiente nova.
-2. Confirme que a tag existe no GitHub (`git ls-remote --tags origin vN.DD.MM.YYYY`); o
-   `atualizar.ps1` clona a tag, não um branch.
-3. Rode um backup manual e copie o resultado para fora do servidor (§8).
-4. Agende uma **janela de manutenção**: o `atualizar.ps1` para o `NexusCaddy` **e** o
-   `NexusApp` antes de mexer na aplicação. O site fica **totalmente indisponível** durante o
-   build (conexão recusada), não apenas com 502/503.
-5. Tenha o plano de rollback (§7.4) e o dump mais recente à mão.
-6. **Migração de MySQL/firewall:** se a instalação atual ainda usa a 3306 ou não tem as
-   regras de firewall, o `atualizar.ps1` sozinho **não** regulariza — ele preserva o
-   `.env`/`backup.cnf` antigos, não instala o `NexusMySQL84` e não executa
-   `Set-NexusFirewallRules`. Nesse caso, rode o bootstrap/instalador (fase 2/3) ou ajuste
-   `DATABASE_URL`/`backup.cnf` e crie as regras manualmente.
+A mudança de 10.02 para 1.07 instala Node portátil, troca o MySQL para o `Data` em
+`C:\ProgramData\Nexus\mysql`, aplica o SQL e cria os serviços. Use o
+**`NexusSetup-1.07.11.2026.exe`** (ou o `bootstrap.ps1` com o payload):
 
-### 7.2 Comando
+1. Faça backup do banco/uploads e copie para fora do servidor.
+2. Rode o setup em PowerShell elevado, com a janela visível.
+3. Confirme o hostname; o bootstrap instala/migra o MySQL, aplica migração 001 + seed e
+   reconfigura os serviços.
+4. Valide com `smoke.ps1` e o primeiro acesso.
+
+O upgrade real 10.02→1.07 foi validado na máquina de teste: health 1.07, HTTPS 200, os três
+serviços `Running`, bandeja presente e contagens **81 permissões / 2 perfis / 3 conversões**.
+
+### 7.2 Atualização de aplicação/SQL por pacote
+
+Para uma instalação já em 1.07, use o `atualizar.ps1` com um pacote (sem Git):
+
+```text
+<pacote>\
+├── app\app.zip        (ou app.zip na raiz)
+└── sql\
+    ├── schema.sql
+    ├── seed.sql
+    └── migracoes\001-unidades-pct10-cx50.sql
+```
 
 ```powershell
 # PowerShell elevado, em C:\Program Files\Nexus\Instalador
-# exemplo de tag; use a tag publicada do release
-.\atualizar.ps1 -Tag v3.02.11.2026
+.\atualizar.ps1 -Package D:\nexus-update-1.08
 ```
 
-`-RepoUrl` sobrescreve a URL (padrão: `remote origin` da instalação atual ou
-`manifesto.json`). `-SkipBackup` pula o backup — **não recomendado**.
+Parâmetros: `-Package` (pasta), `-AppZip` (alternativo), `-Sql` (diretório SQL alternativo),
+`-Version` (senão lê `package.json` de dentro do `app.zip`) e `-SkipBackup` (não recomendado).
 
-### 7.3 O que o `atualizar.ps1` faz
+O `atualizar.ps1`:
 
-1. Confere `C:\Program Files\Nexus\app\package.json` e o serviço `NexusApp`.
-2. Descobre o hostname no `bootstrap.state.json` (ou no `Caddyfile`).
-3. Roda o `backup.ps1`; se o backup falhar, **cancela antes de alterar a aplicação**.
-4. Para o `NexusCaddy` e, em seguida, o `NexusApp` — **indisponibilidade total**.
-5. Move a aplicação atual para `C:\Program Files\Nexus\app.prev-<tag-atual>`.
-6. Clona a nova tag em `C:\Program Files\Nexus\app`.
-7. Valida a tag: exige `src/app/api/health/route.ts` e `package.json` com a mesma versão da
-   tag (sem o `v`); se não bater, falha antes de compilar.
-8. Copia o `.env` da versão anterior e garante `UPLOADS_DIR` com a ACL do `NetworkService`
-   (não altera a porta do `DATABASE_URL`; ver §7.1).
-9. Se a versão anterior tiver `public\uploads`, migra o conteúdo para
-   `C:\ProgramData\Nexus\uploads` com `robocopy /E`.
-10. Copia os `*.ps1` da tag para `C:\Program Files\Nexus\Instalador`, o `Caddyfile` e o
-    `manifesto.json`; copia `backup.ps1`, `common.ps1` e `restart.ps1` para
-    `C:\Program Files\Nexus\scripts`; atualiza o `NexusTray.exe` se a tag trouxer
-    `NexusTray\dist\NexusTray.exe`.
-11. Regenera o `Caddyfile` com o hostname e reaplica a leitura para `LocalService`.
-12. Executa `npm ci`, `db:generate`, `build`, `db:push` e `db:seed`.
-13. Ajusta ACLs do cache (`Modify`) e da aplicação (`ReadAndExecute`).
-14. Inicia o `NexusApp`, valida o health local com `db=true`, inicia o `NexusCaddy`, valida
-    `https://<hostname>/login` e roda o `smoke.ps1` com a versão da tag.
-15. Mantém a versão anterior e mais uma `app.prev-*`; remove as mais antigas. A versão
-    atual nunca é apagada.
+1. valida `app.zip` (precisa de `server.js` na raiz) e o SQL;
+2. roda o `backup.ps1`; se falhar, cancela antes de alterar a aplicação;
+3. para `NexusCaddy` e `NexusApp`;
+4. move a aplicação atual para `app.prev-<versão-atual>`;
+5. extrai o novo `app.zip`, preserva o `.env`, garante `UPLOADS_DIR`, `NODE_ENV`, `PORT` e
+   `HOSTNAME` e reaplica a ACL;
+6. aplica o SQL (`Auto`: migração 001 + seed em banco existente) com `nexus_app`;
+7. ajusta ACLs, inicia o app, valida health, HTTPS e `smoke.ps1`;
+8. mantém a versão anterior e mais uma `app.prev-*`.
 
-Log: `C:\ProgramData\Nexus\logs\deploy-<tag>.log`.
+Log: `C:\ProgramData\Nexus\logs\deploy-<versão>.log`.
 
-### 7.4 Rollback
+**Não atualiza** Node, MySQL, Caddy, NSSM, scripts, bandeja nem firewall — o pacote só contém
+`app.zip` e SQL. Para trocar runtimes ou corrigir firewall, use o setup/`bootstrap.ps1`.
 
-Se qualquer etapa falhar, o `atualizar.ps1` usa flags para saber o que já foi alterado:
+Em falha, o app anterior é restaurado e a versão nova fica em `app.failed-<versão>`; o banco
+**não** é restaurado automaticamente. O `atualizar.ps1` não atualiza o `bootstrap.state`; o
+rollback restaura apenas a aplicação — runtimes e scripts/configuração do setup permanecem
+como estão.
 
-- **falha antes de mover a aplicação** (por exemplo, ao parar um serviço): a produção não é
-  alterada; o script tenta religar `NexusApp` e `NexusCaddy` e informa que a versão em
-  produção permaneceu;
-- **falha depois de mover, mas antes/durante o clone**: se houver um clone parcial, ele vai
-  para `C:\Program Files\Nexus\app.failed-<tag>`; o `app.prev-<tag-atual>` volta a ser
-  `app`;
-- **falha no build, `db push`, health, HTTPS ou smoke**: a versão nova vai para
-  `C:\Program Files\Nexus\app.failed-<tag>` e a anterior é restaurada.
+### 7.3 Reinstalar pelo setup
 
-Depois de restaurar, ele religa o `NexusApp`, espera o health, religa o `NexusCaddy` e
-confere o HTTPS. O **banco não é restaurado automaticamente**. Se o `db push`/`db:seed`
-alterou dados, pare o serviço e restaure o dump mais recente de
-`C:\ProgramData\Nexus\backups\db` (§8.5).
-
-> **Atenção:** o rollback restaura a **aplicação**, não os arquivos copiados para
-> `Instalador`, `scripts` ou o `Caddyfile`/`manifesto.json`; eles permanecem com a versão
-> nova. O `app.failed-<tag>` fica para diagnóstico e não é limpo automaticamente.
-
-### 7.5 `db push`, seed e mudanças destrutivas
-
-O projeto **não usa migrations**: a atualização aplica `prisma db push`. Isso funciona para
-mudanças aditivas, mas:
-
-- mudanças destrutivas podem exigir `--accept-data-loss` ou intervenção manual; o
-  `db push` pode falhar ou pedir confirmação;
-- o `db:seed` roda em toda atualização e reaplica os dados de referência (permissões,
-  perfis, tipos de código e unidades), inclusive removendo permissões obsoletas;
-- releases com novas constraints únicas podem exigir o script de preparação documentado no
-  `CHANGELOG` (por exemplo, `npm run db:dedupe-notas` com a URL explícita do banco) **antes**
-  do `db push`.
-
-**Dívida conhecida:** em releases futuras, o `db push` deve ser substituído por SQL revisado
-(ou migrations versionadas) para o caminho de produção. Até lá, toda release que altere o
-schema precisa de backup, ensaio em banco de teste e um roteiro de rollback.
-
-### 7.6 Reinstalar pelo `.exe` em vez de atualizar
-
-Rodar o `NexusSetup-<nova-versão>.exe` sobre uma instalação existente executa o bootstrap
-do zero (fases 0–7). Ele preserva o `.env` e o `JWT_SECRET`, reconfigura os serviços
-(inclusive instala/ajusta o `NexusMySQL84` na 3214) e **também valida a tag** (`/api/health`
-+ versão do `package.json`), mas **não faz backup automático** e não tem o rollback do
-`atualizar.ps1`. Use o `.exe`/bootstrap para a primeira instalação, para migrar da 3306 ou
-para recuperação; para atualização rotineira de uma instalação já na 3214, prefira o
-`atualizar.ps1`.
+Rodar o `NexusSetup` sobre uma instalação existente executa o bootstrap novamente (fases
+0–7), preserva o `.env` e reconfigura runtime, MySQL, bancos, serviços, firewall e bandeja.
+Ele **não faz backup automático** e não tem o rollback do `atualizar.ps1`; faça backup manual
+antes. É o caminho para migrar de 10.02, trocar versão de Node/MySQL/Caddy ou recuperar
+serviços.
 
 ---
 
@@ -514,24 +445,20 @@ para recuperação; para atualização rotineira de uma instalação já na 3214
 
 ### 8.1 Backup agendado
 
-A tarefa `NexusBackup` roda diariamente às **02:00** como `SYSTEM`, com retenção de
-**30 dias**:
+`NexusBackup` roda diariamente às **02:00** como `SYSTEM`, com retenção de **30 dias**:
 
 ```text
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File "C:\Program Files\Nexus\scripts\backup.ps1" -RetentionDays 30
 ```
 
-`StartWhenAvailable` faz a tarefa rodar no próximo boot se o servidor estiver desligado no
-horário. Ela não aparece na bandeja; confira em **Agendador de Tarefas** ou com
-`Get-ScheduledTaskInfo -TaskName NexusBackup`. O log de cada execução fica em
+`StartWhenAvailable` roda no próximo boot se o servidor estiver desligado. Log:
 `C:\ProgramData\Nexus\logs\backup-<timestamp>.log`.
 
 ### 8.2 Backup manual
 
-Pela bandeja: menu **Fazer backup agora** (a bandeja roda elevada).
-
-Ou em PowerShell elevado, a partir de `C:\Program Files\Nexus\Instalador`:
+Pela bandeja (**Fazer backup agora**) ou em PowerShell elevado, a partir de
+`C:\Program Files\Nexus\Instalador`:
 
 ```powershell
 .\backup.ps1                 # retenção padrão de 30 dias
@@ -539,41 +466,34 @@ Ou em PowerShell elevado, a partir de `C:\Program Files\Nexus\Instalador`:
 .\backup.ps1 -SkipUploads    # não copia uploads
 ```
 
-O backup manual precisa ser elevado porque lê `C:\ProgramData\Nexus\config\backup.cnf`,
-que só Administrators/SYSTEM acessam.
+O backup manual precisa ser elevado porque lê `C:\ProgramData\Nexus\config\backup.cnf`, que
+só Administrators/SYSTEM acessam.
 
 ### 8.3 O que é gerado
 
 | Item | Destino | Formato |
 | --- | --- | --- |
-| Banco `nexus_prod` | `C:\ProgramData\Nexus\backups\db\nexus_prod-<timestamp>.zip` | dump do `mysqldump` **do binário dedicado** (`C:\Program Files\Nexus\mysql\bin\mysqldump.exe`) na porta **3214** (`--single-transaction --routines --triggers --no-tablespaces --databases nexus_prod`) compactado; o `.sql` intermediário é apagado |
-| Banco grande | `C:\ProgramData\Nexus\backups\db\nexus_prod-<timestamp>.sql` | acima de **~1,8 GB** (limite prático do `Compress-Archive` no PowerShell 5.1), o `.sql` é mantido **sem compactar** |
-| Uploads | `C:\ProgramData\Nexus\backups\uploads\` | cópia com `robocopy /E` |
-| `.env` | `C:\ProgramData\Nexus\backups\config\.env-<timestamp>` | cópia com ACL restrita |
-| `Caddyfile` | `C:\ProgramData\Nexus\backups\config\Caddyfile-<timestamp>` | cópia com ACL restrita |
-| Log | `C:\ProgramData\Nexus\logs\backup-<timestamp>.log` | transcript da execução |
+| Banco `nexus_prod` | `C:\ProgramData\Nexus\backups\db\nexus_prod-<timestamp>.zip` | `mysqldump` **do binário dedicado** na 3214, compactado; `.sql` intermediário apagado |
+| Banco grande | `...\backups\db\nexus_prod-<timestamp>.sql` | acima de ~1,8 GB o `.sql` é mantido sem compactar |
+| Uploads | `C:\ProgramData\Nexus\backups\uploads\` | `robocopy /E` |
+| `.env` | `...\backups\config\.env-<timestamp>` | cópia com ACL restrita |
+| `Caddyfile` | `...\backups\config\Caddyfile-<timestamp>` | cópia com ACL restrita |
+| Log | `C:\ProgramData\Nexus\logs\backup-<timestamp>.log` | transcript |
 
-Também em `backups\config` (mas **fora** do `backup.ps1`) ficam os backups do `my.ini`
-(`my.ini-<timestamp>.bak`), criados pelo `pos-instalacao-mysql.ps1`.
-
-O `backup.ps1` lê a porta do `backup.cnf` e **recusa** continuar se ela não for **3214**:
-mensagem para rodar a fase 2 do bootstrap. Ele usa o `mysqldump` do binário dedicado; se ele
-não existir, o `Find-MysqldumpExe` tem fallback para uma instalação 8.0/8.4 padrão (mas a
-conexão continua na 3214).
-
-O `backup.ps1` retorna código diferente de zero quando o dump falha, quando o arquivo do
-dump fica vazio, quando o `robocopy` falha (código ≥ 8) ou quando o `.env` não é encontrado.
-Se o `Caddyfile` não existir, ele avisa que o backup está incompleto, mas continua.
+Em `backups\config` também ficam os `my.ini-<timestamp>.bak` criados pelo pós-instalação.
+O `backup.ps1` usa o `mysqldump` do binário dedicado; se ele faltar, o `Find-MysqldumpExe`
+tem fallback para uma instalação 8.0/8.4 padrão, mas a conexão continua na 3214. O
+`backup.ps1` exige `backup.cnf` na porta **3214**; se a porta estiver diferente, aborta
+pedindo a fase 2 do bootstrap.
 
 ### 8.4 Retenção e verificação
 
-A retenção remove, por `LastWriteTime`, os `*.zip` e `*.sql` de `backups\db` e os
-`.env-*`/`Caddyfile-*` de `backups\config` mais antigos que `RetentionDays`.
+A retenção remove, por `LastWriteTime`, `*.zip`/`*.sql` de `backups\db` e `.env-*`/
+`Caddyfile-*` de `backups\config` mais antigos que `RetentionDays`.
 
 > **Atenção:** a retenção **não** poda `backups\uploads` nem os `my.ini-*.bak`; a cópia de
-> uploads não é podada e pode crescer sem limite. Monitore o espaço em
-> `C:\ProgramData\Nexus\backups` e limpe manualmente o excedente. Dumps grandes ficam como
-> `.sql` sem compactação e ocupam mais disco. Ver §15.
+> uploads não é podada e pode crescer sem limite. Dumps grandes ficam como `.sql` sem
+> compactação. Ver §15.
 
 Verificação rápida:
 
@@ -581,7 +501,6 @@ Verificação rápida:
 Get-ChildItem C:\ProgramData\Nexus\backups\db -File |
   Sort-Object LastWriteTime -Descending | Select-Object -First 3 Name, Length, LastWriteTime
 
-# confira o conteúdo do dump mais recente (.zip ou .sql)
 $latest = Get-ChildItem C:\ProgramData\Nexus\backups\db -File |
   Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if ($latest.Extension -eq ".zip") {
@@ -593,17 +512,15 @@ if ($latest.Extension -eq ".zip") {
 Select-String -Path $sql.FullName -Pattern "CREATE TABLE" | Select-Object -First 1
 ```
 
-Copie os backups para fora do servidor (NAS, unidade de rede ou nuvem) — o script não faz
-isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuração juntos.
+Copie os backups para fora do servidor (NAS, unidade de rede ou nuvem). Sem cópia externa,
+um defeito de disco perde banco, uploads e configuração juntos.
 
 ### 8.5 Restauração em produção
 
 > **Pare o `NexusApp` antes de restaurar.** Todo o procedimento é em **PowerShell elevado**.
-> O Caddy pode continuar no ar; os usuários verão erro até o app voltar. O dump foi feito com
-> `--databases nexus_prod`, então contém `CREATE DATABASE`/`USE nexus_prod` — a importação
-> **substitui as tabelas incluídas no dump** no banco de produção. Tabelas criadas depois do
-> dump e que não estão nele **permanecem**; para voltar a um ponto exato, importe em um banco
-> vazio ou recrie o `nexus_prod` antes.
+> O `NexusMySQL84` pode continuar no ar. O dump foi feito com `--databases nexus_prod`,
+> então contém `CREATE DATABASE`/`USE nexus_prod`; a importação **substitui as tabelas do
+> dump**. Tabelas criadas depois do dump e que não estão nele permanecem.
 
 1. Pare o serviço:
 
@@ -611,10 +528,10 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    Stop-Service NexusApp -Force
    ```
 
-2. Prepare o dump escolhido (`.zip` ou `.sql`):
+2. Prepare o dump (`.zip` ou `.sql`):
 
    ```powershell
-   $dump = "C:\ProgramData\Nexus\backups\db\nexus_prod-20261102-020000.zip"
+   $dump = "C:\ProgramData\Nexus\backups\db\nexus_prod-20261107-020000.zip"
    New-Item -ItemType Directory -Force -Path "D:\restore" | Out-Null
    if ($dump.EndsWith(".zip")) {
      Expand-Archive $dump -DestinationPath "D:\restore" -Force
@@ -624,8 +541,8 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    }
    ```
 
-3. Crie um arquivo de opções do MySQL com as credenciais do **root** (o `nexus_app` não tem
-   privilégio para recriar o banco). Use o mesmo formato do `backup.cnf` e proteja o arquivo:
+3. Crie um arquivo de opções do MySQL com o **root** (o `nexus_app` não tem privilégio para
+   recriar o banco); proteja o arquivo:
 
    ```powershell
    . "C:\Program Files\Nexus\scripts\common.ps1"
@@ -638,8 +555,7 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    Protect-File -Path "C:\ProgramData\Nexus\config\restore.cnf"
    ```
 
-4. Importe o dump. O `Start-Process` com `-RedirectStandardInput` evita o problema de
-   aspas do `cmd /c` e é o mesmo padrão usado pelos scripts:
+4. Importe com o `mysql.exe` **dedicado**:
 
    ```powershell
    $mysql = "C:\Program Files\Nexus\mysql\bin\mysql.exe"
@@ -652,8 +568,8 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    if ($process.ExitCode -ne 0) { throw "mysql falhou (código $($process.ExitCode))" }
    ```
 
-5. Restaure os uploads (o `/MIR` remove o que não existe no backup — é o comportamento
-   desejado para voltar ao ponto do dump):
+5. Restaure os uploads (o `/MIR` remove o que não existe no backup — comportamento desejado
+   para voltar ao ponto do dump):
 
    ```powershell
    robocopy "C:\ProgramData\Nexus\backups\uploads" "C:\ProgramData\Nexus\uploads" `
@@ -664,19 +580,17 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    `C:\Program Files\Nexus\app\.env` e reaplique a ACL:
 
    ```powershell
-   Copy-Item "C:\ProgramData\Nexus\backups\config\.env-20261102-020000" `
+   Copy-Item "C:\ProgramData\Nexus\backups\config\.env-20261107-020000" `
      "C:\Program Files\Nexus\app\.env" -Force
    . "C:\Program Files\Nexus\scripts\common.ps1"
    Protect-File -Path "C:\Program Files\Nexus\app\.env" -ReadIdentities @("S-1-5-20")
    ```
 
-7. Se necessário, restaure o `Caddyfile` de `backups\config\Caddyfile-<timestamp>` em
-   `C:\ProgramData\Nexus\config\Caddyfile` e reaplique a leitura para o `LocalService`:
+7. Se necessário, restaure o `Caddyfile` de `backups\config\Caddyfile-<timestamp>` e proteja:
 
    ```powershell
-   Copy-Item "C:\ProgramData\Nexus\backups\config\Caddyfile-20261102-020000" `
+   Copy-Item "C:\ProgramData\Nexus\backups\config\Caddyfile-20261107-020000" `
      "C:\ProgramData\Nexus\config\Caddyfile" -Force
-   . "C:\Program Files\Nexus\scripts\common.ps1"
    Protect-File -Path "C:\ProgramData\Nexus\config\Caddyfile" -ReadIdentities @("S-1-5-19")
    ```
 
@@ -689,52 +603,51 @@ isso. Sem cópia externa, um defeito de disco perde banco, uploads e configuraç
    & "C:\Program Files\Nexus\Instalador\smoke.ps1" -Hostname nexus.galpao.local
    ```
 
+Se o dump for de uma versão anterior (10.02), depois da importação rode o SQL de atualização
+para renomear as unidades e reaplicar o seed:
+
+```powershell
+.\aplicar-sql.ps1 -MysqlExe "C:\Program Files\Nexus\mysql\bin\mysql.exe" `
+  -AppPassword (Read-Host -AsSecureString "Senha de nexus_app") -Mode Update
+```
+
 ### 8.6 Restauração em banco de teste
 
-Para ensaiar uma restauração sem tocar em `nexus_prod`:
-
-1. Use **outra instância MySQL** (porta 3307 ou uma VM). O dump contém
-   `CREATE DATABASE nexus_prod` e `USE nexus_prod`; na instância de teste isso cria o banco
-   local dela, sem afetar produção.
-2. Importe com o `mysql.exe` da instância de teste e credenciais dela.
-3. Aponte um `.env` de desenvolvimento para a instância de teste (porta 3307) e rode a
-   aplicação localmente.
-4. Nunca aponte o teste para o mesmo `nexus_prod` da produção. Se precisar do mesmo
-   servidor, edite o dump para outro nome de banco antes de importar.
+Use **outra instância MySQL** (porta 3307 ou uma VM) e importe o dump; na instância de teste,
+o `CREATE DATABASE nexus_prod`/`USE nexus_prod` cria o banco local dela. Aponte um `.env` de
+desenvolvimento para essa instância e rode a aplicação localmente. Nunca aponte o teste para
+o `nexus_prod` de produção; se precisar do mesmo servidor, edite o dump para outro nome.
 
 ---
 
 ## 9. Bandeja (`NexusTray`)
 
-A bandeja é um executável .NET 8 self-contained (`C:\Program Files\Nexus\NexusTray\NexusTray.exe`),
-com instância única (mutex global) e configuração em `tray.json`, ao lado do executável.
+Executável .NET 8 self-contained em `C:\Program Files\Nexus\NexusTray\NexusTray.exe`, com
+instância única (mutex global) e `tray.json` ao lado.
 
 ### 9.1 Estados
 
 | Ícone | Estado | Condição |
 | --- | --- | --- |
-| verde | em execução | serviço `NexusApp` rodando e health HTTP 200 com `status=ok` e `db=true` |
-| amarelo | degradado | serviço rodando, health responde, mas sem `status=ok`/`db=true` (ex.: banco indisponível) |
+| verde | em execução | `NexusApp` rodando e health 200 com `status=ok` e `db=true` |
+| amarelo | degradado | serviço rodando, health responde, mas sem `ok`/`db=true` (ex.: banco fora) |
 | vermelho | fora do ar | serviço parado/não instalado ou health inacessível |
 
-O polling é a cada **20 s**; a transição de estado gera um balão. O tooltip mostra
-`Nexus — estado · v<versão>`.
+Polling a cada **20 s**; a transição gera balão. Tooltip: `Nexus — estado · v<versão>`.
 
 ### 9.2 Menu
 
 | Item | Ação |
 | --- | --- |
-| **Abrir Nexus** | abre `https://<hostname>` no navegador (via `explorer.exe`, fora do processo elevado) |
-| **Status** | `Serviço: ... · Banco: ... · v...` (somente leitura) |
-| **Reiniciar aplicação** | executa `C:\Program Files\Nexus\scripts\restart.ps1`: para o Caddy, reinicia o App, espera o health, inicia o Caddy e confere o health; log em `C:\ProgramData\Nexus\logs\restart-<timestamp>.log` |
+| **Abrir Nexus** | abre `https://<hostname>` (via `explorer.exe`, fora do processo elevado) |
+| **Status** | `Serviço: ... · Banco: ... · v...` |
+| **Reiniciar aplicação** | executa `restart.ps1`: para o Caddy, reinicia o App, espera health, inicia o Caddy e confere o health; log `restart-<timestamp>.log` |
 | **Abrir logs** | abre `C:\ProgramData\Nexus\logs` |
-| **Fazer backup agora** | roda `C:\Program Files\Nexus\scripts\backup.ps1` e informa o código de saída |
+| **Fazer backup agora** | roda `C:\Program Files\Nexus\scripts\backup.ps1` |
 | **Abrir pasta de dados** | abre `C:\ProgramData\Nexus` |
-| **Sair** | encerra apenas a bandeja; os serviços continuam |
+| **Sair** | encerra só a bandeja; serviços continuam |
 
 ### 9.3 `tray.json`
-
-O bootstrap grava:
 
 ```json
 {
@@ -749,20 +662,17 @@ O bootstrap grava:
 }
 ```
 
-Se o arquivo faltar ou estiver inválido, a bandeja usa os padrões do código; os padrões de
-`backupScript` e `restartScript` já apontam para `C:\Program Files\Nexus\scripts`. Mantenha
-o `tray.json` no lugar para preservar os caminhos desta instalação.
+Se faltar ou estiver inválido, a bandeja usa os padrões do código (já apontam para
+`C:\Program Files\Nexus\scripts`). Mantenha o arquivo para preservar os caminhos.
 
 ### 9.4 Limitações
 
-- A tarefa `NexusTray` é registrada no **logon do usuário que executou a instalação**, com
-  `RunLevel Highest`; outros usuários do servidor não veem a bandeja.
-- O executável tem `requireAdministrator`; abrir manualmente sem elevação pede UAC.
-- O reinício usa o `restart.ps1` e afeta **Caddy e App**: se o App não voltar ao health, o
-  Caddy permanece parado e o site fica fora do ar até uma intervenção; veja o log
-  `restart-<timestamp>.log`. O `NexusMySQL84` **não** é reiniciado pelo `restart.ps1`.
-- Falhas fatais da bandeja vão para `%LOCALAPPDATA%\NexusTray\tray.log` (do usuário), não
-  para `C:\ProgramData\Nexus\logs`.
+- Registrada no **logon do usuário que instalou**, com `RunLevel Highest`; outros usuários
+  não a veem.
+- `requireAdministrator`; abrir sem elevação pede UAC.
+- O `restart.ps1` afeta **Caddy e App**; se o App não voltar ao health, o Caddy fica parado
+  até intervenção. O `NexusMySQL84` **não** é reiniciado pelo script.
+- Falhas fatais vão para `%LOCALAPPDATA%\NexusTray\tray.log` (do usuário).
 
 ---
 
@@ -770,32 +680,29 @@ o `tray.json` no lugar para preservar os caminhos desta instalação.
 
 ### 10.1 `GET /api/health`
 
-Rota pública (não exige sessão; `src/proxy.ts`), `force-dynamic`, runtime Node:
+Rota pública (`src/proxy.ts`), `force-dynamic`, runtime Node:
 
 ```json
-{ "status": "ok", "db": true, "versao": "3.02.11.2026" }
+{ "status": "ok", "db": true, "versao": "1.07.11.2026" }
 ```
 
-- HTTP **200** quando `SELECT 1` no banco responde.
-- HTTP **503** com `{ "status": "degraded", "db": false, "versao": "..." }` quando o banco
-  não responde. A resposta não expõe mensagem, stack ou credencial.
-- `versao` vem de `NEXT_PUBLIC_APP_VERSION`, definida no build a partir do `package.json`
-  (`next.config.ts`). Por isso a versão do `package.json` deve ser igual à da tag.
+- HTTP **200** quando `SELECT 1` responde;
+- HTTP **503** com `{"status":"degraded","db":false,"versao":"..."}` quando o banco não
+  responde; sem stack/credencial;
+- `versao` vem de `NEXT_PUBLIC_APP_VERSION`, definida no build a partir do `package.json`.
 
 ### 10.2 `smoke.ps1`
 
 ```powershell
-# PowerShell elevado; o smoke só lê o sistema
-# exemplo de versão; use a versão da tag
+# PowerShell elevado; exemplo de versão
 cd "C:\Program Files\Nexus\Instalador"
-.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 3.02.11.2026
+.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 1.07.11.2026
 ```
 
-Confere `NexusMySQL84`/3214, os serviços `NexusApp`/`NexusCaddy`, as quatro regras de
-firewall, as ACLs de `backups`/`config`/`app\.env` (sem `BUILTIN\Users`), o health local com
-`db=true`, `https://<hostname>/login` e a versão. **Não ignora erro de certificado**: o HTTPS
-só passa se a CA do Caddy estiver confiada no Windows. Saída `SMOKE: OK` (código 0) ou
-`SMOKE: FALHOU (n verificação(ões))` (código 1).
+Confere Node portátil, `mysqld.exe`, os três serviços, a porta 3214, as ACLs de
+`backups`/`config`/`app\.env`, as quatro regras de firewall, o health com `db=true`,
+`https://<hostname>/login` e a versão. **Não ignora erro de certificado**: o HTTPS exige a CA
+do Caddy confiada. Saída `SMOKE: OK` (0) ou `SMOKE: FALHOU` (1).
 
 ### 10.3 Testes manuais
 
@@ -804,7 +711,7 @@ Invoke-RestMethod http://127.0.0.1:3000/api/health | ConvertTo-Json
 Invoke-WebRequest https://nexus.galpao.local/login -UseBasicParsing | Select-Object StatusCode
 Get-Service NexusMySQL84, NexusApp, NexusCaddy | Select-Object Name, Status, StartType
 Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
-Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled, Direction, Action
+Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled, Action
 ```
 
 ---
@@ -813,52 +720,40 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 
 | Sintoma | Causa provável | O que fazer |
 | --- | --- | --- |
-| bootstrap falha na fase 2 (MySQL dedicado) | download/ZIP/MD5, `instalar-mysql.ps1` ou criação do serviço `NexusMySQL84` | leia o `bootstrap-*.log`; rode `instalar-mysql.ps1` isoladamente em PowerShell elevado; confira `C:\Program Files\Nexus\mysql\bin\mysqld.exe` e `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini` |
-| `NexusMySQL84` não iniciou / não aceita **3214** | `my.ini` inválido, `Data` corrompido ou serviço parado | restaure o backup `my.ini-<timestamp>.bak`, confira o erro em `C:\ProgramData\MySQL\MySQL Server 8.4\Data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214` |
-| porta **3214** em uso | outro processo/serviço ocupa a porta | `Get-NetTCPConnection -LocalPort 3214 -State Listen`; pare o processo. A 3306 é independente e não precisa ser liberada |
-| conflito de caminho do MySQL | já existe um MySQL 8.4 usando `C:\ProgramData\MySQL\MySQL Server 8.4` | não aponte duas instâncias para o mesmo `Data`/`my.ini`: faça backup e isole/renomeie a instância existente, ou use uma VM limpa; ver §15 |
-| `mysql.exe`/`mysqldump.exe` não encontrado | binários dedicados ausentes em `C:\Program Files\Nexus\mysql` | rode o bootstrap/`instalar-mysql.ps1` de novo; não use o binário da 3306 para operar a 3214 |
-| `NexusApp` não sobe | serviço `NexusMySQL84` parado (dependência), `.env`/ACL ou build | inicie `NexusMySQL84` e confira a 3214; veja `C:\ProgramData\Nexus\logs\app.err.log` e `app\.env` |
-| health responde 503 (`db=false`) | `NexusMySQL84` parado, senha divergente, banco ausente ou `backup.cnf` antigo | `Get-Service NexusMySQL84`; teste `& "C:\Program Files\Nexus\mysql\bin\mysql.exe" --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3214 -D nexus_prod -e "SELECT 1"`; se a senha/porta mudou, rode a fase 2 do bootstrap |
-| regra de firewall ausente ou divergente | fase 3 não rodou, política alterada ou módulo `NetSecurity` indisponível | `Get-NetFirewallRule -DisplayName "Nexus *"`; reaplique as regras (bootstrap `-Force` ou `New-NetFirewallRule`) e valide com `smoke.ps1`; garanta que o `NetSecurity` está disponível no Windows PowerShell 5.1 |
-| fase 5/7 falha em `https://<hostname>/login` | hostname não resolve no servidor ou DNS ainda não propagou | crie o registro A no DNS ou uma entrada em `C:\Windows\System32\drivers\etc\hosts`; teste `Resolve-DnsName <hostname>` |
-| HTTPS com aviso de certificado nas estações | a CA interna do Caddy só foi confiada no servidor | exporte `C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt` e instale em **Autoridades de Certificação Raiz Confiáveis** nas estações |
-| `bootstrap`/`smoke` falha ao confiar na CA | `root.crt` ainda não existe ou `certutil` falhou | confira `NexusCaddy`, `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` e rode `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` em PowerShell elevado |
-| `NexusApp` não escreve uploads/logs | ACL de `uploads`/`logs` sem `NetworkService` | confira `icacls "C:\ProgramData\Nexus\uploads"` e `...\logs`; reaplique `Set-AclRestricted -ModifyIdentities S-1-5-20` ou rode o bootstrap |
-| `NexusCaddy` não sobe | Caddyfile inválido, `LocalService` sem leitura do `Caddyfile`/pastas `caddy`, porta ocupada | `& "C:\Program Files\Nexus\caddy\caddy.exe" validate --config "C:\ProgramData\Nexus\config\Caddyfile" --adapter caddyfile`; confira `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` e as ACLs de `caddy\{data,config,logs}`/`Caddyfile` |
-| smoke falha em "ACL permite BUILTIN\Users" | `backups`, `config` ou `app\.env` herdaram `Users` | rode o `bootstrap`/`smoke` elevado; reaplique `Set-AclRestricted`/`Protect-File` (ou o bootstrap) e confira com `icacls` |
-| bandeja vermelha com serviço rodando | health inacessível ou banco fora | confira o health local e o `app.err.log`; a bandeja mostra "banco indisponível" quando `db=false` |
-| bandeja não aparece | tarefa registrada para outro usuário ou não houve logon | veja `Get-ScheduledTask NexusTray`; rode `C:\Program Files\Nexus\NexusTray\NexusTray.exe` elevado ou registre a tarefa para o usuário desejado |
-| "Fazer backup agora" falha | `backup.ps1` ausente ou `tray.json` com `backupScript` inválido | confira `C:\Program Files\Nexus\scripts\backup.ps1`; o padrão do código já aponta para esse caminho — restaure o `tray.json` ou corrija o `backupScript` |
-| "Reiniciar aplicação" falha e o site fica fora | `restart.ps1` não encontrado, health não voltou ou o `NexusCaddy` não religou | veja `C:\ProgramData\Nexus\logs\restart-<timestamp>.log`; o script para o Caddy antes e só o religa após o health — se falhar, religue manualmente `NexusCaddy` |
-| backup falha com "backup.cnf usa a porta ..." | instalação antiga na 3306 ou `backup.cnf` desatualizado | rode a fase 2 do bootstrap (ou regrave o `backup.cnf` na 3214); confira `backup-<timestamp>.log` |
-| backup falha no `mysqldump` | binário dedicado ausente, senha do `nexus_app` mudou ou `NexusMySQL84` fora | rode a fase 2 do bootstrap; confira o log `backup-<timestamp>.log` e o erro redigido no console |
-| backup gera `.sql` grande e o disco enche | dump acima de ~1,8 GB é mantido sem compactar | confira `backups\db`; a retenção remove `.zip`/`.sql` antigos, mas não `backups\uploads`; limpe manualmente |
-| atualização falha com "A tag ... não contém /api/health" ou versão divergente | tag antiga (`v1.02.11.2026`), `package.json` diferente da tag ou tag sem esta entrega | crie a nova tag DateVer, garanta `package.json` = tag e `-Tag` correto; veja `deploy-<tag>.log` |
-| atualização falha e volta a versão anterior | build, `db push`, health, HTTPS ou smoke falharam | leia `deploy-<tag>.log` e `app.failed-<tag>`; se o banco mudou, restaure o dump (§8.5); scripts/Caddyfile copiados não são revertidos |
-| atualização de uma instalação antiga (3306/sem firewall) não conclui | `atualizar.ps1` não migra o MySQL para a 3214 nem cria as regras de firewall | rode o bootstrap/instalador (fases 2/3), ou ajuste `DATABASE_URL`/`backup.cnf` e crie as regras antes |
-| atualização não encontra hostname | `bootstrap.state.json` e `Caddyfile` ausentes | rode o bootstrap ou informe o hostname no `Caddyfile`; o `atualizar.ps1` não aceita `-Hostname` |
-| instalador mostra `MsgBox` de erro ou o sistema não funciona após a instalação | o bootstrap não concluiu; o `instalador.iss` verifica o `ResultCode` e mostra `MsgBox` | confira `instalador-*.log` e `bootstrap-*.log`, corrija a causa e rode a instalação de novo |
-| desinstalação mostra erro e preserva `app`/`NexusTray` | o `desinstalar.ps1` não conseguiu remover serviços/tarefas e abortou antes de apagar os diretórios | veja `desinstalar-*.log`; corrija o serviço/tarefa e rode de novo |
-| disco enche | `backups\uploads` e `my.ini-*.bak` sem retenção; `app.failed-*` acumulam | limpe manualmente os diretórios antigos após conferir os backups |
+| setup falha na fase 0 com "payload ausente" | `Instalador\payload` incompleto | gere o setup com `build-instalador.ps1` (que chama `preparar-payload.ps1`); confira `payload\node`, `mysql`, `caddy`, `vcredist`, `nssm`, `app\app.zip`, `sql` |
+| `app.zip` inválido/`server.js` ausente | pacote standalone não foi gerado | rode `npm run build:standalone` e `npm run package:standalone`; o `empacotar-standalone.mjs` precisa de `.next/standalone`, `.next/static` e `server.js` |
+| MySQL `NexusMySQL84` não inicia / 3214 fechada | `my.ini`, `Data` ou serviço | confira `C:\ProgramData\Nexus\mysql\my.ini`, o erro em `...\mysql\data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214`; restaure `my.ini-*.bak` |
+| migração do Data não aconteceu | `C:\ProgramData\Nexus\mysql\data` já tinha conteúdo | o `instalar-mysql.ps1` só copia para destino vazio; faça backup e esvazie/renomeie o destino se for migrar |
+| SQL falha em Fresh | banco já tem tabelas | use `-Mode Update` (migração 001 + seed) ou um banco vazio; confira `aplicar-sql.ps1` |
+| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 81 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
+| `NexusApp` não sobe | Node/`server.js`/`.env`/dependência MySQL | confira `C:\Program Files\Nexus\node\node.exe`, `app\server.js`, `app\.env` e `DATABASE_URL` na 3214; veja `app.err.log` |
+| health 503 (`db=false`) | `NexusMySQL84` parado, senha/banco ausente | `Get-Service NexusMySQL84`; teste com `C:\Program Files\Nexus\mysql\bin\mysql.exe --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3214 -D nexus_prod -e "SELECT 1"` |
+| HTTPS falha/CA não confiada | Caddy/CA/ACL/hostname | veja `C:\ProgramData\Nexus\caddy\logs\caddy.err.log`; confira `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` e o `hosts`/DNS |
+| firewall ausente/divergente | bootstrap não aplicou ou política alterada | `Get-NetFirewallRule -DisplayName "Nexus *"`; reaplique com o bootstrap `-Force` (ou `New-NetFirewallRule`) e valide com `smoke.ps1` |
+| smoke falha em ACL `BUILTIN\Users` | ACL herdada/alterada | rode `smoke`/bootstrap elevado; reaplique `Set-AclRestricted`/`Protect-File`; confira com `icacls` |
+| atualização por pacote falha | `app.zip`/`sql` ausente, `server.js` ausente, health/smoke | confira o layout `app\app.zip` + `sql\`; veja `deploy-<versão>.log` e `app.failed-<versão>`; o banco não volta automaticamente |
+| atualização de 10.02 para 1.07 não conclui | pacote de app não instala runtime/MySQL | use o **setup**/bootstrap 1.07; o `atualizar.ps1` só troca app+SQL |
+| bandeja não aparece | tarefa de outro usuário/logon | `Get-ScheduledTask NexusTray`; rode o exe elevado ou registre no usuário desejado |
+| backup falha | `backup.cnf` ausente/porta errada/MySQL fora | confira a porta 3214 no `backup.cnf`; rode a fase 2 do bootstrap; veja `backup-<timestamp>.log` |
+| disco enche | uploads/my.ini antigos, `.sql` grande, `app.failed-*` | limpe `backups\uploads`/`.sql` antigos e versões `app.failed-*` após conferir os backups |
+| desinstalação falha e preserva runtime | serviço/tarefa não removido | veja `desinstalar-*.log`; corrija serviço/tarefa e rode de novo |
 
 ### 11.1 Onde olhar primeiro
 
 | Arquivo | Para quê |
 | --- | --- |
-| `C:\ProgramData\Nexus\logs\app.err.log` | erro da aplicação Next |
-| `C:\ProgramData\Nexus\logs\app.out.log` | saída da aplicação |
-| `C:\ProgramData\MySQL\MySQL Server 8.4\Data\*.err` | erro do `NexusMySQL84` |
+| `C:\ProgramData\Nexus\logs\app.err.log` | erro do Next standalone |
+| `C:\ProgramData\Nexus\logs\app.out.log` | saída do app |
+| `C:\ProgramData\Nexus\mysql\data\*.err` | erro do MySQL |
 | `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` | erro do Caddy |
 | `C:\ProgramData\Nexus\caddy\logs\access.log` | requisições HTTP |
 | `C:\ProgramData\Nexus\logs\bootstrap-*.log` | instalação |
 | `C:\ProgramData\Nexus\logs\instalador-*.log` | andamento do `.exe` |
-| `C:\ProgramData\Nexus\logs\deploy-*.log` | atualização |
+| `C:\ProgramData\Nexus\logs\deploy-*.log` | atualização por pacote |
 | `C:\ProgramData\Nexus\logs\backup-*.log` | backup |
 | `C:\ProgramData\Nexus\logs\restart-*.log` | reinício pela bandeja |
 | `C:\ProgramData\Nexus\logs\desinstalar-*.log` | desinstalação |
-| Visualizador de Eventos → Windows Logs → System | erros de serviço/NSSM |
-| `%LOCALAPPDATA%\NexusTray\tray.log` | falha fatal da bandeja (usuário) |
+| `%LOCALAPPDATA%\NexusTray\tray.log` | falha fatal da bandeja |
 
 ---
 
@@ -866,240 +761,201 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 
 ### 12.1 ACLs e segredos
 
-O `bootstrap.ps1` **remove a herança de `C:\ProgramData`** e aplica ACLs explícitas:
+O bootstrap remove a herança de `C:\ProgramData` e aplica ACLs explícitas:
 
 | Caminho | Permissão |
 | --- | --- |
-| `C:\ProgramData\Nexus` (raiz) | somente **Administrators** (S-1-5-32-544) e **SYSTEM** (S-1-5-18) |
+| `C:\ProgramData\Nexus` (raiz) | Administrators (S-1-5-32-544) e SYSTEM (S-1-5-18) |
 | `C:\ProgramData\Nexus\uploads` | `NetworkService` (S-1-5-20) `Modify` + Administrators/SYSTEM |
 | `C:\ProgramData\Nexus\logs` | `NetworkService` `Modify` + Administrators/SYSTEM |
 | `C:\ProgramData\Nexus\backups` e `config` | somente Administrators/SYSTEM |
+| `C:\ProgramData\Nexus\mysql` e `mysql\data` | somente Administrators/SYSTEM + `NetworkService` `Modify` |
+| `C:\ProgramData\Nexus\mysql\my.ini` | `NetworkService` somente leitura |
 | `C:\ProgramData\Nexus\caddy\{data,config,logs}` | `LocalService` (S-1-5-19) `Modify` + Administrators/SYSTEM |
-| `C:\ProgramData\Nexus\config\Caddyfile` | `LocalService` somente leitura (`Protect-File`) |
-| `C:\Program Files\Nexus\app\.env` | `NetworkService` somente leitura; Administrators/SYSTEM controle total |
-| `C:\ProgramData\Nexus\config\backup.cnf` | somente Administrators/SYSTEM; **o app não lê**; porta **3214** |
-| `C:\Program Files\Nexus` e `app` | `ReadAndExecute` para `NetworkService`; `ProgramRoot` também para `LocalService`; `.next\cache` com `Modify` para `NetworkService` |
-| `C:\Program Files\Nexus\mysql` | `ReadAndExecute` para `NetworkService` (binários do MySQL dedicado) |
-| `C:\ProgramData\MySQL\MySQL Server 8.4` | somente Administrators/SYSTEM + `NetworkService` `Modify` (raiz e `Data`) |
-| `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini` | `NetworkService` somente leitura (`Protect-File`) |
+| `C:\ProgramData\Nexus\config\Caddyfile` | `LocalService` somente leitura |
+| `C:\Program Files\Nexus\node` e `mysql` | `ReadAndExecute` para `NetworkService` |
+| `C:\Program Files\Nexus\app\.env` | `NetworkService` somente leitura; Administrators/SYSTEM total |
+| `C:\Program Files\Nexus\app` | `ReadAndExecute` para `NetworkService`; `.next\cache` com `Modify` |
+| `C:\ProgramData\Nexus\config\backup.cnf` | somente Administrators/SYSTEM; **o app não lê** |
 
-- **`NexusApp`** roda como `NetworkService`; **`NexusCaddy`** como `LocalService`;
-  **`NexusMySQL84`** como `NetworkService`.
-- **`backup.cnf`** guarda a senha do `nexus_app` e a porta **3214**. Quem o usa é o
-  `backup.ps1` (SYSTEM ou PowerShell elevado); o processo da aplicação não precisa e não
-  consegue lê-lo.
-- **`restore.cnf`** (criado manualmente para restauração): mesma proteção do `backup.cnf`;
-  apague depois do uso.
-- **Arquivos temporários do MySQL** (opções, SQL e saída): criados com `Protect-File` e
-  removidos ao final; erros do `mysqldump` são redigidos (`password`/`identified by`).
-- **Transcripts**: suspensos durante a leitura das senhas; não registram a digitação.
-- **`JWT_SECRET`**: gerado com 48 bytes aleatórios (base64) quando ausente; preservado nas
-  atualizações. Nunca reutilize o segredo de desenvolvimento.
-- **Senhas**: `nexus_app` com até 256 caracteres, sem os símbolos que quebram URL/opções
-  (`@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço, tab ou controle); root sem quebra de linha.
-  Não use `-p<senha>` na linha de comando.
+- `NexusApp` e `NexusMySQL84` rodam como **NetworkService**; `NexusCaddy` como
+  **LocalService**.
+- `backup.cnf` guarda a senha do `nexus_app` e a porta 3214; quem o usa é o `bootstrap`
+  (teste da fase 2) e o `backup.ps1` (SYSTEM/elevado).
+- `restore.cnf` (manual) tem a mesma proteção; apague após o uso.
+- Arquivos temporários do MySQL/SQL nascem com `Protect-File`; erros do `mysqldump` são
+  redigidos.
+- Transcripts são suspensos durante a leitura das senhas.
+- `JWT_SECRET` é gerado com 48 bytes aleatórios quando ausente e preservado nas atualizações.
+- Senhas: `nexus_app` 12–64 caracteres do conjunto seguro; root sem quebra de linha; nunca
+  use `-p<senha>` na linha de comando.
 
 O `smoke.ps1` verifica que `backups`, `config` e `app\.env` não tenham ACE para
-`BUILTIN\Users` (S-1-5-32-545). Rode-o elevado para conseguir ler as ACLs restritas.
+`BUILTIN\Users` (S-1-5-32-545); rode-o elevado.
 
 ### 12.2 Exposição de rede
 
-- O **Next** escuta apenas em `127.0.0.1:3000`; o **MySQL dedicado** apenas em
-  `127.0.0.1:3214`. O MySQL existente na **3306** é independente e não é alterado.
-- O **Caddy** é a única porta exposta (80/443) e usa **CA interna** (`tls internal`).
-- O Caddy usa `admin off`: **não há API administrativa**.
-- O bootstrap cria as quatro regras de entrada: `Nexus HTTP`/`Nexus HTTPS` Allow para
-  `LocalSubnet`; `Nexus MySQL (LAN)` (3214) e `Nexus Next (LAN)` (3000) **Block** para
-  `LocalSubnet`. O `smoke.ps1` valida as quatro. Ver §3.4.
-- O MySQL dedicado usa `utf8mb4`/`utf8mb4_0900_ai_ci` e fuso `-03:00`; o X Plugin
-  (`mysqlx`) fica desligado.
+- Node escuta apenas `127.0.0.1:3000`; MySQL apenas `127.0.0.1:3214`; a 3306 é independente.
+- Caddy é a única porta exposta (80/443), com CA interna e `admin off` (sem API administrativa).
+- O firewall cria Allow de 80/443 e Block de 3214/3000 para `LocalSubnet`; valide com
+  `smoke.ps1`.
+- MySQL dedicado usa utf8mb4/utf8mb4_0900_ai_ci, fuso `-03:00` e `mysqlx=0`.
 
-### 12.3 Backups
+### 12.3 Payload e integridade
 
-Os backups contêm banco (via `mysqldump` do MySQL dedicado, porta 3214), uploads, o `.env`
-(com `DATABASE_URL` e `JWT_SECRET`) e o `Caddyfile`. Proteja
-`C:\ProgramData\Nexus\backups` como dado sensível, copie para fora do servidor e restrinja
-quem acessa a pasta. O `NexusBackup` roda como SYSTEM; o acesso manual exige elevação. A
-pasta `caddy\data` (CA/chave privada) **não** entra no backup.
+O build do payload verifica os hashes do manifesto: Node (SHA-256), MySQL (MD5), Caddy
+(SHA-512) e NSSM (SHA-256). O `vc_redist` não tem SHA-256 preenchido e o `app.zip`/SQL não têm
+hash próprio. No destino, o bootstrap valida a presença do payload, o MD5 do MySQL e o
+SHA-256 do NSSM; Node/Caddy/VC++ não são re-hashados. Guarde o setup e valide seu tamanho/hash
+por um canal confiável. O setup não tem assinatura Authenticode configurada.
 
 ### 12.4 CA interna
 
-O `bootstrap.ps1` instala a CA local com `certutil -addstore -f Root` a partir de
-`C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt`. Para as estações,
-distribua o `root.crt` por GPO/script e instale em **Autoridades de Certificação Raiz
-Confiáveis**. A desinstalação **não** remove essa CA do trust store — ver §13.
+O bootstrap instala a CA local com `certutil -addstore -f Root` a partir de
+`C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt`. Distribua esse
+`root.crt` às estações (GPO/script) e instale em **Autoridades de Certificação Raiz
+Confiáveis**. A desinstalação não remove a CA do trust store.
 
 ---
 
 ## 13. Desinstalação
 
-Use **Configurações → Aplicativos → Nexus → Desinstalar** (ou o atalho "Desinstalar Nexus"
-no Menu Iniciar). O `.iss` **não tem `[UninstallRun]` nem `[UninstallDelete]`**: a remoção é
-feita pelo `desinstalar.ps1`, chamado em `CurUninstallStepChanged(usUninstall)`. O Inno
-verifica o `ResultCode` e mostra um `MsgBox` de erro se o script falhar.
+Use **Configurações → Aplicativos → Nexus → Desinstalar** (ou o atalho). O `.iss` não tem
+`[UninstallRun]` nem `[UninstallDelete]`; o `desinstalar.ps1` roda em
+`CurUninstallStepChanged(usUninstall)`, o `ResultCode` é verificado e uma falha mostra
+`MsgBox`.
 
 ### 13.1 O que é removido
 
-- Serviços **`NexusCaddy`**, **`NexusApp`** e **`NexusMySQL84`** (parados e removidos; os
-  dois primeiros usam NSSM se disponível, senão `sc.exe`; o MySQL usa `sc.exe`).
-- Tarefas agendadas **`NexusTray`** e **`NexusBackup`**.
-- Processo da bandeja em execução.
-- `C:\Program Files\Nexus\app`
-- `C:\Program Files\Nexus\NexusTray`
-- `C:\Program Files\Nexus\caddy`
-- `C:\Program Files\Nexus\tools` (NSSM)
-- `C:\Program Files\Nexus\scripts`
-- `C:\Program Files\Nexus\mysql` (binários do MySQL dedicado)
-- Versões antigas `app.prev-*`, `app.failed-*` e `app.prev-manual-*`
-- `C:\ProgramData\Nexus\caddy` (dados/configuração/logs e a CA local)
-- As quatro regras de firewall `Nexus *` (quando o módulo `NetSecurity` está disponível;
-  caso contrário, o log avisa e elas permanecem)
-- O diretório do instalador (`C:\Program Files\Nexus\Instalador`) é removido pelo Inno.
+- Serviços **`NexusCaddy`**, **`NexusApp`** e **`NexusMySQL84`**.
+- Tarefas **`NexusTray`** e **`NexusBackup`**; processo da bandeja.
+- `C:\Program Files\Nexus\app`, `node`, `mysql`, `caddy`, `tools`, `scripts`, `payload`,
+  `sql`, `NexusTray` e versões `app.prev-*`/`app.failed-*`/`app.prev-manual-*`.
+- As quatro regras de firewall `Nexus *` (quando `NetSecurity` está disponível).
+- `C:\ProgramData\Caddy` legado, se existir.
+- O diretório `Instalador` é removido pelo Inno.
 
-O script só apaga `app`, `NexusTray`, o `mysql` e as versões antigas **depois** de remover
-serviços e tarefas com sucesso. Se falhar antes disso, ele mostra erro e **preserva** esses
-diretórios; o Inno ainda remove os arquivos do próprio `Instalador`.
+Se serviços/tarefas não forem removidos, o script para antes de apagar o runtime e preserva
+app, tray, versões antigas e binários; o Inno mostra o erro.
 
 ### 13.2 O que é preservado
 
-- **`C:\ProgramData\Nexus`**, exceto `caddy`: `uploads`, `logs`, `backups`, `config`
-  (`Caddyfile`, `backup.cnf`) e `bootstrap.state.json`.
-- **`C:\ProgramData\MySQL\MySQL Server 8.4`** (Data e `my.ini` do MySQL dedicado).
-- **MySQL existente na 3306**, se houver e usar outro diretório de dados: serviço, dados e
-  configuração não são tocados.
-- **Node.js**, **Git** e o VC++ Redistributable.
-- A **CA interna** no repositório de confiança do Windows (o `root.crt` continua confiado,
-  embora os arquivos em `caddy\data` tenham sido removidos).
+- **`C:\ProgramData\Nexus` inteiro**, incluindo `mysql\data`, `mysql\my.ini`, uploads, config,
+  backups e logs.
+- **`C:\ProgramData\MySQL\MySQL Server 8.4`** (dados do MySQL legado), se existir.
+- Node.js, MySQL e Git **do sistema**, se instalados; o Nexus usava runtimes embutidos.
+- A CA interna no trust store do Windows.
 
-Para uma remoção **total** (depois de copiar o que precisa):
+Para remoção total, depois de copiar o que precisa:
 
-1. Rode a desinstalação normal.
-2. Apague `C:\ProgramData\Nexus` manualmente (isso apaga banco lógico, uploads, backups e
-   configuração restantes).
-3. Se o `C:\ProgramData\MySQL\MySQL Server 8.4` for **exclusivo do Nexus**, apague-o também;
-   se for de um MySQL 8.4 existente, **não** apague.
-4. Desinstale o Node.js e o Git, se não forem usados por outro sistema; o MySQL da 3306, se
-   existir, é independente.
-5. Remova a CA da Caddy de **Autoridades de Certificação Raiz Confiáveis**
-   (`certlm.msc`) — procure o certificado da CA local da Caddy e exclua.
-6. Remova `C:\Program Files\Nexus\Instalador`, se ele ainda existir (desinstalação manual).
+1. rode a desinstalação normal;
+2. apague `C:\ProgramData\Nexus` (isso apaga o banco lógico, uploads e backups);
+3. apague `C:\ProgramData\MySQL\MySQL Server 8.4` se ele for exclusivo do Nexus antigo;
+4. remova a CA da Caddy em `certlm.msc`;
+5. remova `C:\Program Files\Nexus\Instalador`, se ainda existir.
 
-> A desinstalação manual (fora do Inno) é:
+> Desinstalação manual:
 > `powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Nexus\Instalador\desinstalar.ps1"`.
-> Ela não remove o próprio diretório `Instalador`.
+> Ela não remove o próprio `Instalador`.
 
 ---
 
-## 14. Checklist de release de produção
+## 14. Checklist de release do instalador 1.07
 
-- [ ] Entregas aprovadas (reviewer sem bloqueante; QA verde) e `CHANGELOG.md` atualizado.
-- [ ] Documentação de `/docs` atualizada (incluindo este runbook, se o processo mudou).
-- [ ] **Criar uma nova tag DateVer** `vN.DD.MM.YYYY` (a `v1.02.11.2026` não contém
-      `/api/health`; a `v2.02.11.2026` não contém o MySQL 3214/firewall). Bump do
-      `package.json` para a mesma versão da tag (o health reporta essa versão e o smoke a
-      compara).
-- [ ] `deploy/windows/manifesto.json` **não guarda tag**: o build do instalador passa
-      `v<versão>` a partir do `package.json`; o bootstrap manual exige `-Tag`. Confira também
-      `mysql.version` = **8.4.13**, `mysql.url` do ZIP oficial e `mysql.md5`.
-- [ ] Commit de release na `main`; tag criada e **enviada ao GitHub** (o bootstrap e o
-      `atualizar.ps1` clonam a tag; sem ela, a instalação falha).
-- [ ] Branch local **`producao`** avançada por **fast-forward** até o commit da release
-      (worktree de produção; hoje a branch não tem upstream configurado — o push, se houver,
-      é manual).
-- [ ] Se a bandeja mudou: `deploy\windows\NexusTray\build.ps1` (requer **.NET 8 SDK**;
-      `dist\NexusTray.exe` é ignorado pelo Git e é gerado no build).
-- [ ] Instalador gerado: `deploy\windows\build-instalador.ps1` → `out\NexusSetup-<versão>.exe`
-      (Inno Setup 7; baixa o ISCC 7.1.0 do NuGet se necessário). Se a tag existir localmente
-      e não tiver `/api/health`, o script **recusa** a compilação; se a tag não existir
-      localmente, a validação fica para o clone.
-- [ ] Ensaio em **VM Windows limpa** (10/11 x64, sem Node/Git/MySQL): instalação completa,
-      MySQL 8.4.13 dedicado automático (sem pausa), primeira execução/Super Admin,
-      `smoke.ps1`, login e uma operação básica. Teste também:
-      - uma VM com **MySQL 8.4 já existente na 3306**, para confirmar que ele não é tocado;
-      - o cenário de **conflito de caminho** (MySQL 8.4 usando
-        `C:\ProgramData\MySQL\MySQL Server 8.4`) — ver §15;
-      - a atualização a partir da tag anterior e a desinstalação preservando
-        `C:\ProgramData\Nexus` e `C:\ProgramData\MySQL\MySQL Server 8.4`.
-- [ ] **Backup manual** da produção + cópia para fora do servidor; confira o dump mais
-      recente (§8.4) e o `backup.cnf` na **3214**.
-- [ ] Janela de manutenção comunicada; planeje a **indisponibilidade total** durante a
-      atualização e o rollback (`app.prev-*` + dump).
-- [ ] Atualização executada com `atualizar.ps1 -Tag v...`; acompanhe o `deploy-<tag>.log`.
-      Se a instalação ainda estiver na 3306, use o bootstrap/instalador para migrar (ver
-      §7.1).
-- [ ] Pós-release: `smoke.ps1` (serviços, 3214, firewall, ACLs, health), `/api/health` com
-      `db=true`, login, versão exibida, tarefa `NexusBackup` e bandeja no estado verde.
-- [ ] Evidências registradas (data, tag, commit, resultado do smoke e do backup).
+### 14.1 Build do app standalone
 
-> **Dívida de release:** o `db push` ainda é o mecanismo de schema. Antes de uma release
-> com mudança destrutiva ou nova constraint única, revise o `CHANGELOG`, rode o script de
-> preparação indicado (ex.: `db:dedupe-notas`) e ensaie em banco de teste. O caminho alvo é
-> SQL revisado/migrations versionadas.
+- [ ] `npm ci` na máquina de build.
+- [ ] `npm run build:standalone` (Next com `output: "standalone"`).
+- [ ] `npm run package:standalone` → `out/standalone/app.zip`; confira `server.js` na raiz,
+      `.next/static` e ausência de `.env`/`uploads`.
+- [ ] A versão do `package.json` é `1.07.11.2026` (ou a versão da release) e aparece no
+      `app.zip`.
+
+### 14.2 Payload e setup
+
+- [ ] `deploy/windows/tools/nssm/nssm.exe` existe (fonte do NSSM embutido).
+- [ ] `scripts/preparar-payload.ps1` monta `deploy/windows/payload` com Node 24.19.0, MySQL
+      8.4.13, Caddy 2.11.9, VC++, NSSM, `app\app.zip`, `sql\{schema,seed,migracoes\001}`;
+      os hashes definidos no manifesto são verificados.
+- [ ] `deploy/windows/build-instalador.ps1` (chama `preparar-payload`) gera
+      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~393,8 MB).
+- [ ] O setup contém `payload\` e `sql\`; nenhum download/Git/npm/Prisma é necessário no
+      destino.
+
+### 14.3 Testes obrigatórios
+
+- [ ] VM Windows limpa (10/11 x64, sem Node/Git/MySQL): instalação completa, hostname,
+      MySQL 8.4.13 dedicado, SQL, serviços, tray, firewall e `smoke.ps1`.
+- [ ] **Upgrade 10.02→1.07** na máquina de teste: dados migrados de
+      `C:\ProgramData\MySQL\MySQL Server 8.4\Data` para `C:\ProgramData\Nexus\mysql\data`,
+      health 1.07, HTTPS 200, serviços Running, tray e **81/2/3**.
+- [ ] Verificar que o MySQL existente na 3306 (se houver) não foi parado/alterado.
+- [ ] Testar `atualizar.ps1 -Package` em uma instalação 1.07 (app+SQL) e o rollback.
+- [ ] Testar backup/restauração e desinstalação preservando `C:\ProgramData\Nexus`.
+- [ ] Testar acesso de uma estação ao HTTPS e a CA do Caddy.
+- [ ] Registrar evidências (data, versão, setup, health, contagens e logs).
+
+> O app não recebe tag nem clona Git: a versão vem do `package.json`/`app.zip` e o setup do
+> payload. A release do repositório pode ter sua tag DateVer, mas ela não é usada pelo
+> instalador.
 
 ---
 
-## 15. Atenções conhecidas (divergências entre scripts)
+## 15. Atenções conhecidas (limitações reais)
 
-As divergências de ACL/conta, Caddy, reinício, atualização, backup e desinstalação foram
-corrigidas no `RUN-20261102-23..25`; o firewall passou a ser criado nesta entrega. A lista
-abaixo contém apenas o que permanece real nos scripts desta branch; correções de código são
-feitas fora deste documento.
+1. **Retenção do backup não cobre uploads.**
+   `backup.ps1` poda `backups\db\*.zip`/`.sql` e `.env-*`/`Caddyfile-*`; `backups\uploads` e
+   `my.ini-*.bak` não são podados e podem crescer sem limite.
 
-1. **A retenção do backup não cobre uploads.**
-   `backup.ps1` poda `backups\db\*.zip`, `backups\db\*.sql` e
-   `backups\config\.env-*`/`Caddyfile-*`. A cópia de `backups\uploads` (e os
-   `my.ini-*.bak`) não é podada e pode crescer sem limite.
-
-2. **O backup não inclui os dados do Caddy.**
-   O `Caddyfile` é copiado, mas `C:\ProgramData\Nexus\caddy\data` (CA e chave privada) não
-   entra no backup. Após uma perda total, o Caddy gera uma CA nova e as estações precisam
-   confiar nela de novo.
+2. **O backup é lógico, não inclui os arquivos do MySQL nem a CA.**
+   O dump cobre `nexus_prod`, uploads, `.env` e `Caddyfile`; `C:\ProgramData\Nexus\mysql\data`
+   e `caddy\data` (CA/chave privada) não entram no backup. Após perda total, o Caddy gera
+   outra CA.
 
 3. **A bandeja é registrada só para o usuário que instalou.**
-   `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários do servidor não a veem.
+   `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários não a veem.
 
-4. **O `.env` não é mesclado na atualização.**
-   `atualizar.ps1` copia o `.env` anterior inteiro e só garante `UPLOADS_DIR`. Variáveis
-   novas introduzidas por uma release não são adicionadas automaticamente; compare com
+4. **O `.env` não é mesclado na atualização por pacote.**
+   `atualizar.ps1` copia o `.env` anterior e garante `UPLOADS_DIR`/`NODE_ENV`/`PORT`/`HOSTNAME`;
+   variáveis novas de uma release não são adicionadas automaticamente. Compare com
    `.env.example` e ajuste à mão (reaplicando a ACL).
 
-5. **`app.failed-*` e `app.prev-manual-*` não são limpos.**
+5. **`app.failed-*` e `app.prev-manual-*` acumulam.**
    O `atualizar.ps1` mantém a versão anterior e mais uma `app.prev-*`, mas não remove
-   `app.failed-*`; o bootstrap também deixa `app.prev-manual-*`. A desinstalação remove
-   esses diretórios, mas durante a operação eles acumulam. Monitore o disco.
+   `app.failed-*`; o bootstrap deixa `app.prev-manual-*`. A desinstalação os remove, mas
+   durante a operação monitore o disco.
 
-6. **Hashes do manifesto.**
-   `manifesto.json` ainda tem `sha256: ""` para Node, VC++ e Caddy; o MySQL usa **MD5**; o
-   NSSM tem `exe_sha256` e vai embutido. Caddy/Git usam "latest" quando a URL não está
-   fixada. Preencha os hashes restantes para instalações reproduzíveis.
+6. **Hashes do payload incompletos.**
+   Node/Caddy/NSSM têm SHA-256/SHA-512 e MySQL tem MD5; o `vc_redist` está sem SHA-256 e o
+   `app.zip`/SQL não têm hash no manifesto. O destino só revalida MySQL e NSSM. O setup não
+   tem assinatura Authenticode configurada.
 
-7. **Hostname e DNS.**
-   O bootstrap adiciona `127.0.0.1 <hostname>` ao `hosts` do próprio servidor se o nome não
-   resolver (necessário para o smoke HTTPS local). As estações clientes ainda precisam de
-   DNS/hosts e da CA do Caddy confiável; isso não é feito pelo instalador.
+7. **`atualizar.ps1` não atualiza runtimes, scripts, bandeja nem firewall.**
+   O pacote de atualização contém apenas `app.zip` + SQL. Node, MySQL, Caddy, NSSM, scripts,
+   tray, regras de firewall e o `bootstrap.state.json` só mudam com o setup/bootstrap.
 
-8. **`db push` não é migration.**
-   O `atualizar.ps1` aplica `prisma db push` e roda `db:seed` em toda atualização. Mudanças
-   destrutivas podem exigir `--accept-data-loss`/SQL revisado e scripts de preparação; o
-   caminho alvo é SQL revisado em releases futuras.
+8. **Atualização de schema só tem a migração 001.**
+   O caminho Update aplica `001-unidades-pct10-cx50.sql` + seed. Mudanças de schema em
+   releases futuras exigem uma nova migração em `deploy/sql/migracoes`; não use `db push` nem
+   Prisma no destino.
 
-9. **A desinstalação preserva a CA no trust store.**
-   `desinstalar.ps1` remove `C:\ProgramData\Nexus\caddy` (inclusive os arquivos da CA),
-   mas não remove o certificado raiz da Caddy do repositório de confiança do Windows. Para
-   remoção total, exclua-o manualmente (§13).
+9. **Hostname nas estações.**
+   O bootstrap adiciona `127.0.0.1 <hostname>` ao `hosts` do servidor quando o DNS não
+   resolve; as estações ainda precisam de DNS/hosts para acessar o Nexus.
 
-10. **Conflito de caminho com um MySQL 8.4 existente.**
-    O Nexus usa `C:\ProgramData\MySQL\MySQL Server 8.4` para `Data`/`my.ini`. Se a máquina
-    já tiver um MySQL 8.4 usando esse mesmo diretório, as duas instâncias disputam os mesmos
-    arquivos (e o `instalar-mysql.ps1` pode sobrescrever o `my.ini`/usar o `Data` errado).
-    Não instale o Nexus nessa máquina sem isolar/backup da instância existente; o MySQL na
-    **3306** que usa outro `Data` não é afetado.
+10. **Fixtures do Figma usam unidades antigas.**
+    `tools/figma-export/fixtures.ts` ainda usa `CAIXA`/`PACOTE`, enquanto o seed de produção
+    usa `PCT10`/`CX50`. A exportação de telas pode exibir os nomes antigos; não altera o banco.
 
-11. **O `atualizar.ps1` não migra o MySQL nem cria o firewall.**
-    Ele preserva o `.env`/`backup.cnf` anteriores e não executa `instalar-mysql.ps1` nem
-    `Set-NexusFirewallRules`. Para migrar da 3306 ou regularizar as regras, rode o
-    bootstrap/instalador (fases 2/3) ou ajuste `DATABASE_URL`/`backup.cnf` e crie as regras
-    manualmente.
+11. **A desinstalação preserva a CA no disco e no trust store.**
+    O `desinstalar.ps1` preserva `C:\ProgramData\Nexus\caddy` (dados, configuração e a CA) e
+    não remove o certificado raiz da Caddy do repositório de confiança do Windows. Para
+    remoção total, apague `C:\ProgramData\Nexus` e exclua a CA em `certlm.msc`.
+
+12. **O setup é grande e o payload não é versionado.**
+    O `NexusSetup-1.07.11.2026.exe` tem ~393,8 MB; `deploy/windows/payload` é ignorado pelo
+    Git e precisa ser montado no build. O destino é offline, mas o build exige internet e os
+    arquivos de origem (app.zip, NSSM, SQL).
 
 ---
 
@@ -1108,8 +964,11 @@ feitas fora deste documento.
 | Assunto | Arquivo |
 | --- | --- |
 | instalador | [`deploy/windows/instalador.iss`](../../deploy/windows/instalador.iss) e [`build-instalador.ps1`](../../deploy/windows/build-instalador.ps1) |
+| payload | [`scripts/preparar-payload.ps1`](../../scripts/preparar-payload.ps1) e [`deploy/windows/manifesto.json`](../../deploy/windows/manifesto.json) |
+| app standalone | [`scripts/empacotar-standalone.mjs`](../../scripts/empacotar-standalone.mjs) e [`next.config.ts`](../../next.config.ts) |
 | instalação | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) e [`instalar-gui.ps1`](../../deploy/windows/instalar-gui.ps1) |
 | MySQL | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) e [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) |
+| SQL/seed | [`deploy/sql/`](../../deploy/sql/) e [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) |
 | atualização | [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) |
 | backup | [`backup.ps1`](../../deploy/windows/backup.ps1) |
 | reinício | [`restart.ps1`](../../deploy/windows/restart.ps1) |
