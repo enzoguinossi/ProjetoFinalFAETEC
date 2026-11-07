@@ -193,9 +193,10 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
   Corrigido em `87928ec`: hash do NSSM igual ao payload → não copia; divergente → para e
   reinicia App/Caddy; Caddy ganhou a mesma checagem de versão.
 - O `bootstrap.ps1 -Resume` para concluir a validação **não rodou**: o UAC foi cancelado.
-- **Pendente:** fechar o wizard antigo (processos `NexusSetup-...-wizard` ainda abertos),
-  rodar o setup corrigido (`out` ou `-wizard-fix.exe`) e concluir o upgrade; depois testar
-  instalação nova em VM limpa.
+- **Pendente:** rodar o setup corrigido (`C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe`,
+  SHA `2DF4…`, ou `out\NexusSetup-1.07.11.2026.exe`) e concluir o upgrade; depois testar
+  instalação nova em VM limpa. O wizard antigo (SHA `E703…`) foi substituído na Área de
+  Trabalho; os processos antigos já não estão em execução.
 
 ## Verificação — histórico até 11.02
 
@@ -247,12 +248,11 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 ## Pendências
 
 1. **Testar o wizard pós-1.07 em máquina limpa/colega:** usar o setup novo em
-   `deploy/windows/out/NexusSetup-1.07.11.2026.exe` ou
-   `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard-fix.exe` (SHA `2DF4…`); o
-   `NexusSetup-...-wizard.exe` (SHA `E703…`) é o build anterior, com o bug do NSSM em uso.
-   Fechar o wizard antigo antes. Validar a página de senhas, a janela de progresso, a extração
-   do payload, a migração do MySQL, o SQL, os serviços, o HTTPS e a bandeja. Testar o upgrade
-   com os quatro campos vazios e com senhas preenchidas.
+   `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe` (SHA `2DF4…`) ou
+   `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; o `NexusSetup-1.07.11.2026.exe`
+   (SHA `0CB6…`) é a release 1.07 anterior, sem o wizard. Validar a página de senhas, a
+   janela de progresso, a extração do payload, a migração do MySQL, o SQL, os serviços, o
+   HTTPS e a bandeja. Testar o upgrade com os quatro campos vazios e com senhas preenchidas.
 2. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
 3. **Docs:** o runbook `docs/processo/PRODUCAO.md` foi atualizado para o wizard; revisar
