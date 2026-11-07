@@ -214,7 +214,10 @@ as regras precisam ser revistas.
    `bootstrap.ps1` **diretamente**, com `-NoPrompt`, `-ProgressFile` em `{tmp}` e, quando
    há senhas, `-CredentialsFile` em `{tmp}` (UTF-8 sem BOM, ACL restrita). O bootstrap roda
    oculto e grava o progresso; o wizard mostra uma **janela modal com barra e fase atual**,
-   lendo o INI a cada 500 ms. Ao final, os arquivos temporários são apagados.
+   lendo o INI a cada 500 ms. A janela não fecha por Alt+F4 (`OnCloseQuery`/`ProgressAllowClose`);
+   ela fecha quando o bootstrap termina e interrompe após **60 s sem progresso inicial**
+   (`ProgressSeen`/`ProgressNeverStarted`) ou **2 h no total** (`ProgressTicks`). Ao final, os
+   arquivos temporários são apagados.
 6. Em falha, o wizard mostra o código e o caminho dos logs; em sucesso, a página final é
    personalizada com `https://<hostname>`.
 
@@ -232,7 +235,7 @@ O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL 
 | --- | --- |
 | **0 — Pré-checagem offline** | confere Administrador, payload obrigatório, 64 bits, 5 GB livres, portas 3214/3000/80/443; cria entrada no `hosts` se o hostname não resolver; **não acessa a internet** |
 | **1 — Runtime embutido** | instala VC++ (se ausente), extrai Node 24.19.0 para `C:\Program Files\Nexus\node`, copia NSSM 2.24 e Caddy 2.11.9 do payload |
-| **2 — MySQL dedicado** | pede as senhas quando necessário e chama `instalar-mysql.ps1`: extrai MySQL 8.4.13, migra o `Data` legado, grava `C:\ProgramData\Nexus\mysql\my.ini`, cria/reconfigura `NexusMySQL84` na 3214; depois o `pos-instalacao-mysql.ps1` cria `nexus_prod`/`nexus_app` e o bootstrap grava o `backup.cnf` |
+| **2 — MySQL dedicado** | usa as credenciais da página do wizard (ou o `backup.cnf` no upgrade) e chama `instalar-mysql.ps1`: extrai MySQL 8.4.13, migra o `Data` legado, grava `C:\ProgramData\Nexus\mysql\my.ini`, cria/reconfigura `NexusMySQL84` na 3214; depois o `pos-instalacao-mysql.ps1` cria `nexus_prod`/`nexus_app` e o bootstrap grava o `backup.cnf` |
 | **3 — Diretórios e ACLs** | cria `ProgramData\Nexus\{mysql,uploads,logs,backups,config,caddy}`, aplica ACLs restritas, gera o `Caddyfile` e cria as quatro regras de firewall |
 | **4 — Banco e aplicação** | para o Caddy e o App; extrai `app.zip` em `C:\Program Files\Nexus\app` (preserva `.env`), grava/atualiza o `.env`, aplica o SQL de produção (`aplicar-sql.ps1`, modo Auto) e ajusta o cache |
 | **5 — Serviços** | configura `NexusApp` (`node.exe server.js`, env, dependência do MySQL) e `NexusCaddy`; valida health local, inicia o Caddy, instala a CA com `certutil` e valida HTTPS |
@@ -750,7 +753,7 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | Sintoma | Causa provável | O que fazer |
 | --- | --- | --- |
 | setup falha na fase 0 com "payload ausente" | `Instalador\payload` incompleto | gere o setup com `build-instalador.ps1` (que chama `preparar-payload.ps1`); confira `payload\node`, `mysql`, `caddy`, `vcredist`, `nssm`, `app\app.zip`, `sql` |
-| wizard fica na janela de progresso sem avançar | bootstrap não iniciou, falhou antes de gravar o progresso ou ficou preso | confira `%TEMP%\Setup Log*.txt`, `C:\ProgramData\Nexus\logs\bootstrap-*.log` e `%TEMP%\nexus-fail.log`; a janela fecha sozinha com erro após 2 horas |
+| wizard fica na janela de progresso sem avançar | bootstrap não iniciou, falhou antes de gravar o progresso ou ficou preso | confira `%TEMP%\Setup Log*.txt`, `C:\ProgramData\Nexus\logs\bootstrap-*.log` e `%TEMP%\nexus-fail.log`; a janela fecha após **60 s sem progresso inicial** (“O bootstrap não iniciou”) ou **2 h no total** |
 | wizard recusa as senhas | campos incompletos, confirmação divergente ou `nexus_app` com caractere proibido | preencha os quatro campos (ou deixe todos vazios no upgrade); o `nexus_app` não aceita `@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço/tab/controle |
 | bootstrap falha pedindo senha em um upgrade com campos vazios | `backup.cnf` existe, mas não conecta ou o serviço/banco precisa ser criado | execute o setup novamente e preencha as quatro senhas (o bootstrap roda com `-NoPrompt`) |
 | arquivo temporário de credenciais não pôde ser protegido | `icacls` falhou (ACL/política) | o setup aborta antes de iniciar o bootstrap; confira as permissões de `%TEMP%` e repita |

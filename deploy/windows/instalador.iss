@@ -84,6 +84,9 @@ var
   ProgressTicks: Integer;
   ProgressExitCode: Integer;
   ProgressTimedOut: Boolean;
+  ProgressNeverStarted: Boolean;
+  ProgressAllowClose: Boolean;
+  ProgressSeen: Boolean;
   BootstrapSucceeded: Boolean;
 
 function SetTimer(hWnd: HWND; nIDEvent: UINT_PTR; uElapse: UINT; lpTimerFunc: NativeInt): UINT_PTR;
@@ -278,6 +281,11 @@ begin
   end;
 end;
 
+procedure ProgressCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+  CanClose := ProgressAllowClose;
+end;
+
 procedure CreateProgressForm;
 begin
   ProgressForm := CreateCustomForm(ScaleX(420), ScaleY(150), False, False);
@@ -285,6 +293,8 @@ begin
   ProgressForm.BorderIcons := [];
   ProgressForm.BorderStyle := bsDialog;
   ProgressForm.Position := poScreenCenter;
+  ProgressAllowClose := False;
+  ProgressForm.OnCloseQuery := @ProgressCloseQuery;
 
   ProgressTitle := TNewStaticText.Create(ProgressForm);
   ProgressTitle.Parent := ProgressForm;
@@ -292,14 +302,17 @@ begin
   ProgressTitle.Left := ScaleX(14);
   ProgressTitle.Top := ScaleY(12);
   ProgressTitle.Width := ScaleX(392);
+  ProgressTitle.Height := ScaleY(18);
   ProgressTitle.Caption := 'Instalando o Nexus...';
 
   ProgressDetail := TNewStaticText.Create(ProgressForm);
   ProgressDetail.Parent := ProgressForm;
   ProgressDetail.AutoSize := False;
+  ProgressDetail.WordWrap := True;
   ProgressDetail.Left := ScaleX(14);
   ProgressDetail.Top := ScaleY(38);
   ProgressDetail.Width := ScaleX(392);
+  ProgressDetail.Height := ScaleY(24);
   ProgressDetail.Caption := PhaseCaption(0);
 
   ProgressBar := TNewProgressBar.Create(ProgressForm);
@@ -328,6 +341,7 @@ begin
   ProgressHint2.Left := ScaleX(14);
   ProgressHint2.Top := ScaleY(124);
   ProgressHint2.Width := ScaleX(392);
+  ProgressHint2.Height := ScaleY(16);
   ProgressHint2.Caption := 'Logs: C:\ProgramData\Nexus\logs';
 end;
 
@@ -347,9 +361,14 @@ var
   Done: Integer;
   ExitCode: Integer;
 begin
+  if (ProgressForm = nil) or (ProgressBar = nil) or (ProgressDetail = nil) then
+    Exit;
+
   Inc(ProgressTicks);
   if FileExists(ProgressFile) then
   begin
+    ProgressSeen := True;
+    ProgressNeverStarted := False;
     Step := GetIniInt('progress', 'step', 0, 0, 8, ProgressFile);
     Done := GetIniInt('progress', 'done', 0, 0, 1, ProgressFile);
     ExitCode := GetIniInt('progress', 'exit', 1, 0, 1, ProgressFile);
@@ -358,6 +377,7 @@ begin
     if Done = 1 then
     begin
       ProgressExitCode := ExitCode;
+      ProgressAllowClose := True;
       KillTimer(0, ProgressTimer);
       ProgressTimer := 0;
       ProgressForm.Close;
@@ -365,10 +385,24 @@ begin
     end;
   end;
 
+  { 120 ticks x 500 ms = 60 s sem nenhum progresso: o bootstrap não iniciou. }
+  if (not ProgressSeen) and (ProgressTicks > 120) then
+  begin
+    ProgressTimedOut := True;
+    ProgressNeverStarted := True;
+    ProgressAllowClose := True;
+    ProgressExitCode := -1;
+    KillTimer(0, ProgressTimer);
+    ProgressTimer := 0;
+    ProgressForm.Close;
+    Exit;
+  end;
+
   { Segurança: 14400 ticks x 500 ms = 2 horas. }
   if ProgressTicks > 14400 then
   begin
     ProgressTimedOut := True;
+    ProgressAllowClose := True;
     ProgressExitCode := -1;
     KillTimer(0, ProgressTimer);
     ProgressTimer := 0;
@@ -381,6 +415,9 @@ begin
   ProgressTicks := 0;
   ProgressExitCode := -1;
   ProgressTimedOut := False;
+  ProgressNeverStarted := False;
+  ProgressSeen := False;
+  ProgressAllowClose := False;
   CreateProgressForm;
   ProgressTimer := SetTimer(0, 0, 500, CreateCallback(@ProgressTimerProc));
   try
@@ -391,6 +428,7 @@ begin
       KillTimer(0, ProgressTimer);
       ProgressTimer := 0;
     end;
+    ProgressAllowClose := True;
     ProgressForm.Release;
     ProgressForm := nil;
   end;
@@ -410,6 +448,16 @@ begin
     BootstrapSucceeded := False;
     CredentialsFile := ExpandConstant('{tmp}\nexus-mysql-credentials.txt');
     ProgressFile := ExpandConstant('{tmp}\nexus-bootstrap-progress.ini');
+
+    if (not FileExists(ExpandConstant('{app}\bootstrap.ps1'))) or
+       (not FileExists(ExpandConstant('{app}\common.ps1'))) or
+       (not FileExists(ExpandConstant('{app}\manifesto.json'))) then
+    begin
+      MsgBox('O setup está incompleto: bootstrap.ps1, common.ps1 ou manifesto.json ' +
+             'não foi encontrado em ' + ExpandConstant('{app}') + '.' + #13#10 + #13#10 +
+             'Reinstale o Nexus com o setup oficial.', mbError, MB_OK);
+      Abort;
+    end;
 
     DeleteFile(CredentialsFile);
     DeleteFile(ProgressFile);
@@ -480,7 +528,9 @@ begin
       BootstrapSucceeded := True
     else
     begin
-      if ProgressTimedOut then
+      if ProgressNeverStarted then
+        Message := 'O bootstrap não iniciou: nenhum progresso foi registrado em 60 segundos.'
+      else if ProgressTimedOut then
         Message := 'A instalação do Nexus excedeu o tempo limite (código -1).'
       else
         Message := 'A instalação do Nexus não foi concluída (código ' + IntToStr(ProgressExitCode) + ').';
