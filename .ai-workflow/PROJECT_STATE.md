@@ -2,7 +2,8 @@
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
 > Última consolidação: 2026-11-07 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
-> autocontido com Node/MySQL/Caddy/NSSM/app embutidos).
+> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; wizard de senhas/progresso em
+> `[Unreleased]`).
 
 ## Objetivo atual
 
@@ -45,6 +46,28 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 11. **Validação real:** upgrade 10.02 → 1.07 na máquina de teste; health 1.07 `db=true`,
     HTTPS 200, serviços Running, bandeja, `UNIDADE/PCT10/CX50`, 81 permissões/2 perfis; setup
     1.07 compilado.
+
+## Wizard de instalação — senhas e progresso (pós-1.07, `[Unreleased]`)
+
+1. **Inno sem console:** `CurStepChanged(ssPostInstall)` chama o `bootstrap.ps1`
+   diretamente com `-NoPrompt`, `-ProgressFile` e, quando há senhas, `-CredentialsFile`;
+   `instalar-gui.ps1` foi removido do repositório e do `[Files]`.
+2. **Credenciais no wizard:** página com root + confirmação e `nexus_app` + confirmação.
+   Instalação nova exige as quatro; upgrade com `backup.cnf` aceita os quatro campos vazios
+   para reutilizar as credenciais atuais. O `nexus_app` é validado no wizard com a mesma
+   regra do bootstrap.
+3. **Transporte:** arquivo UTF-8 sem BOM em `{tmp}`, ACL somente Administrators/SYSTEM via
+   `icacls` (SIDs), apagado pelo bootstrap e pelo wizard; as senhas nunca vão para linha de
+   comando, `MsgBox`, transcript ou log.
+4. **Progresso:** INI `[progress] step=0..8 done=0|1 exit=0|1` lido a cada 500 ms; formulário
+   modal com barra/fase, sem Alt+F4, timeout de 60 s sem progresso inicial e 2 h no total;
+   pré-checagem de `bootstrap.ps1`/`common.ps1`/`manifesto.json`.
+5. **Manual:** `bootstrap.ps1` sem `-NoPrompt`/`-CredentialsFile` continua pedindo as senhas
+   no console; `-ProgressFile` é opcional.
+6. **Validação:** ISCC 7 compila o setup (412.973.350 bytes, SHA-256 `E703C1…`); as APIs de
+   formulário/barra/timer foram exercitadas em um setup descartável; `icacls` com SIDs aplicou
+   a ACL; o teste `-NoPrompt` sem senhas falha com mensagem clara. O wizard real ainda não foi
+   executado interativamente.
 
 ## Produção Windows — legado (até 11.02)
 
@@ -152,6 +175,21 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
   `C:\ProgramData\Nexus\mysql`; `NexusMySQL84`/`NexusApp`/`NexusCaddy` Running; health 1.07
   `db=true`; HTTPS 200; tray em execução; smoke OK; unidades `UNIDADE/PCT10/CX50`.
 
+## Verificação — wizard (pós-1.07, `[Unreleased]`)
+
+- `ISCC` 7.1.0 → exit 0; `NexusSetup-1.07.11.2026.exe`, **412.973.350 bytes**, SHA-256
+  `E703C100FE019DFB315362EF52677B17FE56E873B9CB0DE060AE68B1487B2477`.
+- Parser PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows` (o `instalar-gui.ps1` foi
+  removido).
+- Setup descartável em `%TEMP%` validou em runtime `CreateCustomForm`, `TNewProgressBar`,
+  `SetTimer`/`CreateCallback`, `ShowModal`, `Close`/`Release` e `OnCloseQuery` (marcador
+  `ok ticks=6`); `icacls` com `*S-1-5-32-544`/`*S-1-5-18` → exit 0, ACL somente
+  Administrators/SYSTEM.
+- Teste do executor com `bootstrap.ps1 -NoPrompt`: sem senhas → exit 1 com mensagem clara;
+  com root+app → leitura do arquivo de credenciais OK.
+- **Pendente:** execução interativa do wizard (página de senhas, barra/fase, upgrade com
+  campos vazios, falha e Alt+F4 bloqueado) nesta máquina ou em VM limpa.
+
 ## Verificação — histórico até 11.02
 
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
@@ -201,20 +239,24 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 
 ## Pendências
 
-1. **Testar o setup 1.07 em máquina limpa/colega:** sem Node/Git/MySQL, com o `.exe` de
-   393,8 MB; validar extração do payload, migração do MySQL, SQL, serviços, HTTPS e bandeja.
+1. **Testar o wizard pós-1.07 em máquina limpa/colega:** usar o setup novo em
+   `deploy/windows/out/NexusSetup-1.07.11.2026.exe` (não o da Área de Trabalho, que é o build
+   anterior); validar a página de senhas, a janela de progresso, a extração do payload, a
+   migração do MySQL, o SQL, os serviços, o HTTPS e a bandeja. Testar também o upgrade com
+   os quatro campos vazios e com senhas preenchidas.
 2. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
-3. **Docs:** atualizar `docs/processo/PRODUCAO.md` para o instalador autocontido (Node
-   portátil, MySQL em `ProgramData\Nexus`, SQL sem Prisma, payload, `atualizar.ps1 -Package`)
-   e `IMPLEMENTACAO.md` se necessário.
-4. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
+3. **Docs:** o runbook `docs/processo/PRODUCAO.md` foi atualizado para o wizard; revisar
+   `IMPLEMENTACAO.md` se necessário.
+4. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar o wizard; o
+   `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
+5. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
-5. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
+6. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
    `RunLevel Highest`; conta padrão exige um tray `asInvoker` + tarefa elevada de restart.
-6. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
+7. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
    criar o usuário do representante e validar impressão/backup.
-7. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
+8. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
    CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
-8. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
+9. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
    fora do escopo.
