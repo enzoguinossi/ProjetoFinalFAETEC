@@ -13,6 +13,29 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [1.07.11.2026] - 2026-11-07
+
+Esta seção consolida o instalador autocontido: Node portátil, MySQL 8.4, Caddy, VC++, NSSM e
+app Next standalone embutidos; seed SQL sem Prisma; conversões `PCT10`/`CX50`.
+
+### Added
+- **Next standalone (KAN-170):** `output: "standalone"`; `scripts/empacotar-standalone.mjs`
+  gera `app.zip` com `server.js`, `.next/static`, `public` e client Prisma, sem `.env`/uploads.
+- **Node portátil (KAN-170):** Node 24.19.0 em `C:\Program Files\Nexus\node`, fora do PATH;
+  `NexusApp` roda `node.exe server.js`.
+- **Payload autocontido (KAN-170):** `scripts/preparar-payload.ps1` monta Node, MySQL 8.4.13,
+  Caddy, VC++, NSSM, app e SQL em `deploy/windows/payload`; o Inno Setup embute tudo.
+- **Seed SQL (KAN-170):** `deploy/sql/schema.sql` + `seed.sql` (tipos, 81 permissões,
+  2 perfis, vínculos e 3 conversões) e migração de unidades; o instalador aplica com
+  `mysql.exe`, sem Prisma.
+- **MySQL isolado (KAN-170):** dados/my.ini em `C:\ProgramData\Nexus\mysql`; serviço
+  `NexusMySQL84` na 3214; migração do caminho legado.
+
+### Changed
+- **Conversões:** `PACOTE`→`PCT10` e `CAIXA`→`CX50`; `UNIDADE` permanece padrão/fator 1.
+- **Atualização:** `atualizar.ps1` passa a trocar pacote standalone + SQL, sem Git/npm/build.
+- **Desinstalação:** remove Node/MySQL/Caddy/NSSM/app, preservando `C:\ProgramData\Nexus`.
+
 ## [11.02.11.2026] - 2026-11-02
 
 Esta seção elimina a dependência de `nssm.cc` durante a instalação.
