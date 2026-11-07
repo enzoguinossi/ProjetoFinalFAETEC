@@ -1235,10 +1235,22 @@ try {
         else {
             Write-Warn "restart.ps1 não encontrado em $restartScriptSource; o reinício pela bandeja ficará indisponível."
         }
+        foreach ($scriptName in @("iniciar-nexus.ps1", "encerrar-nexus.ps1", "abrir-bandeja.vbs")) {
+            $scriptSource = Join-Path $PSScriptRoot $scriptName
+            if (Test-Path -LiteralPath $scriptSource -PathType Leaf) {
+                Copy-Item -LiteralPath $scriptSource -Destination (Join-Path $scriptsDir $scriptName) -Force
+            }
+            else {
+                Write-Warn "$scriptName não encontrado em $scriptSource; o liga/desliga pela bandeja ficará indisponível."
+            }
+        }
         Set-AclReadExecute -Path $scriptsDir
 
         $backupScript = Join-Path $scriptsDir "backup.ps1"
         $restartScript = Join-Path $scriptsDir "restart.ps1"
+        $startScript = Join-Path $scriptsDir "iniciar-nexus.ps1"
+        $stopScript = Join-Path $scriptsDir "encerrar-nexus.ps1"
+        $stateFile = Join-Path $ConfigDir "nexus-state.json"
         $backupAction = New-ScheduledTaskAction -Execute $PsExe `
             -Argument ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -RetentionDays 30' -f $backupScript)
         $backupTrigger = New-ScheduledTaskTrigger -Daily -At "02:00"
@@ -1260,9 +1272,9 @@ try {
             if (-not $traySource) {
                 $candidates = @(
                     (Join-Path $PSScriptRoot "NexusTray\dist\NexusTray.exe"),
-                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net8.0-windows\win-x64\publish\NexusTray.exe"),
-                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net8.0-windows\win-x64\NexusTray.exe"),
-                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net8.0-windows\NexusTray.exe"),
+                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net10.0-windows\win-x64\publish\NexusTray.exe"),
+                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net10.0-windows\win-x64\NexusTray.exe"),
+                    (Join-Path $PSScriptRoot "NexusTray\bin\Release\net10.0-windows\NexusTray.exe"),
                     (Join-Path $PSScriptRoot "NexusTray.exe")
                 )
                 foreach ($candidate in $candidates) {
@@ -1308,11 +1320,16 @@ try {
                     baseUrl       = ("https://{0}" -f $Hostname)
                     healthUrl     = "http://127.0.0.1:3000/api/health"
                     serviceName   = "NexusApp"
+                    mysqlService  = $script:NexusMySqlService
+                    caddyService  = "NexusCaddy"
                     nssmPath      = $NssmExe
                     logsDir       = $LogsDir
                     dataDir       = $DataDir
                     backupScript  = $backupScript
                     restartScript = $restartScript
+                    stopScript    = $stopScript
+                    startScript   = $startScript
+                    stateFile     = $stateFile
                 }
                 Write-Utf8NoBom -Path $trayJsonPath -Lines @(($trayConfig | ConvertTo-Json -Depth 3))
                 Set-AclReadExecute -Path $trayDir

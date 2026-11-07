@@ -49,6 +49,9 @@ Source: "bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "build-instalador.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "common.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "desinstalar.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "iniciar-nexus.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "encerrar-nexus.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "abrir-bandeja.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "instalar-mysql.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "pos-instalacao-mysql.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "restart.ps1"; DestDir: "{app}"; Flags: ignoreversion
@@ -67,6 +70,7 @@ Source: "NexusTray\dist\NexusTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 Name: "{group}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"
 Name: "{group}\Desinstalar Nexus"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"; Tasks: desktopicon
+Name: "{autodesktop}\Bandeja do Nexus"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\abrir-bandeja.vbs"""; IconFilename: "{app}\NexusTray.exe"; Comment: "Reabrir a bandeja do Nexus"; Tasks: desktopicon
 
 [Code]
 var

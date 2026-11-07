@@ -13,7 +13,18 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Added
+- **Bandeja .NET 10 (KAN-170):** `NexusTray` em `net10.0-windows`, self-contained/single-file,
+  com status de `NexusMySQL84`/`NexusApp`/`NexusCaddy`, `Iniciar Nexus`, `Fechar bandeja`
+  (confirmação e encerramento Caddy→App→MySQL), ícone cinza quando parado intencionalmente e
+  fallback de ícone para falhas de GDI+ (`ExternalException`).
+- **Liga/desliga pela bandeja (KAN-170):** `iniciar-nexus.ps1`, `encerrar-nexus.ps1`,
+  `abrir-bandeja.vbs` e `nexus-state.json`; atalho **Bandeja do Nexus** na Área de Trabalho
+  (tarefa `NexusTray`, sem UAC) ao lado do atalho **Nexus** do site. Sem watchdog.
+
 ### Changed
+- **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup
+  ignorado” e sai 0, sem falhar a tarefa diária.
 - **ACL do usuário da instalação (KAN-170):** o SID do usuário que executou o setup recebe
   `Modify` em `C:\ProgramData\Nexus` e subpastas (`config`, `mysql`, `caddy`, `backups`,
   `logs`, `uploads`) e nos arquivos `backup.cnf`, `Caddyfile` e `my.ini`. Administrators e
@@ -34,6 +45,8 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   reinicia.
 
 ### Removed
+- **Item “Sair” da bandeja (KAN-170):** substituído por **Fechar bandeja**, que confirma e
+  encerra o Nexus (Caddy→App→MySQL) quando há serviço rodando.
 - **`instalar-gui.ps1` (KAN-170):** removido do repositório e do `[Files]`. O instalador não
   abre mais janela de console nem grava `instalador-*.log`; o log do Inno fica em
   `%TEMP%\Setup Log*.txt`.

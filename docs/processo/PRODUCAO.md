@@ -47,7 +47,7 @@ estações da rede
 | [`restart.ps1`](../../deploy/windows/restart.ps1) | reinício controlado do `NexusApp`; usado pela bandeja |
 | [`smoke.ps1`](../../deploy/windows/smoke.ps1) | smoke test de runtime, serviços, porta, ACLs, firewall, health e HTTPS |
 | [`desinstalar.ps1`](../../deploy/windows/desinstalar.ps1) | remove serviços, runtimes, tarefas, regras e app; preserva `C:\ProgramData\Nexus` |
-| `NexusTray` | bandeja .NET 8 self-contained; status, reinício, backup e pastas |
+| `NexusTray` | bandeja **.NET 10** self-contained; status dos três serviços, iniciar/encerrar o Nexus, reinício, backup e pastas |
 | [`common.ps1`](../../deploy/windows/common.ps1) | caminhos e funções compartilhadas |
 
 ### 1.1 Versões e componentes
@@ -61,7 +61,7 @@ estações da rede
 | Caddy | **2.11.9**, ZIP `caddy_2.11.9_windows_amd64.zip` (SHA-512) | `manifesto.json` / payload |
 | NSSM | **2.24**, `nssm.exe` (SHA-256) | `manifesto.json` / payload |
 | VC++ Redistributable | **14.x**, `vc_redist.x64.exe` | `manifesto.json` / payload |
-| Bandeja | **.NET 8**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
+| Bandeja | **.NET 10**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
 | Instalador | **Inno Setup 7**; `ISCC.exe` local ou NuGet **7.1.0** no build | `build-instalador.ps1` |
 | Setup | **393,8 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~400 MB | `deploy/windows/out/` |
 
@@ -81,7 +81,7 @@ estações da rede
 | `mysql\` | binários do MySQL 8.4.13 (`bin\mysqld.exe`, `bin\mysql.exe`, `bin\mysqldump.exe`) |
 | `caddy\` | `caddy.exe` (2.11.9) |
 | `tools\nssm\` | `nssm.exe` (2.24) |
-| `scripts\` | `backup.ps1`, `common.ps1` e `restart.ps1` copiados pelo bootstrap |
+| `scripts\` | `backup.ps1`, `common.ps1`, `restart.ps1`, `iniciar-nexus.ps1`, `encerrar-nexus.ps1` e `abrir-bandeja.vbs` copiados pelo bootstrap |
 | `NexusTray\` | `NexusTray.exe` e `tray.json` |
 | `Instalador\` | scripts do instalador e `payload\` (Node, MySQL, Caddy, VC++, NSSM, `app\app.zip`, `sql`) |
 | `Instalador\sql\` | cópia de `schema.sql`, `seed.sql` e `migracoes\001-unidades-pct10-cx50.sql` |
@@ -103,6 +103,7 @@ estações da rede
 | `backups\config\` | `.env-<timestamp>`, `Caddyfile-<timestamp>`, `my.ini-*.bak` |
 | `config\Caddyfile` | Caddyfile gerado com o hostname; leitura para `LocalService` |
 | `config\backup.cnf` | credenciais do `nexus_app` para o `mysqldump`; **sem leitura pelo app** |
+| `config\nexus-state.json` | `nexusStopped` e `updatedAt`; escrito por `iniciar-nexus.ps1`/`encerrar-nexus.ps1` e lido pela bandeja |
 | `caddy\{data,config,logs}\` | dados, configuração e logs do Caddy; a CA local fica em `caddy\data\caddy\pki\authorities\local\` |
 
 > O log do próprio Inno Setup fica em `%TEMP%\Setup Log*.txt` (o `.iss` usa
@@ -142,8 +143,11 @@ app, o `NexusCaddy` também não sobe.
 | `NexusBackup` | diário às **02:00** (executa no próximo boot se a máquina estiver desligada) | `SYSTEM` | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Nexus\scripts\backup.ps1" -RetentionDays 30` |
 | `NexusTray` | **logon do usuário que executou a instalação** | esse usuário, `RunLevel Highest` | `C:\Program Files\Nexus\NexusTray\NexusTray.exe` |
 
-A bandeja roda elevada (`requireAdministrator`) para executar o `restart.ps1` (que usa NSSM)
-sem pedir UAC. Ela não é registrada para "todos os usuários" — ver §9 e §15.
+A bandeja roda elevada (`requireAdministrator`) para executar `restart.ps1`, `iniciar-nexus.ps1`
+e `encerrar-nexus.ps1` (que usam serviços/NSSM) sem pedir UAC. Ela não é registrada para "todos
+os usuários" — ver §9 e §15. **Não há watchdog**: se a bandeja fechar/cair, o Nexus continua e
+o usuário reabre pelo atalho **Bandeja do Nexus**; os serviços sobem com o Windows
+independentemente da sessão.
 
 ### 3.3 Portas
 
@@ -239,7 +243,7 @@ O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL 
 | **3 — Diretórios e ACLs** | cria `ProgramData\Nexus\{mysql,uploads,logs,backups,config,caddy}`, aplica ACLs restritas, gera o `Caddyfile` e cria as quatro regras de firewall |
 | **4 — Banco e aplicação** | para o Caddy e o App; extrai `app.zip` em `C:\Program Files\Nexus\app` (preserva `.env`), grava/atualiza o `.env`, aplica o SQL de produção (`aplicar-sql.ps1`, modo Auto) e ajusta o cache |
 | **5 — Serviços** | configura `NexusApp` (`node.exe server.js`, env, dependência do MySQL) e `NexusCaddy`; valida health local, inicia o Caddy, instala a CA com `certutil` e valida HTTPS |
-| **6 — Bandeja e backup** | copia scripts, registra `NexusBackup` (02:00), copia o tray, grava `tray.json` e registra/inicia `NexusTray` no logon do usuário |
+| **6 - Bandeja e backup** | copia `backup.ps1`/`common.ps1`/`restart.ps1`/`iniciar-nexus.ps1`/`encerrar-nexus.ps1`/`abrir-bandeja.vbs`, registra `NexusBackup` (02:00), copia o tray .NET 10, grava `tray.json` (três serviços e scripts de liga/desliga) e registra/inicia `NexusTray` no logon do usuário; **sem watchdog** |
 | **7 — Smoke e resumo** | roda o `smoke.ps1` com a versão do `package.json` do app e imprime URL, caminhos, versão e o comando de atualização |
 
 O estado fica em `C:\ProgramData\Nexus\bootstrap.state.json`. A instalação é idempotente e
@@ -330,6 +334,10 @@ JWT_SECRET="<segredo>"
 O serviço `NexusApp` executa **`C:\Program Files\Nexus\node\node.exe server.js`**, com
 `AppDirectory` `C:\Program Files\Nexus\app`, as mesmas variáveis no ambiente do NSSM e
 `NEXT_TELEMETRY_DISABLED=1`. **Não usa `next start`** e não precisa de Node global/PATH.
+
+O setup também instala a bandeja **.NET 10** em `C:\Program Files\Nexus\NexusTray` e os
+scripts `iniciar-nexus.ps1`/`encerrar-nexus.ps1` em `C:\Program Files\Nexus\scripts`. A
+bandeja é auxiliar: o app e os serviços não dependem dela para subir.
 
 ### 5.6 Primeira execução e Super Admin
 
@@ -658,56 +666,95 @@ o `nexus_prod` de produção; se precisar do mesmo servidor, edite o dump para o
 
 ## 9. Bandeja (`NexusTray`)
 
-Executável .NET 8 self-contained em `C:\Program Files\Nexus\NexusTray\NexusTray.exe`, com
-instância única (mutex global) e `tray.json` ao lado.
+Executável **.NET 10** self-contained em `C:\Program Files\Nexus\NexusTray\NexusTray.exe`,
+com instância única (mutex global) e `tray.json` ao lado. A bandeja é **auxiliar**: liga e
+desliga o Nexus, mas não é pré-requisito para os serviços, que são **Automatic** e sobem com
+o Windows.
 
 ### 9.1 Estados
 
 | Ícone | Estado | Condição |
 | --- | --- | --- |
-| verde | em execução | `NexusApp` rodando e health 200 com `status=ok` e `db=true` |
-| amarelo | degradado | serviço rodando, health responde, mas sem `ok`/`db=true` (ex.: banco fora) |
-| vermelho | fora do ar | serviço parado/não instalado ou health inacessível |
+| verde | em execução | os três serviços rodando e health 200 com `status=ok` e `db=true` |
+| amarelo | degradado | `NexusApp` rodando, health responde, mas sem `ok`/`db=true` (ex.: banco fora) |
+| vermelho | fora do ar | algum serviço parado/não instalado ou health inacessível |
+| cinza | parado intencionalmente | os três parados e `nexus-state.json` com `nexusStopped=true` |
 
 Polling a cada **20 s**; a transição gera balão. Tooltip: `Nexus — estado · v<versão>`.
+
+O estado fica em `C:\ProgramData\Nexus\config\nexus-state.json`:
+
+```json
+{ "nexusStopped": true, "updatedAt": "2026-11-07T14:07:00.0000000-03:00" }
+```
+
+A bandeja só usa `nexusStopped` quando os **três** serviços estão parados; se algum estiver
+rodando, o estado real vence (estado antigo é ignorado).
 
 ### 9.2 Menu
 
 | Item | Ação |
 | --- | --- |
-| **Abrir Nexus** | abre `https://<hostname>` (via `explorer.exe`, fora do processo elevado) |
-| **Status** | `Serviço: ... · Banco: ... · v...` |
-| **Reiniciar aplicação** | executa `restart.ps1`: para o Caddy, reinicia o App, espera health, inicia o Caddy e confere o health; log `restart-<timestamp>.log` |
+| **Iniciar Nexus** | habilitado quando nem tudo está rodando; executa `iniciar-nexus.ps1` (MySQL → App → Caddy, health) |
+| **Abrir Nexus** | só com os três serviços rodando e health ok; abre `https://<hostname>` via `explorer.exe` |
+| **Status** | `MySQL ... · App ... · Caddy ... · Banco ... · v...` (desabilitado) |
+| **Reiniciar aplicação** | só com tudo rodando; executa `restart.ps1` (para o Caddy, reinicia o App, espera health, inicia o Caddy) |
+| **Fazer backup agora** | só com tudo rodando; executa `backup.ps1` |
 | **Abrir logs** | abre `C:\ProgramData\Nexus\logs` |
-| **Fazer backup agora** | roda `C:\Program Files\Nexus\scripts\backup.ps1` |
 | **Abrir pasta de dados** | abre `C:\ProgramData\Nexus` |
-| **Sair** | encerra só a bandeja; serviços continuam |
+| **Fechar bandeja** | com qualquer serviço rodando pede confirmação e executa `encerrar-nexus.ps1`; com tudo parado fecha direto |
 
-### 9.3 `tray.json`
+Não existe mais **Sair**: o único fechamento é **Fechar bandeja**, com a regra abaixo.
+
+### 9.3 Fechar a bandeja e encerrar o Nexus
+
+- **Com qualquer serviço rodando**, `MessageBox` Yes/No (padrão **Não**): “Fechar a bandeja e
+  encerrar o Nexus? Isso vai parar o Node, o Caddy e o MySQL agora. Para abrir de novo, use o
+  atalho Bandeja do Nexus na Área de Trabalho.”
+  - **Não** → a bandeja permanece aberta.
+  - **Sim** → `encerrar-nexus.ps1` para **Caddy → App → MySQL**; se exit 0, a bandeja fecha;
+    se falhar, mostra o erro e **não** fecha.
+- **Com tudo parado** → fecha direto, sem confirmação e sem executar script.
+- **Decisão 1A:** os serviços continuam **Automatic** e voltam no próximo boot. O
+  `encerrar-nexus.ps1` **não** muda o start type para Manual.
+- O atalho **Bandeja do Nexus** na Área de Trabalho executa `abrir-bandeja.vbs` com
+  `wscript.exe`; o `.vbs` roda a tarefa agendada `NexusTray` oculta, **sem UAC** e **sem
+  iniciar serviços**. O atalho **Nexus** continua abrindo o site.
+
+### 9.4 `tray.json`
 
 ```json
 {
   "baseUrl": "https://nexus.galpao.local",
   "healthUrl": "http://127.0.0.1:3000/api/health",
   "serviceName": "NexusApp",
+  "mysqlService": "NexusMySQL84",
+  "caddyService": "NexusCaddy",
   "nssmPath": "C:\\Program Files\\Nexus\\tools\\nssm\\nssm.exe",
   "logsDir": "C:\\ProgramData\\Nexus\\logs",
   "dataDir": "C:\\ProgramData\\Nexus",
   "backupScript": "C:\\Program Files\\Nexus\\scripts\\backup.ps1",
-  "restartScript": "C:\\Program Files\\Nexus\\scripts\\restart.ps1"
+  "restartScript": "C:\\Program Files\\Nexus\\scripts\\restart.ps1",
+  "stopScript": "C:\\Program Files\\Nexus\\scripts\\encerrar-nexus.ps1",
+  "startScript": "C:\\Program Files\\Nexus\\scripts\\iniciar-nexus.ps1",
+  "stateFile": "C:\\ProgramData\\Nexus\\config\\nexus-state.json"
 }
 ```
 
 Se faltar ou estiver inválido, a bandeja usa os padrões do código (já apontam para
 `C:\Program Files\Nexus\scripts`). Mantenha o arquivo para preservar os caminhos.
 
-### 9.4 Limitações
+### 9.5 Limitações
 
 - Registrada no **logon do usuário que instalou**, com `RunLevel Highest`; outros usuários
   não a veem.
-- `requireAdministrator`; abrir sem elevação pede UAC.
+- `requireAdministrator`; abrir diretamente o `.exe` sem elevação pede UAC. O atalho
+  **Bandeja do Nexus** não pede UAC porque usa a tarefa `NexusTray` já registrada.
+- **Sem watchdog**: se a bandeja fechar ou cair, o Nexus continua; reabra pelo atalho.
 - O `restart.ps1` afeta **Caddy e App**; se o App não voltar ao health, o Caddy fica parado
-  até intervenção. O `NexusMySQL84` **não** é reiniciado pelo script.
+  até intervenção. O `NexusMySQL84` **não** é reiniciado por ele.
+- **Fechar a bandeja** encerra os três serviços **agora**, mas eles continuam Automatic e
+  voltam no próximo boot; não há auto-login obrigatório.
 - Falhas fatais vão para `%LOCALAPPDATA%\NexusTray\tray.log` (do usuário).
 
 ---
@@ -738,7 +785,8 @@ cd "C:\Program Files\Nexus\Instalador"
 Confere Node portátil, `mysqld.exe`, os três serviços, a porta 3214, as ACLs de
 `backups`/`config`/`app\.env`, as quatro regras de firewall, o health com `db=true`,
 `https://<hostname>/login` e a versão. **Não ignora erro de certificado**: o HTTPS exige a CA
-do Caddy confiada. Saída `SMOKE: OK` (0) ou `SMOKE: FALHOU` (1).
+do Caddy confiada. Saída `SMOKE: OK` (0) ou `SMOKE: FALHOU` (1). A bandeja é verificada
+apenas como **aviso** (processo/tarefa `NexusTray`); ausência de sessão não falha o smoke.
 
 ### 10.3 Testes manuais
 
@@ -747,6 +795,8 @@ Invoke-RestMethod http://127.0.0.1:3000/api/health | ConvertTo-Json
 Invoke-WebRequest https://nexus.galpao.local/login -UseBasicParsing | Select-Object StatusCode
 Get-Service NexusMySQL84, NexusApp, NexusCaddy | Select-Object Name, Status, StartType
 Get-ScheduledTask NexusBackup, NexusTray | Select-Object TaskName, State
+Get-Process NexusTray -ErrorAction SilentlyContinue
+Get-Content C:\ProgramData\Nexus\config\nexus-state.json -ErrorAction SilentlyContinue
 Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled, Action
 ```
 
@@ -773,7 +823,9 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | smoke falha em ACL `BUILTIN\Users` | ACL herdada/alterada | rode `smoke`/bootstrap elevado; reaplique `Set-AclRestricted`/`Protect-File`; confira com `icacls` |
 | atualização por pacote falha | `app.zip`/`sql` ausente, `server.js` ausente, health/smoke | confira o layout `app\app.zip` + `sql\`; veja `deploy-<versão>.log` e `app.failed-<versão>`; o banco não volta automaticamente |
 | atualização de 10.02 para 1.07 não conclui | pacote de app não instala runtime/MySQL | use o **setup**/bootstrap 1.07; o `atualizar.ps1` só troca app+SQL |
-| bandeja não aparece | tarefa de outro usuário/logon | `Get-ScheduledTask NexusTray`; rode o exe elevado ou registre no usuário desejado |
+| bandeja não aparece | tarefa de outro usuário/logon | `Get-ScheduledTask NexusTray`; abra pelo atalho **Bandeja do Nexus** ou rode o exe elevado; ela inicia no logon do usuário que instalou |
+| **Iniciar Nexus** falha | serviço parado com dependência/porta/health | veja `iniciar-nexus-<timestamp>.log`, `app.err.log` e `Get-Service NexusMySQL84, NexusApp, NexusCaddy`; confira a 3214 e o health local |
+| **Fechar bandeja** não encerra | script/serviço preso | veja `encerrar-nexus-<timestamp>.log`; a bandeja permanece aberta de propósito quando o script retorna != 0 |
 | backup falha | `backup.cnf` ausente/porta errada/MySQL fora | confira a porta 3214 no `backup.cnf`; rode a fase 2 do bootstrap; veja `backup-<timestamp>.log` |
 | disco enche | uploads/my.ini antigos, `.sql` grande, `app.failed-*` | limpe `backups\uploads`/`.sql` antigos e versões `app.failed-*` após conferir os backups |
 | desinstalação falha e preserva runtime | serviço/tarefa não removido | veja `desinstalar-*.log`; corrija serviço/tarefa e rode de novo |
@@ -794,6 +846,8 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | `C:\ProgramData\Nexus\logs\deploy-*.log` | atualização por pacote |
 | `C:\ProgramData\Nexus\logs\backup-*.log` | backup |
 | `C:\ProgramData\Nexus\logs\restart-*.log` | reinício pela bandeja |
+| `C:\ProgramData\Nexus\logs\iniciar-nexus-*.log` | ligar o Nexus pela bandeja |
+| `C:\ProgramData\Nexus\logs\encerrar-nexus-*.log` | fechar a bandeja/encerrar o Nexus |
 | `C:\ProgramData\Nexus\logs\desinstalar-*.log` | desinstalação |
 | `%LOCALAPPDATA%\NexusTray\tray.log` | falha fatal da bandeja |
 
@@ -942,6 +996,11 @@ Para remoção total, depois de copiar o que precisa:
       os quatro campos vazios reutiliza o `backup.cnf`; a janela modal mostra a fase atual e
       a barra avança até 8; falha do bootstrap mostra o código e os logs e não restaura o
       banco.
+- [ ] **Bandeja .NET 10:** abrir pelo logon/atalho; status dos três serviços; fechar com o
+      Nexus rodando pede confirmação e para **Caddy→App→MySQL** (serviços seguem Automatic);
+      fechar com tudo parado não pede confirmação; reabrir pelo atalho **Bandeja do Nexus**
+      sem UAC; `Iniciar Nexus` sobe na ordem e valida health; matar a bandeja não para o
+      Nexus; reboot sobe os serviços; backup com MySQL parado sai 0.
 - [ ] VM Windows limpa (10/11 x64, sem Node/Git/MySQL): instalação completa, hostname,
       MySQL 8.4.13 dedicado, SQL, serviços, tray, firewall e `smoke.ps1`.
 - [ ] **Upgrade 10.02→1.07** na máquina de teste: dados migrados de
@@ -971,7 +1030,8 @@ Para remoção total, depois de copiar o que precisa:
    outra CA.
 
 3. **A bandeja é registrada só para o usuário que instalou.**
-   `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários não a veem.
+   `NexusTray` usa `AtLogOn -User $currentUser`; outros usuários não a veem nem reabrem pelo
+   atalho. O atalho **Bandeja do Nexus** usa a tarefa `NexusTray` e não pede UAC.
 
 4. **O `.env` não é mesclado na atualização por pacote.**
    `atualizar.ps1` copia o `.env` anterior e garante `UPLOADS_DIR`/`NODE_ENV`/`PORT`/`HOSTNAME`;
@@ -1028,6 +1088,12 @@ Para remoção total, depois de copiar o que precisa:
     backup/restauração, logs e configuração sem elevação; os demais usuários continuam
     precisando de elevação. `C:\Program Files\Nexus` e `app\.env` **não** recebem esse
     acesso.
+
+15. **Fechar a bandeja encerra o Nexus agora; não é desligamento permanente.**
+    O `encerrar-nexus.ps1` para Caddy→App→MySQL, mas os três serviços continuam
+    **Automatic** e voltam no próximo boot — não há watchdog, auto-login obrigatório nem
+    mudança para Manual. Para religar sem reboot, use **Iniciar Nexus** ou o atalho
+    **Bandeja do Nexus**. O `backup.ps1` com o MySQL parado apenas registra e sai 0.
 
 ---
 

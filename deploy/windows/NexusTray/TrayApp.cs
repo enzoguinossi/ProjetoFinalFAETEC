@@ -20,21 +20,28 @@ internal sealed class TrayApp : ApplicationContext
     private static readonly Color GreenColor = Color.FromArgb(46, 158, 68);
     private static readonly Color YellowColor = Color.FromArgb(224, 161, 0);
     private static readonly Color RedColor = Color.FromArgb(214, 69, 69);
+    private static readonly Color GrayColor = Color.FromArgb(128, 128, 128);
 
     private readonly TrayConfig _config;
     private readonly HttpClient _http;
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
+    private readonly ToolStripMenuItem _startItem;
+    private readonly ToolStripMenuItem _openItem;
+    private readonly ToolStripMenuItem _restartItem;
     private readonly ToolStripMenuItem _backupItem;
+    private readonly ToolStripMenuItem _closeItem;
     private readonly System.Windows.Forms.Timer _timer;
 
     private Icon? _icon;
     private IntPtr _iconHandle = IntPtr.Zero;
     private TrayState? _iconState;
     private TrayState? _lastState;
+    private TraySnapshot? _lastSnapshot;
     private bool _polling;
-    private bool _restarting;
+    private bool _operationInProgress;
+    private bool _closing;
     private bool _disposed;
 
     public TrayApp(TrayConfig config)
@@ -44,36 +51,40 @@ internal sealed class TrayApp : ApplicationContext
 
         _statusItem = new ToolStripMenuItem("Status: verificando…") { Enabled = false };
 
-        ToolStripMenuItem openItem = new("Abrir Nexus");
-        openItem.Click += (_, _) => OpenUrl(_config.BaseUrl);
+        _startItem = new ToolStripMenuItem("Iniciar Nexus");
+        _startItem.Click += OnStartClick;
 
-        ToolStripMenuItem restartItem = new("Reiniciar aplicação");
-        restartItem.Click += async (_, _) => await RestartServiceAsync();
+        _openItem = new ToolStripMenuItem("Abrir Nexus");
+        _openItem.Click += (_, _) => OpenUrl(_config.BaseUrl);
+
+        _restartItem = new ToolStripMenuItem("Reiniciar aplicação");
+        _restartItem.Click += OnRestartClick;
 
         ToolStripMenuItem logsItem = new("Abrir logs");
         logsItem.Click += (_, _) => OpenFolder(_config.LogsDir, "logs");
 
         _backupItem = new ToolStripMenuItem("Fazer backup agora");
-        _backupItem.Click += (_, _) => RunBackup();
+        _backupItem.Click += OnBackupClick;
 
         ToolStripMenuItem dataItem = new("Abrir pasta de dados");
         dataItem.Click += (_, _) => OpenFolder(_config.DataDir, "dados");
 
-        ToolStripMenuItem exitItem = new("Sair");
-        exitItem.Click += (_, _) => ExitApplication();
+        _closeItem = new ToolStripMenuItem("Fechar bandeja");
+        _closeItem.Click += OnCloseClick;
 
         _menu = new ContextMenuStrip();
         _menu.Items.AddRange(new ToolStripItem[]
         {
-            openItem,
+            _startItem,
+            _openItem,
             _statusItem,
             new ToolStripSeparator(),
-            restartItem,
-            logsItem,
+            _restartItem,
             _backupItem,
+            logsItem,
             dataItem,
             new ToolStripSeparator(),
-            exitItem
+            _closeItem
         });
 
         _notifyIcon = new NotifyIcon
@@ -85,6 +96,7 @@ internal sealed class TrayApp : ApplicationContext
         _notifyIcon.DoubleClick += (_, _) => OpenUrl(_config.BaseUrl);
 
         SetStateIcon(TrayState.Red);
+        UpdateMenuEnabled();
 
         _timer = new System.Windows.Forms.Timer { Interval = PollIntervalMs };
         _timer.Tick += OnTimerTick;
@@ -114,17 +126,21 @@ internal sealed class TrayApp : ApplicationContext
         _polling = true;
         try
         {
-            ServiceSnapshot service = ReadService();
-            HealthResult health = service.Running
+            ServiceSet services = ReadServices();
+            HealthResult health = services.App.Running
                 ? await CheckHealthAsync()
                 : HealthResult.Unavailable("—");
 
+            // Estado antigo só vale quando os três serviços estão parados; se
+            // algum estiver rodando, o estado real vence.
+            bool stoppedState = services.AllStopped && ReadNexusStopped();
+
             TrayState state;
-            if (!service.Running)
+            if (stoppedState)
             {
-                state = TrayState.Red;
+                state = TrayState.Gray;
             }
-            else if (!health.Reachable)
+            else if (!services.AllRunning || !health.Reachable)
             {
                 state = TrayState.Red;
             }
@@ -133,7 +149,7 @@ internal sealed class TrayApp : ApplicationContext
                 state = health.Ok ? TrayState.Green : TrayState.Yellow;
             }
 
-            Apply(new TraySnapshot(state, service.Text, health.Text, health.Versao));
+            Apply(new TraySnapshot(state, services, health));
         }
         catch (Exception)
         {
@@ -149,15 +165,32 @@ internal sealed class TrayApp : ApplicationContext
     {
         TrayState? previous = _lastState;
         _lastState = snapshot.State;
+        _lastSnapshot = snapshot;
 
         SetStateIcon(snapshot.State);
         _notifyIcon.Text = Truncate(BuildTooltip(snapshot), TooltipLimit);
         _statusItem.Text = BuildStatus(snapshot);
+        UpdateMenuEnabled();
 
         if (previous.HasValue && previous.Value != snapshot.State)
         {
             NotifyTransition(snapshot.State);
         }
+    }
+
+    private void UpdateMenuEnabled()
+    {
+        bool busy = _operationInProgress || _closing;
+        bool hasSnapshot = _lastSnapshot.HasValue;
+        TraySnapshot snapshot = _lastSnapshot.GetValueOrDefault();
+        bool allRunning = hasSnapshot && snapshot.Services.AllRunning;
+        bool healthOk = hasSnapshot && snapshot.Health.Ok;
+
+        _startItem.Enabled = !busy && hasSnapshot && !allRunning;
+        _openItem.Enabled = !busy && allRunning && healthOk;
+        _restartItem.Enabled = !busy && allRunning;
+        _backupItem.Enabled = !busy && allRunning;
+        _closeItem.Enabled = !busy;
     }
 
     private static string BuildTooltip(TraySnapshot snapshot)
@@ -166,11 +199,12 @@ internal sealed class TrayApp : ApplicationContext
         {
             TrayState.Green => "em execução",
             TrayState.Yellow => "degradado",
+            TrayState.Gray => "parado",
             _ => "fora do ar"
         };
 
         string text = "Nexus — " + stateText;
-        string? version = NormalizeVersion(snapshot.Version);
+        string? version = NormalizeVersion(snapshot.Health.Versao);
         if (version is not null)
         {
             text += " · " + version;
@@ -181,8 +215,10 @@ internal sealed class TrayApp : ApplicationContext
 
     private static string BuildStatus(TraySnapshot snapshot)
     {
-        string version = NormalizeVersion(snapshot.Version) ?? "versão desconhecida";
-        return $"Serviço: {snapshot.ServiceText} · Banco: {snapshot.HealthText} · {version}";
+        ServiceSet services = snapshot.Services;
+        string version = NormalizeVersion(snapshot.Health.Versao) ?? "versão desconhecida";
+        return $"Status: MySQL {services.Mysql.Text} · App {services.App.Text} · " +
+               $"Caddy {services.Caddy.Text} · Banco {snapshot.Health.Text} · {version}";
     }
 
     private static string? NormalizeVersion(string? version)
@@ -208,7 +244,7 @@ internal sealed class TrayApp : ApplicationContext
             case TrayState.Red:
                 ShowBalloon(
                     "Nexus indisponível",
-                    "O serviço ou o health check não está respondendo.",
+                    "Um serviço ou o health check não está respondendo.",
                     ToolTipIcon.Error);
                 break;
             case TrayState.Yellow:
@@ -216,6 +252,12 @@ internal sealed class TrayApp : ApplicationContext
                     "Nexus degradado",
                     "O serviço está ativo, mas o banco de dados não respondeu.",
                     ToolTipIcon.Warning);
+                break;
+            case TrayState.Gray:
+                ShowBalloon(
+                    "Nexus parado",
+                    "Os serviços foram encerrados. Use Iniciar Nexus para subir de novo.",
+                    ToolTipIcon.Info);
                 break;
             case TrayState.Green:
                 ShowBalloon(
@@ -233,7 +275,7 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        (Icon icon, IntPtr handle) = CreateIcon(state);
+        (Icon? icon, IntPtr handle) = CreateIcon(state);
         _notifyIcon.Icon = icon;
 
         if (_icon is not null)
@@ -251,46 +293,83 @@ internal sealed class TrayApp : ApplicationContext
         _iconState = state;
     }
 
-    private static (Icon Icon, IntPtr Handle) CreateIcon(TrayState state)
-    {
-        Color color = state switch
-        {
-            TrayState.Green => GreenColor,
-            TrayState.Yellow => YellowColor,
-            _ => RedColor
-        };
-
-        using Bitmap bitmap = new(32, 32);
-        using (Graphics graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            graphics.Clear(Color.Transparent);
-
-            using (SolidBrush brush = new(color))
-            {
-                graphics.FillEllipse(brush, 2, 2, 28, 28);
-            }
-
-            using (Pen border = new(Color.FromArgb(70, 0, 0, 0), 1.5f))
-            {
-                graphics.DrawEllipse(border, 2.75f, 2.75f, 26.5f, 26.5f);
-            }
-
-            using (SolidBrush highlight = new(Color.FromArgb(80, Color.White)))
-            {
-                graphics.FillEllipse(highlight, 9, 8, 9, 7);
-            }
-        }
-
-        IntPtr handle = bitmap.GetHicon();
-        return (Icon.FromHandle(handle), handle);
-    }
-
-    private ServiceSnapshot ReadService()
+    private static (Icon? Icon, IntPtr Handle) CreateIcon(TrayState state)
     {
         try
         {
-            using ServiceController controller = new(_config.ServiceName);
+            Color color = state switch
+            {
+                TrayState.Green => GreenColor,
+                TrayState.Yellow => YellowColor,
+                TrayState.Gray => GrayColor,
+                _ => RedColor
+            };
+
+            using Bitmap bitmap = new(32, 32);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                graphics.Clear(Color.Transparent);
+
+                using (SolidBrush brush = new(color))
+                {
+                    graphics.FillEllipse(brush, 2, 2, 28, 28);
+                }
+
+                using (Pen border = new(Color.FromArgb(70, 0, 0, 0), 1.5f))
+                {
+                    graphics.DrawEllipse(border, 2.75f, 2.75f, 26.5f, 26.5f);
+                }
+
+                using (SolidBrush highlight = new(Color.FromArgb(80, Color.White)))
+                {
+                    graphics.FillEllipse(highlight, 9, 8, 9, 7);
+                }
+            }
+
+            IntPtr handle = bitmap.GetHicon();
+            return (Icon.FromHandle(handle), handle);
+        }
+        catch (ExternalException)
+        {
+            // GDI+ pode falhar no .NET 10 (ExternalException); a bandeja não pode cair.
+            return FallbackIcon();
+        }
+        catch (OutOfMemoryException)
+        {
+            return FallbackIcon();
+        }
+        catch (Exception)
+        {
+            return FallbackIcon();
+        }
+    }
+
+    private static (Icon? Icon, IntPtr Handle) FallbackIcon()
+    {
+        try
+        {
+            return ((Icon)SystemIcons.Application.Clone(), IntPtr.Zero);
+        }
+        catch
+        {
+            return (null, IntPtr.Zero);
+        }
+    }
+
+    private ServiceSet ReadServices()
+    {
+        return new ServiceSet(
+            ReadService(_config.MysqlService),
+            ReadService(_config.ServiceName),
+            ReadService(_config.CaddyService));
+    }
+
+    private static ServiceSnapshot ReadService(string name)
+    {
+        try
+        {
+            using ServiceController controller = new(name);
             ServiceControllerStatus status = controller.Status;
             return status switch
             {
@@ -311,6 +390,25 @@ internal sealed class TrayApp : ApplicationContext
         catch (Exception)
         {
             return new ServiceSnapshot(false, "indisponível");
+        }
+    }
+
+    private bool ReadNexusStopped()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_config.StateFile) || !File.Exists(_config.StateFile))
+            {
+                return false;
+            }
+
+            NexusStatePayload? state = JsonSerializer.Deserialize<NexusStatePayload>(
+                File.ReadAllText(_config.StateFile));
+            return state?.NexusStopped == true;
+        }
+        catch (Exception)
+        {
+            return false;
         }
     }
 
@@ -350,51 +448,77 @@ internal sealed class TrayApp : ApplicationContext
         }
     }
 
-    private async Task RestartServiceAsync()
+    private async void OnStartClick(object? sender, EventArgs e)
     {
-        if (_restarting)
+        await StartNexusAsync();
+    }
+
+    private async void OnRestartClick(object? sender, EventArgs e)
+    {
+        await RestartServiceAsync();
+    }
+
+    private async void OnBackupClick(object? sender, EventArgs e)
+    {
+        await RunBackupAsync();
+    }
+
+    private async void OnCloseClick(object? sender, EventArgs e)
+    {
+        await CloseTrayAsync();
+    }
+
+    private async Task StartNexusAsync()
+    {
+        if (_operationInProgress || _closing)
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_config.RestartScript) || !File.Exists(_config.RestartScript))
-        {
-            ShowBalloon(
-                "Reinício não configurado",
-                $"O script de reinício não foi encontrado: {_config.RestartScript}",
-                ToolTipIcon.Error);
-            return;
-        }
-
-        _restarting = true;
+        _operationInProgress = true;
+        UpdateMenuEnabled();
         try
         {
-            ProcessStartInfo startInfo = new(GetPowerShellPath())
+            ShowBalloon("Nexus", "Iniciando os serviços do Nexus…", ToolTipIcon.Info);
+            int exitCode = await RunScriptAsync(_config.StartScript, "iniciar o Nexus");
+            if (exitCode == 0)
             {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-            startInfo.ArgumentList.Add("-NoProfile");
-            startInfo.ArgumentList.Add("-ExecutionPolicy");
-            startInfo.ArgumentList.Add("Bypass");
-            startInfo.ArgumentList.Add("-File");
-            startInfo.ArgumentList.Add(_config.RestartScript);
-
-            using Process? process = Process.Start(startInfo);
-            if (process is null)
+                ShowBalloon("Nexus", "Serviços iniciados. Validando o health…", ToolTipIcon.Info);
+            }
+            else
             {
                 ShowBalloon(
-                    "Falha ao reiniciar",
-                    "Não foi possível iniciar o script de reinício.",
+                    "Falha ao iniciar",
+                    $"O script terminou com código {exitCode}. Veja os logs.",
                     ToolTipIcon.Error);
-                return;
             }
+        }
+        catch (Exception ex)
+        {
+            ShowBalloon("Falha ao iniciar", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
+            UpdateMenuEnabled();
+            _ = PollAfterAsync(TimeSpan.FromSeconds(2));
+        }
+    }
 
+    private async Task RestartServiceAsync()
+    {
+        if (_operationInProgress || _closing)
+        {
+            return;
+        }
+
+        _operationInProgress = true;
+        UpdateMenuEnabled();
+        try
+        {
             ShowBalloon("Nexus", "Reiniciando a aplicação…", ToolTipIcon.Info);
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
+            int exitCode = await RunScriptAsync(_config.RestartScript, "reiniciar a aplicação");
+            if (exitCode == 0)
             {
                 ShowBalloon("Nexus", "Aplicação reiniciada com sucesso.", ToolTipIcon.Info);
             }
@@ -402,11 +526,9 @@ internal sealed class TrayApp : ApplicationContext
             {
                 ShowBalloon(
                     "Falha ao reiniciar",
-                    $"O script terminou com código {process.ExitCode}. Veja os logs.",
+                    $"O script terminou com código {exitCode}. Veja os logs.",
                     ToolTipIcon.Error);
             }
-
-            _ = PollAfterAsync(TimeSpan.FromSeconds(2));
         }
         catch (Exception ex)
         {
@@ -414,8 +536,147 @@ internal sealed class TrayApp : ApplicationContext
         }
         finally
         {
-            _restarting = false;
+            _operationInProgress = false;
+            UpdateMenuEnabled();
+            _ = PollAfterAsync(TimeSpan.FromSeconds(2));
         }
+    }
+
+    private async Task RunBackupAsync()
+    {
+        if (_operationInProgress || _closing)
+        {
+            return;
+        }
+
+        _operationInProgress = true;
+        UpdateMenuEnabled();
+        try
+        {
+            ShowBalloon("Backup", "O backup foi iniciado em segundo plano.", ToolTipIcon.Info);
+            int exitCode = await RunScriptAsync(_config.BackupScript, "fazer o backup");
+            if (exitCode == 0)
+            {
+                ShowBalloon("Backup concluído", "O backup foi gerado com sucesso.", ToolTipIcon.Info);
+            }
+            else
+            {
+                ShowBalloon(
+                    "Falha no backup",
+                    $"O script terminou com código {exitCode}. Veja os logs.",
+                    ToolTipIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowBalloon("Falha no backup", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
+            UpdateMenuEnabled();
+            _ = PollAfterAsync(TimeSpan.FromSeconds(2));
+        }
+    }
+
+    private async Task CloseTrayAsync()
+    {
+        if (_closing || _operationInProgress)
+        {
+            return;
+        }
+
+        _closing = true;
+        UpdateMenuEnabled();
+        try
+        {
+            ServiceSet services = ReadServices();
+            if (services.AnyRunning)
+            {
+                DialogResult answer = MessageBox.Show(
+                    "Fechar a bandeja e encerrar o Nexus? Isso vai parar o Node, o Caddy e o MySQL agora." +
+                    Environment.NewLine + Environment.NewLine +
+                    "Para abrir de novo, use o atalho Bandeja do Nexus na Área de Trabalho.",
+                    "Nexus - fechar bandeja",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+
+                if (answer != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                int exitCode = await RunScriptAsync(_config.StopScript, "encerrar o Nexus");
+                if (exitCode != 0)
+                {
+                    MessageBox.Show(
+                        $"O Nexus não foi encerrado (código {exitCode}). A bandeja continua aberta." +
+                        Environment.NewLine + Environment.NewLine +
+                        $"Veja os logs em {_config.LogsDir}.",
+                        "Nexus - falha ao encerrar",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
+                }
+            }
+
+            // Tudo parado (ou encerrado agora): fecha sem prompt.
+            ExitApplication();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Falha ao fechar a bandeja: {ex.Message}",
+                "Nexus - falha ao fechar",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            _closing = false;
+            if (!_disposed)
+            {
+                UpdateMenuEnabled();
+            }
+        }
+    }
+
+    private async Task<int> RunScriptAsync(string scriptPath, string action)
+    {
+        if (string.IsNullOrWhiteSpace(scriptPath) || !File.Exists(scriptPath))
+        {
+            ShowBalloon(
+                "Script não encontrado",
+                $"O script para {action} não foi encontrado: {scriptPath}",
+                ToolTipIcon.Error);
+            return -1;
+        }
+
+        ProcessStartInfo startInfo = new(GetPowerShellPath())
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden
+        };
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-ExecutionPolicy");
+        startInfo.ArgumentList.Add("Bypass");
+        startInfo.ArgumentList.Add("-File");
+        startInfo.ArgumentList.Add(scriptPath);
+
+        using Process? process = Process.Start(startInfo);
+        if (process is null)
+        {
+            ShowBalloon(
+                "Falha ao executar",
+                $"Não foi possível iniciar o script para {action}.",
+                ToolTipIcon.Error);
+            return -1;
+        }
+
+        await process.WaitForExitAsync();
+        return process.ExitCode;
     }
 
     private async Task PollAfterAsync(TimeSpan delay)
@@ -477,72 +738,6 @@ internal sealed class TrayApp : ApplicationContext
         }
     }
 
-    private async void RunBackup()
-    {
-        if (!_backupItem.Enabled)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_config.BackupScript) || !File.Exists(_config.BackupScript))
-        {
-            ShowBalloon(
-                "Backup não configurado",
-                $"O script de backup não foi encontrado: {_config.BackupScript}",
-                ToolTipIcon.Error);
-            return;
-        }
-
-        _backupItem.Enabled = false;
-        try
-        {
-            ProcessStartInfo startInfo = new(GetPowerShellPath())
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-            startInfo.ArgumentList.Add("-NoProfile");
-            startInfo.ArgumentList.Add("-ExecutionPolicy");
-            startInfo.ArgumentList.Add("Bypass");
-            startInfo.ArgumentList.Add("-File");
-            startInfo.ArgumentList.Add(_config.BackupScript);
-
-            using Process? process = Process.Start(startInfo);
-            if (process is null)
-            {
-                ShowBalloon(
-                    "Falha no backup",
-                    "Não foi possível iniciar o script de backup.",
-                    ToolTipIcon.Error);
-                return;
-            }
-
-            ShowBalloon("Backup", "O backup foi iniciado em segundo plano.", ToolTipIcon.Info);
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
-            {
-                ShowBalloon("Backup concluído", "O backup foi gerado com sucesso.", ToolTipIcon.Info);
-            }
-            else
-            {
-                ShowBalloon(
-                    "Falha no backup",
-                    $"O script terminou com código {process.ExitCode}. Veja os logs.",
-                    ToolTipIcon.Error);
-            }
-        }
-        catch (Exception ex)
-        {
-            ShowBalloon("Falha no backup", ex.Message, ToolTipIcon.Error);
-        }
-        finally
-        {
-            _backupItem.Enabled = true;
-        }
-    }
-
     private static string GetPowerShellPath()
     {
         string system = Environment.GetFolderPath(Environment.SpecialFolder.System);
@@ -599,16 +794,28 @@ internal sealed class TrayApp : ApplicationContext
     {
         Green,
         Yellow,
-        Red
+        Red,
+        Gray
     }
 
     private readonly record struct ServiceSnapshot(bool Running, string Text);
 
+    private readonly record struct ServiceSet(
+        ServiceSnapshot Mysql,
+        ServiceSnapshot App,
+        ServiceSnapshot Caddy)
+    {
+        public bool AllRunning => Mysql.Running && App.Running && Caddy.Running;
+
+        public bool AnyRunning => Mysql.Running || App.Running || Caddy.Running;
+
+        public bool AllStopped => !AnyRunning;
+    }
+
     private readonly record struct TraySnapshot(
         TrayState State,
-        string ServiceText,
-        string HealthText,
-        string? Version);
+        ServiceSet Services,
+        HealthResult Health);
 
     private readonly record struct HealthResult(
         bool Reachable,
@@ -617,6 +824,12 @@ internal sealed class TrayApp : ApplicationContext
         string Text)
     {
         public static HealthResult Unavailable(string text) => new(false, false, null, text);
+    }
+
+    private sealed class NexusStatePayload
+    {
+        [JsonPropertyName("nexusStopped")]
+        public bool? NexusStopped { get; set; }
     }
 
     private sealed class HealthPayload

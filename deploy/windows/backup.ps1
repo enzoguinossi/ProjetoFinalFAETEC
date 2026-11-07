@@ -61,6 +61,17 @@ catch {
     Write-Warn "Não foi possível iniciar o log em $logPath`: $($_.Exception.Message)"
 }
 
+# Com o Nexus encerrado (vencedor 1A), a tarefa diária não falha: apenas registra.
+$mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
+if (-not $mysqlService -or $mysqlService.Status.ToString() -ne "Running") {
+    Write-Warn "MySQL parado; backup ignorado (serviço $($script:NexusMySqlService))."
+    Write-Host "BACKUP: OK (ignorado)" -ForegroundColor Yellow
+    if ($transcriptActive) {
+        try { Stop-Transcript | Out-Null } catch { }
+    }
+    exit 0
+}
+
 $mysqlDump = $null
 $dbBackupDir = Join-Path $BackupsDir "db"
 $uploadsBackupDir = Join-Path $BackupsDir "uploads"

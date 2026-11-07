@@ -216,6 +216,22 @@ if ($ExpectedVersion) {
     }
 }
 
+# A bandeja é auxiliar: ausência de sessão/processo não falha o smoke.
+$trayProcess = Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue
+$trayTask = $null
+if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {
+    $trayTask = Get-ScheduledTask -TaskName "NexusTray" -ErrorAction SilentlyContinue
+}
+if ($trayProcess) {
+    Write-Ok "Bandeja NexusTray em execução."
+}
+elseif ($trayTask) {
+    Write-Warn "Bandeja NexusTray registrada no logon, mas não está em execução nesta sessão."
+}
+else {
+    Write-Warn "Bandeja NexusTray não registrada (auxiliar; o Nexus não depende dela)."
+}
+
 Write-Host ""
 if ($failures.Count -eq 0) {
     Write-Host "SMOKE: OK" -ForegroundColor Green
