@@ -97,8 +97,9 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
   `run-tests`, `code-testing`, `build-perf-baseline`, `build-perf-diagnostics`,
   `incremental-build`, `directory-build-organization`, `binlog-generation`,
   `binlog-failure-analysis`, `check-bin-obj-clash`, `setup-local-sdk`.
-- O SDK user-local 8 em `C:\Users\Enzo\.dotnet` foi removido; o build do agente .NET 10
-  depende do SDK 10 que o usuário vai instalar via winget.
+- O SDK user-local 8 em `C:\Users\Enzo\.dotnet` foi removido; o SDK **10.0.403** foi
+  instalado via winget em `C:\Program Files\dotnet\sdk` e o `dotnet --list-sdks` já o resolve.
+  O build da bandeja/agente .NET 10 passa a usar o SDK 10 do PATH.
 
 ## Produção Windows — legado (até 11.02)
 
