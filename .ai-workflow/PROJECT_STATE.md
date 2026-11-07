@@ -2,16 +2,17 @@
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
 > Última consolidação: 2026-11-07 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
-> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; wizard de senhas/progresso em
-> `[Unreleased]`).
+> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; wizard de senhas/progresso, ACL e
+> bandeja .NET 10 em `[Unreleased]`).
 
 ## Objetivo atual
 
 Instalar o Nexus em máquinas Windows que já têm Node/Git/MySQL/NSSM/Caddy sem depender deles
 (KAN-170): instalador autocontido com Node 24.19.0 portátil, MySQL 8.4.13, NSSM, Caddy, VC++ e
 app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\mysql`; bandeja
-.NET 8. O release `1.07.11.2026` foi validado na máquina de teste (upgrade 10.02 → 1.07) e gerou
-`NexusSetup-1.07.11.2026.exe` (393,8 MB).
+**.NET 10** com iniciar/encerrar o Nexus e atalho na Área de Trabalho. O release
+`1.07.11.2026` foi validado na máquina de teste (upgrade 10.02 → 1.07); o setup atualizado
+`NexusSetup-1.07.11.2026.exe` tem **380,9 MB**.
 
 ## Produção Windows — instalador autocontido (KAN-170, 1.07)
 
@@ -64,10 +65,11 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    pré-checagem de `bootstrap.ps1`/`common.ps1`/`manifesto.json`.
 5. **Manual:** `bootstrap.ps1` sem `-NoPrompt`/`-CredentialsFile` continua pedindo as senhas
    no console; `-ProgressFile` é opcional.
-6. **Validação:** ISCC 7 compila o setup (412.959.775 bytes, SHA-256 `1AE58E…`); as APIs de
+6. **Validação:** ISCC 7 compila o setup (399.438.043 bytes, SHA-256 `29B92E…`); as APIs de
    formulário/barra/timer foram exercitadas em um setup descartável; `icacls` com SIDs aplicou
    a ACL; o teste `-NoPrompt` sem senhas falha com mensagem clara. O wizard real foi executado
-   no upgrade e encontrou um bug de NSSM em uso (corrigido; ver abaixo).
+   no upgrade e encontrou um bug de NSSM em uso (corrigido; ver abaixo); o setup final 1.07
+   também instala a bandeja .NET 10.
 
 ## ACL do usuário da instalação (pós-1.07, `[Unreleased]`)
 
@@ -100,6 +102,32 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 - O SDK user-local 8 em `C:\Users\Enzo\.dotnet` foi removido; o SDK **10.0.403** foi
   instalado via winget em `C:\Program Files\dotnet\sdk` e o `dotnet --list-sdks` já o resolve.
   O build da bandeja/agente .NET 10 passa a usar o SDK 10 do PATH.
+
+## Bandeja .NET 10 — liga/desliga (pós-1.07, `[Unreleased]`)
+
+1. **Decisões 1A/2A:** fechar a bandeja com qualquer serviço rodando pede confirmação e para
+   **Caddy → App → MySQL agora**; os três continuam **Automatic** e voltam no próximo boot.
+   Atalho novo **Bandeja do Nexus** na Área de Trabalho, mantendo **Nexus** (site). Sem watchdog,
+   sem auto-login e sem mudar start type para Manual.
+2. **Bandeja:** migrada para **.NET 10** (`net10.0-windows`, self-contained 116.240.320 bytes);
+   status dos três serviços, ícone cinza quando parado intencionalmente, menu Iniciar/Fechar,
+   confirmação Yes/No (default Não), fallback de ícone para `ExternalException`/GDI+, clique
+   duplo só abre o site quando os três estão rodando e o health está ok.
+3. **Scripts/estado:** `iniciar-nexus.ps1` (MySQL→App→Caddy, health, Automatic),
+   `encerrar-nexus.ps1` (Caddy→App→MySQL, tenta todos, sem Manual), `abrir-bandeja.vbs`
+   (`schtasks /run /tn NexusTray` oculto, sem UAC) e
+   `C:\ProgramData\Nexus\config\nexus-state.json` (`nexusStopped`).
+4. **Instalação:** `NexusSetup-1.07.11.2026.exe`, **399.438.043 bytes (380,9 MB)**, SHA-256
+   `29B92E022DDFF8E6C827F888A8B581F717F61270C3A7B8CDEFE442F1FCD2E414`;
+   cópia em `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe`. O setup foi executado
+   na máquina (upgrade): serviços/health OK, `NexusTray` Running, `tray.json` novo, atalho
+   **Bandeja do Nexus** no Desktop público, `smoke.ps1` OK.
+5. **Validação real:** `iniciar-nexus.ps1` exit 0; `encerrar`+`iniciar` **STOP=0 START=0**;
+   serviços Running/Automatic; health `db=true`; estado final `nexusStopped=false`; `.vbs`
+   encerrou e reabriu a tarefa `NexusTray` sem UAC, mantendo o Nexus e o health.
+6. **Pendente manual:** clicar **Fechar bandeja** com o Nexus rodando (confirmação → parada →
+   bandeja fecha), reabrir pelo atalho, **Iniciar Nexus**, fechar com tudo parado, duplo clique
+   com Nexus parado, reboot e tray no logon. O `backup.ps1` ignora MySQL parado (exit 0).
 
 ## Produção Windows — legado (até 11.02)
 
@@ -209,10 +237,10 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 
 ## Verificação — wizard (pós-1.07, `[Unreleased]`)
 
-- `ISCC` 7.1.0 → exit 0; `NexusSetup-1.07.11.2026.exe`, **412.959.775 bytes**, SHA-256
-  `1AE58EAADEB65BB02E2DC6CF691D0BB5F4D6FA3501FDDD9D39AABB2447CF5034`.
-- Parser PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows` (o `instalar-gui.ps1` foi
-  removido).
+- `ISCC` 7.1.0 → exit 0; `NexusSetup-1.07.11.2026.exe`, **399.438.043 bytes**, SHA-256
+  `29B92E022DDFF8E6C827F888A8B581F717F61270C3A7B8CDEFE442F1FCD2E414`.
+- Parser PowerShell 5.1 → OK nos **14** `.ps1` de `deploy/windows` (o `instalar-gui.ps1` foi
+  removido; entraram `iniciar-nexus.ps1`/`encerrar-nexus.ps1`).
 - Setup descartável em `%TEMP%` validou em runtime `CreateCustomForm`, `TNewProgressBar`,
   `SetTimer`/`CreateCallback`, `ShowModal`, `Close`/`Release` e `OnCloseQuery` (marcador
   `ok ticks=6`); `icacls` com `*S-1-5-32-544`/`*S-1-5-18` → exit 0, ACL somente
@@ -224,15 +252,16 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
   `NexusMySQL84`/`NexusApp`/`NexusCaddy` continuaram Running e o health 1.07 `db=true`.
   Corrigido em `87928ec`: hash do NSSM igual ao payload → não copia; divergente → para e
   reinicia App/Caddy; Caddy ganhou a mesma checagem de versão.
-- O `bootstrap.ps1 -Resume` para concluir a validação **não rodou**: o UAC foi cancelado.
 - **ACL (14:07):** aplicada na máquina; raiz com `Enzo:(OI)(CI)(M)` + SYSTEM/Administrators
   Full; 33 diretórios e 3 arquivos protegidos; `logs`/`uploads`/`backups`/`config`/`mysql`/
   `caddy` listáveis sem elevação; serviços e health OK. O código correspondente está em
-  `ac9a8e7`/`cb5ee0b`; um novo setup aplica a regra em instalações futuras.
-- **Pendente:** rodar o setup corrigido (`C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe`,
-  SHA `1AE58E…`, ou `out\NexusSetup-1.07.11.2026.exe`) e concluir o upgrade; depois testar
-  instalação nova em VM limpa. O wizard antigo (SHA `E703…`) foi substituído na Área de
-  Trabalho; os processos antigos já não estão em execução.
+  `ac9a8e7`/`cb5ee0b`; o setup novo aplica a regra em instalações futuras.
+- **Setup 1.07 reexecutado (15:59–16:02):** exit 0; wizard/progress; `NexusTray` .NET 10,
+  `tray.json` novo, scripts/estado, atalho **Bandeja do Nexus** no Desktop público; `smoke.ps1`
+  OK; serviços e health; bandeja em execução. O hash `29B9…`/380,9 MB é o setup atual.
+- **Pendente:** testar o setup em máquina limpa/colega e o fluxo manual da bandeja
+  (“Fechar bandeja” com o Nexus rodando → confirmação → parada → reabrir pelo atalho →
+  Iniciar Nexus; fechar com tudo parado; duplo clique com Nexus parado; reboot).
 
 ## Verificação — histórico até 11.02
 
@@ -283,31 +312,34 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 
 ## Pendências
 
-1. **Testar o wizard pós-1.07 em máquina limpa/colega:** usar o setup novo em
-   `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe` (SHA `1AE58E…`) ou
+1. **Testar o wizard/setup em máquina limpa/colega:** usar o setup novo em
+   `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard.exe` (SHA `29B92E…`, 380,9 MB) ou
    `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; o `NexusSetup-1.07.11.2026.exe`
-   (SHA `0CB6…`) é a release 1.07 anterior, sem o wizard. Validar a página de senhas, a
-   janela de progresso, a extração do payload, a migração do MySQL, o SQL, os serviços, o
-   HTTPS e a bandeja. Testar o upgrade com os quatro campos vazios e com senhas preenchidas.
-   A ACL do usuário já está aplicada na máquina; o setup novo apenas a persiste para
-   instalações futuras.
-2. **Acesso de outros usuários:** a ACL concede `Modify` somente ao SID de quem instalou;
+   (SHA `0CB6…`) é a release 1.07 anterior, sem o wizard/tray .NET 10. O setup novo já foi
+   executado nesta máquina (upgrade, serviços/health/tray OK); falta a máquina limpa/colega.
+2. **Testar manualmente a bandeja:** fechar com o Nexus rodando (confirmação → parada →
+   bandeja fecha), reabrir pelo atalho **Bandeja do Nexus**, Iniciar Nexus, fechar com tudo
+   parado, duplo clique com Nexus parado, reboot e tray no logon.
+3. **Acesso de outros usuários:** a ACL concede `Modify` somente ao SID de quem instalou;
    outras contas locais ainda precisam de elevação. `C:\Program Files\Nexus` e `app\.env`
    continuam protegidos; se o usuário quiser `app\.env` ou as cópias `.env-*` de backup sem
    UAC, decidir em um próximo run.
-3. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
+4. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
-4. **Docs:** o runbook `docs/processo/PRODUCAO.md` foi atualizado para o wizard e para a ACL;
-   revisar `IMPLEMENTACAO.md` se necessário.
-5. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar o wizard/ACL; o
-   `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
-6. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
+5. **Docs:** o runbook foi atualizado para wizard/ACL/bandeja; revisar `IMPLEMENTACAO.md` se
+   necessário.
+6. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar wizard/ACL/tray
+   .NET 10; o `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
+7. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
-7. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
+8. **NexusAgent/painel/filtros:** os planos de `NexusAgent` .NET 10 + Task Scheduler, painel
+   `/administracao` de backup e filtros nas listas **não foram implementados**; retomar após
+   fechar a bandeja.
+9. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
    `RunLevel Highest`; conta padrão exige um tray `asInvoker` + tarefa elevada de restart.
-8. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
-   criar o usuário do representante e validar impressão/backup.
-9. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
-   CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
-10. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
+10. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
+    criar o usuário do representante e validar impressão/backup.
+11. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
+    CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
+12. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
     fora do escopo.
