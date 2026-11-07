@@ -76,6 +76,8 @@ function rotuloGrupo(prefixo: string): string {
   return ROTULOS_GRUPO[prefixo] ?? humanizar(prefixo);
 }
 
+export { rotuloGrupo };
+
 function acaoDaPermissao(nome: string): string {
   const partes = nome.split(".");
   return partes.slice(1).join(".") || partes[0] || nome;

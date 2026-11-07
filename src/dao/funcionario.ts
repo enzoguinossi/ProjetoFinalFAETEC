@@ -10,11 +10,21 @@ const AUDIT_ENTIDADE = "Funcionario";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de funcionários. */
+export type FuncionarioListFiltros = {
+  cargos?: string[];
+  condutor?: boolean;
+};
+
 export class FuncionarioDAO {
-  async list(params: ListParams = {}) {
+  async list(params: ListParams & FuncionarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.FuncionarioWhereInput = { ativo: true };
     if (params.search) where.pessoaFisica = { nome: { contains: params.search } };
+    if (params.cargos && params.cargos.length > 0) {
+      where.cargo = { in: params.cargos };
+    }
+    if (params.condutor === true) where.condutor = true;
     const [data, total] = await Promise.all([
       prisma.funcionario.findMany({
         skip, take,
@@ -53,6 +63,19 @@ export class FuncionarioDAO {
       include: { pessoaFisica: true },
       orderBy: { id_funcionario: "asc" },
     });
+  }
+
+  /** Cargos distintos já cadastrados (não nulos), ordenados — opções do filtro. */
+  async listCargos(): Promise<string[]> {
+    const linhas = await prisma.funcionario.findMany({
+      where: { cargo: { not: null } },
+      distinct: ["cargo"],
+      select: { cargo: true },
+      orderBy: { cargo: "asc" },
+    });
+    return linhas
+      .map((linha) => linha.cargo)
+      .filter((cargo): cargo is string => cargo !== null);
   }
 
   async create(

@@ -1,5 +1,5 @@
 import FuncionariosClient from "./FuncionariosClient";
-import { listarFuncionarios } from "./actions";
+import { listarCargosFuncionarios, listarFuncionarios } from "./actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { resolverPermissoes } from "@/lib/permissoes";
@@ -11,15 +11,16 @@ export default async function FuncionariosPage() {
   const perms = await resolverPermissoes("funcionario");
   if (!perms.canList) redirect("/dashboard");
 
-  const [inicial, tiposCodigo] = await Promise.all([
+  const [inicial, tiposCodigo, cargos] = await Promise.all([
     listarFuncionarios({ page: 1, limit: 20 }),
     tipoCodigoDAO.listParaEntidade("FUNCIONARIO"),
+    listarCargosFuncionarios(),
   ]);
 
   return (
     <>
       <PageTitle>Funcionários</PageTitle>
-      <FuncionariosClient inicial={inicial} tiposCodigo={tiposCodigo} perms={perms} />
+      <FuncionariosClient inicial={inicial} tiposCodigo={tiposCodigo} cargos={cargos} perms={perms} />
     </>
   );
 }

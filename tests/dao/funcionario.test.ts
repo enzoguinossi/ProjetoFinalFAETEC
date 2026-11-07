@@ -34,6 +34,56 @@ describe("funcionarioDAO", () => {
       expect(busca.total).toBe(1);
       expect(busca.data[0]?.pessoaFisica.nome).toBe("Bruno Souza");
     });
+
+    it("filtra por cargos e por condutor, combinados com a busca", async () => {
+      const motorista = await criarFuncionario({
+        nome: "Motorista Alfa",
+        cargo: "Motorista",
+        condutor: true,
+      });
+      const separador = await criarFuncionario({
+        nome: "Separador Alfa",
+        cargo: "Separador",
+      });
+      await criarFuncionario({ nome: "Motorista Beta", cargo: "Motorista" });
+
+      const porCargo = await funcionarioDAO.list({ cargos: ["Motorista"] });
+      expect(porCargo.total).toBe(2);
+
+      const soCondutores = await funcionarioDAO.list({ condutor: true });
+      expect(soCondutores.data.map((f) => f.id_funcionario)).toEqual([
+        motorista.funcionario.id_funcionario,
+      ]);
+
+      const combinado = await funcionarioDAO.list({
+        cargos: ["Motorista"],
+        condutor: true,
+      });
+      expect(combinado.data.map((f) => f.id_funcionario)).toEqual([
+        motorista.funcionario.id_funcionario,
+      ]);
+
+      const comBusca = await funcionarioDAO.list({
+        cargos: ["Separador"],
+        search: "Alfa",
+      });
+      expect(comBusca.data.map((f) => f.id_funcionario)).toEqual([
+        separador.funcionario.id_funcionario,
+      ]);
+    });
+  });
+
+  describe("listCargos", () => {
+    it("devolve cargos distintos e não nulos em ordem alfabética", async () => {
+      await criarFuncionario({ cargo: "Separador" });
+      await criarFuncionario({ cargo: "Motorista" });
+      await criarFuncionario({ cargo: "Separador" });
+      await criarFuncionario();
+
+      const cargos = await funcionarioDAO.listCargos();
+
+      expect(cargos).toEqual(["Motorista", "Separador"]);
+    });
   });
 
   describe("getById", () => {

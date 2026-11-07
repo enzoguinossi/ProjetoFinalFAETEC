@@ -4,8 +4,11 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import FuncionarioForm from "./novo/FuncionarioForm";
 import type { Column } from "@/components/DataTable";
+import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
@@ -19,6 +22,8 @@ import {
 interface Props {
   inicial: PaginatedResult<FuncionarioListRow>;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
+  /** Cargos distintos já cadastrados (opções do filtro de cargo). */
+  cargos: string[];
   perms: PermissoesEntidade;
 }
 
@@ -29,11 +34,12 @@ const columns: Column<FuncionarioListRow>[] = [
   { key: "condutor", label: "Condutor", width: "1fr", align: "center" },
 ];
 
-export default function FuncionariosClient({ inicial, tiposCodigo, perms }: Props) {
+export default function FuncionariosClient({ inicial, tiposCodigo, cargos, perms }: Props) {
   const {
     resultado,
     carregando,
     buscarPorTermo,
+    aplicarFiltros,
     paginacaoServidor,
     actions,
     modalMode,
@@ -55,6 +61,36 @@ export default function FuncionariosClient({ inicial, tiposCodigo, perms }: Prop
     mensagemExcluido: "Funcionário excluído com sucesso.",
   });
 
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    {
+      id: "cargo",
+      rotulo: "Cargo",
+      tipo: "multi",
+      opcoes: cargos.map((cargo) => ({ valor: cargo, rotulo: cargo })),
+    },
+    { id: "condutor", rotulo: "Condutor", tipo: "checkbox" },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    const cargo = novos.cargo;
+    const condutor = novos.condutor;
+    aplicarFiltros({
+      cargos: Array.isArray(cargo) && cargo.length > 0 ? cargo : undefined,
+      condutor: Array.isArray(condutor) && condutor.includes("1") ? true : undefined,
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    aplicarFiltros({});
+  }
+
   return (
     <>
       <SearchBar
@@ -62,6 +98,13 @@ export default function FuncionariosClient({ inicial, tiposCodigo, perms }: Prop
         onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
+      />
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
       <DataTable
         columns={columns}

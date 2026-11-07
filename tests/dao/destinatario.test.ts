@@ -30,6 +30,57 @@ describe("destinatarioDAO", () => {
       expect(busca.total).toBe(1);
       expect(busca.data[0]?.pessoaJuridica.razao_social).toBe("Creche Beta");
     });
+
+    it("filtra por tipo e UF, combinados com a busca, sem expor inativos", async () => {
+      const escolaRj = await criarDestinatario({
+        razaoSocial: "Escola Alfa",
+        tipo: "ESCOLA",
+        uf: "RJ",
+      });
+      const crecheSp = await criarDestinatario({
+        razaoSocial: "Creche Alfa",
+        tipo: "CRECHE",
+        uf: "SP",
+      });
+      const cmeiRj = await criarDestinatario({
+        razaoSocial: "CMEI Alfa",
+        tipo: "CMEI",
+        uf: "RJ",
+      });
+      await criarDestinatario({
+        razaoSocial: "Escola Alfa Inativa",
+        tipo: "ESCOLA",
+        uf: "RJ",
+        ativo: false,
+      });
+
+      const porTipo = await destinatarioDAO.list({ tipos: ["CRECHE", "CMEI"] });
+      expect(porTipo.data.map((d) => d.id_destinatario).sort((a, b) => a - b)).toEqual(
+        [
+          crecheSp.destinatario.id_destinatario,
+          cmeiRj.destinatario.id_destinatario,
+        ].sort((a, b) => a - b),
+      );
+
+      const porUf = await destinatarioDAO.list({ ufs: ["SP"] });
+      expect(porUf.data.map((d) => d.id_destinatario)).toEqual([
+        crecheSp.destinatario.id_destinatario,
+      ]);
+
+      const combinado = await destinatarioDAO.list({ tipos: ["ESCOLA"], ufs: ["RJ"] });
+      expect(combinado.data.map((d) => d.id_destinatario)).toEqual([
+        escolaRj.destinatario.id_destinatario,
+      ]);
+
+      const comBusca = await destinatarioDAO.list({
+        tipos: ["ESCOLA"],
+        ufs: ["RJ"],
+        search: "Alfa",
+      });
+      expect(comBusca.data.map((d) => d.id_destinatario)).toEqual([
+        escolaRj.destinatario.id_destinatario,
+      ]);
+    });
   });
 
   describe("getById", () => {

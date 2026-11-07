@@ -6,8 +6,11 @@ import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import UsuarioForm from "./novo/UsuarioForm";
 import type { Column } from "@/components/DataTable";
+import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
@@ -39,6 +42,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
     resultado,
     carregando,
     buscarPorTermo,
+    aplicarFiltros,
     paginacaoServidor,
     actions,
     modalMode,
@@ -60,6 +64,29 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
     mensagemExcluido: "Usuário excluído com sucesso.",
   });
 
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "superAdmin", rotulo: "Somente super admin", tipo: "checkbox" },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    const superAdmin = novos.superAdmin;
+    aplicarFiltros({
+      superAdmin:
+        Array.isArray(superAdmin) && superAdmin.includes("1") ? true : undefined,
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    aplicarFiltros({});
+  }
+
   return (
     <>
       <div className="flex items-center gap-4">
@@ -73,6 +100,13 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
         </div>
         <Button label="Gerenciar perfis" onClick={() => router.push("/perfis")} />
       </div>
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
+      />
       <DataTable
         columns={columns}
         data={resultado.data}

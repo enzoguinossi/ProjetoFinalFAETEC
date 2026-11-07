@@ -136,7 +136,8 @@ export async function criarDestinatario(
   opts: {
     razaoSocial?: string;
     nomeFantasia?: string;
-    tipo?: "ESCOLA" | "CRECHE";
+    tipo?: "ESCOLA" | "CRECHE" | "CMEI" | "CMEIA";
+    uf?: string;
     ativo?: boolean;
   } = {},
 ) {
@@ -145,7 +146,7 @@ export async function criarDestinatario(
     data: { razao_social: opts.razaoSocial ?? `Escola ${n}`, nome_fantasia: opts.nomeFantasia },
   });
   const endereco = await prismaTeste.endereco.create({
-    data: { logradouro: `Rua ${n}`, cidade: "Rio de Janeiro" },
+    data: { logradouro: `Rua ${n}`, cidade: "Rio de Janeiro", uf: opts.uf },
   });
   const destinatario = await prismaTeste.destinatario.create({
     data: {
@@ -159,7 +160,7 @@ export async function criarDestinatario(
 }
 
 export async function criarFornecedor(
-  opts: { razaoSocial?: string; nomeFantasia?: string; comEndereco?: boolean; ativo?: boolean } = {},
+  opts: { razaoSocial?: string; nomeFantasia?: string; comEndereco?: boolean; uf?: string; ativo?: boolean } = {},
 ) {
   const n = proximo();
   const pessoaJuridica = await prismaTeste.pessoaJuridica.create({
@@ -167,7 +168,7 @@ export async function criarFornecedor(
   });
   const endereco = opts.comEndereco
     ? await prismaTeste.endereco.create({
-        data: { logradouro: `Av ${n}`, cidade: "Rio de Janeiro" },
+        data: { logradouro: `Av ${n}`, cidade: "Rio de Janeiro", uf: opts.uf },
       })
     : null;
   const fornecedor = await prismaTeste.fornecedor.create({

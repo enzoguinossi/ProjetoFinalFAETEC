@@ -11,6 +11,7 @@ import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-
 import { formatarCodigo } from "@/lib/formatar";
 import { validarCnpj } from "@/lib/cnpj";
 import { validarCep } from "@/lib/cep";
+import { isUF } from "@/lib/uf";
 import { resultadoVazio, TIPO_DESTINATARIO, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
 
 export type DestinatarioListRow = {
@@ -79,12 +80,20 @@ function lerTipoDestinatario(formData: FormData): TipoDestinatario {
 }
 
 export async function listarDestinatarios(
-  params: ListParams = {},
+  params: ListParams & { tipos?: string[]; ufs?: string[] } = {},
 ): Promise<PaginatedResult<DestinatarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "destinatario.listar"))) return resultadoVazio(params);
 
-  const resultado = await destinatarioDAO.list(params);
+  // Enums/UF são sanitizados no servidor: valores fora do domínio são ignorados.
+  const tipos = Array.isArray(params.tipos)
+    ? params.tipos.filter((tipo): tipo is TipoDestinatario =>
+        (TIPO_DESTINATARIO as readonly string[]).includes(tipo),
+      )
+    : undefined;
+  const ufs = Array.isArray(params.ufs) ? params.ufs.filter(isUF) : undefined;
+
+  const resultado = await destinatarioDAO.list({ ...params, tipos, ufs });
   return {
     ...resultado,
     data: resultado.data.map((d) => ({

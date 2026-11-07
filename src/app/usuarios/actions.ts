@@ -27,12 +27,15 @@ export type UsuarioFormData = {
 };
 
 export async function listarUsuarios(
-  params: ListParams = {},
+  params: ListParams & { superAdmin?: boolean } = {},
 ): Promise<PaginatedResult<UsuarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "usuario.listar"))) return resultadoVazio(params);
 
-  const resultado = await usuarioDAO.list(params);
+  const resultado = await usuarioDAO.list({
+    ...params,
+    superAdmin: params.superAdmin === true ? true : undefined,
+  });
   return {
     ...resultado,
     data: resultado.data.map((u) => ({

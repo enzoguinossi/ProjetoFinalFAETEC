@@ -8,6 +8,11 @@ const AUDIT_ENTIDADE = "Usuario";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de usuários. */
+export type UsuarioListFiltros = {
+  superAdmin?: boolean;
+};
+
 export class UsuarioDAO {
   async getById(id: number) {
     return prisma.usuario.findUnique({
@@ -34,9 +39,10 @@ export class UsuarioDAO {
     return prisma.usuario.findFirst({ where: { super_admin: true }, select: { id_usuario: true } });
   }
 
-  async list(params: ListParams = {}) {
+  async list(params: ListParams & UsuarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.UsuarioWhereInput = { ativo: true };
+    if (params.superAdmin === true) where.super_admin = true;
     if (params.search) {
       where.OR = [
         { login: { contains: params.search } },

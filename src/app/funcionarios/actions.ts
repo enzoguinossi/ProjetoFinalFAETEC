@@ -62,12 +62,22 @@ function lerRemoverAnexos(formData: FormData): number[] {
 }
 
 export async function listarFuncionarios(
-  params: ListParams = {},
+  params: ListParams & { cargos?: string[]; condutor?: boolean } = {},
 ): Promise<PaginatedResult<FuncionarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "funcionario.listar"))) return resultadoVazio(params);
 
-  const resultado = await funcionarioDAO.list(params);
+  const cargos = Array.isArray(params.cargos)
+    ? params.cargos.filter(
+        (cargo): cargo is string => typeof cargo === "string" && cargo.trim().length > 0,
+      )
+    : undefined;
+
+  const resultado = await funcionarioDAO.list({
+    ...params,
+    cargos,
+    condutor: params.condutor === true ? true : undefined,
+  });
   return {
     ...resultado,
     data: resultado.data.map((f) => ({
@@ -78,6 +88,13 @@ export async function listarFuncionarios(
       condutor: f.condutor ? "Sim" : "Não",
     })),
   };
+}
+
+/** Cargos distintos cadastrados — opções do filtro de cargo na listagem. */
+export async function listarCargosFuncionarios(): Promise<string[]> {
+  const user = await requireUser();
+  if (!(await usuarioPode(user, "funcionario.listar"))) return [];
+  return funcionarioDAO.listCargos();
 }
 
 export async function getFuncionario(id: number): Promise<FuncionarioFormData | null> {

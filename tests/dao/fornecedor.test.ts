@@ -25,6 +25,30 @@ describe("fornecedorDAO", () => {
       expect(busca.total).toBe(1);
       expect(busca.data[0]?.pessoaJuridica.razao_social).toBe("Atacadão Beta");
     });
+
+    it("filtra por UF e mantém a busca combinada", async () => {
+      const rj = await criarFornecedor({ razaoSocial: "Alfa RJ", comEndereco: true, uf: "RJ" });
+      await criarFornecedor({ razaoSocial: "Alfa SP", comEndereco: true, uf: "SP" });
+      await criarFornecedor({ razaoSocial: "Sem UF", comEndereco: true });
+      await criarFornecedor({
+        razaoSocial: "Alfa RJ Inativo",
+        comEndereco: true,
+        uf: "RJ",
+        ativo: false,
+      });
+
+      const porUf = await fornecedorDAO.list({ ufs: ["RJ"] });
+      expect(porUf.data.map((f) => f.id_fornecedor)).toEqual([rj.fornecedor.id_fornecedor]);
+      expect(porUf.total).toBe(1);
+
+      const comBusca = await fornecedorDAO.list({ ufs: ["RJ"], search: "Alfa" });
+      expect(comBusca.data.map((f) => f.id_fornecedor)).toEqual([
+        rj.fornecedor.id_fornecedor,
+      ]);
+
+      const todas = await fornecedorDAO.list({});
+      expect(todas.total).toBe(3);
+    });
   });
 
   describe("getById", () => {

@@ -8,11 +8,19 @@ import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de fornecedores. */
+export type FornecedorListFiltros = {
+  ufs?: string[];
+};
+
 export class FornecedorDAO {
-  async list(params: ListParams = {}) {
+  async list(params: ListParams & FornecedorListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.FornecedorWhereInput = { ativo: true };
     if (params.search) where.pessoaJuridica = { razao_social: { contains: params.search } };
+    if (params.ufs && params.ufs.length > 0) {
+      where.endereco = { uf: { in: params.ufs } };
+    }
     const [data, total] = await Promise.all([
       prisma.fornecedor.findMany({
         skip, take,

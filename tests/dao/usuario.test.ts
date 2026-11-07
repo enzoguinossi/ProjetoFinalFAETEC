@@ -95,6 +95,45 @@ describe("usuarioDAO", () => {
       const porNome = await usuarioDAO.list({ search: "Ana" });
       expect(porNome.total).toBe(1);
     });
+
+    it("filtra somente super admin, combinado com a busca e sem inativos", async () => {
+      // `senhaAlteradaEm` explícito: o default `new Date(0)` do factory não é aceito
+      // pelo MariaDB local (`senha_alterada_em` mínimo 1000-01-01) — falha de
+      // ambiente pré-existente, fora do escopo deste run.
+      const senhaAlteradaEm = new Date("2026-01-01T00:00:00Z");
+      const admin = await criarUsuario({
+        login: "admin",
+        nome: "Admin",
+        superAdmin: true,
+        senhaAlteradaEm,
+      });
+      const comum = await criarUsuario({
+        login: "comum",
+        nome: "Comum",
+        senhaAlteradaEm,
+      });
+      const adminInativo = await criarUsuario({
+        login: "admininativo",
+        nome: "Admin Inativo",
+        superAdmin: true,
+        senhaAlteradaEm,
+      });
+      await prismaTeste.usuario.update({
+        where: { id_usuario: adminInativo.usuario.id_usuario },
+        data: { ativo: false },
+      });
+
+      const soSuper = await usuarioDAO.list({ superAdmin: true });
+      expect(soSuper.data.map((u) => u.id_usuario)).toEqual([admin.usuario.id_usuario]);
+
+      const comBusca = await usuarioDAO.list({ superAdmin: true, search: "comum" });
+      expect(comBusca.total).toBe(0);
+
+      const todos = await usuarioDAO.list({ superAdmin: false });
+      expect(todos.data.map((u) => u.id_usuario).sort((a, b) => a - b)).toEqual(
+        [admin.usuario.id_usuario, comum.usuario.id_usuario].sort((a, b) => a - b),
+      );
+    });
   });
 
   describe("registrarAcesso", () => {

@@ -2,16 +2,25 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type ListParams } from "@/types";
+import { buildPagination, type ListParams, type StatusVeiculo } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de veículos (status único ou múltiplo). */
+export type VeiculoListFiltros = {
+  status?: StatusVeiculo | StatusVeiculo[];
+};
+
 export class VeiculoDAO {
-  async list(params: ListParams & { status?: string } = {}) {
+  async list(params: ListParams & VeiculoListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.VeiculoWhereInput = { ativo: true };
-    if (params.status) where.status = params.status as Prisma.VeiculoWhereInput["status"];
+    if (Array.isArray(params.status)) {
+      if (params.status.length > 0) where.status = { in: params.status };
+    } else if (params.status) {
+      where.status = params.status;
+    }
     if (params.search) {
       where.OR = [
         { placa: { contains: params.search } },

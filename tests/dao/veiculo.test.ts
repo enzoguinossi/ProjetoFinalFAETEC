@@ -49,6 +49,21 @@ describe("veiculoDAO", () => {
       expect(emExpedicao.total).toBe(1);
       expect(disponiveis.total).toBe(1);
     });
+
+    it("aceita status múltiplos e ignora a lista vazia", async () => {
+      const disponivel = await criarVeiculo({ status: "DISPONIVEL" });
+      const emExpedicao = await criarVeiculo({ status: "EM_EXPEDICAO" });
+      await criarVeiculo({ status: "INDISPONIVEL" });
+
+      const varios = await veiculoDAO.list({ status: ["DISPONIVEL", "EM_EXPEDICAO"] });
+      expect(varios.total).toBe(2);
+      expect(varios.data.map((v) => v.id_veiculo).sort((a, b) => a - b)).toEqual(
+        [disponivel.id_veiculo, emExpedicao.id_veiculo].sort((a, b) => a - b),
+      );
+
+      const semStatus = await veiculoDAO.list({ status: [] });
+      expect(semStatus.total).toBe(3);
+    });
   });
 
   describe("getById", () => {

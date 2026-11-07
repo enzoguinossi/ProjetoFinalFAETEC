@@ -4,9 +4,12 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import VeiculoForm from "./novo/VeiculoForm";
 import type { Column } from "@/components/DataTable";
-import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { useState } from "react";
+import { STATUS_VEICULO, type PaginatedResult, type PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarVeiculos,
@@ -29,11 +32,18 @@ const columns: Column<VeiculoListRow>[] = [
   { key: "status", label: "Status", width: "1fr", align: "center" },
 ];
 
+const ROTULOS_STATUS_FILTRO: Record<(typeof STATUS_VEICULO)[number], string> = {
+  DISPONIVEL: "Disponível",
+  INDISPONIVEL: "Indisponível",
+  EM_EXPEDICAO: "Em expedição",
+};
+
 export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
   const {
     resultado,
     carregando,
     buscarPorTermo,
+    aplicarFiltros,
     paginacaoServidor,
     actions,
     modalMode,
@@ -55,6 +65,36 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
     mensagemExcluido: "Veículo excluído com sucesso.",
   });
 
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    {
+      id: "status",
+      rotulo: "Status",
+      tipo: "multi",
+      opcoes: STATUS_VEICULO.map((status) => ({
+        valor: status,
+        rotulo: ROTULOS_STATUS_FILTRO[status],
+      })),
+    },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    const status = novos.status;
+    aplicarFiltros({
+      status: Array.isArray(status) && status.length > 0 ? status : undefined,
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    aplicarFiltros({});
+  }
+
   return (
     <>
       <SearchBar
@@ -62,6 +102,13 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
         onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
+      />
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
       <DataTable
         columns={columns}

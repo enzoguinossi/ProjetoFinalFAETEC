@@ -4,14 +4,19 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import DestinatarioForm from "./novo/DestinatarioForm";
 import type { Column } from "@/components/DataTable";
+import { useState } from "react";
 import {
   ROTULOS_TIPO_DESTINATARIO,
+  TIPO_DESTINATARIO,
   type PaginatedResult,
   type PermissoesEntidade,
   type TipoDestinatario,
 } from "@/types";
+import { UFS } from "@/lib/uf";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarDestinatarios,
@@ -45,6 +50,7 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
     resultado,
     carregando,
     buscarPorTermo,
+    aplicarFiltros,
     paginacaoServidor,
     actions,
     modalMode,
@@ -66,6 +72,44 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
     mensagemExcluido: "Destinatário excluído com sucesso.",
   });
 
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    {
+      id: "tipo",
+      rotulo: "Tipo",
+      tipo: "multi",
+      opcoes: TIPO_DESTINATARIO.map((tipo) => ({
+        valor: tipo,
+        rotulo: ROTULOS_TIPO_DESTINATARIO[tipo],
+      })),
+    },
+    {
+      id: "uf",
+      rotulo: "UF",
+      tipo: "multi",
+      opcoes: UFS.map((uf) => ({ valor: uf, rotulo: uf })),
+    },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    const tipo = novos.tipo;
+    const uf = novos.uf;
+    aplicarFiltros({
+      tipos: Array.isArray(tipo) && tipo.length > 0 ? tipo : undefined,
+      ufs: Array.isArray(uf) && uf.length > 0 ? uf : undefined,
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    aplicarFiltros({});
+  }
+
   return (
     <>
       <SearchBar
@@ -73,6 +117,13 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
         onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
+      />
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
       <DataTable
         columns={columns}

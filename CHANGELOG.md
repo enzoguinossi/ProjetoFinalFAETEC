@@ -26,6 +26,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   visualizar produtos inativos em `/produtos`, com filtro **Situação** e coluna própria. A
   listagem ganhou filtros em chips de **Perecível**, **Composto** e **Tipo de código**. Sem a
   permissão, a tela continua só com ativos, e os seletores operacionais não mudam.
+- **Filtros em chips nos cadastros (KAN-170):** as listagens de **Destinatários** (Tipo e UF),
+  **Fornecedores** (UF), **Funcionários** (Cargo e Condutor), **Veículos** (Status),
+  **Usuários** (Somente super admin) e **Perfis** (Grupo de permissões) usam a barra de
+  filtros em chips, combinada com a busca livre. Em Perfis, a busca passa a filtrar por nome
+  ou descrição no cliente. As listagens continuam ocultando registros inativos.
 
 ### Changed
 - **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup

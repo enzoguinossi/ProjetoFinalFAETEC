@@ -4,9 +4,13 @@ import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import FornecedorForm from "./novo/FornecedorForm";
 import type { Column } from "@/components/DataTable";
+import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { UFS } from "@/lib/uf";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarFornecedores,
@@ -32,6 +36,7 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
     resultado,
     carregando,
     buscarPorTermo,
+    aplicarFiltros,
     paginacaoServidor,
     actions,
     modalMode,
@@ -53,6 +58,31 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
     mensagemExcluido: "Fornecedor excluído com sucesso.",
   });
 
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    {
+      id: "uf",
+      rotulo: "UF",
+      tipo: "multi",
+      opcoes: UFS.map((uf) => ({ valor: uf, rotulo: uf })),
+    },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    const uf = novos.uf;
+    aplicarFiltros({ ufs: Array.isArray(uf) && uf.length > 0 ? uf : undefined });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    aplicarFiltros({});
+  }
+
   return (
     <>
       <SearchBar
@@ -60,6 +90,13 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
         onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
+      />
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
       <DataTable
         columns={columns}

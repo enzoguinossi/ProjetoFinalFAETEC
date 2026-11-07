@@ -8,12 +8,24 @@ import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de destinatários (não se aplicam aos seletores operacionais). */
+export type DestinatarioListFiltros = {
+  tipos?: TipoDestinatario[];
+  ufs?: string[];
+};
+
 export class DestinatarioDAO {
-  async list(params: ListParams = {}) {
+  async list(params: ListParams & DestinatarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.DestinatarioWhereInput = { ativo: true };
     if (params.search) {
       where.pessoaJuridica = { razao_social: { contains: params.search } };
+    }
+    if (params.tipos && params.tipos.length > 0) {
+      where.tipo_destinatario = { in: params.tipos };
+    }
+    if (params.ufs && params.ufs.length > 0) {
+      where.endereco = { uf: { in: params.ufs } };
     }
     const [data, total] = await Promise.all([
       prisma.destinatario.findMany({

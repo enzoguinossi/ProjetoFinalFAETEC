@@ -7,12 +7,14 @@ import DataTable from "@/components/DataTable";
 import type { Column, Action } from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import Button from "@/components/Button";
 import PerfilForm from "./novo/PerfilForm";
 import type { PerfilListRow, PerfilFormData } from "./actions";
 import { getPerfil, excluirPerfil } from "./actions";
-import type { GrupoPermissoes } from "@/components/PermissoesPanel";
+import { rotuloGrupo, type GrupoPermissoes } from "@/components/PermissoesPanel";
 
 interface Props {
   rows: PerfilListRow[];
@@ -36,7 +38,52 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
   const [formData, setFormData] = useState<PerfilFormData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PerfilListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [termo, setTermo] = useState("");
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
   const mostrarAviso = useAviso();
+
+  const camposFiltro: CampoFiltro[] = [
+    {
+      id: "grupo",
+      rotulo: "Grupo de permissões",
+      tipo: "multi",
+      opcoes: grupos.map((grupo) => ({
+        valor: grupo.prefixo,
+        rotulo: rotuloGrupo(grupo.prefixo),
+      })),
+    },
+  ];
+
+  const busca = termo.trim().toLowerCase();
+  const gruposSelecionados = Array.isArray(valoresFiltros.grupo) ? valoresFiltros.grupo : [];
+  const permissoesDosGrupos = new Set(
+    grupos
+      .filter((grupo) => gruposSelecionados.includes(grupo.prefixo))
+      .flatMap((grupo) => grupo.permissoes.map((permissao) => permissao.nome)),
+  );
+
+  // Filtro client-side: a tela recebe todas as linhas e o DataTable pagina em memória.
+  const rows = initialRows.filter((row) => {
+    const casaBusca =
+      busca.length === 0 ||
+      row.nome.toLowerCase().includes(busca) ||
+      (row.descricao ?? "").toLowerCase().includes(busca);
+    const casaGrupo =
+      permissoesDosGrupos.size === 0 ||
+      row.permissoes.some((permissao) => permissoesDosGrupos.has(permissao));
+    return casaBusca && casaGrupo;
+  });
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+  }
 
   async function openModal(id: number, mode: "edit" | "view") {
     const data = await getPerfil(id);
@@ -71,12 +118,25 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
     <>
       <div className="flex items-center gap-4">
         <div className="flex-1">
-          <SearchBar placeholder="Pesquisar perfis..." onNew={() => setModalMode("create")} showNew />
+          <SearchBar
+            placeholder="Pesquisar perfis..."
+            onSearch={setTermo}
+            onNew={() => setModalMode("create")}
+            showNew
+          />
         </div>
         <Button label="Voltar" variant="cancel" onClick={() => router.push("/usuarios")} />
       </div>
 
-      <DataTable columns={columns} data={initialRows} idField="id_perfil" actions={actions} />
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
+      />
+
+      <DataTable columns={columns} data={rows} idField="id_perfil" actions={actions} />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="min(860px, calc(100vw - 32px))" title="Novo Perfil">
         <PerfilForm grupos={grupos} mode="create" onSuccess={handleSuccess} onCancel={closeModal} />

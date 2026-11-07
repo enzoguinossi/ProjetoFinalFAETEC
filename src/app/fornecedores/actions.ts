@@ -11,6 +11,7 @@ import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-
 import { formatarCodigo } from "@/lib/formatar";
 import { validarCnpj } from "@/lib/cnpj";
 import { validarCep } from "@/lib/cep";
+import { isUF } from "@/lib/uf";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type FornecedorListRow = {
@@ -69,12 +70,14 @@ function lerCep(formData: FormData): { cep?: string } | { error: string } {
 }
 
 export async function listarFornecedores(
-  params: ListParams = {},
+  params: ListParams & { ufs?: string[] } = {},
 ): Promise<PaginatedResult<FornecedorListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "fornecedor.listar"))) return resultadoVazio(params);
 
-  const resultado = await fornecedorDAO.list(params);
+  const ufs = Array.isArray(params.ufs) ? params.ufs.filter(isUF) : undefined;
+
+  const resultado = await fornecedorDAO.list({ ...params, ufs });
   return {
     ...resultado,
     data: resultado.data.map((f) => ({

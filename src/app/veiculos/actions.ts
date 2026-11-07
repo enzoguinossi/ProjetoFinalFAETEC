@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
-import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
+import { resultadoVazio, STATUS_VEICULO, type ListParams, type PaginatedResult, type StatusVeiculo } from "@/types";
 
 export type VeiculoListRow = {
   id_veiculo: number;
@@ -26,12 +26,18 @@ export type VeiculoFormData = {
 };
 
 export async function listarVeiculos(
-  params: ListParams = {},
+  params: ListParams & { status?: string[] } = {},
 ): Promise<PaginatedResult<VeiculoListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "veiculo.listar"))) return resultadoVazio(params);
 
-  const resultado = await veiculoDAO.list(params);
+  const status = Array.isArray(params.status)
+    ? params.status.filter((valor): valor is StatusVeiculo =>
+        (STATUS_VEICULO as readonly string[]).includes(valor),
+      )
+    : undefined;
+
+  const resultado = await veiculoDAO.list({ ...params, status });
   return {
     ...resultado,
     data: resultado.data.map((v) => ({
