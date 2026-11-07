@@ -545,6 +545,17 @@ begin
   end;
 end;
 
+function GetCustomSetupExitCode: Integer;
+begin
+  { O bootstrap pode falhar depois de o Setup concluir a cópia dos arquivos.
+    O wizard já mostra o erro; aqui o processo do setup sai != 0 para que
+    automações (e o Orquestrador) detectem a falha. Sucesso continua 0. }
+  if BootstrapSucceeded then
+    Result := 0
+  else
+    Result := 1;
+end;
+
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if (PasswordPage <> nil) and (CurPageID = PasswordPage.ID) then

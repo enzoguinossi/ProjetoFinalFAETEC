@@ -755,15 +755,31 @@ try {
             $ownerService = Get-Service -Name $entry.Service -ErrorAction SilentlyContinue
             if (-not $ownerService -or $ownerService.Status.ToString() -ne "Running") {
                 $owner = "processo desconhecido"
+                $ownerPid = 0
                 $connection = Get-NetTCPConnection -LocalPort $entry.Port -State Listen -ErrorAction SilentlyContinue |
                     Select-Object -First 1
                 if ($connection) {
+                    $ownerPid = [int]$connection.OwningProcess
                     $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
                     if ($process) {
                         $owner = "$($process.ProcessName) (PID $($process.Id))"
                     }
                     else {
                         $owner = "PID $($connection.OwningProcess)"
+                    }
+                }
+
+                # A porta 3000 pode estar presa por um node do próprio Nexus com o
+                # serviço Stopped/Paused. O helper só encerra o node comprovadamente
+                # do Nexus (node portátil + server.js/app); sem essa limpeza o
+                # upgrade nunca se recupera sozinho. As demais portas continuam
+                # falhando quando ocupadas por terceiros.
+                if ($entry.Port -eq 3000) {
+                    if (Stop-NexusAppProcess) {
+                        $pidText = ""
+                        if ($ownerPid -gt 0) { $pidText = " (PID $ownerPid)" }
+                        Write-Warn "Porta 3000 ocupada por node órfão do Nexus$pidText; processo encerrado."
+                        continue
                     }
                 }
                 Fail "A porta $($entry.Port) está em uso por $owner. Libere-a antes de continuar."

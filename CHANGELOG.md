@@ -55,6 +55,9 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 - **sharp/libvips e NexusApp travada (KAN-170):** o pacote standalone passa a incluir
   `sharp`/`@img` completos (DLLs do libvips), corrigindo o `ERR_DLOPEN_FAILED`; o serviço é
   reiniciado sem deixar node órfão na porta 3000, evitando `NexusApp: Paused`.
+- **Fase 0 e código de saída do setup (KAN-170):** a fase 0 do bootstrap encerra o node órfão
+  do Nexus na porta 3000 antes de falhar (nunca processo de terceiros) e o setup retorna
+  código 1 quando o bootstrap não conclui.
 
 ## [1.07.11.2026] - 2026-11-07
 
