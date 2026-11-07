@@ -1,17 +1,52 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-02 (release `11.02.11.2026`, tag `v11.02.11.2026`; NSSM
-> embutido no instalador).
+> Última consolidação: 2026-11-07 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
+> autocontido com Node/MySQL/Caddy/NSSM/app embutidos).
 
 ## Objetivo atual
 
-Preparar a instalação e a operação do Nexus em produção no Windows (KAN-170): health check,
-uploads fora da aplicação, bootstrap do zero (Node 24, MySQL 8.4 LTS, NSSM, Caddy), bandeja
-.NET 8, instalador Inno Setup e runbook. A entrega anterior (relatórios padronizados) está na
-release `1.02.11.2026`.
+Instalar o Nexus em máquinas Windows que já têm Node/Git/MySQL/NSSM/Caddy sem depender deles
+(KAN-170): instalador autocontido com Node 24.19.0 portátil, MySQL 8.4.13, NSSM, Caddy, VC++ e
+app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\mysql`; bandeja
+.NET 8. O release `1.07.11.2026` foi validado na máquina de teste (upgrade 10.02 → 1.07) e gerou
+`NexusSetup-1.07.11.2026.exe` (393,8 MB).
 
-## Produção Windows (KAN-170, runs `RUN-20261102-14..26`)
+## Produção Windows — instalador autocontido (KAN-170, 1.07)
+
+1. **App standalone:** `next.config.ts` com `output: "standalone"`;
+   `scripts/empacotar-standalone.mjs` gera `app.zip` com `server.js`, `.next/static`, `public`
+   e client Prisma, sem `.env`/uploads. O serviço roda
+   `C:\Program Files\Nexus\node\node.exe server.js`.
+2. **Runtimes isolados:** Node 24.19.0 em `C:\Program Files\Nexus\node`; MySQL 8.4.13 em
+   `C:\Program Files\Nexus\mysql`; dados/config em `C:\ProgramData\Nexus\mysql`; NSSM em
+   `C:\Program Files\Nexus\tools\nssm`; Caddy em `C:\Program Files\Nexus\caddy`. O
+   Node/Git/MySQL/NSSM/Caddy do sistema não é usado nem alterado.
+3. **Serviços:** `NexusMySQL84` (3214, loopback), `NexusApp` (Node portátil + `server.js`, env
+   `DATABASE_URL`/`JWT_SECRET`/`UPLOADS_DIR`/`PORT`/`HOSTNAME`) e `NexusCaddy` (80/443, CA
+   interna via `certutil`, `admin off`).
+4. **SQL:** `deploy/sql/schema.sql` (DDL do Prisma) e `seed.sql` (tipos, 81 permissões, 2
+   perfis, vínculos e conversões) + `migracoes/001-unidades-pct10-cx50.sql`; `aplicar-sql.ps1`
+   usa `mysql.exe` e detecta Fresh/Update; **sem Prisma no destino**.
+5. **Conversões:** `UNIDADE` (padrão/1), `PCT10` (10) e `CX50` (50); a migração renomeia em
+   linha, preservando IDs e vínculos.
+6. **Payload/setup:** `scripts/preparar-payload.ps1` monta Node/MySQL/Caddy/VC++/NSSM/app/SQL
+   em `deploy/windows/payload` (gitignored); `build-instalador.ps1` gera
+   `NexusSetup-<versão>.exe` (~394 MB) com tudo embutido.
+7. **Instalação sem ferramentas:** o bootstrap extrai o payload, migra o Data legado para
+   `C:\ProgramData\Nexus\mysql` (se existir), aplica o SQL, extrai o app, configura os serviços,
+   firewall/tray/backup e roda o smoke; sem Git/npm/`next build`/Prisma/downloads.
+8. **Atualização:** `atualizar.ps1 -Package <pasta com app\ e sql\>`; backup, troca do pacote,
+   SQL, smoke e rollback; sem Git.
+9. **Desinstalação:** remove Node/MySQL/Caddy/NSSM/app, preservando `C:\ProgramData\Nexus`
+   (mysql/data, uploads, logs, backups).
+10. **Segurança:** ACLs restritas (backups/config; uploads/logs NetworkService; caddy
+    LocalService); `.env` protegido; firewall 80/443 Allow e 3214/3000 Block.
+11. **Validação real:** upgrade 10.02 → 1.07 na máquina de teste; health 1.07 `db=true`,
+    HTTPS 200, serviços Running, bandeja, `UNIDADE/PCT10/CX50`, 81 permissões/2 perfis; setup
+    1.07 compilado.
+
+## Produção Windows — legado (até 11.02)
 
 1. **Health e uploads:** `GET /api/health` público (200/`db=true`, 503 sem banco) e
    `UPLOADS_DIR` em `src/lib/uploads.ts` (fallback `public/uploads`); `/api/health` liberado
@@ -99,7 +134,25 @@ release `1.02.11.2026`.
     removidos do código, docs e AGENTS (o sistema só gera A4 retrato); release
     `1.02.11.2026` no `CHANGELOG.md` e `package.json`; tag `v1.02.11.2026`.
 
-## Verificação
+## Verificação — 1.07
+
+- `npm run lint` → exit 0; `npm run build:standalone` → exit 0; `npm run package:standalone`
+  → `app.zip` 35,3 MB, com `server.js`, `.next/static`, `public` e client Prisma; sem `.env`.
+- Standalone em `PORT=3010`: `/api/health` → **200** `{"status":"ok","db":true,"versao":
+  "1.07.11.2026"}`.
+- SQL em banco temporário: `schema.sql` + `seed.sql` aplicados; **81 permissões, 2 perfis, 3
+  conversões** (`UNIDADE:1`, `PCT10:10`, `CX50:50`); seed reaplicado sem duplicar; migração 001
+  renomeou preservando IDs. `npm test`/Vitest → **542 testes**.
+- Parser do Windows PowerShell 5.1 → OK nos **13** `.ps1` de `deploy/windows`.
+- Payload: Node 37.304.352, MySQL 281.154.912, Caddy 18.384.117, VC++ 25.635.768, NSSM 331.264,
+  app 37.029.389, SQL; total 399.888.932 bytes.
+- Setup Inno Setup 7: `NexusSetup-1.07.11.2026.exe`, **412.970.582 bytes (393,8 MB)**, SHA-256
+  `0CB656A92B37169B51AC27CCE1A6EBD3D793C6BA77A0ED8D0F55BAFA28FE55CC`.
+- Upgrade real 10.02 → 1.07 na máquina (que já tinha Node/Git/MySQL 8.0): MySQL migrado para
+  `C:\ProgramData\Nexus\mysql`; `NexusMySQL84`/`NexusApp`/`NexusCaddy` Running; health 1.07
+  `db=true`; HTTPS 200; tray em execução; smoke OK; unidades `UNIDADE/PCT10/CX50`.
+
+## Verificação — histórico até 11.02
 
 - `npm run lint` → exit 0; `npm run build` → exit 0 (health/uploads).
 - Testes de health/uploads → **13/13** com config temporária sem `globalSetup`.
@@ -148,22 +201,20 @@ release `1.02.11.2026`.
 
 ## Pendências
 
-1. **Testar o instalador 11.02** na máquina do usuário e na do colega (VM/máquina limpa):
-   MySQL 8.4.13 na **3214** (`NexusMySQL84`), hostname/DNS, CA do Caddy nos clientes, login e
-   smoke. Testar com `nssm.cc` bloqueado para confirmar o NSSM embutido.
-2. **Bandeja e usuário padrão:** a tarefa `NexusTray` roda no logon do usuário que instalou,
-   com `RunLevel Highest`; o `.exe` tem `requireAdministrator`. Se o representante usar uma
-   conta **padrão**, a bandeja não inicia elevada. Para esse cenário, será necessário um tray
-   `asInvoker` e uma tarefa elevada separada para o restart.
-3. **Limitações conhecidas do runbook (§15):** retenção de `backups\uploads`/`my.ini-*.bak`;
-   backup sem `caddy\data`; bandeja só no logon de quem instalou; `.env` não mesclado;
-   hashes incompletos no manifesto; DNS fora do escopo; `db push` sem migrations; CA permanece
-   no trust store; conflito de caminho se já existir um MySQL 8.4 usando o diretório padrão.
-4. **Produção:** executar o `NexusSetup` na máquina do galpão, concluir o primeiro acesso
-   (Super Admin), criar o usuário do representante e validar impressão/backup.
-4. **Módulo avançado de auditoria** (pesquisa, filtros e visualização própria) — adiado pelo
-   usuário; o resolvedor de descrições já é reutilizável.
-5. **Refatoração adiada pelo usuário:** separar responsabilidades do `BarraFiltros`
-   (helpers de data/filtros) e trocar os SVGs inline por `lucide-react`.
-6. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
+1. **Testar o setup 1.07 em máquina limpa/colega:** sem Node/Git/MySQL, com o `.exe` de
+   393,8 MB; validar extração do payload, migração do MySQL, SQL, serviços, HTTPS e bandeja.
+2. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
+   caminho de pacote + SQL do atualizador ainda não foi exercitado.
+3. **Docs:** atualizar `docs/processo/PRODUCAO.md` para o instalador autocontido (Node
+   portátil, MySQL em `ProgramData\Nexus`, SQL sem Prisma, payload, `atualizar.ps1 -Package`)
+   e `IMPLEMENTACAO.md` se necessário.
+4. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
+   `PCT10`/`CX50`.
+5. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
+   `RunLevel Highest`; conta padrão exige um tray `asInvoker` + tarefa elevada de restart.
+6. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
+   criar o usuário do representante e validar impressão/backup.
+7. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
+   CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
+8. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
    fora do escopo.
