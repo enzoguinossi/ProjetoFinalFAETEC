@@ -10,10 +10,19 @@ import {
   usuarioPodeAlguma,
 } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
-import { inventarioDAO, type DecidirAjusteInput } from "@/dao/inventario";
+import {
+  inventarioDAO,
+  type DecidirAjusteInput,
+  type InventarioListParams,
+} from "@/dao/inventario";
 import { produtoDAO } from "@/dao/produto";
 import { formatarCodigo } from "@/lib/formatar";
-import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
+import { limitesDoDiaUtc } from "@/lib/datas";
+import {
+  resultadoVazio,
+  STATUS_INVENTARIO,
+  type PaginatedResult,
+} from "@/types";
 import type { OrigemAjuste, StatusInventario } from "@prisma/client";
 import {
   mediaContagens,
@@ -242,17 +251,41 @@ function mapearAjuste(
   };
 }
 
+/** Data `YYYY-MM-DD` válida; qualquer outro valor não filtra. */
+function dataFiltro(valor: unknown): string | undefined {
+  if (typeof valor !== "string") return undefined;
+  const texto = valor.trim();
+  return limitesDoDiaUtc(texto, null).inicio ? texto : undefined;
+}
+
 export async function listarInventarios(
-  params: ListParams & { status?: StatusInventario } = {},
+  params: InventarioListParams = {},
 ): Promise<PaginatedResult<InventarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, [...PERMISSOES_VER]))) {
     return resultadoVazio(params);
   }
 
+  const status = Array.isArray(params.status)
+    ? params.status.filter((valor): valor is StatusInventario =>
+        (STATUS_INVENTARIO as readonly string[]).includes(valor),
+      )
+    : undefined;
+  const contagemCega =
+    params.contagemCega === true ||
+    (params.contagemCega as unknown) === "true"
+      ? true
+      : undefined;
+
   const [resultado, abrir, podeContar, podeAprovar, podeCancelar] =
     await Promise.all([
-      inventarioDAO.list(params),
+      inventarioDAO.list({
+        ...params,
+        status,
+        de: dataFiltro(params.de),
+        ate: dataFiltro(params.ate),
+        contagemCega,
+      }),
       podeAbrir(user),
       usuarioPode(user, "inventario.contar"),
       usuarioPode(user, "inventario.aprovar_ajuste"),

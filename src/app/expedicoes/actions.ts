@@ -1,6 +1,6 @@
 "use server";
 
-import { expedicaoDAO, saldoPendente } from "@/dao/expedicao";
+import { expedicaoDAO, saldoPendente, type ExpedicaoListFiltros } from "@/dao/expedicao";
 import { mensagemDeErro } from "@/dao/_errors";
 import { expedicaoService } from "@/services/expedicao";
 import {
@@ -8,13 +8,16 @@ import {
   removerImagemAnexo,
   salvarImagemAnexo,
 } from "@/lib/imagem";
+import { limitesDoDiaUtc } from "@/lib/datas";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { formatarCodigo } from "@/lib/formatar";
 import {
   resultadoVazio,
+  STATUS_EXPEDICAO,
   type ListParams,
   type PaginatedResult,
+  type StatusExpedicao,
 } from "@/types";
 
 const ROTULOS_STATUS_EXPEDICAO: Record<string, string> = {
@@ -32,6 +35,22 @@ const ROTULOS_STATUS_NOTA: Record<string, string> = {
   BAIXA_COM_CORTE: "Baixa com corte",
   CANCELADA: "Cancelada",
 };
+
+/** Ids inteiros positivos, sem duplicatas; vazio/inválido não filtra. */
+function idsFiltro(valores: unknown): number[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
+
+/** Data `YYYY-MM-DD` válida; qualquer outro valor não filtra. */
+function dataFiltro(valor: unknown): string | undefined {
+  if (typeof valor !== "string") return undefined;
+  const texto = valor.trim();
+  return limitesDoDiaUtc(texto, null).inicio ? texto : undefined;
+}
 
 export type ExpedicaoListRow = {
   id_expedicao: number;
@@ -228,14 +247,27 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
 }
 
 export async function listarExpedicoes(
-  params: ListParams = {},
+  params: ListParams & ExpedicaoListFiltros = {},
 ): Promise<PaginatedResult<ExpedicaoListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "expedicao.listar"))) {
     return resultadoVazio(params);
   }
 
-  const resultado = await expedicaoDAO.list(params);
+  const status = Array.isArray(params.status)
+    ? params.status.filter((valor): valor is StatusExpedicao =>
+        (STATUS_EXPEDICAO as readonly string[]).includes(valor),
+      )
+    : undefined;
+
+  const resultado = await expedicaoDAO.list({
+    ...params,
+    status,
+    de: dataFiltro(params.de),
+    ate: dataFiltro(params.ate),
+    id_veiculo: idsFiltro(params.id_veiculo),
+    id_funcionario_condutor: idsFiltro(params.id_funcionario_condutor),
+  });
   return { ...resultado, data: resultado.data.map(mapaResumo) };
 }
 

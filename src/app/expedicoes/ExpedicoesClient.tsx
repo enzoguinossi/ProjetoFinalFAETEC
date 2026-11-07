@@ -7,12 +7,14 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import SearchBar from "@/components/SearchBar";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import { ui } from "@/lib/ui";
 import { hojeISO } from "@/lib/formatar";
 import { useListaPaginada } from "@/lib/use-lista-paginada";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import type { Action, Column } from "@/components/DataTable";
-import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import { STATUS_EXPEDICAO, type PaginatedResult, type PermissoesEntidade } from "@/types";
 import {
   desativarExpedicao,
   listarCondutoresParaExpedicao,
@@ -29,6 +31,8 @@ import {
 interface Props {
   inicial: PaginatedResult<ExpedicaoListRow>;
   perms: PermissoesEntidade;
+  veiculos: VeiculoExpedicaoRow[];
+  condutores: CondutorExpedicaoRow[];
 }
 
 function formatarData(valor: string | null): string {
@@ -42,6 +46,21 @@ const statusCls: Record<string, string> = {
   EM_PERCURSO: "bg-[#fff4e5] text-[#7a4100]",
   CONCLUIDA: "bg-[#e7f6ec] text-[#0f5132]",
 };
+
+const ROTULOS_STATUS_EXPEDICAO: Record<(typeof STATUS_EXPEDICAO)[number], string> = {
+  PLANEJADA: "Planejada",
+  EM_PERCURSO: "Em percurso",
+  CONCLUIDA: "Concluída",
+};
+
+/** Números inteiros positivos, sem duplicatas; vazio vira `undefined`. */
+function idsNumericos(valores: string[] | { de: string; ate: string } | undefined) {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
 
 const columns: Column<ExpedicaoListRow>[] = [
   {
@@ -254,7 +273,12 @@ function ExpedicaoForm({
   );
 }
 
-export default function ExpedicoesClient({ inicial, perms }: Props) {
+export default function ExpedicoesClient({
+  inicial,
+  perms,
+  veiculos,
+  condutores,
+}: Props) {
   const router = useRouter();
   const mostrarAviso = useAviso();
   const lista = useListaPaginada(listarExpedicoes, inicial);
@@ -262,6 +286,63 @@ export default function ExpedicoesClient({ inicial, perms }: Props) {
   const [novoAberto, setNovoAberto] = useState(false);
   const [desativando, setDesativando] = useState<ExpedicaoListRow | null>(null);
   const [processando, setProcessando] = useState(false);
+
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Data prevista", tipo: "periodo" },
+    {
+      id: "status",
+      rotulo: "Status",
+      tipo: "multi",
+      opcoes: STATUS_EXPEDICAO.map((status) => ({
+        valor: status,
+        rotulo: ROTULOS_STATUS_EXPEDICAO[status],
+      })),
+    },
+    {
+      id: "veiculo",
+      rotulo: "Veículo",
+      tipo: "multi",
+      opcoes: veiculos.map((veiculo) => ({
+        valor: String(veiculo.id_veiculo),
+        rotulo: veiculo.modelo
+          ? `${veiculo.placa} — ${veiculo.modelo}`
+          : veiculo.placa,
+      })),
+    },
+    {
+      id: "condutor",
+      rotulo: "Condutor",
+      tipo: "multi",
+      opcoes: condutores.map((condutor) => ({
+        valor: String(condutor.id_funcionario),
+        rotulo: condutor.nome,
+      })),
+    },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+
+    const periodo = Array.isArray(novos.periodo) ? undefined : novos.periodo;
+    const status = novos.status;
+    lista.aplicarFiltros({
+      status: Array.isArray(status) && status.length > 0 ? status : undefined,
+      de: periodo?.de || undefined,
+      ate: periodo?.ate || undefined,
+      id_veiculo: idsNumericos(novos.veiculo),
+      id_funcionario_condutor: idsNumericos(novos.condutor),
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    lista.aplicarFiltros({});
+  }
 
   const actions: Action<ExpedicaoListRow>[] = [
     ...(perms.canView
@@ -324,6 +405,14 @@ export default function ExpedicoesClient({ inicial, perms }: Props) {
         onNew={() => setNovoAberto(true)}
         onSearch={lista.buscarPorTermo}
         showNew={perms.canCreate}
+      />
+
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
 
       <DataTable

@@ -575,4 +575,130 @@ describe("inventarioDAO", () => {
     }
   });
 
+  describe("list", () => {
+    async function criarInventarioLista(opts: {
+      status: "ABERTO" | "EM_CONTAGEM" | "AGUARDANDO_APROVACAO" | "FINALIZADO" | "CANCELADO";
+      dataInicio?: string;
+      contagemCega?: boolean;
+      observacao?: string;
+    }) {
+      const { usuario } = await criarUsuario({ senhaAlteradaEm: null });
+      return prismaTeste.inventario.create({
+        data: {
+          data_inicio: new Date(
+            `${opts.dataInicio ?? "2026-11-05"}T00:00:00.000Z`,
+          ),
+          contagem_cega: opts.contagemCega ?? false,
+          status: opts.status,
+          id_usuario_abertura: usuario.id_usuario,
+          observacao: opts.observacao,
+        },
+      });
+    }
+
+    it("filtra por status em lista e mantém o default sem filtros", async () => {
+      const aberto = await criarInventarioLista({ status: "ABERTO" });
+      const finalizado = await criarInventarioLista({ status: "FINALIZADO" });
+      const cancelado = await criarInventarioLista({ status: "CANCELADO" });
+
+      const semFiltro = await inventarioDAO.list({ limit: 100 });
+      expect(semFiltro.data.map((item) => item.id_inventario).sort()).toEqual(
+        [aberto.id_inventario, finalizado.id_inventario, cancelado.id_inventario].sort(),
+      );
+
+      const filtrados = await inventarioDAO.list({
+        status: ["ABERTO", "CANCELADO"],
+        limit: 100,
+      });
+      expect(filtrados.data.map((item) => item.id_inventario).sort()).toEqual(
+        [aberto.id_inventario, cancelado.id_inventario].sort(),
+      );
+      expect(filtrados.total).toBe(2);
+    });
+
+    it("filtra por período de data de início, com dia inicial e final inclusivos", async () => {
+      const antes = await criarInventarioLista({
+        status: "ABERTO",
+        dataInicio: "2026-11-05",
+      });
+      const meio = await criarInventarioLista({
+        status: "ABERTO",
+        dataInicio: "2026-11-07",
+      });
+      const depois = await criarInventarioLista({
+        status: "ABERTO",
+        dataInicio: "2026-11-09",
+      });
+
+      const periodo = await inventarioDAO.list({
+        de: "2026-11-05",
+        ate: "2026-11-07",
+        limit: 100,
+      });
+      expect(periodo.data.map((item) => item.id_inventario).sort()).toEqual(
+        [antes.id_inventario, meio.id_inventario].sort(),
+      );
+
+      const soAte = await inventarioDAO.list({ ate: "2026-11-05", limit: 100 });
+      expect(soAte.data.map((item) => item.id_inventario)).toEqual([
+        antes.id_inventario,
+      ]);
+
+      const soDe = await inventarioDAO.list({ de: "2026-11-09", limit: 100 });
+      expect(soDe.data.map((item) => item.id_inventario)).toEqual([
+        depois.id_inventario,
+      ]);
+    });
+
+    it("filtra por contagem cega quando marcado", async () => {
+      const cega = await criarInventarioLista({
+        status: "ABERTO",
+        contagemCega: true,
+      });
+      const aberta = await criarInventarioLista({
+        status: "ABERTO",
+        contagemCega: false,
+      });
+
+      const filtrados = await inventarioDAO.list({
+        contagemCega: true,
+        limit: 100,
+      });
+      expect(filtrados.data.map((item) => item.id_inventario)).toEqual([
+        cega.id_inventario,
+      ]);
+
+      const semMarcar = await inventarioDAO.list({ limit: 100 });
+      expect(semMarcar.data.map((item) => item.id_inventario).sort()).toEqual(
+        [cega.id_inventario, aberta.id_inventario].sort(),
+      );
+    });
+
+    it("combina a busca livre com os filtros de domínio", async () => {
+      const cegaNorte = await criarInventarioLista({
+        status: "ABERTO",
+        contagemCega: true,
+        observacao: "Contagem Norte",
+      });
+      const abertaNorte = await criarInventarioLista({
+        status: "ABERTO",
+        contagemCega: false,
+        observacao: "Contagem Norte",
+      });
+
+      const busca = await inventarioDAO.list({ search: "Norte", limit: 100 });
+      expect(busca.data.map((item) => item.id_inventario).sort()).toEqual(
+        [cegaNorte.id_inventario, abertaNorte.id_inventario].sort(),
+      );
+
+      const combinados = await inventarioDAO.list({
+        search: "Norte",
+        contagemCega: true,
+        limit: 100,
+      });
+      expect(combinados.data.map((item) => item.id_inventario)).toEqual([
+        cegaNorte.id_inventario,
+      ]);
+    });
+  });
 });

@@ -31,6 +31,10 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   **Usuários** (Somente super admin) e **Perfis** (Grupo de permissões) usam a barra de
   filtros em chips, combinada com a busca livre. Em Perfis, a busca passa a filtrar por nome
   ou descrição no cliente. As listagens continuam ocultando registros inativos.
+- **Filtros de Expedições e Inventário (KAN-170):** as duas listagens ganham filtros em
+  chips no servidor. Em **Expedições**: período de data prevista, status, veículo e condutor.
+  Em **Inventário**: período de data de início, status (lista) e contagem cega. Os filtros
+  combinam com a busca livre e continuam sem alterar o resultado quando nenhum é aplicado.
 
 ### Changed
 - **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup

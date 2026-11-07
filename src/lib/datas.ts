@@ -54,6 +54,30 @@ export function fimDoDiaSaoPaulo(iso: string | null | undefined): Date | null {
   return Number.isNaN(data.getTime()) ? null : data;
 }
 
+/**
+ * Limites de um período sobre uma coluna `DATE` (`YYYY-MM-DD`, inclusivo).
+ *
+ * A coluna guarda a meia-noite UTC do dia informado — mesma convenção de
+ * `data_prevista` e `data_inicio` —, então o intervalo usa o próprio dia em
+ * UTC. Usar o instante de São Paulo deslocaria o `de` para depois da
+ * meia-noite e excluiria o primeiro dia. Entradas inválidas viram `null`.
+ */
+export function limitesDoDiaUtc(
+  de: string | null | undefined,
+  ate: string | null | undefined,
+): { inicio: Date | null; fim: Date | null } {
+  const converter = (valor: string | null | undefined): Date | null => {
+    if (!valor) return null;
+    const texto = valor.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+    const data = new Date(`${texto}T00:00:00.000Z`);
+    if (Number.isNaN(data.getTime())) return null;
+    // Rejeita datas normalizadas pelo JS (ex.: 2026-02-31 → 03/03).
+    return data.toISOString().slice(0, 10) === texto ? data : null;
+  };
+  return { inicio: converter(de), fim: converter(ate) };
+}
+
 /** Data `YYYY-MM-DD` do dia civil de São Paulo. */
 export function diaISOSaoPaulo(valor: Date): string {
   const { ano, mes, dia } = partesDataSaoPaulo(valor);

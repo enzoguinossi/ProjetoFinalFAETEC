@@ -1406,3 +1406,145 @@ describe("expedicaoService — execução da entrega", () => {
     ).toBe(0);
   });
 });
+
+describe("expedicaoDAO.list", () => {
+  it("filtra por status em lista e mantém o default sem filtros", async () => {
+    const planejada = await criarExpedicao({ status: "PLANEJADA" });
+    const emPercurso = await criarExpedicao({ status: "EM_PERCURSO" });
+    const concluida = await criarExpedicao({ status: "CONCLUIDA" });
+    const inativa = await criarExpedicao({ ativo: false });
+
+    const semFiltro = await expedicaoDAO.list({ limit: 100 });
+    expect(semFiltro.data.map((item) => item.id_expedicao)).toEqual(
+      expect.arrayContaining([
+        planejada.id_expedicao,
+        emPercurso.id_expedicao,
+        concluida.id_expedicao,
+      ]),
+    );
+    expect(semFiltro.data.map((item) => item.id_expedicao)).not.toContain(
+      inativa.id_expedicao,
+    );
+
+    const filtradas = await expedicaoDAO.list({
+      status: ["PLANEJADA", "CONCLUIDA"],
+      limit: 100,
+    });
+    expect(filtradas.data.map((item) => item.id_expedicao).sort()).toEqual(
+      [planejada.id_expedicao, concluida.id_expedicao].sort(),
+    );
+    expect(filtradas.total).toBe(2);
+  });
+
+  it("filtra por período de data prevista, com dia inicial e final inclusivos", async () => {
+    const antes = await criarExpedicao({
+      dataPrevista: new Date("2026-11-05T00:00:00.000Z"),
+    });
+    const meio = await criarExpedicao({
+      dataPrevista: new Date("2026-11-07T00:00:00.000Z"),
+    });
+    const depois = await criarExpedicao({
+      dataPrevista: new Date("2026-11-09T00:00:00.000Z"),
+    });
+
+    const periodo = await expedicaoDAO.list({
+      de: "2026-11-05",
+      ate: "2026-11-07",
+      limit: 100,
+    });
+    expect(periodo.data.map((item) => item.id_expedicao).sort()).toEqual(
+      [antes.id_expedicao, meio.id_expedicao].sort(),
+    );
+
+    const soDe = await expedicaoDAO.list({ de: "2026-11-09", limit: 100 });
+    expect(soDe.data.map((item) => item.id_expedicao)).toEqual([
+      depois.id_expedicao,
+    ]);
+  });
+
+  it("filtra por veículo e condutor, inclusive combinados", async () => {
+    const veiculoA = await criarVeiculo();
+    const veiculoB = await criarVeiculo();
+    const condutorA = (await criarFuncionario({ condutor: true })).funcionario;
+    const condutorB = (await criarFuncionario({ condutor: true })).funcionario;
+
+    const ambosA = await criarExpedicao({
+      idVeiculo: veiculoA.id_veiculo,
+      idCondutor: condutorA.id_funcionario,
+    });
+    const soVeiculoA = await criarExpedicao({
+      idVeiculo: veiculoA.id_veiculo,
+      idCondutor: condutorB.id_funcionario,
+    });
+    const soCondutorA = await criarExpedicao({
+      idVeiculo: veiculoB.id_veiculo,
+      idCondutor: condutorA.id_funcionario,
+    });
+
+    const porVeiculo = await expedicaoDAO.list({
+      id_veiculo: [veiculoA.id_veiculo],
+      limit: 100,
+    });
+    expect(porVeiculo.data.map((item) => item.id_expedicao).sort()).toEqual(
+      [ambosA.id_expedicao, soVeiculoA.id_expedicao].sort(),
+    );
+
+    const porCondutor = await expedicaoDAO.list({
+      id_funcionario_condutor: [condutorA.id_funcionario],
+      limit: 100,
+    });
+    expect(porCondutor.data.map((item) => item.id_expedicao).sort()).toEqual(
+      [ambosA.id_expedicao, soCondutorA.id_expedicao].sort(),
+    );
+
+    const combinados = await expedicaoDAO.list({
+      id_veiculo: [veiculoA.id_veiculo],
+      id_funcionario_condutor: [condutorA.id_funcionario],
+      limit: 100,
+    });
+    expect(combinados.data.map((item) => item.id_expedicao)).toEqual([
+      ambosA.id_expedicao,
+    ]);
+  });
+
+  it("combina a busca livre (OR) com os filtros de domínio (AND)", async () => {
+    const planejadaNorte = await criarExpedicao({ status: "PLANEJADA" });
+    const concluidaNorte = await criarExpedicao({ status: "CONCLUIDA" });
+    const planejadaSul = await criarExpedicao({ status: "PLANEJADA" });
+
+    await prismaTeste.expedicao.update({
+      where: { id_expedicao: planejadaNorte.id_expedicao },
+      data: { observacao: "Rota Norte" },
+    });
+    await prismaTeste.expedicao.update({
+      where: { id_expedicao: concluidaNorte.id_expedicao },
+      data: { observacao: "Rota Norte" },
+    });
+    await prismaTeste.expedicao.update({
+      where: { id_expedicao: planejadaSul.id_expedicao },
+      data: { observacao: "Rota Sul" },
+    });
+
+    const busca = await expedicaoDAO.list({ search: "Norte", limit: 100 });
+    expect(busca.data.map((item) => item.id_expedicao).sort()).toEqual(
+      [planejadaNorte.id_expedicao, concluidaNorte.id_expedicao].sort(),
+    );
+
+    const buscaComStatus = await expedicaoDAO.list({
+      search: "Norte",
+      status: ["PLANEJADA"],
+      limit: 100,
+    });
+    expect(buscaComStatus.data.map((item) => item.id_expedicao)).toEqual([
+      planejadaNorte.id_expedicao,
+    ]);
+
+    const buscaComPeriodo = await expedicaoDAO.list({
+      search: "Sul",
+      de: "2020-01-01",
+      ate: "2020-01-31",
+      limit: 100,
+    });
+    expect(buscaComPeriodo.data).toHaveLength(0);
+  });
+});

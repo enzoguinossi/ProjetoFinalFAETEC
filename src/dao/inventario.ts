@@ -6,6 +6,7 @@ import {
   type StatusInventario,
 } from "@prisma/client";
 import { buildPagination, type ListParams } from "@/types";
+import { limitesDoDiaUtc } from "@/lib/datas";
 import { registrarAuditoria } from "./_audit";
 
 /** Status em que o produto fica bloqueado para movimentações de saldo. */
@@ -19,7 +20,13 @@ const EPS = 0.000001;
 type Db = Prisma.TransactionClient;
 
 export type InventarioListParams = ListParams & {
-  status?: StatusInventario;
+  status?: StatusInventario[];
+  /** Início do período de `data_inicio` (`YYYY-MM-DD`, inclusivo). */
+  de?: string;
+  /** Fim do período de `data_inicio` (`YYYY-MM-DD`, inclusivo). */
+  ate?: string;
+  /** `true` = somente inventários de contagem cega. */
+  contagemCega?: boolean;
 };
 
 export type CriarInventarioInput = {
@@ -147,7 +154,17 @@ export class InventarioDAO {
     const { skip, take } = buildPagination(params);
     const where: Prisma.InventarioWhereInput = {};
     if (params.search) where.observacao = { contains: params.search };
-    if (params.status) where.status = params.status;
+    if (params.status && params.status.length > 0) {
+      where.status = { in: params.status };
+    }
+    if (params.contagemCega === true) where.contagem_cega = true;
+    const { inicio, fim } = limitesDoDiaUtc(params.de, params.ate);
+    if (inicio || fim) {
+      where.data_inicio = {
+        ...(inicio ? { gte: inicio } : {}),
+        ...(fim ? { lte: fim } : {}),
+      };
+    }
 
     const [data, total] = await Promise.all([
       prisma.inventario.findMany({

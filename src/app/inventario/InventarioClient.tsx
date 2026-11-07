@@ -6,9 +6,11 @@ import DataTable, { type Action, type Column } from "@/components/DataTable";
 import Modal from "@/components/Modal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SearchBar from "@/components/SearchBar";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import { useListaPaginada } from "@/lib/use-lista-paginada";
-import type { PaginatedResult } from "@/types";
+import { STATUS_INVENTARIO, type PaginatedResult } from "@/types";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import {
   excluirInventario,
   getInventario,
@@ -34,6 +36,14 @@ const statusCls: Record<string, string> = {
   AGUARDANDO_APROVACAO: "bg-[#f3e8ff] text-[#5b1a8a]",
   FINALIZADO: "bg-[#e7f6ec] text-[#0f5132]",
   CANCELADO: "bg-[#f2f4f8] text-[#4a4f55]",
+};
+
+const ROTULOS_STATUS_INVENTARIO: Record<(typeof STATUS_INVENTARIO)[number], string> = {
+  ABERTO: "Aberto",
+  EM_CONTAGEM: "Em contagem",
+  AGUARDANDO_APROVACAO: "Aguardando aprovação",
+  FINALIZADO: "Finalizado",
+  CANCELADO: "Cancelado",
 };
 
 const columns: Column<InventarioListRow>[] = [
@@ -90,6 +100,44 @@ export default function InventarioClient({ inicial, podeAbrir }: Props) {
   const [editando, setEditando] = useState<InventarioDetalhe | null>(null);
   const [excluindo, setExcluindo] = useState<InventarioListRow | null>(null);
   const [processando, setProcessando] = useState(false);
+
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Data de início", tipo: "periodo" },
+    {
+      id: "status",
+      rotulo: "Status",
+      tipo: "multi",
+      opcoes: STATUS_INVENTARIO.map((status) => ({
+        valor: status,
+        rotulo: ROTULOS_STATUS_INVENTARIO[status],
+      })),
+    },
+    { id: "contagemCega", rotulo: "Contagem cega", tipo: "checkbox" },
+  ];
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+
+    const periodo = Array.isArray(novos.periodo) ? undefined : novos.periodo;
+    const status = novos.status;
+    const cega = novos.contagemCega;
+    lista.aplicarFiltros({
+      status: Array.isArray(status) && status.length > 0 ? status : undefined,
+      de: periodo?.de || undefined,
+      ate: periodo?.ate || undefined,
+      contagemCega: Array.isArray(cega) && cega.length > 0 ? true : undefined,
+    });
+  }
+
+  function limparFiltrosTela() {
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    lista.aplicarFiltros({});
+  }
 
   const actions: Action<InventarioListRow>[] = [
     {
@@ -164,6 +212,14 @@ export default function InventarioClient({ inicial, podeAbrir }: Props) {
         onNew={() => setNovoAberto(true)}
         onSearch={lista.buscarPorTermo}
         showNew={podeAbrir}
+      />
+
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
       />
 
       <DataTable

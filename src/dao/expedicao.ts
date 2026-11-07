@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { anexoDAO, type AnexoInput } from "./anexo";
 import { saldoDAO } from "./estoque";
+import { limitesDoDiaUtc } from "@/lib/datas";
 import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
@@ -14,6 +15,17 @@ type Db = Prisma.TransactionClient;
 export type EntregaItem = {
   id_item_nota_saida: number;
   qtd_entregue: number;
+};
+
+/** Filtros de domínio da listagem de expedições. */
+export type ExpedicaoListFiltros = {
+  status?: StatusExpedicao[];
+  /** Início do período de `data_prevista` (`YYYY-MM-DD`, inclusivo). */
+  de?: string;
+  /** Fim do período de `data_prevista` (`YYYY-MM-DD`, inclusivo). */
+  ate?: string;
+  id_veiculo?: number[];
+  id_funcionario_condutor?: number[];
 };
 
 export type ResultadoEntrega = {
@@ -536,7 +548,7 @@ async function finalizarNota(
 
 export class ExpedicaoDAO {
   /** Lista paginada das expedições ativas, com notas, destinatários e veículo. */
-  async list(params: ListParams = {}) {
+  async list(params: ListParams & ExpedicaoListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.ExpedicaoWhereInput = { ativo: true };
 
@@ -558,6 +570,34 @@ export class ExpedicaoDAO {
         },
       ];
     }
+
+    // Os filtros de domínio entram por `AND` para nunca sobrescrever o `OR`
+    // da busca livre.
+    const filtros: Prisma.ExpedicaoWhereInput[] = [];
+    if (params.status && params.status.length > 0) {
+      filtros.push({ status: { in: params.status } });
+    }
+    if (params.id_veiculo && params.id_veiculo.length > 0) {
+      filtros.push({ id_veiculo: { in: params.id_veiculo } });
+    }
+    if (
+      params.id_funcionario_condutor &&
+      params.id_funcionario_condutor.length > 0
+    ) {
+      filtros.push({
+        id_funcionario_condutor: { in: params.id_funcionario_condutor },
+      });
+    }
+    const { inicio, fim } = limitesDoDiaUtc(params.de, params.ate);
+    if (inicio || fim) {
+      filtros.push({
+        data_prevista: {
+          ...(inicio ? { gte: inicio } : {}),
+          ...(fim ? { lte: fim } : {}),
+        },
+      });
+    }
+    if (filtros.length > 0) where.AND = filtros;
 
     const [data, total] = await Promise.all([
       prisma.expedicao.findMany({
