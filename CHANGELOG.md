@@ -14,6 +14,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Changed
+- **ACL do usuário da instalação (KAN-170):** o SID do usuário que executou o setup recebe
+  `Modify` em `C:\ProgramData\Nexus` e subpastas (`config`, `mysql`, `caddy`, `backups`,
+  `logs`, `uploads`) e nos arquivos `backup.cnf`, `Caddyfile` e `my.ini`. Administrators e
+  SYSTEM continuam com FullControl e os serviços mantêm o acesso; `C:\Program Files\Nexus`
+  e `app\.env` não mudam. `Protect-File` ganhou `-ModifyIdentities`.
 - **Instalador sem console (KAN-170):** o Inno Setup passa a chamar o `bootstrap.ps1`
   diretamente. O wizard ganha a página de credenciais do MySQL (root e `nexus_app`, com
   confirmação) e uma janela modal de progresso com barra e fase atual. As senhas são

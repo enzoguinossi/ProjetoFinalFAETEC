@@ -76,6 +76,10 @@ trap {
 
 . (Join-Path $PSScriptRoot "common.ps1")
 
+# Usuário que executou o setup (processo elevado): recebe Modify na árvore de
+# dados em C:\ProgramData\Nexus, como a ACL aplicada manualmente na instalação.
+$script:NexusInstallUserSid = ([Security.Principal.WindowsIdentity]::GetCurrent()).User.Value
+
 $Hostname = $Hostname.Trim().ToLowerInvariant()
 if ($Hostname -notmatch '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$') {
     Fail "Hostname inválido: '$Hostname'. Informe apenas o nome DNS, sem http://, porta ou caminho."
@@ -665,7 +669,7 @@ function Write-BackupCnf {
     if (-not (Test-Path -LiteralPath $BackupCnf)) {
         Write-Utf8NoBom -Path $BackupCnf -Lines @("")
     }
-    Protect-File -Path $BackupCnf
+    Protect-File -Path $BackupCnf -ModifyIdentities @($script:NexusInstallUserSid)
     Write-Utf8NoBom -Path $BackupCnf -Lines $lines
 }
 
@@ -925,20 +929,22 @@ try {
             }
         }
 
-        # ACLs restritas: nada herda Users de C:\ProgramData.
+        # ACLs restritas: nada herda Users de C:\ProgramData. O usuário que
+        # instalou recebe Modify em toda a árvore de dados e nos arquivos de
+        # configuração; os serviços mantêm o acesso atual.
         Set-AclReadExecute -Path $ProgramRoot
         Set-AclReadExecute -Path $ProgramRoot -Identity "S-1-5-19"
-        Set-AclRestricted -Path $DataDir
-        Set-AclRestricted -Path $UploadsDir -ModifyIdentities @("S-1-5-20")
-        Set-AclRestricted -Path $LogsDir -ModifyIdentities @("S-1-5-20")
-        Set-AclRestricted -Path $ConfigDir
-        Set-AclRestricted -Path $BackupsDir
+        Set-AclRestricted -Path $DataDir -ModifyIdentities @($script:NexusInstallUserSid)
+        Set-AclRestricted -Path $UploadsDir -ModifyIdentities @("S-1-5-20", $script:NexusInstallUserSid)
+        Set-AclRestricted -Path $LogsDir -ModifyIdentities @("S-1-5-20", $script:NexusInstallUserSid)
+        Set-AclRestricted -Path $ConfigDir -ModifyIdentities @($script:NexusInstallUserSid)
+        Set-AclRestricted -Path $BackupsDir -ModifyIdentities @($script:NexusInstallUserSid)
         foreach ($dir in @(
             (Join-Path $BackupsDir "db"),
             (Join-Path $BackupsDir "uploads"),
             (Join-Path $BackupsDir "config")
         )) {
-            Set-AclRestricted -Path $dir
+            Set-AclRestricted -Path $dir -ModifyIdentities @($script:NexusInstallUserSid)
         }
         foreach ($dir in @(
             $script:NexusCaddyDir,
@@ -946,7 +952,7 @@ try {
             $CaddyConfigDir,
             $CaddyLogsDir
         )) {
-            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
+            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19", $script:NexusInstallUserSid)
         }
 
         if (Test-Path -LiteralPath $NodeDir) {
@@ -956,12 +962,12 @@ try {
             Set-AclReadExecute -Path $MySqlDir -Identity "S-1-5-20"
         }
         if (Test-Path -LiteralPath $script:NexusMySqlRoot) {
-            Set-AclRestricted -Path $script:NexusMySqlRoot -ModifyIdentities @("S-1-5-20")
+            Set-AclRestricted -Path $script:NexusMySqlRoot -ModifyIdentities @("S-1-5-20", $script:NexusInstallUserSid)
             if (Test-Path -LiteralPath $script:NexusMySqlDataDir) {
-                Set-AclRestricted -Path $script:NexusMySqlDataDir -ModifyIdentities @("S-1-5-20")
+                Set-AclRestricted -Path $script:NexusMySqlDataDir -ModifyIdentities @("S-1-5-20", $script:NexusInstallUserSid)
             }
             if (Test-Path -LiteralPath $script:NexusMySqlConfig) {
-                Protect-File -Path $script:NexusMySqlConfig -ReadIdentities @("S-1-5-20")
+                Protect-File -Path $script:NexusMySqlConfig -ReadIdentities @("S-1-5-20") -ModifyIdentities @($script:NexusInstallUserSid)
             }
         }
         $templatePath = Join-Path $PSScriptRoot "Caddyfile"
@@ -995,7 +1001,7 @@ try {
         }
         Write-Ok "Caddyfile gerado para $Hostname."
 
-        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
+        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19") -ModifyIdentities @($script:NexusInstallUserSid)
         Set-NexusFirewallRules
         Write-Ok "ACLs restritas e regras de firewall aplicadas."
 
@@ -1105,7 +1111,7 @@ try {
             if (-not (Test-Path -LiteralPath $dir)) {
                 New-Item -ItemType Directory -Force -Path $dir | Out-Null
             }
-            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
+            Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19", $script:NexusInstallUserSid)
         }
 
         # AppDirectory é o diretório da aplicação; por isso server.js é relativo.

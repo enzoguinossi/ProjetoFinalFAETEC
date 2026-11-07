@@ -807,19 +807,23 @@ O bootstrap remove a herança de `C:\ProgramData` e aplica ACLs explícitas:
 
 | Caminho | Permissão |
 | --- | --- |
-| `C:\ProgramData\Nexus` (raiz) | Administrators (S-1-5-32-544) e SYSTEM (S-1-5-18) |
-| `C:\ProgramData\Nexus\uploads` | `NetworkService` (S-1-5-20) `Modify` + Administrators/SYSTEM |
-| `C:\ProgramData\Nexus\logs` | `NetworkService` `Modify` + Administrators/SYSTEM |
-| `C:\ProgramData\Nexus\backups` e `config` | somente Administrators/SYSTEM |
-| `C:\ProgramData\Nexus\mysql` e `mysql\data` | somente Administrators/SYSTEM + `NetworkService` `Modify` |
-| `C:\ProgramData\Nexus\mysql\my.ini` | `NetworkService` somente leitura |
-| `C:\ProgramData\Nexus\caddy\{data,config,logs}` | `LocalService` (S-1-5-19) `Modify` + Administrators/SYSTEM |
-| `C:\ProgramData\Nexus\config\Caddyfile` | `LocalService` somente leitura |
+| `C:\ProgramData\Nexus` (raiz) | Administrators (S-1-5-32-544) e SYSTEM (S-1-5-18) Full; **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\uploads` | `NetworkService` (S-1-5-20) `Modify` + Administrators/SYSTEM Full + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\logs` | `NetworkService` `Modify` + Administrators/SYSTEM Full + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\backups` e `config` | Administrators/SYSTEM Full + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\mysql` e `mysql\data` | Administrators/SYSTEM Full + `NetworkService` `Modify` + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\mysql\my.ini` | `NetworkService` somente leitura + Administrators/SYSTEM Full + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\caddy\{data,config,logs}` | `LocalService` (S-1-5-19) `Modify` + Administrators/SYSTEM Full + **usuário que instalou: Modify** |
+| `C:\ProgramData\Nexus\config\Caddyfile` | `LocalService` somente leitura + Administrators/SYSTEM Full + **usuário que instalou: Modify** |
 | `C:\Program Files\Nexus\node` e `mysql` | `ReadAndExecute` para `NetworkService` |
-| `C:\Program Files\Nexus\app\.env` | `NetworkService` somente leitura; Administrators/SYSTEM total |
+| `C:\Program Files\Nexus\app\.env` | **continua restrito**: `NetworkService` somente leitura + Administrators/SYSTEM Full; **não** recebe o usuário da instalação |
 | `C:\Program Files\Nexus\app` | `ReadAndExecute` para `NetworkService`; `.next\cache` com `Modify` |
-| `C:\ProgramData\Nexus\config\backup.cnf` | somente Administrators/SYSTEM; **o app não lê** |
+| `C:\ProgramData\Nexus\config\backup.cnf` | Administrators/SYSTEM Full + **usuário que instalou: Modify**; **o app não lê** |
 
+- O **usuário que instalou** é o dono do processo elevado
+  (`[Security.Principal.WindowsIdentity]::GetCurrent().User.Value`, por exemplo
+  `S-1-5-21-…-1001`), não `BUILTIN\Users`; ele recebe `Modify` na árvore de dados para
+  operar backups, logs e configuração sem elevação.
 - `NexusApp` e `NexusMySQL84` rodam como **NetworkService**; `NexusCaddy` como
   **LocalService**.
 - `backup.cnf` guarda a senha do `nexus_app` e a porta 3214; quem o usa é o `bootstrap`
@@ -1016,6 +1020,14 @@ Para remoção total, depois de copiar o que precisa:
     obrigatória na instalação nova e o wizard precisa do progresso. Para automatizar, use a
     instalação manual do §6 com `-CredentialsFile` (arquivo protegido e apagado) ou
     `-RootPassword`/`-AppPassword` em `SecureString` — nunca a senha na linha de comando.
+
+14. **O usuário que instalou tem Modify na árvore de dados.**
+    `C:\ProgramData\Nexus` e subpastas (`config`, `mysql`, `caddy`, `backups`, `logs`,
+    `uploads`) dão `Modify` ao SID do usuário que executou o setup, além de
+    Administrators/SYSTEM Full e do acesso dos serviços. Isso permite operar
+    backup/restauração, logs e configuração sem elevação; os demais usuários continuam
+    precisando de elevação. `C:\Program Files\Nexus` e `app\.env` **não** recebem esse
+    acesso.
 
 ---
 

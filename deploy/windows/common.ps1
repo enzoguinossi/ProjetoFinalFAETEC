@@ -385,7 +385,8 @@ function Set-AclRestricted {
 function Protect-File {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [string[]]$ReadIdentities = @()
+        [string[]]$ReadIdentities = @(),
+        [string[]]$ModifyIdentities = @()
     )
     if (-not (Test-Path -LiteralPath $Path)) {
         Fail "Arquivo não encontrado para proteger: $Path"
@@ -406,6 +407,18 @@ function Protect-File {
             [Security.AccessControl.AccessControlType]::Allow
         )
         $acl.AddAccessRule($fullRule)
+    }
+
+    # Modify para o usuário da instalação (arquivo: sem herança).
+    foreach ($identity in ($ModifyIdentities | Where-Object { $_ } | Select-Object -Unique)) {
+        $modifyRule = New-Object Security.AccessControl.FileSystemAccessRule -ArgumentList @(
+            (Get-AccessIdentity -Identity $identity),
+            [Security.AccessControl.FileSystemRights]::Modify,
+            [Security.AccessControl.InheritanceFlags]::None,
+            [Security.AccessControl.PropagationFlags]::None,
+            [Security.AccessControl.AccessControlType]::Allow
+        )
+        $acl.AddAccessRule($modifyRule)
     }
 
     foreach ($identity in ($ReadIdentities | Where-Object { $_ } | Select-Object -Unique)) {
