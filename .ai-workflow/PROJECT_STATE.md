@@ -86,6 +86,20 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    metadados; serviços Running e health 1.07 `db=true`. O `smoke.ps1` continua válido porque
    o SID do usuário não é `BUILTIN\Users`.
 
+## Skills .NET (vendorizadas)
+
+- Repositório oficial **`dotnet/skills`**, commit `96c3d68dad2855e3ab5178aa1a262789d86a1466`,
+  licença MIT; **17 skills** em `.opencode/skills/` além das 4 do Nexus. Origem e lista em
+  `.opencode/skills/DOTNET-VENDOR.md`.
+- **Tray:** `winforms-expert`, `analyzing-dotnet-performance`, `migrate-dotnet8-to-dotnet9`,
+  `migrate-dotnet9-to-dotnet10`.
+- **Agente/build:** `csharp-expert`, `scaffold-dotnet-test-project`, `writing-mstest-tests`,
+  `run-tests`, `code-testing`, `build-perf-baseline`, `build-perf-diagnostics`,
+  `incremental-build`, `directory-build-organization`, `binlog-generation`,
+  `binlog-failure-analysis`, `check-bin-obj-clash`, `setup-local-sdk`.
+- O SDK user-local 8 em `C:\Users\Enzo\.dotnet` foi removido; o build do agente .NET 10
+  depende do SDK 10 que o usuário vai instalar via winget.
+
 ## Produção Windows — legado (até 11.02)
 
 1. **Health e uploads:** `GET /api/health` público (200/`db=true`, 503 sem banco) e
