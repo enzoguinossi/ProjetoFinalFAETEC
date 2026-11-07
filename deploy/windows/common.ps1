@@ -695,8 +695,20 @@ function Assert-SafeAppPassword {
 function Read-MySqlCredentials {
     param(
         [Security.SecureString]$RootPassword,
-        [Security.SecureString]$AppPassword
+        [Security.SecureString]$AppPassword,
+        [switch]$NoPrompt
     )
+
+    if ($NoPrompt) {
+        if (-not $RootPassword) {
+            Fail ("A senha do root do MySQL não foi informada. " +
+                "Execute o instalador novamente e preencha a página de credenciais.")
+        }
+        if (-not $AppPassword) {
+            Fail ("A senha do nexus_app não foi informada. " +
+                "Execute o instalador novamente e preencha a página de credenciais.")
+        }
+    }
 
     Suspend-Transcript
     try {
@@ -709,6 +721,7 @@ function Read-MySqlCredentials {
             $message = Test-MysqlRootPassword -Plain $plain
             $plain = $null
             if (-not $message) { break }
+            if ($NoPrompt) { Fail $message }
             Write-Warn $message
             Write-Host "Tente novamente (Ctrl+C para cancelar)." -ForegroundColor Yellow
             $root = $null
@@ -723,6 +736,7 @@ function Read-MySqlCredentials {
             $message = Test-SafeAppPassword -Plain $plain -Label "Senha de nexus_app"
             $plain = $null
             if (-not $message) { break }
+            if ($NoPrompt) { Fail $message }
             Write-Warn $message
             Write-Host "Tente novamente (Ctrl+C para cancelar)." -ForegroundColor Yellow
             $app = $null

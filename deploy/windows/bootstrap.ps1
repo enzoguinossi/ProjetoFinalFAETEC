@@ -30,6 +30,21 @@
 
 .PARAMETER Force
     Ignora o estado e reinstala a aplicação sobre um diretório existente.
+
+.PARAMETER CredentialsFile
+    Arquivo UTF-8 sem BOM com as linhas `root=<senha>` e `app=<senha>`, gravado
+    pelo instalador com ACL restrita. Quando informado, substitui a leitura no
+    console e o arquivo é apagado ao final (inclusive em erro). Nunca use a
+    senha na linha de comando.
+
+.PARAMETER ProgressFile
+    Arquivo INI em que o bootstrap grava o andamento para o wizard do Inno:
+    [progress] step=0..8, done=0|1 e exit=0|1. Opcional; sem ele nada é gravado.
+
+.PARAMETER NoPrompt
+    Não abre Read-Host. Se faltar a senha do root ou do nexus_app, falha com
+    mensagem clara em vez de pedir no console. O instalador usa sempre este
+    modo e envia as senhas por -CredentialsFile.
 #>
 [CmdletBinding()]
 param(
@@ -39,6 +54,9 @@ param(
     [string]$TrayExe = "",
     [Security.SecureString]$RootPassword,
     [Security.SecureString]$AppPassword,
+    [string]$CredentialsFile = "",
+    [string]$ProgressFile = "",
+    [switch]$NoPrompt,
     [switch]$Force
 )
 
@@ -92,6 +110,28 @@ $PsExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.e
 $SqlDir = Join-Path $PSScriptRoot "sql"
 if (-not (Test-Path -LiteralPath $SqlDir -PathType Container)) {
     $SqlDir = Join-Path $PayloadDir "sql"
+}
+
+# Progresso para o wizard do Inno Setup (arquivo INI em {tmp}).
+$script:NexusProgressFile = $ProgressFile
+$script:NexusProgressStep = 0
+$script:NexusBootstrapExit = 1
+
+function Write-NexusProgress {
+    param(
+        [int]$Step = $script:NexusProgressStep,
+        [int]$Done = 0,
+        [int]$ExitCode = 0
+    )
+    if (-not $script:NexusProgressFile) { return }
+    $script:NexusProgressStep = $Step
+    try {
+        $content = "[progress]`r`nstep=$Step`r`ndone=$Done`r`nexit=$ExitCode`r`n"
+        [System.IO.File]::WriteAllText($script:NexusProgressFile, $content, [System.Text.Encoding]::ASCII)
+    }
+    catch {
+        # O arquivo de progresso nunca pode interromper a instalação.
+    }
 }
 
 # Diretórios necessários antes do transcript e do estado.
@@ -373,6 +413,37 @@ function Write-AppEnvironment {
     Write-Ok "Arquivo .env criado com ACL restrita (NetworkService lê; Administrators/SYSTEM controlam)."
 }
 
+function Read-NexusCredentialsFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        Fail ("Arquivo de credenciais não encontrado em '$Path'. " +
+            "Execute o instalador novamente e preencha a página de credenciais do MySQL.")
+    }
+    $rootPlain = $null
+    $appPlain = $null
+    foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
+        if ($line -match '^root=(.*)$') {
+            $rootPlain = $matches[1]
+            continue
+        }
+        if ($line -match '^app=(.*)$') {
+            $appPlain = $matches[1]
+        }
+    }
+    $rootMessage = Test-MysqlRootPassword -Plain $rootPlain
+    if ($rootMessage) { Fail $rootMessage }
+    $appMessage = Test-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
+    if ($appMessage) { Fail $appMessage }
+
+    $result = @{
+        Root = (ConvertTo-SecureString -String $rootPlain -AsPlainText -Force)
+        App  = (ConvertTo-SecureString -String $appPlain -AsPlainText -Force)
+    }
+    $rootPlain = $null
+    $appPlain = $null
+    return $result
+}
+
 $previousState = Get-PreviousState
 if ($Resume -and -not $previousState) {
     Fail "Não há estado anterior em $StatePath. Rode sem -Resume."
@@ -563,7 +634,17 @@ $rootSecure = $null
 $appSecure = $null
 
 try {
+    Write-NexusProgress -Step 0
+
+    if ($CredentialsFile) {
+        $credentials = Read-NexusCredentialsFile -Path $CredentialsFile
+        $RootPassword = $credentials.Root
+        $AppPassword = $credentials.App
+        Remove-Item -LiteralPath $CredentialsFile -Force -ErrorAction SilentlyContinue
+    }
+
     if ($startPhase -le 0) {
+        Write-NexusProgress -Step 0
         Write-Step "Fase 0/7 - Pré-checagem (offline)"
         Assert-Admin
         Assert-Payload
@@ -617,6 +698,7 @@ try {
     }
 
     if ($startPhase -le 1) {
+        Write-NexusProgress -Step 1
         Write-Step "Fase 1/7 - Runtime embutido (VC++, Node, NSSM, Caddy)"
         Assert-Admin
 
@@ -633,6 +715,7 @@ try {
     }
 
     if ($startPhase -le 2) {
+        Write-NexusProgress -Step 2
         Write-Step "Fase 2/7 - MySQL 8.4 dedicado"
         Assert-Admin
 
@@ -640,7 +723,7 @@ try {
         $dataDirEmpty = (@(Get-ChildItem -LiteralPath $script:NexusMySqlDataDir -Force -ErrorAction SilentlyContinue).Count -eq 0)
         $legacyDataExists = Test-Path -LiteralPath $script:NexusMySqlLegacyDataDir -PathType Container
         if (-not $serviceExisted -or ($dataDirEmpty -and -not $legacyDataExists)) {
-            $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
+            $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword -NoPrompt:$NoPrompt
             $rootSecure = $credentials.Root
             $appSecure = $credentials.App
         }
@@ -708,7 +791,7 @@ try {
 
         if ($needsSetup) {
             if (-not $rootSecure) {
-                $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
+                $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword -NoPrompt:$NoPrompt
                 $rootSecure = $credentials.Root
                 $appSecure = $credentials.App
             }
@@ -734,6 +817,7 @@ try {
     }
 
     if ($startPhase -le 3) {
+        Write-NexusProgress -Step 3
         Write-Step "Fase 3/7 - Diretórios e ACLs"
         Assert-Admin
 
@@ -842,6 +926,7 @@ try {
     }
 
     if ($startPhase -le 4) {
+        Write-NexusProgress -Step 4
         Write-Step "Fase 4/7 - Banco e aplicação"
         Assert-Admin
         Update-SessionPath
@@ -915,6 +1000,7 @@ try {
     }
 
     if ($startPhase -le 5) {
+        Write-NexusProgress -Step 5
         Write-Step "Fase 5/7 - Serviços NexusApp e NexusCaddy"
         Assert-Admin
         Update-SessionPath
@@ -1042,6 +1128,7 @@ try {
     }
 
     if ($startPhase -le 6) {
+        Write-NexusProgress -Step 6
         Write-Step "Fase 6/7 - Bandeja e backup diário"
         Assert-Admin
 
@@ -1193,6 +1280,7 @@ try {
     }
 
     if ($startPhase -le 7) {
+        Write-NexusProgress -Step 7
         Write-Step "Fase 7/7 - Smoke test e resumo"
         Assert-Admin
 
@@ -1224,10 +1312,17 @@ try {
         Write-Host "  Backup:     tarefa NexusBackup (diária, 02:00)"
         Write-Host "  Atualizar:  .\atualizar.ps1 -Package <pasta com app\ e sql\>"
         Write-Host ""
+        Write-NexusProgress -Step 8
     }
+
+    $script:NexusBootstrapExit = 0
 }
 finally {
     Stop-NexusTranscript
+    Write-NexusProgress -Step $script:NexusProgressStep -Done 1 -ExitCode $script:NexusBootstrapExit
+    if ($CredentialsFile) {
+        Remove-Item -LiteralPath $CredentialsFile -Force -ErrorAction SilentlyContinue
+    }
     $rootSecure = $null
     $appSecure = $null
 }

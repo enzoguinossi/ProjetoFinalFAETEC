@@ -37,9 +37,8 @@ estações da rede
 
 | Peça | Papel |
 | --- | --- |
-| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~393,8 MB); embute o payload e executa o bootstrap |
+| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~393,8 MB); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
-| [`instalar-gui.ps1`](../../deploy/windows/instalar-gui.ps1) | wrapper do instalador; executa o bootstrap em janela visível e mostra sucesso/falha |
 | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
 | [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) | aplica `schema.sql`/`seed.sql` (Fresh) ou migração 001 + seed (Update), sem Prisma |
@@ -98,13 +97,17 @@ estações da rede
 | `mysql\data\` | diretório de dados do `NexusMySQL84` |
 | `mysql\my.ini` | configuração do `NexusMySQL84` (porta 3214, bind local, utf8mb4, fuso `-03:00`) |
 | `uploads\` | raiz física dos uploads (`UPLOADS_DIR`) |
-| `logs\` | `app.out/err.log`, `bootstrap-*.log`, `instalador-*.log`, `deploy-*.log`, `backup-*.log`, `restart-*.log`, `desinstalar-*.log` |
+| `logs\` | `app.out/err.log`, `bootstrap-*.log`, `deploy-*.log`, `backup-*.log`, `restart-*.log`, `desinstalar-*.log` |
 | `backups\db\` | dumps `nexus_prod-<timestamp>.zip` ou `.sql` (acima de ~1,8 GB) |
 | `backups\uploads\` | cópia dos uploads |
 | `backups\config\` | `.env-<timestamp>`, `Caddyfile-<timestamp>`, `my.ini-*.bak` |
 | `config\Caddyfile` | Caddyfile gerado com o hostname; leitura para `LocalService` |
 | `config\backup.cnf` | credenciais do `nexus_app` para o `mysqldump`; **sem leitura pelo app** |
 | `caddy\{data,config,logs}\` | dados, configuração e logs do Caddy; a CA local fica em `caddy\data\caddy\pki\authorities\local\` |
+
+> O log do próprio Inno Setup fica em `%TEMP%\Setup Log*.txt` (o `.iss` usa
+> `SetupLogging=yes`). Não existe mais `C:\ProgramData\Nexus\logs\instalador-*.log`; o
+> andamento do bootstrap continua em `bootstrap-*.log`.
 
 ### 2.3 Legado (somente migração)
 
@@ -199,16 +202,26 @@ as regras precisam ser revistas.
 1. Verifica se o Windows é **64 bits**; se não for, aborta.
 2. Pede o **hostname** (nome DNS), com valor inicial `nexus.galpao.local`. Aceita apenas
    letras, números, ponto e hífen; converte para minúsculas.
-3. Permite marcar o ícone na **Área de Trabalho** (opcional). O diretório é fixo:
+3. Pede as **credenciais do MySQL**: senha do root e do `nexus_app`, cada uma com
+   confirmação. Em uma **instalação nova** (sem `C:\ProgramData\Nexus\config\backup.cnf`),
+   as quatro senhas são obrigatórias. Em **upgrade** (com `backup.cnf`), deixar os quatro
+   campos vazios reutiliza as credenciais atuais; se qualquer campo for preenchido, os
+   quatro são obrigatórios. O `nexus_app` é validado no wizard com a mesma regra do
+   bootstrap e o root só não pode ser vazio. Não há console nem prompt de senha.
+4. Permite marcar o ícone na **Área de Trabalho** (opcional). O diretório é fixo:
    `C:\Program Files\Nexus\Instalador`.
-4. Ao concluir os arquivos, `CurStepChanged(ssPostInstall)` executa o `instalar-gui.ps1` em
-   janela visível com `Exec`/`ewWaitUntilTerminated`; o código de saída é verificado e uma
-   falha mostra `MsgBox` com o código e o caminho dos logs.
+5. Ao concluir os arquivos, `CurStepChanged(ssPostInstall)` executa o
+   `bootstrap.ps1` **diretamente**, com `-NoPrompt`, `-ProgressFile` em `{tmp}` e, quando
+   há senhas, `-CredentialsFile` em `{tmp}` (UTF-8 sem BOM, ACL restrita). O bootstrap roda
+   oculto e grava o progresso; o wizard mostra uma **janela modal com barra e fase atual**,
+   lendo o INI a cada 500 ms. Ao final, os arquivos temporários são apagados.
+6. Em falha, o wizard mostra o código e o caminho dos logs; em sucesso, a página final é
+   personalizada com `https://<hostname>`.
 
 O `.iss` **não usa `[Run]`** e **não tem `[UninstallDelete]`**: instalação e desinstalação
-ficam no `[Code]`, para checar o `ResultCode`. O `instalar-gui.ps1` grava
-`C:\ProgramData\Nexus\logs\instalador-<timestamp>.log`; o bootstrap grava
-`bootstrap-<timestamp>.log`.
+ficam no `[Code]`, para checar o `ResultCode`. O bootstrap grava
+`C:\ProgramData\Nexus\logs\bootstrap-<timestamp>.log`; o Inno registra o próprio log em
+`%TEMP%\Setup Log*.txt`. Não existe mais `instalar-gui.ps1` nem `instalador-*.log`.
 
 O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL também para
 `Instalador\sql`.
@@ -228,6 +241,12 @@ O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL 
 
 O estado fica em `C:\ProgramData\Nexus\bootstrap.state.json`. A instalação é idempotente e
 retomável com `-Resume`; se o hostname mudar, o bootstrap recusa continuar sem `-Force`.
+
+O wizard chama o bootstrap com `-Hostname`, `-TrayExe`, `-ProgressFile`, `-NoPrompt` e,
+quando as senhas foram preenchidas, `-CredentialsFile`. O `-ProgressFile` recebe
+`[progress] step=0..8`, `done=0|1` e `exit=0|1`; `-CredentialsFile` é o único transporte das
+senhas (nunca a linha de comando). O `-NoPrompt` faz o bootstrap falhar rápido, com mensagem
+clara, se precisar de uma senha que não recebeu.
 
 ### 5.3 MySQL 8.4.13 dedicado e migração do legado
 
@@ -252,10 +271,12 @@ reinicia o `NexusMySQL84`, cria o banco `nexus_prod` e o usuário `nexus_app@loc
 `GRANT ALL PRIVILEGES ON nexus_prod.*`, valida a conexão na 3214; em seguida o bootstrap
 grava o `backup.cnf`.
 
-**Senhas:** o bootstrap pede root/app no console com `Read-Host -AsSecureString` quando o
-serviço/banco precisa ser criado. Em um upgrade 10.02→1.07 com `Data` legado e `backup.cnf`
-válido, as credenciais existentes podem ser reutilizadas; se o `backup.cnf` não conectar, as
-senhas são pedidas. Não há pausa para instalar o MySQL.
+**Senhas:** as senhas do root e do `nexus_app` vêm da página de credenciais do wizard, são
+entregues ao bootstrap por um arquivo temporário e nunca aparecem na linha de comando nem
+nos logs. Em um upgrade com `backup.cnf` válido, deixar os quatro campos vazios reutiliza as
+credenciais atuais; se o `backup.cnf` não conectar (ou o serviço/banco precisar ser criado),
+o bootstrap não pede senha no console (roda com `-NoPrompt`) e falha com mensagem clara —
+execute o setup novamente preenchendo as senhas. Não há pausa para instalar o MySQL.
 
 > **Atenção:** `C:\ProgramData\MySQL\MySQL Server 8.4` é o caminho do MySQL antigo (10.02) e
 > pode coincidir com uma instalação MySQL 8.4 comum. Não rode o Nexus nessa máquina sem
@@ -364,7 +385,14 @@ Parâmetros:
 | `-SkipTray` | não copia/registra a bandeja |
 | `-TrayExe` | caminho explícito do `NexusTray.exe`; se informado e ausente, falha |
 | `-RootPassword` / `-AppPassword` | `SecureString` opcional; se ausentes, o console pede |
+| `-CredentialsFile` | arquivo UTF-8 sem BOM com `root=<senha>` e `app=<senha>`; substitui a leitura no console e é apagado ao final |
+| `-ProgressFile` | INI de progresso (`[progress] step=0..8, done=0|1, exit=0|1`); opcional |
+| `-NoPrompt` | não abre `Read-Host`; sem as senhas, falha com mensagem clara (usado pelo instalador) |
 | `-Force` | ignora o estado e reinstala sobre o diretório existente |
+
+Na instalação manual, **sem** `-CredentialsFile` e **sem** `-NoPrompt`, o bootstrap continua
+pedindo as senhas no console com `Read-Host -AsSecureString`. O `-ProgressFile` também é
+opcional: sem ele, nada é gravado e o andamento aparece no console.
 
 O bootstrap **não aceita `-Tag`, `-RepoUrl`, Git ou download**: a versão vem do `app.zip` do
 payload. Sem payload, a fase 0 falha. Logs em
@@ -722,6 +750,10 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | Sintoma | Causa provável | O que fazer |
 | --- | --- | --- |
 | setup falha na fase 0 com "payload ausente" | `Instalador\payload` incompleto | gere o setup com `build-instalador.ps1` (que chama `preparar-payload.ps1`); confira `payload\node`, `mysql`, `caddy`, `vcredist`, `nssm`, `app\app.zip`, `sql` |
+| wizard fica na janela de progresso sem avançar | bootstrap não iniciou, falhou antes de gravar o progresso ou ficou preso | confira `%TEMP%\Setup Log*.txt`, `C:\ProgramData\Nexus\logs\bootstrap-*.log` e `%TEMP%\nexus-fail.log`; a janela fecha sozinha com erro após 2 horas |
+| wizard recusa as senhas | campos incompletos, confirmação divergente ou `nexus_app` com caractere proibido | preencha os quatro campos (ou deixe todos vazios no upgrade); o `nexus_app` não aceita `@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço/tab/controle |
+| bootstrap falha pedindo senha em um upgrade com campos vazios | `backup.cnf` existe, mas não conecta ou o serviço/banco precisa ser criado | execute o setup novamente e preencha as quatro senhas (o bootstrap roda com `-NoPrompt`) |
+| arquivo temporário de credenciais não pôde ser protegido | `icacls` falhou (ACL/política) | o setup aborta antes de iniciar o bootstrap; confira as permissões de `%TEMP%` e repita |
 | `app.zip` inválido/`server.js` ausente | pacote standalone não foi gerado | rode `npm run build:standalone` e `npm run package:standalone`; o `empacotar-standalone.mjs` precisa de `.next/standalone`, `.next/static` e `server.js` |
 | MySQL `NexusMySQL84` não inicia / 3214 fechada | `my.ini`, `Data` ou serviço | confira `C:\ProgramData\Nexus\mysql\my.ini`, o erro em `...\mysql\data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214`; restaure `my.ini-*.bak` |
 | migração do Data não aconteceu | `C:\ProgramData\Nexus\mysql\data` já tinha conteúdo | o `instalar-mysql.ps1` só copia para destino vazio; faça backup e esvazie/renomeie o destino se for migrar |
@@ -749,7 +781,9 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | `C:\ProgramData\Nexus\caddy\logs\caddy.err.log` | erro do Caddy |
 | `C:\ProgramData\Nexus\caddy\logs\access.log` | requisições HTTP |
 | `C:\ProgramData\Nexus\logs\bootstrap-*.log` | instalação |
-| `C:\ProgramData\Nexus\logs\instalador-*.log` | andamento do `.exe` |
+| `%TEMP%\Setup Log*.txt` | log do próprio Inno Setup (`SetupLogging=yes`) |
+| `%TEMP%\nexus-bootstrap-progress.ini` | progresso lido pelo wizard (apagado ao final) |
+| `%TEMP%\nexus-fail.log` | última falha do bootstrap |
 | `C:\ProgramData\Nexus\logs\deploy-*.log` | atualização por pacote |
 | `C:\ProgramData\Nexus\logs\backup-*.log` | backup |
 | `C:\ProgramData\Nexus\logs\restart-*.log` | reinício pela bandeja |
@@ -787,6 +821,12 @@ O bootstrap remove a herança de `C:\ProgramData` e aplica ACLs explícitas:
 - Arquivos temporários do MySQL/SQL nascem com `Protect-File`; erros do `mysqldump` são
   redigidos.
 - Transcripts são suspensos durante a leitura das senhas.
+- **Arquivo temporário de credenciais do wizard:** o Inno grava `root=<senha>` e
+  `app=<senha>` em `{tmp}\nexus-mysql-credentials.txt` (UTF-8 sem BOM), aplica
+  `icacls /inheritance:r` com FullControl apenas para Administrators (S-1-5-32-544) e SYSTEM
+  (S-1-5-18) e só inicia o bootstrap se a ACL for aplicada. O bootstrap lê o arquivo, valida
+  as senhas e o apaga; o wizard também o apaga ao final (inclusive em falha). As senhas
+  nunca vão para a linha de comando, `MsgBox`, transcript ou log.
 - `JWT_SECRET` é gerado com 48 bytes aleatórios quando ausente e preservado nas atualizações.
 - Senhas: o `nexus_app` aceita até 256 caracteres e recusa `@`, `/`, `?`, `#`, `"`, `\`,
   `;`, espaço/tab e caracteres de controle (sem mínimo nem composição); o root só não pode
@@ -886,6 +926,11 @@ Para remoção total, depois de copiar o que precisa:
 
 ### 14.3 Testes obrigatórios
 
+- [ ] **Wizard de senhas e progresso:** instalação nova exige as quatro senhas; confirmações
+      divergentes e caractere proibido no `nexus_app` são recusados no wizard; upgrade com
+      os quatro campos vazios reutiliza o `backup.cnf`; a janela modal mostra a fase atual e
+      a barra avança até 8; falha do bootstrap mostra o código e os logs e não restaura o
+      banco.
 - [ ] VM Windows limpa (10/11 x64, sem Node/Git/MySQL): instalação completa, hostname,
       MySQL 8.4.13 dedicado, SQL, serviços, tray, firewall e `smoke.ps1`.
 - [ ] **Upgrade 10.02→1.07** na máquina de teste: dados migrados de
@@ -959,6 +1004,12 @@ Para remoção total, depois de copiar o que precisa:
     Git e precisa ser montado no build. O destino é offline, mas o build exige internet e os
     arquivos de origem (app.zip, NSSM, SQL).
 
+13. **Instalação silenciosa não é suportada.**
+    O Inno não é executado com `/SILENT`/`/VERYSILENT` em produção: a página de credenciais é
+    obrigatória na instalação nova e o wizard precisa do progresso. Para automatizar, use a
+    instalação manual do §6 com `-CredentialsFile` (arquivo protegido e apagado) ou
+    `-RootPassword`/`-AppPassword` em `SecureString` — nunca a senha na linha de comando.
+
 ---
 
 ## 16. Referências
@@ -968,7 +1019,7 @@ Para remoção total, depois de copiar o que precisa:
 | instalador | [`deploy/windows/instalador.iss`](../../deploy/windows/instalador.iss) e [`build-instalador.ps1`](../../deploy/windows/build-instalador.ps1) |
 | payload | [`scripts/preparar-payload.ps1`](../../scripts/preparar-payload.ps1) e [`deploy/windows/manifesto.json`](../../deploy/windows/manifesto.json) |
 | app standalone | [`scripts/empacotar-standalone.mjs`](../../scripts/empacotar-standalone.mjs) e [`next.config.ts`](../../next.config.ts) |
-| instalação | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) e [`instalar-gui.ps1`](../../deploy/windows/instalar-gui.ps1) |
+| instalação | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) e [`instalador.iss`](../../deploy/windows/instalador.iss) |
 | MySQL | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) e [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) |
 | SQL/seed | [`deploy/sql/`](../../deploy/sql/) e [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) |
 | atualização | [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) |

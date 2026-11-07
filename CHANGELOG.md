@@ -13,6 +13,20 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+### Changed
+- **Instalador sem console (KAN-170):** o Inno Setup passa a chamar o `bootstrap.ps1`
+  diretamente. O wizard ganha a página de credenciais do MySQL (root e `nexus_app`, com
+  confirmação) e uma janela modal de progresso com barra e fase atual. As senhas são
+  entregues por um arquivo temporário UTF-8 sem BOM com ACL restrita
+  (Administrators/SYSTEM), apagado ao final; no upgrade, os quatro campos vazios reutilizam
+  as credenciais do `backup.cnf`. O `bootstrap.ps1` ganhou `-CredentialsFile`,
+  `-ProgressFile` e `-NoPrompt`; a instalação manual continua pedindo as senhas no console.
+
+### Removed
+- **`instalar-gui.ps1` (KAN-170):** removido do repositório e do `[Files]`. O instalador não
+  abre mais janela de console nem grava `instalador-*.log`; o log do Inno fica em
+  `%TEMP%\Setup Log*.txt`.
+
 ## [1.07.11.2026] - 2026-11-07
 
 Esta seção consolida o instalador autocontido: Node portátil, MySQL 8.4, Caddy, VC++, NSSM e
