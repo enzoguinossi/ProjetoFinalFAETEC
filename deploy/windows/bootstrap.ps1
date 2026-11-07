@@ -261,29 +261,92 @@ function Install-PortableNode {
 function Install-Nssm {
     $source = Get-PayloadFile -RelativePath "nssm\nssm.exe" -Label "NSSM"
     $expectedHash = ([string]$manifest.nssm.exe_sha256).ToUpperInvariant()
-    if ($expectedHash) {
-        $actual = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
-        if ($actual -ne $expectedHash) {
-            Fail "O hash do NSSM embutido não confere (esperado $expectedHash, obtido $actual)."
-        }
+    $payloadHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
+    if ($expectedHash -and $payloadHash -ne $expectedHash) {
+        Fail "O hash do NSSM embutido não confere (esperado $expectedHash, obtido $payloadHash)."
     }
+
+    # Upgrade comum: o NSSM instalado é o host dos serviços NexusApp/NexusCaddy e
+    # não pode ser sobrescrito em uso. Se o hash confere, nem toca no arquivo.
+    if (Test-Path -LiteralPath $NssmExe -PathType Leaf) {
+        $installedHash = (Get-FileHash -LiteralPath $NssmExe -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($installedHash -eq $payloadHash) {
+            Write-Ok "NSSM $($manifest.nssm.version) já presente em $NssmExe (hash confere)."
+            return
+        }
+        Write-Warn "O NSSM instalado difere do payload; atualizando $NssmExe."
+    }
+
     if (-not (Test-Path -LiteralPath $NssmDir)) {
         New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
     }
-    Copy-Item -LiteralPath $source -Destination $NssmExe -Force
-    Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue
+
+    # Caddy depende do App: para primeiro o Caddy; no finally, reinicia o App e
+    # depois o Caddy. O finally não lança para não mascarar a falha original.
+    $stopped = @()
+    try {
+        foreach ($serviceName in @("NexusCaddy", "NexusApp")) {
+            $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if (-not $service) { continue }
+            if ($service.Status.ToString() -eq "Stopped") { continue }
+            Write-Ok "Parando $serviceName para atualizar o NSSM..."
+            Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+            if (-not (Wait-ServiceState -Name $serviceName -Status "Stopped" -TimeoutSeconds 60)) {
+                Fail "O serviço $serviceName não parou para atualizar o NSSM. Pare-o manualmente e repita."
+            }
+            $stopped += $serviceName
+        }
+        Copy-Item -LiteralPath $source -Destination $NssmExe -Force -ErrorAction Stop
+        Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue
+    }
+    finally {
+        foreach ($serviceName in @("NexusApp", "NexusCaddy")) {
+            if ($stopped -notcontains $serviceName) { continue }
+            try {
+                $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+                if (-not $service -or $service.Status.ToString() -eq "Running") { continue }
+                Start-Service -Name $serviceName -ErrorAction Stop
+                if (-not (Wait-ServiceState -Name $serviceName -Status "Running" -TimeoutSeconds 120)) {
+                    Write-Warn "O serviço $serviceName não voltou a iniciar após a atualização do NSSM."
+                }
+                else {
+                    Write-Ok "$serviceName reiniciado."
+                }
+            }
+            catch {
+                Write-Warn "Não foi possível reiniciar $serviceName após a atualização do NSSM: $($_.Exception.Message)"
+            }
+        }
+    }
     Write-Ok "NSSM $($manifest.nssm.version) instalado em $NssmExe."
 }
 
 function Install-Caddy {
+    $expectedVersion = "v" + [string]$manifest.caddy.version
     if (Test-Path -LiteralPath $CaddyExe -PathType Leaf) {
         $current = ([string](& $CaddyExe "version" 2>&1 | Select-Object -First 1)).Trim()
-        Write-Ok "Caddy já presente: $current"
-        return
+        $currentVersion = ($current -split '\s+')[0]
+        if ($currentVersion -eq $expectedVersion) {
+            Write-Ok "Caddy já presente: $current"
+            return
+        }
+        Write-Warn "O Caddy instalado ('$current') difere de $expectedVersion; atualizando."
     }
+
     $caddyZip = Get-PayloadFile -RelativePath (Join-Path "caddy" ([string]$manifest.caddy.archive)) -Label "Caddy"
     $tempRoot = Join-Path $env:TEMP ("nexus-caddy-" + [guid]::NewGuid().ToString("N"))
+    $stopped = $false
     try {
+        $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+        if ($service -and $service.Status.ToString() -ne "Stopped") {
+            Write-Ok "Parando NexusCaddy para atualizar o Caddy..."
+            Stop-Service -Name "NexusCaddy" -Force -ErrorAction SilentlyContinue
+            if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
+                Fail "O serviço NexusCaddy não parou para atualizar o Caddy. Pare-o manualmente e repita."
+            }
+            $stopped = $true
+        }
+
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
         Write-Ok "Extraindo Caddy $($manifest.caddy.version) do payload..."
         Expand-Archive -LiteralPath $caddyZip -DestinationPath $tempRoot -Force
@@ -295,15 +358,36 @@ function Install-Caddy {
         if (-not (Test-Path -LiteralPath $CaddyDir)) {
             New-Item -ItemType Directory -Force -Path $CaddyDir | Out-Null
         }
-        Copy-Item -LiteralPath $binary.FullName -Destination $CaddyExe -Force
+        Copy-Item -LiteralPath $binary.FullName -Destination $CaddyExe -Force -ErrorAction Stop
+        Unblock-File -LiteralPath $CaddyExe -ErrorAction SilentlyContinue
     }
     finally {
         if (Test-Path -LiteralPath $tempRoot) {
             Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
+        if ($stopped) {
+            try {
+                $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+                if ($service -and $service.Status.ToString() -ne "Running") {
+                    Start-Service -Name "NexusCaddy" -ErrorAction Stop
+                    if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Running" -TimeoutSeconds 60)) {
+                        Write-Warn "O serviço NexusCaddy não voltou a iniciar após a atualização do Caddy."
+                    }
+                    else {
+                        Write-Ok "NexusCaddy reiniciado."
+                    }
+                }
+            }
+            catch {
+                Write-Warn "Não foi possível reiniciar o NexusCaddy após a atualização do Caddy: $($_.Exception.Message)"
+            }
+        }
     }
-    Unblock-File -LiteralPath $CaddyExe -ErrorAction SilentlyContinue
     $installed = ([string](& $CaddyExe "version" 2>&1 | Select-Object -First 1)).Trim()
+    $installedVersion = ($installed -split '\s+')[0]
+    if ($installedVersion -ne $expectedVersion) {
+        Fail "Caddy instalado é '$installed'; esperado '$expectedVersion'."
+    }
     Write-Ok "Caddy instalado: $installed"
 }
 
