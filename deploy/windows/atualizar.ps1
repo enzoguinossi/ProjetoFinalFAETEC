@@ -144,16 +144,6 @@ function Resolve-SqlDir {
     throw "SQL de produção não encontrado. Informe -Sql com a pasta que contém schema.sql/seed.sql."
 }
 
-function Stop-NexusCaddy {
-    $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
-    if ($service -and $service.Status.ToString() -ne "Stopped") {
-        Stop-Service -Name "NexusCaddy" -Force
-        if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
-            throw "O serviço NexusCaddy não parou."
-        }
-    }
-}
-
 function Start-NexusCaddy {
     $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
     if (-not $service) { throw "O serviço NexusCaddy não existe." }
@@ -298,8 +288,10 @@ try {
     $failedDir = Join-Path $ProgramRoot ("app.failed-" + (ConvertTo-SafeName $Version) + "-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
 
     Write-Ok "Versão atual: $currentVersion"
-    Write-Ok "Parando NexusCaddy..."
-    Stop-NexusCaddy
+    Write-Ok "Parando NexusCaddy e liberando as portas 80/443..."
+    if (-not (Stop-NexusCaddyProcess)) {
+        throw "Não foi possível parar o NexusCaddy/liberar as portas 80 e 443."
+    }
     Write-Ok "Parando NexusApp e liberando a porta 3000..."
     if (-not (Stop-NexusAppProcess)) {
         throw "Não foi possível parar o NexusApp/liberar a porta 3000."
@@ -404,7 +396,12 @@ catch {
     $message = $_.Exception.Message
     Write-Warn "Falha na atualização: $message"
 
-    try { Stop-NexusCaddy } catch { Write-Warn "Não foi possível parar o NexusCaddy: $($_.Exception.Message)" }
+    try {
+        if (-not (Stop-NexusCaddyProcess)) {
+            Write-Warn "Não foi possível parar o NexusCaddy/liberar as portas 80 e 443."
+        }
+    }
+    catch { Write-Warn "Não foi possível parar o NexusCaddy: $($_.Exception.Message)" }
     try {
         if (-not (Stop-NexusAppProcess)) {
             Write-Warn "Não foi possível parar o NexusApp/liberar a porta 3000."

@@ -58,6 +58,9 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 - **Fase 0 e código de saída do setup (KAN-170):** a fase 0 do bootstrap encerra o node órfão
   do Nexus na porta 3000 antes de falhar (nunca processo de terceiros) e o setup retorna
   código 1 quando o bootstrap não conclui.
+- **Caddy órfão nas portas 80/443 (KAN-170):** mesma classe do node na 3000 — a fase 0,
+  `Install-Caddy`, `restart`, `iniciar`, `atualizar` e `encerrar` usam `Stop-NexusCaddyProcess`
+  para liberar 80/443 sem encerrar processo de terceiros.
 
 ## [1.07.11.2026] - 2026-11-07
 

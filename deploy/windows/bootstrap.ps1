@@ -339,14 +339,12 @@ function Install-Caddy {
     $stopped = $false
     try {
         $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
-        if ($service -and $service.Status.ToString() -ne "Stopped") {
-            Write-Ok "Parando NexusCaddy para atualizar o Caddy..."
-            Stop-Service -Name "NexusCaddy" -Force -ErrorAction SilentlyContinue
-            if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
-                Fail "O serviço NexusCaddy não parou para atualizar o Caddy. Pare-o manualmente e repita."
-            }
-            $stopped = $true
+        $wasRunning = [bool]($service -and $service.Status.ToString() -ne "Stopped")
+        Write-Ok "Parando NexusCaddy e liberando as portas 80/443 para atualizar o Caddy..."
+        if (-not (Stop-NexusCaddyProcess)) {
+            Fail "Não foi possível parar o NexusCaddy/liberar as portas 80/443 para atualizar o Caddy."
         }
+        $stopped = $wasRunning
 
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
         Write-Ok "Extraindo Caddy $($manifest.caddy.version) do payload..."
@@ -779,6 +777,17 @@ try {
                         $pidText = ""
                         if ($ownerPid -gt 0) { $pidText = " (PID $ownerPid)" }
                         Write-Warn "Porta 3000 ocupada por node órfão do Nexus$pidText; processo encerrado."
+                        continue
+                    }
+                }
+                # O Caddy do Nexus também pode sobrar fora do serviço (Stopped ou
+                # Paused) e segurar 80/443. O helper só encerra o caddy.exe da
+                # instalação com o Caddyfile do Nexus; terceiros continuam falhando.
+                if ($entry.Port -eq 80 -or $entry.Port -eq 443) {
+                    if (Stop-NexusCaddyProcess) {
+                        $pidText = ""
+                        if ($ownerPid -gt 0) { $pidText = " (PID $ownerPid)" }
+                        Write-Warn "Porta $($entry.Port) ocupada por Caddy órfão do Nexus$pidText; processo encerrado."
                         continue
                     }
                 }

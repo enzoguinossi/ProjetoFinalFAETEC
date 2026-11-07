@@ -56,6 +56,24 @@ try {
 
     # Caddy → App → MySQL. Tenta todos mesmo se um falhar.
     foreach ($name in @("NexusCaddy", "NexusApp", $mySqlName)) {
+        if ($name -eq "NexusCaddy") {
+            $caddyService = Get-Service -Name $name -ErrorAction SilentlyContinue
+            if (-not $caddyService) {
+                Write-Warn "O serviço $name não existe."
+                $failures.Add($name)
+                continue
+            }
+            Write-Ok "Parando $name e liberando as portas 80/443..."
+            if (Stop-NexusCaddyProcess) {
+                Write-Ok "$name parado."
+            }
+            else {
+                Write-Warn "O serviço $name/portas 80 e 443 não foi liberado."
+                $failures.Add($name)
+            }
+            continue
+        }
+
         if ($name -eq "NexusApp") {
             $appService = Get-Service -Name $name -ErrorAction SilentlyContinue
             if (-not $appService) {

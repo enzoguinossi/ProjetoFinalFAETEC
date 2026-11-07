@@ -19,6 +19,9 @@ $script:NexusCaddyDir = Join-Path $script:NexusDataDir "caddy"
 $script:NexusCaddyDataDir = Join-Path $script:NexusCaddyDir "data"
 $script:NexusCaddyConfigDir = Join-Path $script:NexusCaddyDir "config"
 $script:NexusCaddyLogsDir = Join-Path $script:NexusCaddyDir "logs"
+# Binário do Caddy (program files), diferente de $script:NexusCaddyDir, que é o
+# diretório de dados em C:\ProgramData\Nexus\caddy.
+$script:NexusCaddyExe = Join-Path $script:NexusProgramRoot "caddy\caddy.exe"
 $script:NexusMySqlPort = 3214
 $script:NexusMySqlService = "NexusMySQL84"
 $script:NexusMySqlDir = Join-Path $script:NexusProgramRoot "mysql"
@@ -389,6 +392,102 @@ function Start-NexusApp {
     }
 
     Write-Ok "NexusApp em execução; health local OK (versão $($health.Versao))."
+}
+
+function Stop-NexusCaddyProcess {
+    <#
+    .SYNOPSIS
+        Para o serviço NexusCaddy e libera as portas 80/443 de um Caddy órfão do Nexus.
+
+    .DESCRIPTION
+        O serviço pode ficar Stopped/Paused com o caddy.exe antigo ainda escutando
+        em 80/443. Só encerra processos comprovadamente do Nexus: ExecutablePath
+        igual ao caddy.exe da instalação E CommandLine com o Caddyfile ou o
+        diretório C:\Program Files\Nexus. Nunca mata outro processo apenas por
+        ocupar a porta. Quando um processo não pode ser inspecionado, registra
+        aviso e retorna $false.
+
+    .OUTPUTS
+        $true quando o serviço está parado e as portas 80/443 estão livres; $false
+        caso contrário (o chamador decide falhar).
+    #>
+    $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+    if ($service -and $service.Status.ToString() -ne "Stopped") {
+        Write-Ok "Parando o serviço NexusCaddy ($($service.Status))..."
+        try {
+            Stop-Service -Name "NexusCaddy" -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warn "Não foi possível parar o serviço NexusCaddy: $($_.Exception.Message)"
+        }
+        if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
+            Write-Warn "O serviço NexusCaddy não chegou a Stopped em 60 segundos."
+            return $false
+        }
+        Write-Ok "Serviço NexusCaddy parado."
+    }
+
+    # O mesmo caddy.exe pode escutar em 80 e 443; deduplica os PIDs para não
+    # tentar encerrar o mesmo processo duas vezes.
+    $ports = @(80, 443)
+    $listeners = @()
+    foreach ($port in $ports) {
+        $listeners += @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+    }
+    $ownerIds = @($listeners | ForEach-Object { [int]$_.OwningProcess } | Sort-Object -Unique)
+
+    $failed = $false
+    foreach ($ownerId in $ownerIds) {
+        $process = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId={0}" -f $ownerId) -ErrorAction SilentlyContinue
+        if (-not $process) {
+            Write-Warn "As portas 80/443 estão ocupadas pelo PID $ownerId, mas o processo não pôde ser inspecionado; ele não será encerrado."
+            $failed = $true
+            continue
+        }
+
+        $executable = [string]$process.ExecutablePath
+        $commandLine = [string]$process.CommandLine
+        $isNexusCaddyExe = $executable -and ($executable -ieq $script:NexusCaddyExe)
+        $isNexusCaddy = $commandLine -and (
+            ($commandLine.IndexOf("Caddyfile", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) -or
+            ($commandLine.IndexOf($script:NexusProgramRoot, [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
+        if (-not ($isNexusCaddyExe -and $isNexusCaddy)) {
+            Write-Warn "As portas 80/443 estão ocupadas pelo PID $ownerId ($executable), que não é o Caddy do Nexus; ele não será encerrado."
+            $failed = $true
+            continue
+        }
+
+        try {
+            Stop-Process -Id $ownerId -Force -ErrorAction Stop
+            Write-Ok "Encerrado Caddy órfão do Nexus nas portas 80/443 (PID $ownerId)."
+        }
+        catch {
+            Write-Warn "Não foi possível encerrar o PID ${ownerId}: $($_.Exception.Message)"
+            $failed = $true
+        }
+    }
+
+    # Espera 80 e 443 ficarem livres (até 30 s), mesmo quando não havia órfão.
+    $deadline = (Get-Date).AddSeconds(30)
+    $busy = @()
+    foreach ($port in $ports) {
+        $busy += @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+    }
+    while ($busy.Count -gt 0 -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 1
+        $busy = @()
+        foreach ($port in $ports) {
+            $busy += @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)
+        }
+    }
+    if ($busy.Count -gt 0) {
+        Write-Warn "As portas 80/443 continuam ocupadas após 30 segundos."
+        return $false
+    }
+    if ($failed) {
+        return $false
+    }
+    return $true
 }
 
 function Get-AccessIdentity {

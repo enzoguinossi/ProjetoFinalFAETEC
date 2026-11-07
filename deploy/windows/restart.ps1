@@ -63,12 +63,9 @@ try {
     $caddyService = Get-Service -Name $caddyName -ErrorAction SilentlyContinue
     if (-not $caddyService) { Stop-RestartFailure "O serviço $caddyName não existe." }
 
-    Write-Ok "Parando $caddyName..."
-    if ($caddyService.Status.ToString() -ne "Stopped") {
-        Stop-Service -Name $caddyName -Force
-        if (-not (Wait-ServiceState -Name $caddyName -Status "Stopped" -TimeoutSeconds 60)) {
-            Stop-RestartFailure "O serviço $caddyName não parou."
-        }
+    Write-Ok "Parando $caddyName e liberando as portas 80/443..."
+    if (-not (Stop-NexusCaddyProcess)) {
+        Stop-RestartFailure "Não foi possível parar o $caddyName e liberar as portas 80/443."
     }
     Write-Ok "$caddyName parado."
 

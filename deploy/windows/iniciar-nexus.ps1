@@ -134,7 +134,15 @@ try {
     Write-Ok "Iniciando $caddyName..."
     $caddy = Get-Service -Name $caddyName -ErrorAction SilentlyContinue
     if (-not $caddy -or $caddy.Status.ToString() -ne "Running") {
-        Start-Service -Name $caddyName -ErrorAction SilentlyContinue
+        # O serviço pode estar Stopped com o caddy.exe órfão segurando 80/443;
+        # o helper limpa só o Caddy do Nexus antes de subir.
+        if (-not (Stop-NexusCaddyProcess)) {
+            Stop-InitFailure "Não foi possível parar o $caddyName/liberar as portas 80 e 443."
+        }
+        $caddy = Get-Service -Name $caddyName -ErrorAction SilentlyContinue
+        if (-not $caddy -or $caddy.Status.ToString() -ne "Running") {
+            Start-Service -Name $caddyName -ErrorAction SilentlyContinue
+        }
     }
     if (-not (Wait-ServiceState -Name $caddyName -Status "Running" -TimeoutSeconds 60)) {
         Stop-InitFailure "O serviço $caddyName não iniciou."
