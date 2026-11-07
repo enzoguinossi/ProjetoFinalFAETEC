@@ -58,7 +58,9 @@ export async function criarUsuario(
       login: opts.login ?? `usuario${n}`,
       senha_hash: opts.senhaHash === undefined ? "hash" : opts.senhaHash,
       senha_alterada_em:
-        opts.senhaAlteradaEm === undefined ? new Date(0) : opts.senhaAlteradaEm,
+        opts.senhaAlteradaEm === undefined
+          ? new Date("2024-01-01T12:00:00Z")
+          : opts.senhaAlteradaEm,
       super_admin: opts.superAdmin ?? false,
     },
   });
