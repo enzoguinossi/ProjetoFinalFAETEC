@@ -30,6 +30,10 @@ tsconfig.tsbuildinfo
 /out/figma-export/
 # Artefatos gerados localmente (planilhas, capturas e relatórios avulsos)
 /out/
+# Payload do instalador Windows (Node, MySQL, Caddy, VC++ e app standalone)
+/deploy/windows/payload/
+/out/standalone/
+/out/update/
 # Configuração local da exportação (pode conter a URL do banco de exportação)
 /tools/figma-export/.env
 

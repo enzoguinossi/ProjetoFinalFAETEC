@@ -6,3 +6,6 @@ NexusTray/dist/
 
 # Instalador gerado por build-instalador.ps1
 out/
+
+# Payload autocontido (binários baixados/copiados por scripts\preparar-payload.ps1)
+payload/

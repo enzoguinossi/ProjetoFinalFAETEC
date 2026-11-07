@@ -1,26 +1,44 @@
 ﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Atualiza o Nexus para uma tag publicada.
+    Atualiza o Nexus a partir de um pacote de atualização (sem Git).
 
 .DESCRIPTION
-    Faz backup, para o NexusApp, troca a pasta da aplicação, compila a nova tag,
-    aplica o schema, sobe o serviço e valida com smoke test. Em caso de falha,
-    a pasta anterior volta a ser usada; o banco NÃO é restaurado automaticamente.
+    O pacote contém a aplicação standalone (app.zip) e o SQL de produção
+    (schema.sql/seed.sql/migracoes). O atualizador faz backup, para o
+    NexusCaddy/NexusApp, troca a pasta da aplicação, preserva o .env, aplica o
+    SQL com mysql.exe, sobe os serviços e valida com smoke test. Em caso de
+    falha, a pasta anterior volta a ser usada; o banco NÃO é restaurado
+    automaticamente.
 
-.PARAMETER Tag
-    Tag a instalar (ex.: v1.02.11.2026).
+    Layout do pacote (-Package):
+        <pacote>\app\app.zip    (ou <pacote>\app.zip)
+        <pacote>\sql\schema.sql
+        <pacote>\sql\seed.sql
+        <pacote>\sql\migracoes\001-unidades-pct10-cx50.sql
 
-.PARAMETER RepoUrl
-    URL do repositório. Padrão: remote origin da instalação atual.
+.PARAMETER Package
+    Diretório do pacote de atualização (app\ + sql\).
+
+.PARAMETER AppZip
+    Caminho alternativo do app.zip (quando não se usa -Package).
+
+.PARAMETER Sql
+    Diretório do SQL de produção. Padrão: <pacote>\sql, .\sql ou payload\sql.
+
+.PARAMETER Version
+    Versão da nova aplicação (ex.: 12.02.11.2026). Padrão: lida do package.json
+    dentro do app.zip.
 
 .PARAMETER SkipBackup
     Não executa o backup antes da atualização (não recomendado).
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Tag,
-    [string]$RepoUrl = "",
+    [string]$Package = "",
+    [string]$AppZip = "",
+    [string]$Sql = "",
+    [string]$Version = "",
     [switch]$SkipBackup
 )
 
@@ -29,7 +47,6 @@ $ErrorActionPreference = "Stop"
 Assert-Admin
 Update-SessionPath
 
-$manifest = Get-Manifest
 $ProgramRoot = $script:NexusProgramRoot
 $AppDir = $script:NexusAppDir
 $DataDir = $script:NexusDataDir
@@ -37,28 +54,10 @@ $LogsDir = $script:NexusLogsDir
 $ConfigDir = $script:NexusConfigDir
 $BackupsDir = $script:NexusBackupsDir
 $UploadsDir = $script:NexusUploadsDir
-$Caddyfile = Join-Path $ConfigDir "Caddyfile"
-$InstaladorDir = Join-Path $ProgramRoot "Instalador"
-$ScriptsDir = Join-Path $ProgramRoot "scripts"
-$TrayDir = Join-Path $ProgramRoot "NexusTray"
+$EnvPath = Join-Path $AppDir ".env"
+$BackupCnf = Join-Path $ConfigDir "backup.cnf"
+$MySqlExe = Join-Path $script:NexusMySqlDir "bin\mysql.exe"
 $PsExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
-
-if (-not (Test-Path -LiteralPath (Join-Path $AppDir "package.json"))) {
-    Fail "Aplicação não encontrada em $AppDir. Rode o bootstrap primeiro."
-}
-if (-not (Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue)) {
-    Fail "O serviço NexusApp não existe. Rode o bootstrap primeiro."
-}
-if (-not $RepoUrl) {
-    $git = Get-Command git.exe -ErrorAction SilentlyContinue
-    if ($git -and (Test-Path -LiteralPath (Join-Path $AppDir ".git"))) {
-        $RepoUrl = ([string](& $git.Source -C $AppDir remote get-url origin 2>$null | Select-Object -First 1)).Trim()
-    }
-    if (-not $RepoUrl) { $RepoUrl = [string]$manifest.repo.url }
-}
-if (-not $RepoUrl) {
-    Fail "URL do repositório não definida. Passe -RepoUrl."
-}
 
 function Get-NexusHostname {
     $statePath = Join-Path $DataDir "bootstrap.state.json"
@@ -81,6 +80,70 @@ function Get-NexusHostname {
     return ""
 }
 
+function Get-AppZipVersion {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = $null
+    try {
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+        $entry = $archive.Entries |
+            Where-Object { $_.FullName -eq "package.json" } |
+            Select-Object -First 1
+        if (-not $entry) { return "" }
+        $reader = New-Object System.IO.StreamReader -ArgumentList $entry.Open()
+        try {
+            $package = $reader.ReadToEnd() | ConvertFrom-Json
+            return ([string]$package.version).Trim()
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+    catch {
+        return ""
+    }
+    finally {
+        if ($archive) { $archive.Dispose() }
+    }
+}
+
+function Assert-AppZip {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $archive = $null
+    try {
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($Path)
+        $names = @($archive.Entries | ForEach-Object { $_.FullName })
+    }
+    catch {
+        throw "app.zip inválido ($Path): $($_.Exception.Message)"
+    }
+    finally {
+        if ($archive) { $archive.Dispose() }
+    }
+    if (-not ($names | Where-Object { $_ -eq "server.js" } | Select-Object -First 1)) {
+        throw "O app.zip não contém server.js na raiz. Gere o pacote com npm run package:standalone."
+    }
+}
+
+function Resolve-SqlDir {
+    param([string]$Explicit)
+    $candidates = @()
+    if ($Explicit) { $candidates += $Explicit }
+    if ($Package) { $candidates += (Join-Path $Package "sql") }
+    $candidates += @(
+        (Join-Path $PSScriptRoot "sql"),
+        (Join-Path $PSScriptRoot "payload\sql"),
+        (Join-Path $PSScriptRoot "..\..\deploy\sql")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath (Join-Path $candidate "schema.sql") -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+    throw "SQL de produção não encontrado. Informe -Sql com a pasta que contém schema.sql/seed.sql."
+}
+
 function Stop-NexusApp {
     $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
     if ($service -and $service.Status.ToString() -ne "Stopped") {
@@ -99,6 +162,16 @@ function Start-NexusApp {
     }
     if (-not (Wait-ServiceState -Name "NexusApp" -Status "Running" -TimeoutSeconds 120)) {
         throw "O serviço NexusApp não iniciou."
+    }
+}
+
+function Stop-NexusCaddy {
+    $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+    if ($service -and $service.Status.ToString() -ne "Stopped") {
+        Stop-Service -Name "NexusCaddy" -Force
+        if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
+            throw "O serviço NexusCaddy não parou."
+        }
     }
 }
 
@@ -124,16 +197,6 @@ function Wait-NexusHealth {
     return $last
 }
 
-function Stop-NexusCaddy {
-    $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
-    if ($service -and $service.Status.ToString() -ne "Stopped") {
-        Stop-Service -Name "NexusCaddy" -Force
-        if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
-            throw "O serviço NexusCaddy não parou."
-        }
-    }
-}
-
 function Wait-NexusHttps {
     param(
         [Parameter(Mandatory = $true)][string]$Hostname,
@@ -149,27 +212,63 @@ function Wait-NexusHttps {
     return $last
 }
 
-function Assert-TagContents {
-    param(
-        [Parameter(Mandatory = $true)][string]$Tag,
-        [Parameter(Mandatory = $true)][string]$AppPath
-    )
-    $healthRoute = Join-Path $AppPath "src\app\api\health\route.ts"
-    if (-not (Test-Path -LiteralPath $healthRoute)) {
-        throw "A tag $Tag não contém src/app/api/health/route.ts; crie a tag do release com a rota."
-    }
+# --- Pacote -----------------------------------------------------------------
+if (-not $Package -and -not $AppZip) {
+    Fail "Informe -Package (pasta com app\ e sql\) ou -AppZip (caminho do app.zip)."
+}
 
-    $packagePath = Join-Path $AppPath "package.json"
-    try {
-        $package = Get-Content -LiteralPath $packagePath -Raw -Encoding UTF8 | ConvertFrom-Json
+$PackageRoot = ""
+if ($Package) {
+    if (-not (Test-Path -LiteralPath $Package -PathType Container)) {
+        Fail "Pacote não encontrado: $Package"
     }
-    catch {
-        throw "Não foi possível ler o package.json da tag $Tag`: $($_.Exception.Message)"
+    $PackageRoot = (Resolve-Path -LiteralPath $Package).Path
+    if (-not $AppZip) {
+        $candidates = @(
+            (Join-Path $PackageRoot "app\app.zip"),
+            (Join-Path $PackageRoot "app.zip")
+        )
+        foreach ($candidate in $candidates) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $AppZip = $candidate
+                break
+            }
+        }
     }
-    $expectedVersion = $Tag -replace '^v', ''
-    if ([string]$package.version -ne $expectedVersion) {
-        throw "A versão do package.json da tag $Tag é '$([string]$package.version)', esperada '$expectedVersion'. Crie a tag a partir do release."
-    }
+}
+if (-not $AppZip) {
+    Fail "app.zip não encontrado no pacote. Esperado app\app.zip ou app.zip."
+}
+if (-not (Test-Path -LiteralPath $AppZip -PathType Leaf)) {
+    Fail "app.zip não encontrado: $AppZip"
+}
+$AppZip = (Resolve-Path -LiteralPath $AppZip).Path
+
+Assert-AppZip -Path $AppZip
+
+$sqlDir = ""
+try {
+    $sqlDir = Resolve-SqlDir -Explicit $Sql
+}
+catch {
+    Fail $_.Exception.Message
+}
+
+if (-not $Version) {
+    $Version = Get-AppZipVersion -Path $AppZip
+}
+if (-not $Version) {
+    $Version = "manual-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+}
+
+if (-not (Test-Path -LiteralPath (Join-Path $AppDir "server.js"))) {
+    Fail "Aplicação não encontrada em $AppDir. Rode o bootstrap primeiro."
+}
+if (-not (Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue)) {
+    Fail "O serviço NexusApp não existe. Rode o bootstrap primeiro."
+}
+if (-not (Test-Path -LiteralPath $MySqlExe -PathType Leaf)) {
+    Fail "mysql.exe não encontrado em $MySqlExe."
 }
 
 $hostname = Get-NexusHostname
@@ -177,16 +276,29 @@ if (-not $hostname) {
     Fail "Hostname não encontrado no bootstrap/Caddyfile. Não é possível rodar o smoke test."
 }
 
-$logFile = Join-Path $LogsDir ("deploy-" + (ConvertTo-SafeName $Tag) + ".log")
+$logFile = Join-Path $LogsDir ("deploy-" + (ConvertTo-SafeName $Version) + ".log")
 Start-NexusTranscript -Path $logFile
-$git = Get-Command git.exe -ErrorAction SilentlyContinue
-$npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
-if (-not $git) { Fail "Git não encontrado." }
-if (-not $npm) { Fail "npm.cmd não encontrado." }
+
+$previousDir = ""
+$failedDir = ""
+$oldAppMoved = $false
+
+function Get-CurrentAppVersion {
+    $packagePath = Join-Path $AppDir "package.json"
+    if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) { return "desconhecida" }
+    try {
+        return [string](Get-Content -LiteralPath $packagePath -Raw -Encoding UTF8 | ConvertFrom-Json).version
+    }
+    catch {
+        return "desconhecida"
+    }
+}
 
 try {
-    Write-Step "Atualização do Nexus para $Tag"
+    Write-Step "Atualização do Nexus para $Version (pacote standalone)"
     Write-Ok "Log: $logFile"
+    Write-Ok "Aplicação: $AppZip"
+    Write-Ok "SQL: $sqlDir"
 
     if ($SkipBackup) {
         Write-Warn "Backup ignorado por -SkipBackup."
@@ -199,272 +311,177 @@ try {
         }
     }
 
-    $currentTag = Get-CurrentTag -RepoPath $AppDir
-    if (-not $currentTag) { $currentTag = "desconhecida" }
-    $previousDir = Join-Path $ProgramRoot ("app.prev-" + (ConvertTo-SafeName $currentTag))
+    $currentVersion = Get-CurrentAppVersion
+    $previousDir = Join-Path $ProgramRoot ("app.prev-" + (ConvertTo-SafeName $currentVersion))
     if (Test-Path -LiteralPath $previousDir) {
-        $previousDir = Join-Path $ProgramRoot ("app.prev-" + (ConvertTo-SafeName $currentTag) + "-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+        $previousDir = Join-Path $ProgramRoot ("app.prev-" + (ConvertTo-SafeName $currentVersion) + "-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
     }
-    $failedDir = Join-Path $ProgramRoot ("app.failed-" + (ConvertTo-SafeName $Tag))
-    if (Test-Path -LiteralPath $failedDir) {
-        $failedDir = Join-Path $ProgramRoot ("app.failed-" + (ConvertTo-SafeName $Tag) + "-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $failedDir = Join-Path $ProgramRoot ("app.failed-" + (ConvertTo-SafeName $Version) + "-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+
+    Write-Ok "Versão atual: $currentVersion"
+    Write-Ok "Parando NexusCaddy..."
+    Stop-NexusCaddy
+    Write-Ok "Parando NexusApp..."
+    Stop-NexusApp
+
+    Write-Ok "Movendo a aplicação atual para $previousDir..."
+    Move-Item -LiteralPath $AppDir -Destination $previousDir -ErrorAction Stop
+    $oldAppMoved = $true
+
+    Write-Ok "Extraindo a nova aplicação..."
+    New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+    Expand-Archive -LiteralPath $AppZip -DestinationPath $AppDir -Force -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath (Join-Path $AppDir "server.js") -PathType Leaf)) {
+        throw "O app.zip não contém server.js na raiz."
     }
 
-    $oldAppMoved = $false
-    $newAppCloned = $false
-    $failedAppMoved = $false
-
-    Write-Ok "Versão atual: $currentTag"
+    $previousEnv = Join-Path $previousDir ".env"
+    if (-not (Test-Path -LiteralPath $previousEnv -PathType Leaf)) {
+        throw "O .env da instalação anterior não foi encontrado."
+    }
+    Suspend-Transcript
     try {
-        Write-Ok "Parando NexusCaddy..."
-        Stop-NexusCaddy
-        Write-Ok "Parando NexusApp..."
-        Stop-NexusApp
-
-        Write-Ok "Movendo a aplicação atual para $previousDir..."
-        Move-Item -LiteralPath $AppDir -Destination $previousDir
-        $oldAppMoved = $true
-
-        Write-Ok "Clonando $Tag..."
-        & $git.Source clone --branch $Tag --depth 1 $RepoUrl $AppDir
-        if ($LASTEXITCODE -ne 0) { throw "git clone da tag $Tag falhou." }
-        $newAppCloned = $true
-
-        Assert-TagContents -Tag $Tag -AppPath $AppDir
-        Write-Ok "Tag $Tag contém /api/health e a versão esperada."
-
-        $previousEnv = Join-Path $previousDir ".env"
-        if (-not (Test-Path -LiteralPath $previousEnv)) {
-            throw "O .env da instalação anterior não foi encontrado."
-        }
-        Suspend-Transcript
-        try {
-            Copy-Item -LiteralPath $previousEnv -Destination (Join-Path $AppDir ".env") -Force
-            Set-EnvFile -Path (Join-Path $AppDir ".env") -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
-        }
-        finally {
-            Resume-Transcript
-        }
-        Write-Ok ".env restaurado com ACL restrita e UPLOADS_DIR garantido."
-
-        $previousUploads = Join-Path $previousDir "public\uploads"
-        if (Test-Path -LiteralPath $previousUploads) {
-            Write-Ok "Migrando uploads de $previousUploads para $UploadsDir..."
-            if (-not (Test-Path -LiteralPath $UploadsDir)) {
-                New-Item -ItemType Directory -Force -Path $UploadsDir | Out-Null
-            }
-            $robocopy = Join-Path $env:SystemRoot "System32\robocopy.exe"
-            & $robocopy $previousUploads $UploadsDir /E /COPY:DAT /R:2 /W:2 /NP /NFL /NDL /NJH /NJS
-            if ($LASTEXITCODE -ge 8) {
-                throw "robocopy falhou (código $LASTEXITCODE) ao migrar os uploads."
-            }
-            Write-Ok "Uploads migrados."
-        }
-
-        $newDeployDir = Join-Path $AppDir "deploy\windows"
-        if (-not (Test-Path -LiteralPath $newDeployDir)) {
-            throw "A tag $Tag não contém deploy\windows."
-        }
-        if (-not (Test-Path -LiteralPath $InstaladorDir)) {
-            New-Item -ItemType Directory -Force -Path $InstaladorDir | Out-Null
-        }
-        if (-not (Test-Path -LiteralPath $ScriptsDir)) {
-            New-Item -ItemType Directory -Force -Path $ScriptsDir | Out-Null
-        }
-
-        Get-ChildItem -LiteralPath $newDeployDir -Filter "*.ps1" -File | ForEach-Object {
-            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $InstaladorDir $_.Name) -Force
-        }
-        foreach ($name in @("Caddyfile", "manifesto.json")) {
-            $sourceFile = Join-Path $newDeployDir $name
-            if (-not (Test-Path -LiteralPath $sourceFile)) {
-                throw "A tag $Tag não contém deploy\windows\$name."
-            }
-            Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $InstaladorDir $name) -Force
-        }
-        foreach ($name in @("backup.ps1", "common.ps1", "restart.ps1")) {
-            $sourceFile = Join-Path $newDeployDir $name
-            if (Test-Path -LiteralPath $sourceFile) {
-                Copy-Item -LiteralPath $sourceFile -Destination (Join-Path $ScriptsDir $name) -Force
-            }
-            elseif ($name -eq "restart.ps1") {
-                Write-Warn "A tag $Tag não contém restart.ps1; mantendo o script atual da bandeja."
-            }
-            else {
-                throw "A tag $Tag não contém deploy\windows\$name."
-            }
-        }
-        $newTray = Join-Path $newDeployDir "NexusTray\dist\NexusTray.exe"
-        if (Test-Path -LiteralPath $newTray) {
-            try {
-                if (-not (Test-Path -LiteralPath $TrayDir)) {
-                    New-Item -ItemType Directory -Force -Path $TrayDir | Out-Null
-                }
-                Copy-Item -LiteralPath $newTray -Destination (Join-Path $TrayDir "NexusTray.exe") -Force
-                Write-Ok "NexusTray atualizado."
-            }
-            catch {
-                Write-Warn "Não foi possível atualizar o NexusTray (a bandeja atual será mantida): $($_.Exception.Message)"
-            }
-        }
-        else {
-            Write-Warn "A tag $Tag não contém NexusTray\dist\NexusTray.exe; mantendo a bandeja atual."
-        }
-
-        $newCaddyTemplate = Join-Path $newDeployDir "Caddyfile"
-        $caddyContent = [System.IO.File]::ReadAllText($newCaddyTemplate)
-        $caddyContent = $caddyContent.Replace("__HOSTNAME__", $hostname)
-        $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
-        [System.IO.File]::WriteAllText($Caddyfile, $caddyContent, $utf8NoBom)
-        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
-        Write-Ok "Caddyfile atualizado para $hostname."
-
-        Push-Location $AppDir
-        try {
-            Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
-            Write-Ok "Executando npm ci..."
-            & $npm.Source ci --no-audit --no-fund
-            if ($LASTEXITCODE -ne 0) { throw "npm ci falhou." }
-
-            Write-Ok "Gerando o cliente Prisma..."
-            & $npm.Source run db:generate
-            if ($LASTEXITCODE -ne 0) { throw "prisma generate falhou." }
-
-            Write-Ok "Compilando a aplicação..."
-            & $npm.Source run build
-            if ($LASTEXITCODE -ne 0) { throw "npm run build falhou." }
-
-            Write-Ok "Aplicando o schema no banco..."
-            & $npm.Source run db:push
-            if ($LASTEXITCODE -ne 0) { throw "prisma db push falhou." }
-
-            Write-Ok "Executando o seed de referência..."
-            & $npm.Source run db:seed
-            if ($LASTEXITCODE -ne 0) { throw "db:seed falhou." }
-        }
-        finally {
-            Pop-Location
-        }
-
-        $cacheDir = Join-Path $AppDir ".next\cache"
-        if (-not (Test-Path -LiteralPath $cacheDir)) {
-            New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
-        }
-        Set-AclModify -Path $cacheDir
-        Set-AclReadExecute -Path $AppDir
-        Write-Ok "Build concluído."
-
-        Write-Ok "Iniciando NexusApp..."
-        Start-NexusApp
-        $health = Wait-NexusHealth
-        if (-not $health.Ok) {
-            throw "O health local não respondeu 200 com db=true."
-        }
-        Write-Ok "Health local OK (versão $($health.Versao))."
-
-        Write-Ok "Iniciando NexusCaddy..."
-        Start-NexusCaddy
-        $https = Wait-NexusHttps -Hostname $hostname
-        if (-not $https.Ok) {
-            throw "HTTPS https://$hostname/login não respondeu 200."
-        }
-        Write-Ok "HTTPS https://$hostname/login OK."
-
-        Write-Ok "Executando smoke test..."
-        $expectedVersion = $Tag -replace '^v', ''
-        & $PsExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke.ps1") `
-            -Hostname $hostname -ExpectedVersion $expectedVersion
-        if ($LASTEXITCODE -ne 0) {
-            throw "O smoke test falhou."
-        }
-
-        Write-Ok "Atualização para $Tag concluída e validada."
-
-        # Mantém a versão anterior recém-criada e mais uma; nunca apaga a atual.
-        $olderVersions = Get-ChildItem -LiteralPath $ProgramRoot -Directory -Filter "app.prev-*" -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -ne $previousDir } |
-            Sort-Object LastWriteTime -Descending
-        $olderVersions | Select-Object -Skip 1 | ForEach-Object {
-            Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        $kept = @($previousDir) + @($olderVersions | Select-Object -First 1 | ForEach-Object { $_.FullName })
-        Write-Ok ("Versões anteriores mantidas: " + (($kept | ForEach-Object { Split-Path -Leaf $_ }) -join ", "))
+        Copy-Item -LiteralPath $previousEnv -Destination $EnvPath -Force
+        Set-EnvFile -Path $EnvPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "HOSTNAME" -Value "127.0.0.1" -ReadIdentities @("S-1-5-20")
     }
-    catch {
-        $message = $_.Exception.Message
-        Write-Warn "Falha na atualização: $message"
+    finally {
+        Resume-Transcript
+    }
+    Protect-File -Path $EnvPath -ReadIdentities @("S-1-5-20")
+    Write-Ok ".env restaurado com ACL restrita e UPLOADS_DIR garantido."
 
-        try { Stop-NexusCaddy } catch { Write-Warn "Não foi possível parar o NexusCaddy: $($_.Exception.Message)" }
-        try { Stop-NexusApp } catch { Write-Warn "Não foi possível parar o NexusApp: $($_.Exception.Message)" }
-
-        if ($newAppCloned -and (Test-Path -LiteralPath $AppDir)) {
-            Write-Warn "Movendo a versão com falha para $failedDir..."
-            try {
-                Move-Item -LiteralPath $AppDir -Destination $failedDir -Force
-                $failedAppMoved = $true
-            }
-            catch {
-                Write-Warn "Não foi possível mover a versão com falha: $($_.Exception.Message)"
-            }
+    $appPasswordPlain = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
+    if (-not $appPasswordPlain) {
+        throw "Senha de nexus_app não encontrada em $BackupCnf."
+    }
+    $appSecure = ConvertTo-SecureString -String $appPasswordPlain -AsPlainText -Force
+    $appPasswordPlain = $null
+    try {
+        Write-Ok "Aplicando o SQL de produção (migração/seed)..."
+        & (Join-Path $PSScriptRoot "aplicar-sql.ps1") `
+            -MysqlExe $MySqlExe `
+            -AppPassword $appSecure `
+            -Database "nexus_prod" `
+            -Mode Auto `
+            -Port $script:NexusMySqlPort `
+            -SqlDir $sqlDir
+        if ($LASTEXITCODE -ne 0) {
+            throw "A aplicação do SQL falhou (código $LASTEXITCODE)."
         }
-        elseif ($oldAppMoved -and (Test-Path -LiteralPath $AppDir)) {
-            Write-Warn "Movendo o clone incompleto para $failedDir..."
-            try {
-                Move-Item -LiteralPath $AppDir -Destination $failedDir -Force
-                $failedAppMoved = $true
-            }
-            catch {
-                Write-Warn "Não foi possível mover o clone incompleto: $($_.Exception.Message)"
-            }
-        }
+    }
+    finally {
+        $appSecure = $null
+    }
 
-        if (($oldAppMoved -or -not (Test-Path -LiteralPath $AppDir)) -and (Test-Path -LiteralPath $previousDir)) {
-            Write-Warn "Restaurando a versão anterior..."
-            try {
-                Move-Item -LiteralPath $previousDir -Destination $AppDir -Force
-            }
-            catch {
-                Write-Warn "Não foi possível restaurar a versão anterior: $($_.Exception.Message)"
-            }
-        }
+    $cacheDir = Join-Path $AppDir ".next\cache"
+    if (-not (Test-Path -LiteralPath $cacheDir)) {
+        New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
+    }
+    Set-AclModify -Path $cacheDir
+    Set-AclReadExecute -Path $AppDir
+    Write-Ok "ACLs aplicadas."
 
+    Write-Ok "Iniciando NexusApp..."
+    Start-NexusApp
+    $health = Wait-NexusHealth
+    if (-not $health.Ok) {
+        throw "O health local não respondeu 200 com db=true."
+    }
+    Write-Ok "Health local OK (versão $($health.Versao))."
+
+    Write-Ok "Iniciando NexusCaddy..."
+    Start-NexusCaddy
+    $https = Wait-NexusHttps -Hostname $hostname
+    if (-not $https.Ok) {
+        throw "HTTPS https://$hostname/login não respondeu 200."
+    }
+    Write-Ok "HTTPS https://$hostname/login OK."
+
+    Write-Ok "Executando smoke test..."
+    & $PsExe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "smoke.ps1") `
+        -Hostname $hostname -ExpectedVersion $Version
+    if ($LASTEXITCODE -ne 0) {
+        throw "O smoke test falhou."
+    }
+
+    Write-Ok "Atualização para $Version concluída e validada."
+
+    # Mantém a versão anterior recém-criada e mais uma; nunca apaga a atual.
+    $olderVersions = Get-ChildItem -LiteralPath $ProgramRoot -Directory -Filter "app.prev-*" -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -ne $previousDir } |
+        Sort-Object LastWriteTime -Descending
+    $olderVersions | Select-Object -Skip 1 | ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $kept = @($previousDir) + @($olderVersions | Select-Object -First 1 | ForEach-Object { $_.FullName })
+    Write-Ok ("Versões anteriores mantidas: " + (($kept | ForEach-Object { Split-Path -Leaf $_ }) -join ", "))
+}
+catch {
+    $message = $_.Exception.Message
+    Write-Warn "Falha na atualização: $message"
+
+    try { Stop-NexusCaddy } catch { Write-Warn "Não foi possível parar o NexusCaddy: $($_.Exception.Message)" }
+    try { Stop-NexusApp } catch { Write-Warn "Não foi possível parar o NexusApp: $($_.Exception.Message)" }
+
+    if ($oldAppMoved -and (Test-Path -LiteralPath $AppDir)) {
+        Write-Warn "Movendo a versão com falha para $failedDir..."
         try {
-            Write-Ok "Religando NexusApp..."
-            Start-NexusApp
-            $rollbackHealth = Wait-NexusHealth
-            if ($rollbackHealth.Ok) {
-                Write-Ok "NexusApp respondendo (versão $($rollbackHealth.Versao))."
-            }
-            else {
-                Write-Warn "O NexusApp foi iniciado, mas o health ainda não respondeu."
-            }
-
-            Write-Ok "Religando NexusCaddy..."
-            Start-NexusCaddy
-            $rollbackHttps = Wait-NexusHttps -Hostname $hostname
-            if ($rollbackHttps.Ok) {
-                Write-Ok "HTTPS https://$hostname/login restaurado."
-            }
-            else {
-                Write-Warn "O NexusCaddy foi iniciado, mas o HTTPS ainda não respondeu."
-            }
+            Move-Item -LiteralPath $AppDir -Destination $failedDir -Force -ErrorAction Stop
         }
         catch {
-            Write-Warn "Os serviços não foram religados completamente: $($_.Exception.Message)"
+            Write-Warn "Não foi possível mover a versão com falha: $($_.Exception.Message)"
         }
+    }
 
-        Write-Host ""
-        if ($failedAppMoved) {
-            Write-Host "A versão nova ficou em $failedDir para diagnóstico." -ForegroundColor Yellow
+    if ($oldAppMoved -and (Test-Path -LiteralPath $previousDir)) {
+        Write-Warn "Restaurando a versão anterior..."
+        try {
+            Move-Item -LiteralPath $previousDir -Destination $AppDir -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warn "Não foi possível restaurar a versão anterior: $($_.Exception.Message)"
+        }
+    }
+
+    try {
+        Write-Ok "Religando NexusApp..."
+        Start-NexusApp
+        $rollbackHealth = Wait-NexusHealth
+        if ($rollbackHealth.Ok) {
+            Write-Ok "NexusApp respondendo (versão $($rollbackHealth.Versao))."
         }
         else {
-            Write-Host "A versão em produção não foi alterada." -ForegroundColor Yellow
+            Write-Warn "O NexusApp foi iniciado, mas o health ainda não respondeu."
         }
-        Write-Host "O banco NÃO foi restaurado automaticamente." -ForegroundColor Yellow
-        Write-Host "Se o db push/seed alterou dados, restaure o dump mais recente de $BackupsDir\db." -ForegroundColor Yellow
-        Write-Host "Log desta execução: $logFile" -ForegroundColor Yellow
-        exit 1
+
+        Write-Ok "Religando NexusCaddy..."
+        Start-NexusCaddy
+        $rollbackHttps = Wait-NexusHttps -Hostname $hostname
+        if ($rollbackHttps.Ok) {
+            Write-Ok "HTTPS https://$hostname/login restaurado."
+        }
+        else {
+            Write-Warn "O NexusCaddy foi iniciado, mas o HTTPS ainda não respondeu."
+        }
     }
+    catch {
+        Write-Warn "Os serviços não foram religados completamente: $($_.Exception.Message)"
+    }
+
+    Write-Host ""
+    if (Test-Path -LiteralPath $failedDir) {
+        Write-Host "A versão nova ficou em $failedDir para diagnóstico." -ForegroundColor Yellow
+    }
+    else {
+        Write-Host "A versão em produção não foi alterada." -ForegroundColor Yellow
+    }
+    Write-Host "O banco NÃO foi restaurado automaticamente." -ForegroundColor Yellow
+    Write-Host "Se o SQL alterou dados, restaure o dump mais recente de $BackupsDir\db." -ForegroundColor Yellow
+    Write-Host "Log desta execução: $logFile" -ForegroundColor Yellow
+    exit 1
 }
 finally {
     Stop-NexusTranscript

@@ -1,17 +1,18 @@
 ﻿; Instalador do Nexus para Windows (Inno Setup 7).
 ;
-; Compile com build-instalador.ps1. O pacote NÃO embute o código da aplicação:
-; o bootstrap clona a tag do GitHub durante a instalação (requer internet).
+; Compile com build-instalador.ps1. O pacote é AUTOCONTIDO: Node.js portátil,
+; MySQL 8.4, Caddy, VC++, NSSM, a aplicação standalone (app.zip) e o SQL de
+; produção entram no payload. O destino não usa Git, npm, Prisma nem internet.
 ;
 ; Parâmetros de compilação:
 ;   /DMyAppVersion=<versão>   (ex.: 1.02.11.2026)
-;   /DMyAppTag=<tag>          (ex.: v1.02.11.2026)
+;   /DPayloadDir=<pasta>      (padrão: payload)
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"
 #endif
-#ifndef MyAppTag
-  #define MyAppTag "v0.0.0"
+#ifndef PayloadDir
+  #define PayloadDir "payload"
 #endif
 
 [Setup]
@@ -42,6 +43,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "atualizar.ps1"; DestDir: "{app}"; Flags: ignoreversion
+Source: "aplicar-sql.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "backup.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "bootstrap.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "build-instalador.ps1"; DestDir: "{app}"; Flags: ignoreversion
@@ -54,8 +56,11 @@ Source: "restart.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "smoke.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "Caddyfile"; DestDir: "{app}"; Flags: ignoreversion
 Source: "manifesto.json"; DestDir: "{app}"; Flags: ignoreversion
-; NSSM 2.24 (win64) embutido: não depende de nssm.cc durante a instalação.
-Source: "tools\nssm\nssm.exe"; DestDir: "{app}\tools\nssm"; Flags: ignoreversion
+; Payload autocontido: Node portátil, MySQL, Caddy, VC++, NSSM, app.zip e SQL.
+; Sem ele o bootstrap falha na fase 0 com mensagem clara.
+Source: "{#PayloadDir}\*"; DestDir: "{app}\payload"; Flags: ignoreversion recursesubdirs createallsubdirs
+; SQL também fora do payload, no caminho usado por aplicar-sql.ps1 ({app}\sql).
+Source: "{#PayloadDir}\sql\*"; DestDir: "{app}\sql"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Obrigatório: a bandeja é copiada pelo bootstrap para {commonpf}\Nexus\NexusTray.
 Source: "NexusTray\dist\NexusTray.exe"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -111,7 +116,7 @@ begin
     'Endereço do Nexus',
     'Informe o nome pelo qual o sistema será acessado na rede.',
     'Use um nome DNS válido, sem http://, porta ou caminho (ex.: nexus.galpao.local). ' +
-    'Versão {#MyAppVersion} (tag {#MyAppTag}).');
+    'Versão {#MyAppVersion}.');
   HostnamePage.Add('Hostname:', False);
   HostnamePage.Values[0] := 'nexus.galpao.local';
 end;
@@ -157,7 +162,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    Cmd := Format('-NoProfile -ExecutionPolicy Bypass -File "%s\instalar-gui.ps1" -Hostname "%s" -TrayExe "%s\NexusTray.exe" -Tag "%s"', [ExpandConstant('{app}'), GetHostname(''), ExpandConstant('{app}'), '{#MyAppTag}']);
+    Cmd := Format('-NoProfile -ExecutionPolicy Bypass -File "%s\instalar-gui.ps1" -Hostname "%s" -TrayExe "%s\NexusTray.exe"', [ExpandConstant('{app}'), GetHostname(''), ExpandConstant('{app}')]);
     ResultCode := -1;
     if (not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Cmd, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode)) or (ResultCode <> 0) then
     begin

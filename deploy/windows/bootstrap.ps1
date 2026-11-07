@@ -1,24 +1,23 @@
 ﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Instalação do Nexus em Windows, do zero (sem Node, Git ou MySQL instalados).
+    Instalação do Nexus em Windows a partir do pacote autocontido.
 
 .DESCRIPTION
     Executa as fases 0 a 7 com estado em
     C:\ProgramData\Nexus\bootstrap.state.json. É idempotente e retomável.
 
-    A fase 2 instala automaticamente o MySQL 8.4.13 LTS dedicado do Nexus
-    (serviço NexusMySQL84, porta 3214, bind 127.0.0.1), sem instalar nem
-    alterar o MySQL existente na porta 3306.
+    Nada é baixado na máquina de destino: Node.js portátil, MySQL 8.4.13,
+    NSSM, Caddy, VC++ e a aplicação standalone vêm do payload embutido no
+    instalador (C:\Program Files\Nexus\Instalador\payload). A aplicação é
+    extraída de app.zip e executada por `node server.js` — sem Git, npm,
+    `next build` ou Prisma no destino.
+
+    O SQL (schema/seed ou migração 001 + seed) é aplicado por aplicar-sql.ps1
+    com mysql.exe.
 
 .PARAMETER Hostname
     Nome DNS usado pelo Caddy (ex.: nexus.escola.local).
-
-.PARAMETER RepoUrl
-    URL do repositório. Padrão: manifesto.json.
-
-.PARAMETER Tag
-    Tag a instalar (obrigatória; ex.: v2.02.11.2026).
 
 .PARAMETER Resume
     Retoma da última fase concluída.
@@ -35,8 +34,6 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Hostname,
-    [string]$RepoUrl = "",
-    [string]$Tag = "",
     [switch]$Resume,
     [switch]$SkipTray,
     [string]$TrayExe = "",
@@ -67,12 +64,10 @@ if ($Hostname -notmatch '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$') {
 }
 
 $manifest = Get-Manifest
-if (-not $RepoUrl) { $RepoUrl = [string]$manifest.repo.url }
-if (-not $RepoUrl) { Fail "repo.url não definido no manifesto." }
-if (-not $Tag) { Fail "Informe a tag do release com -Tag (ex.: v2.02.11.2026)." }
 
 $ProgramRoot = $script:NexusProgramRoot
 $AppDir = $script:NexusAppDir
+$PayloadDir = $script:NexusPayloadDir
 $DataDir = $script:NexusDataDir
 $LogsDir = $script:NexusLogsDir
 $ConfigDir = $script:NexusConfigDir
@@ -82,13 +77,22 @@ $CaddyDataDir = $script:NexusCaddyDataDir
 $CaddyConfigDir = $script:NexusCaddyConfigDir
 $CaddyLogsDir = $script:NexusCaddyLogsDir
 $CaddyDir = Join-Path $ProgramRoot "caddy"
+$NodeDir = $script:NexusNodeDir
+$NodeExe = $script:NexusNodeExe
+$MySqlDir = $script:NexusMySqlDir
+$MySqlExe = Join-Path $MySqlDir "bin\mysql.exe"
 $NssmDir = Join-Path $ProgramRoot "tools\nssm"
 $NssmExe = Join-Path $NssmDir "nssm.exe"
 $CaddyExe = Join-Path $CaddyDir "caddy.exe"
 $Caddyfile = Join-Path $ConfigDir "Caddyfile"
 $BackupCnf = Join-Path $ConfigDir "backup.cnf"
+$EnvPath = Join-Path $AppDir ".env"
 $StatePath = Join-Path $DataDir "bootstrap.state.json"
 $PsExe = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+$SqlDir = Join-Path $PSScriptRoot "sql"
+if (-not (Test-Path -LiteralPath $SqlDir -PathType Container)) {
+    $SqlDir = Join-Path $PayloadDir "sql"
+}
 
 # Diretórios necessários antes do transcript e do estado.
 foreach ($dir in @(
@@ -125,16 +129,259 @@ function Get-PreviousState {
     }
 }
 
-$previous = Get-PreviousState
-if ($Resume -and -not $previous) {
+function Get-PayloadFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$RelativePath,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+    $path = Join-Path $PayloadDir $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        Fail ("$Label não encontrado no payload ($path). " +
+            "O instalador precisa ter sido gerado por build-instalador.ps1 com o payload completo.")
+    }
+    return $path
+}
+
+function Assert-Payload {
+    Write-Step "Validando o payload embutido"
+    $required = @(
+        @{ Path = (Join-Path "node" ([string]$manifest.node.archive)); Label = "Node.js $($manifest.node.version)" },
+        @{ Path = (Join-Path "mysql" ([string]$manifest.mysql.archive)); Label = "MySQL $($manifest.mysql.version)" },
+        @{ Path = (Join-Path "caddy" ([string]$manifest.caddy.archive)); Label = "Caddy $($manifest.caddy.version)" },
+        @{ Path = (Join-Path "vcredist" ([string]$manifest.vcredist.archive)); Label = "VC++ Redistributable" },
+        @{ Path = "nssm\nssm.exe"; Label = "NSSM" },
+        @{ Path = "app\app.zip"; Label = "aplicação standalone (app.zip)" },
+        @{ Path = "sql\schema.sql"; Label = "schema.sql" },
+        @{ Path = "sql\seed.sql"; Label = "seed.sql" },
+        @{ Path = "sql\migracoes\001-unidades-pct10-cx50.sql"; Label = "migração 001" }
+    )
+    foreach ($item in $required) {
+        $path = Join-Path $PayloadDir $item.Path
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            Fail "Arquivo obrigatório ausente no payload: $($item.Label) ($path)"
+        }
+        Write-Ok "$($item.Label)"
+    }
+}
+
+function Install-PortableNode {
+    $nodeZip = Get-PayloadFile -RelativePath (Join-Path "node" ([string]$manifest.node.archive)) -Label "Node.js"
+    $expectedVersion = "v" + [string]$manifest.node.version
+    if (Test-Path -LiteralPath $NodeExe -PathType Leaf) {
+        $current = ([string](& $NodeExe "--version" 2>$null | Select-Object -First 1)).Trim()
+        if ($current -eq $expectedVersion) {
+            Write-Ok "Node.js portátil já presente ($current)."
+            return
+        }
+        Write-Warn "Node.js portátil em versão inesperada ('$current'); reinstalando $expectedVersion."
+    }
+
+    $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+    if ($appService -and $appService.Status.ToString() -ne "Stopped") {
+        Stop-Service -Name "NexusApp" -Force
+        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
+            Fail "O serviço NexusApp não parou para atualizar o Node portátil."
+        }
+    }
+
+    $tempRoot = Join-Path $env:TEMP ("nexus-node-" + [guid]::NewGuid().ToString("N"))
+    try {
+        New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+        Write-Ok "Extraindo Node.js $($manifest.node.version) do payload..."
+        Expand-Archive -LiteralPath $nodeZip -DestinationPath $tempRoot -Force
+        $sourceDir = Get-ChildItem -LiteralPath $tempRoot -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "node.exe") } |
+            Select-Object -First 1
+        if (-not $sourceDir) {
+            Fail "O pacote do Node.js não contém node.exe."
+        }
+        if (Test-Path -LiteralPath $NodeDir) {
+            Remove-Item -LiteralPath $NodeDir -Recurse -Force
+        }
+        New-Item -ItemType Directory -Force -Path $NodeDir | Out-Null
+        Copy-Item -Path (Join-Path $sourceDir.FullName "*") -Destination $NodeDir -Recurse -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $NodeExe -PathType Leaf)) {
+        Fail "node.exe não encontrado em $NodeDir após a extração."
+    }
+    Unblock-File -LiteralPath $NodeExe -ErrorAction SilentlyContinue
+    $installed = ([string](& $NodeExe "--version" 2>$null | Select-Object -First 1)).Trim()
+    if ($installed -ne $expectedVersion) {
+        Fail "Node.js portátil é '$installed'; esperado '$expectedVersion'."
+    }
+    Write-Ok "Node.js portátil $installed instalado em $NodeDir."
+}
+
+function Install-Nssm {
+    $source = Get-PayloadFile -RelativePath "nssm\nssm.exe" -Label "NSSM"
+    $expectedHash = ([string]$manifest.nssm.exe_sha256).ToUpperInvariant()
+    if ($expectedHash) {
+        $actual = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($actual -ne $expectedHash) {
+            Fail "O hash do NSSM embutido não confere (esperado $expectedHash, obtido $actual)."
+        }
+    }
+    if (-not (Test-Path -LiteralPath $NssmDir)) {
+        New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
+    }
+    Copy-Item -LiteralPath $source -Destination $NssmExe -Force
+    Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue
+    Write-Ok "NSSM $($manifest.nssm.version) instalado em $NssmExe."
+}
+
+function Install-Caddy {
+    if (Test-Path -LiteralPath $CaddyExe -PathType Leaf) {
+        $current = ([string](& $CaddyExe "version" 2>&1 | Select-Object -First 1)).Trim()
+        Write-Ok "Caddy já presente: $current"
+        return
+    }
+    $caddyZip = Get-PayloadFile -RelativePath (Join-Path "caddy" ([string]$manifest.caddy.archive)) -Label "Caddy"
+    $tempRoot = Join-Path $env:TEMP ("nexus-caddy-" + [guid]::NewGuid().ToString("N"))
+    try {
+        New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+        Write-Ok "Extraindo Caddy $($manifest.caddy.version) do payload..."
+        Expand-Archive -LiteralPath $caddyZip -DestinationPath $tempRoot -Force
+        $binary = Get-ChildItem -Path $tempRoot -Recurse -Filter "caddy.exe" -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if (-not $binary) {
+            Fail "caddy.exe não encontrado no pacote embutido."
+        }
+        if (-not (Test-Path -LiteralPath $CaddyDir)) {
+            New-Item -ItemType Directory -Force -Path $CaddyDir | Out-Null
+        }
+        Copy-Item -LiteralPath $binary.FullName -Destination $CaddyExe -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Unblock-File -LiteralPath $CaddyExe -ErrorAction SilentlyContinue
+    $installed = ([string](& $CaddyExe "version" 2>&1 | Select-Object -First 1)).Trim()
+    Write-Ok "Caddy instalado: $installed"
+}
+
+function Install-VcRedist {
+    $vcInstalled = $false
+    foreach ($key in @(
+        "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+    )) {
+        $value = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
+        if ($value -and $value.Installed -eq 1) {
+            $vcInstalled = $true
+            break
+        }
+    }
+    if ($vcInstalled) {
+        Write-Ok "VC++ Redistributable x64 já instalado."
+        return
+    }
+    $vcPath = Get-PayloadFile -RelativePath (Join-Path "vcredist" ([string]$manifest.vcredist.archive)) -Label "VC++ Redistributable"
+    Install-Exe -Path $vcPath -Arguments "/install /quiet /norestart" -Label "VC++ Redistributable"
+}
+
+function Expand-AppPackage {
+    $appZip = Get-PayloadFile -RelativePath "app\app.zip" -Label "aplicação standalone"
+    $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+    if ($appService -and $appService.Status.ToString() -ne "Stopped") {
+        Write-Ok "Parando NexusApp para atualizar a aplicação..."
+        Stop-Service -Name "NexusApp" -Force
+        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
+            Fail "O serviço NexusApp não parou para atualizar a aplicação."
+        }
+    }
+
+    $previousDir = ""
+    if (Test-Path -LiteralPath $AppDir) {
+        $previousDir = Join-Path $ProgramRoot ("app.prev-manual-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+        Move-Item -LiteralPath $AppDir -Destination $previousDir -ErrorAction Stop
+        Write-Ok "Aplicação anterior movida para $previousDir."
+    }
+
+    New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
+    Write-Ok "Extraindo a aplicação standalone..."
+    Expand-Archive -LiteralPath $appZip -DestinationPath $AppDir -Force -ErrorAction Stop
+    if (-not (Test-Path -LiteralPath (Join-Path $AppDir "server.js") -PathType Leaf)) {
+        Fail "app.zip não contém server.js no diretório raiz."
+    }
+
+    # Preserva o .env (segredos e URL do banco) na atualização/reinstalação.
+    if ($previousDir) {
+        $previousEnv = Join-Path $previousDir ".env"
+        if (Test-Path -LiteralPath $previousEnv -PathType Leaf) {
+            Copy-Item -LiteralPath $previousEnv -Destination $EnvPath -Force
+            Write-Ok ".env anterior preservado."
+        }
+    }
+    return $previousDir
+}
+
+function Get-AppVersion {
+    $packagePath = Join-Path $AppDir "package.json"
+    if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+        return ""
+    }
+    try {
+        return [string](Get-Content -LiteralPath $packagePath -Raw -Encoding UTF8 | ConvertFrom-Json).version
+    }
+    catch {
+        return ""
+    }
+}
+
+function Write-AppEnvironment {
+    $appPasswordPlain = $null
+    $jwtSecret = $null
+    $generatedJwt = $false
+    Suspend-Transcript
+    try {
+        if (Test-Path -LiteralPath $BackupCnf) {
+            $appPasswordPlain = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
+        }
+        if (-not $appPasswordPlain) {
+            Fail "Senha de nexus_app não encontrada em $BackupCnf. Refaça a fase 2."
+        }
+
+        Set-EnvFile -Path $EnvPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:{1}/nexus_prod"' -f $appPasswordPlain, $script:NexusMySqlPort) -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
+        Set-EnvFile -Path $EnvPath -Key "HOSTNAME" -Value "127.0.0.1" -ReadIdentities @("S-1-5-20")
+        $jwtSecret = Get-EnvValue -Path $EnvPath -Key "JWT_SECRET"
+        if (-not $jwtSecret) {
+            $jwtSecret = New-RandomSecret -Bytes 48
+            Set-EnvFile -Path $EnvPath -Key "JWT_SECRET" -Value ('"{0}"' -f $jwtSecret) -ReadIdentities @("S-1-5-20")
+            $generatedJwt = $true
+        }
+    }
+    finally {
+        Resume-Transcript
+        $appPasswordPlain = $null
+        $jwtSecret = $null
+    }
+    if ($generatedJwt) {
+        Write-Ok "JWT_SECRET gerado para esta instalação."
+    }
+    Protect-File -Path $EnvPath -ReadIdentities @("S-1-5-20")
+    Write-Ok "Arquivo .env criado com ACL restrita (NetworkService lê; Administrators/SYSTEM controlam)."
+}
+
+$previousState = Get-PreviousState
+if ($Resume -and -not $previousState) {
     Fail "Não há estado anterior em $StatePath. Rode sem -Resume."
 }
 
 $state = @{
-    version        = 1
+    version        = 2
     hostname       = $Hostname
-    tag            = $Tag
-    repoUrl        = $RepoUrl
+    appVersion     = ""
     completedPhase = -1
     paused         = $false
     pausedPhase    = $null
@@ -142,13 +389,14 @@ $state = @{
     updatedAt      = (Get-Date).ToString("s")
 }
 
-if ($previous -and -not $Force) {
-    $state.completedPhase = [int]$previous.completedPhase
-    if ($previous.startedAt) { $state.startedAt = [string]$previous.startedAt }
-    $state.paused = [bool]$previous.paused
-    $state.pausedPhase = $previous.pausedPhase
-    if ($previous.hostname -and [string]$previous.hostname -ne $Hostname) {
-        Fail "O hostname mudou desde a instalação anterior ('$($previous.hostname)'). Use -Force para reconfigurar."
+if ($previousState -and -not $Force) {
+    $state.completedPhase = [int]$previousState.completedPhase
+    if ($previousState.startedAt) { $state.startedAt = [string]$previousState.startedAt }
+    if ($previousState.appVersion) { $state.appVersion = [string]$previousState.appVersion }
+    $state.paused = [bool]$previousState.paused
+    $state.pausedPhase = $previousState.pausedPhase
+    if ($previousState.hostname -and [string]$previousState.hostname -ne $Hostname) {
+        Fail "O hostname mudou desde a instalação anterior ('$($previousState.hostname)'). Use -Force para reconfigurar."
     }
 }
 
@@ -311,10 +559,14 @@ function Set-NexusFirewallRules {
     }
 }
 
+$rootSecure = $null
+$appSecure = $null
+
 try {
     if ($startPhase -le 0) {
-        Write-Step "Fase 0/7 - Pré-checagem"
+        Write-Step "Fase 0/7 - Pré-checagem (offline)"
         Assert-Admin
+        Assert-Payload
         Ensure-HostnameHostsEntry -Hostname $Hostname
 
         if (-not [Environment]::Is64BitOperatingSystem) {
@@ -327,11 +579,6 @@ try {
             Fail "Espaço livre insuficiente em C: ($freeGb GB). São necessários pelo menos 5 GB."
         }
         Write-Ok "Espaço livre em C: $freeGb GB."
-
-        if (-not (Test-Internet)) {
-            Fail "Sem conectividade com a internet (nodejs.org:443). Verifique a rede/proxy."
-        }
-        Write-Ok "Internet disponível."
 
         $ports = @(
             @{ Port = $script:NexusMySqlPort; Service = $script:NexusMySqlService },
@@ -363,29 +610,6 @@ try {
         }
         Write-Ok "Portas $($script:NexusMySqlPort), 3000, 80 e 443 verificadas."
 
-        try {
-            $response = Invoke-WebRequest -Uri "https://nodejs.org" -Method Head -UseBasicParsing -TimeoutSec 20
-            $dateText = [string]$response.Headers["Date"]
-            if ($dateText) {
-                $remote = [DateTimeOffset]::Parse(
-                    $dateText,
-                    [Globalization.CultureInfo]::InvariantCulture,
-                    [Globalization.DateTimeStyles]::AssumeUniversal
-                ).UtcDateTime
-                $skew = [math]::Abs(((Get-Date).ToUniversalTime() - $remote).TotalMinutes)
-                if ($skew -gt 10) {
-                    Fail "O relógio do servidor está $([math]::Round($skew)) min fora do horário da internet. Ajuste o horário antes de instalar."
-                }
-                Write-Ok "Relógio dentro da tolerância ($([math]::Round($skew)) min)."
-            }
-            else {
-                Write-Warn "O servidor não informou a data; verificação do relógio ignorada."
-            }
-        }
-        catch {
-            Write-Warn "Não foi possível conferir o relógio pela internet; siga apenas se o horário estiver correto."
-        }
-
         $state.completedPhase = 0
         $state.paused = $false
         $state.pausedPhase = $null
@@ -393,82 +617,14 @@ try {
     }
 
     if ($startPhase -le 1) {
-        Write-Step "Fase 1/7 - Runtime (VC++, Node.js, Git)"
+        Write-Step "Fase 1/7 - Runtime embutido (VC++, Node, NSSM, Caddy)"
         Assert-Admin
 
-        $vcInstalled = $false
-        foreach ($key in @(
-            "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64",
-            "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
-        )) {
-            $value = Get-ItemProperty -Path $key -ErrorAction SilentlyContinue
-            if ($value -and $value.Installed -eq 1) {
-                $vcInstalled = $true
-                break
-            }
-        }
-        if ($vcInstalled) {
-            Write-Ok "VC++ Redistributable x64 já instalado."
-        }
-        else {
-            $vcPath = Join-Path $env:TEMP "nexus-vc_redist.x64.exe"
-            Invoke-Download -Url $manifest.vcredist.url -Destination $vcPath -Sha256 ([string]$manifest.vcredist.sha256) -Label "VC++ Redistributable"
-            Install-Exe -Path $vcPath -Arguments "/install /quiet /norestart" -Label "VC++ Redistributable"
-        }
-
-        $nodeVersion = ""
-        $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
-        if ($nodeCommand) {
-            $nodeVersion = ([string](& $nodeCommand.Source --version 2>$null | Select-Object -First 1)).Trim()
-        }
-        if ($nodeVersion -ne ("v" + [string]$manifest.node.version)) {
-            $nodeMsi = Join-Path $env:TEMP ("nexus-node-v" + [string]$manifest.node.version + "-x64.msi")
-            Invoke-Download -Url $manifest.node.url -Destination $nodeMsi -Sha256 ([string]$manifest.node.sha256) -Label "Node.js $($manifest.node.version)"
-            Install-Msi -Path $nodeMsi -Label "Node.js $($manifest.node.version)"
-            Update-SessionPath
-        }
-        $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
-        if (-not $nodeCommand) {
-            Fail "Node.js não encontrado após a instalação."
-        }
-        $nodeVersion = ([string](& $nodeCommand.Source --version 2>$null | Select-Object -First 1)).Trim()
-        if ($nodeVersion -ne ("v" + [string]$manifest.node.version)) {
-            Fail "Node.js instalado é $nodeVersion; esperado v$($manifest.node.version)."
-        }
-        Write-Ok "Node.js $nodeVersion."
-
-        $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
-        if (-not $gitCommand) {
-            $gitUrl = [string]$manifest.git.url
-            $gitVersion = [string]$manifest.git.version
-            if (-not $gitUrl) {
-                $gitInfo = Resolve-LatestGitForWindows
-                $gitUrl = $gitInfo.Url
-                $gitVersion = $gitInfo.Version
-            }
-            Write-Ok "Baixando Git for Windows $gitVersion..."
-            $gitInstaller = Join-Path $env:TEMP "nexus-git-for-windows-x64.exe"
-            Invoke-Download -Url $gitUrl -Destination $gitInstaller -Sha256 ([string]$manifest.git.sha256) -Label "Git for Windows"
-            Install-Exe -Path $gitInstaller -Arguments "/VERYSILENT /NORESTART /NOCANCEL /SP-" -Label "Git for Windows"
-            Update-SessionPath
-        }
-        else {
-            Write-Ok "Git já instalado: $((& $gitCommand.Source --version 2>$null | Select-Object -First 1))."
-        }
-        $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
-        if (-not $gitCommand) {
-            Fail "Git não encontrado após a instalação."
-        }
-
-        $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
-        if (-not $npmCommand) {
-            Update-SessionPath
-            $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
-        }
-        if (-not $npmCommand) {
-            Fail "npm.cmd não encontrado após a instalação do Node.js."
-        }
-        Write-Ok "npm disponível em $($npmCommand.Source)."
+        Install-VcRedist
+        Install-PortableNode
+        Install-Nssm
+        Install-Caddy
+        Update-SessionPath
 
         $state.completedPhase = 1
         $state.paused = $false
@@ -480,123 +636,105 @@ try {
         Write-Step "Fase 2/7 - MySQL 8.4 dedicado"
         Assert-Admin
 
-        $rootSecure = $null
-        $appSecure = $null
-        $appPlain = $null
-        try {
-            $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
-            $installedNow = $false
-            if (-not $mysqlService) {
+        $serviceExisted = [bool](Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue)
+        $dataDirEmpty = (@(Get-ChildItem -LiteralPath $script:NexusMySqlDataDir -Force -ErrorAction SilentlyContinue).Count -eq 0)
+        $legacyDataExists = Test-Path -LiteralPath $script:NexusMySqlLegacyDataDir -PathType Container
+        if (-not $serviceExisted -or ($dataDirEmpty -and -not $legacyDataExists)) {
+            $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
+            $rootSecure = $credentials.Root
+            $appSecure = $credentials.App
+        }
+
+        # Sempre garante os binários 8.4.13, a migração dos dados para
+        # C:\ProgramData\Nexus\mysql e o serviço com o my.ini novo. É idempotente.
+        Write-Ok "Garantindo o MySQL dedicado (serviço $($script:NexusMySqlService), porta $($script:NexusMySqlPort))..."
+        & (Join-Path $PSScriptRoot "instalar-mysql.ps1") `
+            -RootPassword $rootSecure `
+            -AppPassword $appSecure `
+            -Port $script:NexusMySqlPort
+        if ($LASTEXITCODE -ne 0) {
+            Fail "A instalação do MySQL dedicado falhou (código $LASTEXITCODE). Consulte $LogsDir."
+        }
+
+        $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
+        if (-not $mysqlService) {
+            Fail "O serviço $($script:NexusMySqlService) não foi criado."
+        }
+        if ($mysqlService.Status.ToString() -ne "Running") {
+            Start-Service -Name $script:NexusMySqlService
+        }
+        if (-not (Wait-ServiceState -Name $script:NexusMySqlService -Status "Running" -TimeoutSeconds 120)) {
+            Fail "O serviço $($script:NexusMySqlService) não iniciou."
+        }
+        $deadline = (Get-Date).AddSeconds(120)
+        while (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+        }
+        if (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000)) {
+            Fail "O $($script:NexusMySqlService) está em execução, mas não aceita conexões na porta $($script:NexusMySqlPort)."
+        }
+        Write-Ok "$($script:NexusMySqlService) em execução em 127.0.0.1:$($script:NexusMySqlPort)."
+
+        if (-not (Test-Path -LiteralPath $MySqlExe -PathType Leaf)) {
+            Fail "mysql.exe não encontrado em $MySqlExe."
+        }
+
+        $needsSetup = $true
+        if ($serviceExisted -and (Test-Path -LiteralPath $BackupCnf)) {
+            $cnfPort = Get-CnfValue -Path $BackupCnf -Section "client" -Key "port"
+            if ([string]$cnfPort -ne [string]$script:NexusMySqlPort) {
+                Write-Warn "O backup.cnf usa a porta '$cnfPort'; ele será regravado para $($script:NexusMySqlPort)."
+            }
+            else {
+                $testOut = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".out")
+                $testErr = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".err")
+                try {
+                    $testArgs = "--defaults-extra-file=`"$BackupCnf`" --protocol=TCP -h 127.0.0.1 -P $script:NexusMySqlPort -D nexus_prod -e `"SELECT 1;`""
+                    $testProcess = Start-Process -FilePath $MySqlExe -ArgumentList $testArgs -Wait -PassThru -NoNewWindow `
+                        -RedirectStandardOutput $testOut -RedirectStandardError $testErr
+                    if ($testProcess.ExitCode -eq 0) {
+                        $needsSetup = $false
+                        Write-Ok "Banco nexus_prod acessível com o usuário nexus_app."
+                    }
+                    else {
+                        Write-Warn "O usuário nexus_app não conseguiu conectar; a configuração do banco será refeita."
+                    }
+                }
+                finally {
+                    Remove-Item -LiteralPath $testOut, $testErr -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        if ($needsSetup) {
+            if (-not $rootSecure) {
                 $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
                 $rootSecure = $credentials.Root
                 $appSecure = $credentials.App
-                Write-Ok "Instalando o MySQL dedicado (serviço $($script:NexusMySqlService), porta $($script:NexusMySqlPort))..."
-                & (Join-Path $PSScriptRoot "instalar-mysql.ps1") `
-                    -RootPassword $rootSecure `
-                    -AppPassword $appSecure `
-                    -Port $script:NexusMySqlPort
-                if ($LASTEXITCODE -ne 0) {
-                    Fail "A instalação do MySQL dedicado falhou (código $LASTEXITCODE). Consulte $LogsDir."
-                }
-                $installedNow = $true
-                $mysqlService = Get-Service -Name $script:NexusMySqlService -ErrorAction SilentlyContinue
             }
-
-            if (-not $mysqlService) {
-                Fail "O serviço $($script:NexusMySqlService) não foi criado."
+            Write-Ok "Configurando o banco nexus_prod e o usuário nexus_app..."
+            & (Join-Path $PSScriptRoot "pos-instalacao-mysql.ps1") `
+                -RootPassword $rootSecure `
+                -AppPassword $appSecure `
+                -Hostname $Hostname
+            $mysqlSetupCode = $LASTEXITCODE
+            if ($mysqlSetupCode -ne 0) {
+                Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
             }
-            if ($mysqlService.Status.ToString() -ne "Running") {
-                Start-Service -Name $script:NexusMySqlService
-            }
-            if (-not (Wait-ServiceState -Name $script:NexusMySqlService -Status "Running" -TimeoutSeconds 120)) {
-                Fail "O serviço $($script:NexusMySqlService) não iniciou."
-            }
-            $deadline = (Get-Date).AddSeconds(120)
-            while (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000) -and (Get-Date) -lt $deadline) {
-                Start-Sleep -Seconds 2
-            }
-            if (-not (Test-TcpPort -Port $script:NexusMySqlPort -TimeoutMs 2000)) {
-                Fail "O $($script:NexusMySqlService) está em execução, mas não aceita conexões na porta $($script:NexusMySqlPort)."
-            }
-            Write-Ok "$($script:NexusMySqlService) em execução em 127.0.0.1:$($script:NexusMySqlPort)."
-
-            $mysqlExe = Join-Path $script:NexusMySqlDir "bin\mysql.exe"
-            if (-not (Test-Path -LiteralPath $mysqlExe -PathType Leaf)) {
-                Fail "mysql.exe não encontrado em $mysqlExe."
-            }
-
-            $needsSetup = $true
-            if (-not $installedNow -and (Test-Path -LiteralPath $BackupCnf)) {
-                $cnfPort = Get-CnfValue -Path $BackupCnf -Section "client" -Key "port"
-                if ([string]$cnfPort -ne [string]$script:NexusMySqlPort) {
-                    Write-Warn "O backup.cnf usa a porta '$cnfPort'; ele será regravado para $($script:NexusMySqlPort)."
-                }
-                else {
-                    $testOut = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".out")
-                    $testErr = Join-Path $env:TEMP ("nexus-mysql-test-" + [guid]::NewGuid().ToString("N") + ".err")
-                    try {
-                        $testArgs = "--defaults-extra-file=`"$BackupCnf`" --protocol=TCP -h 127.0.0.1 -P $script:NexusMySqlPort -D nexus_prod -e `"SELECT 1;`""
-                        $testProcess = Start-Process -FilePath $mysqlExe -ArgumentList $testArgs -Wait -PassThru -NoNewWindow `
-                            -RedirectStandardOutput $testOut -RedirectStandardError $testErr
-                        if ($testProcess.ExitCode -eq 0) {
-                            $needsSetup = $false
-                            Write-Ok "Banco nexus_prod acessível com o usuário nexus_app."
-                        }
-                        else {
-                            Write-Warn "O usuário nexus_app não conseguiu conectar; a configuração do banco será refeita."
-                        }
-                    }
-                    finally {
-                        Remove-Item -LiteralPath $testOut, $testErr -Force -ErrorAction SilentlyContinue
-                    }
-                }
-            }
-            if ($installedNow) { $needsSetup = $true }
-
-            if ($needsSetup) {
-                if (-not $rootSecure) {
-                    $credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
-                    $rootSecure = $credentials.Root
-                    $appSecure = $credentials.App
-                }
-                if (-not $installedNow) {
-                    Write-Ok "Verificando a instalação existente do MySQL dedicado..."
-                    & (Join-Path $PSScriptRoot "instalar-mysql.ps1") `
-                        -RootPassword $rootSecure `
-                        -AppPassword $appSecure `
-                        -Port $script:NexusMySqlPort
-                    if ($LASTEXITCODE -ne 0) {
-                        Fail "A verificação do MySQL dedicado falhou (código $LASTEXITCODE). Consulte $LogsDir."
-                    }
-                }
-                Write-Ok "Configurando o banco nexus_prod e o usuário nexus_app..."
-                & (Join-Path $PSScriptRoot "pos-instalacao-mysql.ps1") `
-                    -RootPassword $rootSecure `
-                    -AppPassword $appSecure `
-                    -Hostname $Hostname
-                $mysqlSetupCode = $LASTEXITCODE
-                if ($mysqlSetupCode -ne 0) {
-                    Fail "A configuração do MySQL falhou (código $mysqlSetupCode). Consulte o log em $LogsDir."
-                }
-                $appPlain = ConvertFrom-SecureStringPlain -Secure $appSecure
-                Write-BackupCnf -Password $appPlain
-                Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
-            }
-
-            $state.completedPhase = 2
-            $state.paused = $false
-            $state.pausedPhase = $null
-            Save-BootstrapState -State $state
-        }
-        finally {
-            $rootSecure = $null
-            $appSecure = $null
+            $appPlain = ConvertFrom-SecureStringPlain -Secure $appSecure
+            Write-BackupCnf -Password $appPlain
             $appPlain = $null
+            Write-Ok "Configuração do MySQL concluída; backup.cnf criado com ACL restrita."
         }
+
+        $state.completedPhase = 2
+        $state.paused = $false
+        $state.pausedPhase = $null
+        Save-BootstrapState -State $state
     }
 
     if ($startPhase -le 3) {
-        Write-Step "Fase 3/7 - Ferramentas, diretórios e ACLs"
+        Write-Step "Fase 3/7 - Diretórios e ACLs"
         Assert-Admin
 
         foreach ($dir in @(
@@ -618,144 +756,6 @@ try {
                 New-Item -ItemType Directory -Force -Path $dir | Out-Null
             }
         }
-
-        if (-not (Test-Path -LiteralPath $NssmExe)) {
-            $expectedHash = ([string]$manifest.nssm.exe_sha256).ToUpperInvariant()
-            $nssmBundled = Join-Path $PSScriptRoot "tools\nssm\nssm.exe"
-
-            if (Test-Path -LiteralPath $nssmBundled -PathType Leaf) {
-                Write-Ok "Usando o NSSM embutido no instalador."
-                if ($expectedHash) {
-                    $actualHash = (Get-FileHash -LiteralPath $nssmBundled -Algorithm SHA256).Hash
-                    if ($actualHash -ne $expectedHash) {
-                        Fail "O hash do NSSM embutido não confere (esperado $expectedHash, obtido $actualHash)."
-                    }
-                }
-                if (-not (Test-Path -LiteralPath $NssmDir)) {
-                    New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
-                }
-                Copy-Item -LiteralPath $nssmBundled -Destination $NssmExe -Force
-            }
-            else {
-                $nssmUrls = New-Object System.Collections.Generic.List[string]
-                if ($manifest.nssm.url) { $nssmUrls.Add([string]$manifest.nssm.url) }
-                foreach ($mirror in @($manifest.nssm.mirrors)) {
-                    if ($mirror) { $nssmUrls.Add([string]$mirror) }
-                }
-                $nssmTemp = Join-Path $env:TEMP ("nexus-nssm-" + [guid]::NewGuid().ToString("N"))
-                New-Item -ItemType Directory -Force -Path $nssmTemp | Out-Null
-                try {
-                    foreach ($url in $nssmUrls) {
-                        $extension = if ($url -match '\.exe(\?|$)') { ".exe" } else { ".zip" }
-                        $download = Join-Path $nssmTemp ("nssm-" + [guid]::NewGuid().ToString("N") + $extension)
-                        try {
-                            Write-Ok "Baixando NSSM de $url..."
-                            Invoke-Download -Url $url -Destination $download -Label "NSSM 2.24"
-                            $candidate = $download
-                            if ($download -notmatch '\.exe$') {
-                                $extract = Join-Path $nssmTemp ("extract-" + [guid]::NewGuid().ToString("N"))
-                                Expand-Archive -LiteralPath $download -DestinationPath $extract -Force
-                                $binary = Get-ChildItem -Path $extract -Recurse -Filter "nssm.exe" -ErrorAction SilentlyContinue |
-                                    Where-Object { $_.FullName -match '\\win64\\' } |
-                                    Select-Object -First 1
-                                if (-not $binary) {
-                                    Write-Warn "Pacote de $url não contém win64\nssm.exe."
-                                    continue
-                                }
-                                $candidate = $binary.FullName
-                            }
-                            if ($expectedHash) {
-                                $actualHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash
-                                if ($actualHash -ne $expectedHash) {
-                                    Write-Warn "Hash de $url não confere; tentando o próximo."
-                                    continue
-                                }
-                            }
-                            if (-not (Test-Path -LiteralPath $NssmDir)) {
-                                New-Item -ItemType Directory -Force -Path $NssmDir | Out-Null
-                            }
-                            Copy-Item -LiteralPath $candidate -Destination $NssmExe -Force
-                            Write-Ok "NSSM obtido de $url."
-                            break
-                        }
-                        catch {
-                            Write-Warn "Falha ao obter NSSM de $url`: $($_.Exception.Message)"
-                        }
-                    }
-                    if (-not (Test-Path -LiteralPath $NssmExe)) {
-                        Fail "Não foi possível obter o NSSM (embutido/URL oficial/mirrors). Copie o nssm.exe para $NssmExe e rode novamente."
-                    }
-                }
-                finally {
-                    Remove-Item -LiteralPath $nssmTemp -Recurse -Force -ErrorAction SilentlyContinue
-                }
-            }
-        }
-        Unblock-File -LiteralPath $NssmExe -ErrorAction SilentlyContinue
-        $nssmVersion = [string]$manifest.nssm.version
-        Write-Ok "NSSM instalado: $nssmVersion"
-
-        if (-not (Test-Path -LiteralPath $CaddyExe)) {
-            $caddyUrl = [string]$manifest.caddy.url
-            $caddyVersion = [string]$manifest.caddy.version
-            if (-not $caddyUrl) {
-                $caddyInfo = Resolve-LatestCaddy
-                $caddyUrl = $caddyInfo.Url
-                $caddyVersion = $caddyInfo.Version
-            }
-            Write-Ok "Baixando Caddy $caddyVersion..."
-            $caddyZip = Join-Path $env:TEMP "nexus-caddy-windows-amd64.zip"
-            Invoke-Download -Url $caddyUrl -Destination $caddyZip -Sha256 ([string]$manifest.caddy.sha256) -Label "Caddy"
-            $caddyTemp = Join-Path $env:TEMP ("nexus-caddy-" + [guid]::NewGuid().ToString("N"))
-            try {
-                Expand-Archive -LiteralPath $caddyZip -DestinationPath $caddyTemp -Force
-                $caddyBinary = Get-ChildItem -Path $caddyTemp -Recurse -Filter "caddy.exe" -ErrorAction SilentlyContinue |
-                    Select-Object -First 1
-                if (-not $caddyBinary) {
-                    Fail "caddy.exe não encontrado no pacote baixado."
-                }
-                if (-not (Test-Path -LiteralPath $CaddyDir)) {
-                    New-Item -ItemType Directory -Force -Path $CaddyDir | Out-Null
-                }
-                Copy-Item -LiteralPath $caddyBinary.FullName -Destination $CaddyExe -Force
-            }
-            finally {
-                Remove-Item -LiteralPath $caddyTemp -Recurse -Force -ErrorAction SilentlyContinue
-                Remove-Item -LiteralPath $caddyZip -Force -ErrorAction SilentlyContinue
-            }
-        }
-        Unblock-File -LiteralPath $CaddyExe -ErrorAction SilentlyContinue
-        $caddyVersion = ([string](& $CaddyExe version 2>&1 | Select-Object -First 1)).Trim()
-        Write-Ok "Caddy instalado: $caddyVersion"
-
-        $templatePath = Join-Path $PSScriptRoot "Caddyfile"
-        if (-not (Test-Path -LiteralPath $templatePath)) {
-            Fail "Template Caddyfile não encontrado em $templatePath."
-        }
-        $caddyContent = [System.IO.File]::ReadAllText($templatePath)
-        $caddyContent = $caddyContent.Replace("__HOSTNAME__", $Hostname)
-        $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
-        [System.IO.File]::WriteAllText($Caddyfile, $caddyContent, $utf8NoBom)
-
-        $oldXdgData = $env:XDG_DATA_HOME
-        $oldXdgConfig = $env:XDG_CONFIG_HOME
-        $oldAppData = $env:APPDATA
-        $env:XDG_DATA_HOME = $CaddyDataDir
-        $env:XDG_CONFIG_HOME = $CaddyConfigDir
-        $env:APPDATA = $CaddyDataDir
-        try {
-            & $CaddyExe validate --config $Caddyfile --adapter caddyfile
-            $caddyValidateCode = $LASTEXITCODE
-        }
-        finally {
-            if ($oldXdgData) { $env:XDG_DATA_HOME = $oldXdgData } else { Remove-Item Env:XDG_DATA_HOME -ErrorAction SilentlyContinue }
-            if ($oldXdgConfig) { $env:XDG_CONFIG_HOME = $oldXdgConfig } else { Remove-Item Env:XDG_CONFIG_HOME -ErrorAction SilentlyContinue }
-            if ($oldAppData) { $env:APPDATA = $oldAppData } else { Remove-Item Env:APPDATA -ErrorAction SilentlyContinue }
-        }
-        if ($caddyValidateCode -ne 0) {
-            Fail "O Caddyfile gerado é inválido."
-        }
-        Write-Ok "Caddyfile gerado para $Hostname."
 
         # ACLs restritas: nada herda Users de C:\ProgramData.
         Set-AclReadExecute -Path $ProgramRoot
@@ -780,11 +780,12 @@ try {
         )) {
             Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
         }
-        # O serviço LocalService do Caddy precisa ler o arquivo de configuração.
-        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
 
-        if (Test-Path -LiteralPath $script:NexusMySqlDir) {
-            Set-AclReadExecute -Path $script:NexusMySqlDir -Identity "S-1-5-20"
+        if (Test-Path -LiteralPath $NodeDir) {
+            Set-AclReadExecute -Path $NodeDir -Identity "S-1-5-20"
+        }
+        if (Test-Path -LiteralPath $MySqlDir) {
+            Set-AclReadExecute -Path $MySqlDir -Identity "S-1-5-20"
         }
         if (Test-Path -LiteralPath $script:NexusMySqlRoot) {
             Set-AclRestricted -Path $script:NexusMySqlRoot -ModifyIdentities @("S-1-5-20")
@@ -795,12 +796,43 @@ try {
                 Protect-File -Path $script:NexusMySqlConfig -ReadIdentities @("S-1-5-20")
             }
         }
+        $templatePath = Join-Path $PSScriptRoot "Caddyfile"
+        if (-not (Test-Path -LiteralPath $templatePath -PathType Leaf)) {
+            Fail "Template Caddyfile não encontrado em $templatePath."
+        }
+        $caddyContent = [System.IO.File]::ReadAllText($templatePath)
+        $caddyContent = $caddyContent.Replace("__HOSTNAME__", $Hostname)
+        $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+        [System.IO.File]::WriteAllText($Caddyfile, $caddyContent, $utf8NoBom)
+
+        if (Test-Path -LiteralPath $CaddyExe -PathType Leaf) {
+            $oldXdgData = $env:XDG_DATA_HOME
+            $oldXdgConfig = $env:XDG_CONFIG_HOME
+            $oldAppData = $env:APPDATA
+            $env:XDG_DATA_HOME = $CaddyDataDir
+            $env:XDG_CONFIG_HOME = $CaddyConfigDir
+            $env:APPDATA = $CaddyDataDir
+            try {
+                & $CaddyExe validate --config $Caddyfile --adapter caddyfile
+                $caddyValidateCode = $LASTEXITCODE
+            }
+            finally {
+                if ($oldXdgData) { $env:XDG_DATA_HOME = $oldXdgData } else { Remove-Item Env:XDG_DATA_HOME -ErrorAction SilentlyContinue }
+                if ($oldXdgConfig) { $env:XDG_CONFIG_HOME = $oldXdgConfig } else { Remove-Item Env:XDG_CONFIG_HOME -ErrorAction SilentlyContinue }
+                if ($oldAppData) { $env:APPDATA = $oldAppData } else { Remove-Item Env:APPDATA -ErrorAction SilentlyContinue }
+            }
+            if ($caddyValidateCode -ne 0) {
+                Fail "O Caddyfile gerado é inválido."
+            }
+        }
+        Write-Ok "Caddyfile gerado para $Hostname."
+
+        Protect-File -Path $Caddyfile -ReadIdentities @("S-1-5-19")
         Set-NexusFirewallRules
         Write-Ok "ACLs restritas e regras de firewall aplicadas."
 
-        $appEnv = Join-Path $AppDir ".env"
-        if (Test-Path -LiteralPath $appEnv) {
-            Protect-File -Path $appEnv -ReadIdentities @("S-1-5-20")
+        if (Test-Path -LiteralPath $EnvPath) {
+            Protect-File -Path $EnvPath -ReadIdentities @("S-1-5-20")
         }
 
         $state.completedPhase = 3
@@ -810,138 +842,62 @@ try {
     }
 
     if ($startPhase -le 4) {
-        Write-Step "Fase 4/7 - Aplicação"
+        Write-Step "Fase 4/7 - Banco e aplicação"
         Assert-Admin
         Update-SessionPath
 
-        $gitCommand = Get-Command git.exe -ErrorAction SilentlyContinue
-        if (-not $gitCommand) { Fail "Git não encontrado." }
-        $npmCommand = Get-Command npm.cmd -ErrorAction SilentlyContinue
-        if (-not $npmCommand) { Fail "npm.cmd não encontrado." }
-
-        if (Test-Path -LiteralPath $AppDir) {
-            if (Test-Path -LiteralPath (Join-Path $AppDir ".git")) {
-                Write-Ok "Repositório existente; atualizando para $Tag..."
-                & $gitCommand.Source -C $AppDir remote set-url origin $RepoUrl
-                if ($LASTEXITCODE -ne 0) { Fail "git remote set-url falhou." }
-                & $gitCommand.Source -C $AppDir fetch --tags --force origin
-                if ($LASTEXITCODE -ne 0) { Fail "git fetch falhou." }
-                & $gitCommand.Source -C $AppDir checkout -f $Tag
-                if ($LASTEXITCODE -ne 0) { Fail "git checkout $Tag falhou." }
-            }
-            else {
-                $appItems = @(Get-ChildItem -LiteralPath $AppDir -Force -ErrorAction SilentlyContinue)
-                if ($appItems.Count -gt 0) {
-                    if (-not $Force) {
-                        Fail "$AppDir já existe e não é um repositório Git. Use -Force para movê-lo e reinstalar."
-                    }
-                    $oldDir = Join-Path $ProgramRoot ("app.prev-manual-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
-                    Move-Item -LiteralPath $AppDir -Destination $oldDir
-                    Write-Warn "Diretório anterior movido para $oldDir."
-                }
+        $caddyService = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+        if ($caddyService -and $caddyService.Status.ToString() -ne "Stopped") {
+            Write-Ok "Parando NexusCaddy para atualizar a aplicação..."
+            Stop-Service -Name "NexusCaddy" -Force
+            if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Stopped" -TimeoutSeconds 60)) {
+                Fail "O serviço NexusCaddy não parou para atualizar a aplicação."
             }
         }
 
-        if (-not (Test-Path -LiteralPath (Join-Path $AppDir "package.json"))) {
-            if (-not (Test-Path -LiteralPath $AppDir)) {
-                & $gitCommand.Source clone --branch $Tag --depth 1 $RepoUrl $AppDir
-                if ($LASTEXITCODE -ne 0) { Fail "git clone da tag $Tag falhou." }
-            }
-            elseif (-not (Test-Path -LiteralPath (Join-Path $AppDir ".git"))) {
-                & $gitCommand.Source clone --branch $Tag --depth 1 $RepoUrl $AppDir
-                if ($LASTEXITCODE -ne 0) { Fail "git clone da tag $Tag falhou." }
-            }
+        $previousDir = Expand-AppPackage
+        Write-AppEnvironment
+
+        $appVersion = Get-AppVersion
+        if ($appVersion) {
+            Write-Ok "Aplicação standalone $appVersion extraída em $AppDir."
+            $state.appVersion = $appVersion
         }
-        if (-not (Test-Path -LiteralPath (Join-Path $AppDir "package.json"))) {
-            Fail "A aplicação não foi encontrada em $AppDir após o clone."
+        else {
+            Write-Warn "package.json da aplicação sem versão; o smoke não validará a versão."
+        }
+        if ($previousDir) {
+            Write-Ok "Versão anterior preservada em $previousDir."
         }
 
-        $healthRoute = Join-Path $AppDir "src\app\api\health\route.ts"
-        if (-not (Test-Path -LiteralPath $healthRoute)) {
-            Fail "A tag $Tag não contém src/app/api/health/route.ts; crie a tag do release com a rota."
-        }
-        try {
-            $packageInfo = Get-Content -LiteralPath (Join-Path $AppDir "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json
-        }
-        catch {
-            Fail "Não foi possível ler o package.json da tag $Tag`: $($_.Exception.Message)"
-        }
-        $expectedTagVersion = $Tag -replace '^v', ''
-        if ([string]$packageInfo.version -ne $expectedTagVersion) {
-            Fail "A versão do package.json da tag $Tag é '$([string]$packageInfo.version)', esperada '$expectedTagVersion'. Crie a tag a partir do release."
-        }
-        Write-Ok "Tag $Tag contém /api/health e versão $expectedTagVersion."
-
-        $envPath = Join-Path $AppDir ".env"
-        $appPasswordPlain = $null
-        $jwtSecret = $null
-        $generatedJwt = $false
-        Suspend-Transcript
-        try {
+        # SQL de produção, sem Prisma: banco vazio → schema+seed; existente → migração+seed.
+        $sqlRootSecure = $rootSecure
+        $sqlAppSecure = $appSecure
+        if (-not ($sqlRootSecure -or $sqlAppSecure)) {
             if (Test-Path -LiteralPath $BackupCnf) {
-                $appPasswordPlain = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
-            }
-            if (-not $appPasswordPlain) {
-                Fail "Senha de nexus_app não encontrada em $BackupCnf. Refaça a fase 2."
-            }
-
-            Set-EnvFile -Path $envPath -Key "DATABASE_URL" -Value ('"mysql://nexus_app:{0}@127.0.0.1:{1}/nexus_prod"' -f $appPasswordPlain, $script:NexusMySqlPort) -ReadIdentities @("S-1-5-20")
-            Set-EnvFile -Path $envPath -Key "UPLOADS_DIR" -Value $UploadsDir -ReadIdentities @("S-1-5-20")
-            Set-EnvFile -Path $envPath -Key "NODE_ENV" -Value "production" -ReadIdentities @("S-1-5-20")
-            Set-EnvFile -Path $envPath -Key "PORT" -Value "3000" -ReadIdentities @("S-1-5-20")
-            $jwtSecret = Get-EnvValue -Path $envPath -Key "JWT_SECRET"
-            if (-not $jwtSecret) {
-                $jwtSecret = New-RandomSecret -Bytes 48
-                Set-EnvFile -Path $envPath -Key "JWT_SECRET" -Value ('"{0}"' -f $jwtSecret) -ReadIdentities @("S-1-5-20")
-                $generatedJwt = $true
+                $appPlain = Get-CnfValue -Path $BackupCnf -Section "client" -Key "password"
+                if ($appPlain) {
+                    $sqlAppSecure = ConvertTo-SecureString -String $appPlain -AsPlainText -Force
+                }
+                $appPlain = $null
             }
         }
-        finally {
-            Resume-Transcript
-            $appPasswordPlain = $null
-            $jwtSecret = $null
+        if (-not ($sqlRootSecure -or $sqlAppSecure)) {
+            Fail "Credenciais do MySQL indisponíveis para aplicar o SQL. Refaça a fase 2."
         }
-        if ($generatedJwt) {
-            Write-Ok "JWT_SECRET gerado para esta instalação."
+        Write-Ok "Aplicando o SQL de produção com mysql.exe..."
+        $sqlArguments = @{
+            MysqlExe  = $MySqlExe
+            Database  = "nexus_prod"
+            Mode      = "Auto"
+            Port      = $script:NexusMySqlPort
+            SqlDir    = $SqlDir
         }
-        Protect-File -Path $envPath -ReadIdentities @("S-1-5-20")
-        Write-Ok "Arquivo .env criado com ACL restrita (NetworkService lê; Administrators/SYSTEM controlam)."
-
-        # A aplicação em execução trava node_modules/.next durante npm ci/build.
-        $runningApp = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-        if ($runningApp -and $runningApp.Status.ToString() -ne "Stopped") {
-            Write-Ok "Parando NexusApp/NexusCaddy para atualizar a aplicação..."
-            Stop-Service -Name "NexusApp" -Force -ErrorAction SilentlyContinue
-            if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
-                Fail "O serviço NexusApp não parou para atualizar a aplicação."
-            }
-        }
-
-        Push-Location $AppDir
-        try {
-            Remove-Item Env:NODE_ENV -ErrorAction SilentlyContinue
-            Write-Ok "Executando npm ci..."
-            & $npmCommand.Source ci --no-audit --no-fund
-            if ($LASTEXITCODE -ne 0) { Fail "npm ci falhou." }
-
-            Write-Ok "Gerando o cliente Prisma..."
-            & $npmCommand.Source run db:generate
-            if ($LASTEXITCODE -ne 0) { Fail "prisma generate falhou." }
-
-            Write-Ok "Compilando a aplicação..."
-            & $npmCommand.Source run build
-            if ($LASTEXITCODE -ne 0) { Fail "npm run build falhou." }
-
-            Write-Ok "Aplicando o schema no banco..."
-            & $npmCommand.Source run db:push
-            if ($LASTEXITCODE -ne 0) { Fail "prisma db push falhou." }
-
-            Write-Ok "Executando o seed de referência..."
-            & $npmCommand.Source run db:seed
-            if ($LASTEXITCODE -ne 0) { Fail "db:seed falhou." }
-        }
-        finally {
-            Pop-Location
+        if ($sqlRootSecure) { $sqlArguments.RootPassword = $sqlRootSecure }
+        if ($sqlAppSecure) { $sqlArguments.AppPassword = $sqlAppSecure }
+        & (Join-Path $PSScriptRoot "aplicar-sql.ps1") @sqlArguments
+        if ($LASTEXITCODE -ne 0) {
+            Fail "A aplicação do SQL falhou (código $LASTEXITCODE). Consulte $LogsDir."
         }
 
         $cacheDir = Join-Path $AppDir ".next\cache"
@@ -950,7 +906,7 @@ try {
         }
         Set-AclModify -Path $cacheDir
         Set-AclReadExecute -Path $AppDir
-        Write-Ok "Build concluído e cache acessível ao serviço."
+        Write-Ok "Cache da aplicação acessível ao serviço."
 
         $state.completedPhase = 4
         $state.paused = $false
@@ -963,14 +919,17 @@ try {
         Assert-Admin
         Update-SessionPath
 
-        $nodeCommand = Get-Command node.exe -ErrorAction SilentlyContinue
-        if (-not $nodeCommand) { Fail "node.exe não encontrado." }
+        if (-not (Test-Path -LiteralPath $NodeExe -PathType Leaf)) { Fail "node.exe não encontrado em $NodeExe." }
+        if (-not (Test-Path -LiteralPath (Join-Path $AppDir "server.js") -PathType Leaf)) {
+            Fail "server.js não encontrado em $AppDir. Refaça a fase 4."
+        }
         if (-not (Test-Path -LiteralPath $NssmExe)) { Fail "NSSM não encontrado em $NssmExe." }
         if (-not (Test-Path -LiteralPath $CaddyExe)) { Fail "Caddy não encontrado em $CaddyExe." }
-        $nextBin = Join-Path $AppDir "node_modules\next\dist\bin\next"
-        if (-not (Test-Path -LiteralPath $nextBin)) {
-            Fail "O binário do Next não foi encontrado em $nextBin. Refaça a fase 4."
-        }
+
+        $databaseUrl = Get-EnvValue -Path $EnvPath -Key "DATABASE_URL"
+        $jwtSecret = Get-EnvValue -Path $EnvPath -Key "JWT_SECRET"
+        if (-not $databaseUrl) { Fail "DATABASE_URL não encontrada em $EnvPath." }
+        if (-not $jwtSecret) { Fail "JWT_SECRET não encontrado em $EnvPath." }
 
         foreach ($dir in @($script:NexusCaddyDir, $CaddyDataDir, $CaddyConfigDir, $CaddyLogsDir)) {
             if (-not (Test-Path -LiteralPath $dir)) {
@@ -979,26 +938,28 @@ try {
             Set-AclRestricted -Path $dir -ModifyIdentities @("S-1-5-19")
         }
 
-        # AppDirectory é o diretório da aplicação; por isso o caminho do Next pode
-        # ser relativo (sem espaços) e não precisa de aspas no AppParameters do NSSM.
-        $appParameters = "node_modules\next\dist\bin\next start -H 127.0.0.1 -p 3000"
+        # AppDirectory é o diretório da aplicação; por isso server.js é relativo.
         Set-NexusService `
             -Name "NexusApp" `
-            -Application $nodeCommand.Source `
-            -Parameters $appParameters `
+            -Application $NodeExe `
+            -Parameters "server.js" `
             -Directory $AppDir `
             -Environment @(
                 "NODE_ENV=production",
                 "PORT=3000",
                 "HOSTNAME=127.0.0.1",
                 "UPLOADS_DIR=$UploadsDir",
+                "DATABASE_URL=$databaseUrl",
+                "JWT_SECRET=$jwtSecret",
                 "NEXT_TELEMETRY_DISABLED=1"
             ) `
             -Stdout (Join-Path $LogsDir "app.out.log") `
             -Stderr (Join-Path $LogsDir "app.err.log") `
-            -Description "Nexus - aplicação Next.js" `
+            -Description "Nexus - aplicação Next.js (standalone)" `
             -DependOnService $script:NexusMySqlService
-        Write-Ok "Serviço NexusApp configurado (NT AUTHORITY\NetworkService)."
+        Write-Ok "Serviço NexusApp configurado (Node portátil + server.js, NT AUTHORITY\NetworkService)."
+        $databaseUrl = $null
+        $jwtSecret = $null
 
         $caddyParameters = "run --config $Caddyfile --adapter caddyfile"
         Set-NexusService `
@@ -1167,13 +1128,13 @@ try {
                 # Configuração da bandeja: caminhos reais desta instalação, sem segredos.
                 $trayJsonPath = Join-Path $trayDir "tray.json"
                 $trayConfig = [ordered]@{
-                    baseUrl      = ("https://{0}" -f $Hostname)
-                    healthUrl    = "http://127.0.0.1:3000/api/health"
-                    serviceName  = "NexusApp"
-                    nssmPath     = $NssmExe
-                    logsDir      = $LogsDir
-                    dataDir      = $DataDir
-                    backupScript = $backupScript
+                    baseUrl       = ("https://{0}" -f $Hostname)
+                    healthUrl     = "http://127.0.0.1:3000/api/health"
+                    serviceName   = "NexusApp"
+                    nssmPath      = $NssmExe
+                    logsDir       = $LogsDir
+                    dataDir       = $DataDir
+                    backupScript  = $backupScript
                     restartScript = $restartScript
                 }
                 Write-Utf8NoBom -Path $trayJsonPath -Lines @(($trayConfig | ConvertTo-Json -Depth 3))
@@ -1239,7 +1200,7 @@ try {
         if (-not (Test-Path -LiteralPath $smokeScript)) {
             Fail "smoke.ps1 não encontrado em $smokeScript."
         }
-        $expectedVersion = $Tag -replace '^v', ''
+        $expectedVersion = [string]$state.appVersion
         & $PsExe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -Hostname $Hostname -ExpectedVersion $expectedVersion
         if ($LASTEXITCODE -ne 0) {
             Fail "O smoke test falhou. Verifique serviços, certificado e logs em $LogsDir."
@@ -1255,14 +1216,18 @@ try {
         Write-Host "Resumo" -ForegroundColor Cyan
         Write-Host "  URL:        https://$Hostname"
         Write-Host "  Aplicação:  $AppDir"
+        Write-Host "  Node:       $NodeExe"
+        Write-Host "  MySQL:      $MySqlDir (dados em $script:NexusMySqlDataDir)"
         Write-Host "  Dados:      $DataDir"
         Write-Host "  Logs:       $LogsDir"
-        Write-Host "  Versão:     $Tag"
+        Write-Host "  Versão:     $expectedVersion"
         Write-Host "  Backup:     tarefa NexusBackup (diária, 02:00)"
-        Write-Host "  Atualizar:  .\atualizar.ps1 -Tag <nova-tag>"
+        Write-Host "  Atualizar:  .\atualizar.ps1 -Package <pasta com app\ e sql\>"
         Write-Host ""
     }
 }
 finally {
     Stop-NexusTranscript
+    $rootSecure = $null
+    $appSecure = $null
 }

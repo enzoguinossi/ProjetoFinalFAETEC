@@ -4,15 +4,21 @@
     Instala o MySQL 8.4.13 LTS dedicado do Nexus na porta 3214.
 
 .DESCRIPTION
-    Baixa o ZIP oficial (validando o MD5), instala os binários em
-    C:\Program Files\Nexus\mysql e mantém dados/configuração em
-    C:\ProgramData\MySQL\MySQL Server 8.4. Cria o serviço NexusMySQL84 com
-    bind em 127.0.0.1 e define a senha do root por arquivo temporário
-    protegido — nunca por -p, log ou argumento de linha de comando.
+    Usa o ZIP embutido no payload do instalador (nada é baixado na máquina de
+    destino), instala os binários em C:\Program Files\Nexus\mysql e mantém
+    dados/configuração em C:\ProgramData\Nexus\mysql (data\ e my.ini).
 
-    É idempotente: se o serviço existe e roda, se os binários existem ou se
-    Data não está vazio, as etapas correspondentes não são refeitas. Não cria
-    o banco/usuário nexus_app; isso é feito por pos-instalacao-mysql.ps1.
+    Se existir o diretório antigo C:\ProgramData\MySQL\MySQL Server 8.4\Data
+    (instalação anterior), copia os dados para o novo local, preservando o
+    original, e recria o serviço NexusMySQL84 com o novo --defaults-file.
+
+    Cria/recria o serviço NexusMySQL84 com bind em 127.0.0.1 e define a senha
+    do root por arquivo temporário protegido — nunca por -p, log ou argumento
+    de linha de comando.
+
+    É idempotente: se o serviço existe, aponta para o my.ini atual e roda, as
+    etapas correspondentes não são refeitas. Não cria o banco/usuário
+    nexus_app; isso é feito por pos-instalacao-mysql.ps1.
 #>
 [CmdletBinding()]
 param(
@@ -34,38 +40,39 @@ $mysqlDir = $script:NexusMySqlDir
 $mysqlRoot = $script:NexusMySqlRoot
 $dataDir = $script:NexusMySqlDataDir
 $myIni = $script:NexusMySqlConfig
+$payloadDir = $script:NexusPayloadDir
 $mysqld = Join-Path $mysqlDir "bin\mysqld.exe"
 $mysql = Join-Path $mysqlDir "bin\mysql.exe"
 $scExe = Join-Path $env:SystemRoot "System32\sc.exe"
-
-$credentials = Read-MySqlCredentials -RootPassword $RootPassword -AppPassword $AppPassword
-$RootPassword = $credentials.Root
-$AppPassword = $credentials.App
-
-$appPlain = ConvertFrom-SecureStringPlain -Secure $AppPassword
-Assert-SafeAppPassword -Plain $appPlain -Label "Senha de nexus_app"
-$appPlain = $null
-
-$rootProbe = ConvertFrom-SecureStringPlain -Secure $RootPassword
-Assert-MysqlRootPassword -Plain $rootProbe
-$rootProbe = $null
+$robocopy = Join-Path $env:SystemRoot "System32\robocopy.exe"
 
 $manifest = Get-Manifest
 $mysqlInfo = $manifest.mysql
-$url = [string]$mysqlInfo.url
-$md5 = [string]$mysqlInfo.md5
 $version = [string]$mysqlInfo.version
-if (-not $url) { Fail "mysql.url não definido no manifesto." }
-if (-not $md5) { Fail "mysql.md5 não definido no manifesto." }
+$archive = [string]$mysqlInfo.archive
+$md5 = [string]$mysqlInfo.md5
+if (-not $archive) { Fail "mysql.archive não definido no manifesto." }
+$mysqlZip = Join-Path (Join-Path $payloadDir "mysql") $archive
 
 function Install-MySqlZip {
+    if (-not (Test-Path -LiteralPath $mysqlZip -PathType Leaf)) {
+        Fail ("MySQL embutido não encontrado em $mysqlZip. " +
+            "Monte o payload com scripts\preparar-payload.ps1 antes de gerar o instalador.")
+    }
+    $actualMd5 = (Get-FileHash -LiteralPath $mysqlZip -Algorithm MD5).Hash.ToLowerInvariant()
+    if ($md5 -and $actualMd5 -ne $md5.Trim().ToLowerInvariant()) {
+        Fail "O MD5 do MySQL embutido não confere (esperado $md5, obtido $actualMd5)."
+    }
+
+    # Os binários podem estar em uso pelo serviço antigo; pare antes de trocar.
+    Stop-MySqlForMigration
+
     $tempRoot = Join-Path $env:TEMP ("nexus-mysql-zip-" + [guid]::NewGuid().ToString("N"))
-    $zipFile = Join-Path $tempRoot "mysql.zip"
     $extractDir = Join-Path $tempRoot "extract"
     try {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
-        Invoke-Download -Url $url -Destination $zipFile -Md5 $md5 -Label "MySQL $version"
-        Expand-Archive -LiteralPath $zipFile -DestinationPath $extractDir -Force
+        Write-Ok "Extraindo MySQL $version do payload..."
+        Expand-Archive -LiteralPath $mysqlZip -DestinationPath $extractDir -Force
 
         $sourceMysqld = Get-ChildItem -Path $extractDir -Recurse -Filter "mysqld.exe" -File -ErrorAction SilentlyContinue |
             Where-Object { $_.Directory.Name -eq "bin" } |
@@ -88,19 +95,99 @@ function Install-MySqlZip {
     }
 }
 
+function Stop-MySqlForMigration {
+    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if ($service -and $service.Status.ToString() -ne "Stopped") {
+        Stop-Service -Name $serviceName -Force
+        if (-not (Wait-ServiceState -Name $serviceName -Status "Stopped" -TimeoutSeconds 60)) {
+            Fail "O serviço $serviceName não parou para migrar os dados."
+        }
+    }
+}
+
+function Copy-LegacyData {
+    $legacyData = $script:NexusMySqlLegacyDataDir
+    if (-not (Test-Path -LiteralPath $legacyData -PathType Container)) {
+        return $false
+    }
+    $existingItems = @(Get-ChildItem -LiteralPath $dataDir -Force -ErrorAction SilentlyContinue)
+    if ($existingItems.Count -gt 0) {
+        return $false
+    }
+
+    Write-Step "Migrando os dados do MySQL anterior"
+    Write-Ok "Origem: $legacyData (preservada)"
+    Write-Ok "Destino: $dataDir"
+    Stop-MySqlForMigration
+    if (-not (Test-Path -LiteralPath $dataDir)) {
+        New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+    }
+    & $robocopy $legacyData $dataDir /E /COPY:DAT /R:2 /W:2 /NP /NFL /NDL /NJH /NJS
+    if ($LASTEXITCODE -ge 8) {
+        Fail "robocopy falhou (código $LASTEXITCODE) ao migrar os dados do MySQL anterior."
+    }
+    $newItems = @(Get-ChildItem -LiteralPath $dataDir -Force -ErrorAction SilentlyContinue)
+    if ($newItems.Count -eq 0) {
+        Fail "A cópia dos dados do MySQL anterior não gerou arquivos em $dataDir."
+    }
+    Write-Ok "Dados migrados para $dataDir (o diretório antigo continua intacto)."
+    return $true
+}
+
+function Test-ServiceUsesConfig {
+    param([Parameter(Mandatory = $true)][string]$ConfigPath)
+    try {
+        $service = Get-CimInstance -ClassName Win32_Service -Filter ("Name='{0}'" -f $serviceName) -ErrorAction Stop
+    }
+    catch {
+        return $true
+    }
+    if (-not $service -or -not $service.PathName) {
+        return $false
+    }
+    return ($service.PathName.IndexOf($ConfigPath, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Remove-MySqlService {
+    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if (-not $service) { return }
+    Stop-MySqlForMigration
+    Write-Ok "Removendo o serviço $serviceName para recriá-lo com o novo my.ini..."
+    & $scExe delete $serviceName | Out-Null
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-Service -Name $serviceName -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 1
+    }
+    if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) {
+        Fail "Não foi possível remover o serviço $serviceName para recriá-lo."
+    }
+}
+
 Write-Step "MySQL 8.4 dedicado do Nexus (porta $Port)"
 
-if (-not (Test-Path -LiteralPath $mysqld -PathType Leaf)) {
-    Write-Ok "Baixando MySQL $version..."
+$needBinaries = $true
+if (Test-Path -LiteralPath $mysqld -PathType Leaf) {
+    $currentVersion = ([string](& $mysqld "--version" 2>&1 | Select-Object -First 1)).Trim()
+    if ($currentVersion -match [regex]::Escape($version)) {
+        $needBinaries = $false
+        Write-Ok "Binários MySQL $version já presentes em $mysqlDir."
+    }
+    else {
+        Write-Warn "Binários em $mysqlDir estão em outra versão ('$currentVersion'); reinstalando $version."
+    }
+}
+if ($needBinaries) {
     Install-MySqlZip
     Write-Ok "Binários instalados em $mysqlDir."
-}
-else {
-    Write-Ok "Binários MySQL já presentes em $mysqlDir."
 }
 if (-not (Test-Path -LiteralPath $mysql -PathType Leaf)) {
     Fail "mysql.exe não encontrado em $mysql\bin."
 }
+$versionOutput = ([string](& $mysqld "--version" 2>&1 | Select-Object -First 1)).Trim()
+if ($versionOutput -notmatch [regex]::Escape($version)) {
+    Fail "Versão do mysqld diferente da esperada ($version): $versionOutput"
+}
+Write-Ok $versionOutput
 
 foreach ($dir in @($mysqlRoot, $dataDir)) {
     if (-not (Test-Path -LiteralPath $dir)) {
@@ -110,6 +197,8 @@ foreach ($dir in @($mysqlRoot, $dataDir)) {
 Set-AclReadExecute -Path $mysqlDir -Identity "S-1-5-20"
 Set-AclRestricted -Path $mysqlRoot -ModifyIdentities @("S-1-5-20")
 Set-AclRestricted -Path $dataDir -ModifyIdentities @("S-1-5-20")
+
+$migrated = Copy-LegacyData
 
 $basedir = $mysqlDir.Replace("\", "/")
 $datadir = $dataDir.Replace("\", "/")
@@ -139,11 +228,18 @@ $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
 $dataItems = @(Get-ChildItem -LiteralPath $dataDir -Force -ErrorAction SilentlyContinue)
 $dataEmpty = ($dataItems.Count -eq 0)
 
+if ($service -and -not (Test-ServiceUsesConfig -ConfigPath $myIni)) {
+    Write-Warn "O serviço $serviceName aponta para outro my.ini; será recriado."
+    $migrated = $true
+}
+
 if ($dataEmpty -and $service -and $service.Status.ToString() -ne "Stopped") {
-    Stop-Service -Name $serviceName -Force
-    if (-not (Wait-ServiceState -Name $serviceName -Status "Stopped" -TimeoutSeconds 60)) {
-        Fail "O serviço $serviceName não parou para inicialização do Data."
-    }
+    Stop-MySqlForMigration
+}
+
+if ($dataEmpty -and -not $RootPassword) {
+    Fail ("O diretório de dados do MySQL está vazio e a senha do root não foi informada. " +
+        "Rode a instalação pelo bootstrap/instalador (ele solicita a senha).")
 }
 
 if ($dataEmpty) {
@@ -157,6 +253,10 @@ if ($dataEmpty) {
 }
 else {
     Write-Ok "Data já possui conteúdo; inicialização ignorada."
+}
+
+if ($migrated) {
+    Remove-MySqlService
 }
 
 $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
@@ -205,7 +305,14 @@ if (-not (Test-TcpPort -Port $Port -TimeoutMs 2000)) {
 }
 Write-Ok "$serviceName em execução em 127.0.0.1:$Port."
 
-$rootPlain = ConvertFrom-SecureStringPlain -Secure $RootPassword
+# A senha do root só é definida quando o Data acabou de ser inicializado (root
+# sem senha). Em dados migrados/antigos a senha existente é mantida.
+$rootPlain = $null
+if ($RootPassword) {
+    $rootPlain = ConvertFrom-SecureStringPlain -Secure $RootPassword
+    Assert-MysqlRootPassword -Plain $rootPlain
+}
+
 $tempRoot = Join-Path $env:TEMP ("nexus-mysql-root-" + [guid]::NewGuid().ToString("N"))
 $checkOut = Join-Path $tempRoot "check.out"
 $checkErr = Join-Path $tempRoot "check.err"
@@ -224,7 +331,7 @@ try {
     $check = Start-Process -FilePath $mysql -ArgumentList $checkArgs `
         -RedirectStandardOutput $checkOut -RedirectStandardError $checkErr `
         -Wait -PassThru -NoNewWindow
-    if ($check.ExitCode -eq 0) {
+    if ($check.ExitCode -eq 0 -and $rootPlain) {
         $escaped = $rootPlain.Replace("\", "\\").Replace("'", "''")
         $sql = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$escaped'; FLUSH PRIVILEGES;"
         Write-Utf8NoBom -Path $sqlFile -Lines @("")
@@ -247,7 +354,7 @@ try {
         Write-Ok "Senha do root definida."
     }
     else {
-        Write-Warn "O root já possui senha; a configuração existente será mantida."
+        Write-Ok "O root já possui senha; a configuração existente será mantida."
     }
 }
 finally {

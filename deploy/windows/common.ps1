@@ -7,6 +7,9 @@
 $script:NexusScriptRoot = $PSScriptRoot
 $script:NexusProgramRoot = "C:\Program Files\Nexus"
 $script:NexusAppDir = Join-Path $script:NexusProgramRoot "app"
+$script:NexusPayloadDir = Join-Path $script:NexusScriptRoot "payload"
+$script:NexusNodeDir = Join-Path $script:NexusProgramRoot "node"
+$script:NexusNodeExe = Join-Path $script:NexusNodeDir "node.exe"
 $script:NexusDataDir = "C:\ProgramData\Nexus"
 $script:NexusLogsDir = Join-Path $script:NexusDataDir "logs"
 $script:NexusConfigDir = Join-Path $script:NexusDataDir "config"
@@ -19,9 +22,13 @@ $script:NexusCaddyLogsDir = Join-Path $script:NexusCaddyDir "logs"
 $script:NexusMySqlPort = 3214
 $script:NexusMySqlService = "NexusMySQL84"
 $script:NexusMySqlDir = Join-Path $script:NexusProgramRoot "mysql"
-$script:NexusMySqlRoot = "C:\ProgramData\MySQL\MySQL Server 8.4"
-$script:NexusMySqlDataDir = Join-Path $script:NexusMySqlRoot "Data"
+$script:NexusMySqlRoot = Join-Path $script:NexusDataDir "mysql"
+$script:NexusMySqlDataDir = Join-Path $script:NexusMySqlRoot "data"
 $script:NexusMySqlConfig = Join-Path $script:NexusMySqlRoot "my.ini"
+# Caminho criado pelo instalador antigo (MySQL instalado pelo MSI). Só é usado
+# para migrar os dados; o Nexus nunca volta a gravar nele.
+$script:NexusMySqlLegacyRoot = "C:\ProgramData\MySQL\MySQL Server 8.4"
+$script:NexusMySqlLegacyDataDir = Join-Path $script:NexusMySqlLegacyRoot "Data"
 
 $script:NexusTranscriptPath = $null
 $script:NexusTranscriptActive = $false
@@ -73,6 +80,7 @@ function Invoke-Download {
         [Parameter(Mandatory = $true)][string]$Url,
         [Parameter(Mandatory = $true)][string]$Destination,
         [string]$Sha256 = "",
+        [string]$Sha512 = "",
         [string]$Md5 = "",
         [string]$Label = "arquivo",
         [int]$Attempts = 3
@@ -128,6 +136,16 @@ function Invoke-Download {
         Write-Ok "Hash de $Label verificado."
     }
 
+    if ($Sha512) {
+        $expected = $Sha512.Trim().ToLowerInvariant()
+        $actual = (Get-FileHash -LiteralPath $Destination -Algorithm SHA512).Hash.ToLowerInvariant()
+        if ($actual -ne $expected) {
+            Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+            Fail "Hash SHA-512 de $Label não confere. Esperado: $expected; obtido: $actual."
+        }
+        Write-Ok "Hash SHA-512 de $Label verificado."
+    }
+
     if ($Md5) {
         $expected = $Md5.Trim().ToLowerInvariant()
         $actual = (Get-FileHash -LiteralPath $Destination -Algorithm MD5).Hash.ToLowerInvariant()
@@ -137,26 +155,6 @@ function Invoke-Download {
         }
         Write-Ok "MD5 de $Label verificado."
     }
-}
-
-function Install-Msi {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [string]$Label = "MSI"
-    )
-    if (-not (Test-Path -LiteralPath $Path)) {
-        Fail "Arquivo $Label não encontrado: $Path"
-    }
-    $msiexec = Join-Path $env:SystemRoot "System32\msiexec.exe"
-    $arguments = @("/i", ('"{0}"' -f $Path), "/qn", "/norestart")
-    $process = Start-Process -FilePath $msiexec -ArgumentList $arguments -Wait -PassThru
-    if ($process.ExitCode -notin @(0, 3010, 1638)) {
-        Fail "Instalação de $Label falhou (msiexec código $($process.ExitCode))."
-    }
-    if ($process.ExitCode -eq 3010) {
-        Write-Warn "$Label instalado; o Windows pedirá reinicialização."
-    }
-    Write-Ok "$Label instalado."
 }
 
 function Install-Exe {
@@ -529,25 +527,6 @@ function Get-CnfValue {
     return $null
 }
 
-function Get-CurrentTag {
-    param([string]$RepoPath = $script:NexusAppDir)
-    if (-not (Test-Path -LiteralPath (Join-Path $RepoPath ".git"))) {
-        return ""
-    }
-    $git = Get-Command git.exe -ErrorAction SilentlyContinue
-    if (-not $git) {
-        return ""
-    }
-    $tag = & $git.Source -C $RepoPath describe --tags --exact-match 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $tag) {
-        $tag = & $git.Source -C $RepoPath describe --tags --abbrev=0 2>$null
-    }
-    if ($LASTEXITCODE -eq 0 -and $tag) {
-        return ([string]($tag | Select-Object -First 1)).Trim()
-    }
-    return ""
-}
-
 function Get-Manifest {
     param([string]$Path = (Join-Path $script:NexusScriptRoot "manifesto.json"))
     if (-not (Test-Path -LiteralPath $Path)) {
@@ -584,10 +563,6 @@ function Test-TcpPort {
     }
 }
 
-function Test-Internet {
-    return (Test-TcpPort -ComputerName "nodejs.org" -Port 443 -TimeoutMs 5000)
-}
-
 function Get-FreeSpaceGB {
     param([string]$Drive = "C")
     $item = Get-PSDrive -Name $Drive -ErrorAction SilentlyContinue
@@ -596,13 +571,9 @@ function Get-FreeSpaceGB {
 }
 
 function Update-SessionPath {
-    $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $parts = @($machinePath, $userPath) | Where-Object { $_ }
-    $env:Path = ($parts -join ";")
-
-    # Garante os caminhos padrão mesmo quando o instalador não atualizou o PATH.
-    foreach ($known in @("C:\Program Files\nodejs", "C:\Program Files\Git\cmd")) {
+    # O destino não instala Node/Git no sistema: apenas os runtimes embutidos
+    # em C:\Program Files\Nexus entram no PATH desta sessão.
+    foreach ($known in @($script:NexusNodeDir, (Join-Path $script:NexusMySqlDir "bin"))) {
         if ((Test-Path -LiteralPath $known) -and ($env:Path -notlike ("*" + $known + "*"))) {
             $env:Path = $known + ";" + $env:Path
         }
@@ -781,44 +752,6 @@ function ConvertTo-SafeName {
     param([string]$Value)
     if (-not $Value) { return "desconhecida" }
     return ($Value -replace '[^A-Za-z0-9._-]', '_')
-}
-
-function Resolve-LatestGitForWindows {
-    Enable-Tls12
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/git-for-windows/git/releases/latest" `
-            -Headers @{ "User-Agent" = "NexusDeploy" } -UseBasicParsing -TimeoutSec 60
-    }
-    catch {
-        Fail "Não foi possível consultar a última versão do Git for Windows. Defina git.url no manifesto."
-    }
-    $asset = $release.assets | Where-Object { $_.name -match '^Git-.*-64-bit\.exe$' } | Select-Object -First 1
-    if (-not $asset) {
-        Fail "O release do Git for Windows não contém o instalador 64-bit esperado."
-    }
-    return [pscustomobject]@{
-        Version = [string]$release.tag_name
-        Url     = [string]$asset.browser_download_url
-    }
-}
-
-function Resolve-LatestCaddy {
-    Enable-Tls12
-    try {
-        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/caddyserver/caddy/releases/latest" `
-            -Headers @{ "User-Agent" = "NexusDeploy" } -UseBasicParsing -TimeoutSec 60
-    }
-    catch {
-        Fail "Não foi possível consultar a última versão do Caddy. Defina caddy.url no manifesto."
-    }
-    $asset = $release.assets | Where-Object { $_.name -match '^caddy_.*_windows_amd64\.zip$' } | Select-Object -First 1
-    if (-not $asset) {
-        Fail "O release do Caddy não contém o pacote windows_amd64 esperado."
-    }
-    return [pscustomobject]@{
-        Version = [string]$release.tag_name
-        Url     = [string]$asset.browser_download_url
-    }
 }
 
 function Start-NexusTranscript {

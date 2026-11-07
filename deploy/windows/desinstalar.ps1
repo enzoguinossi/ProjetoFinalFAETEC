@@ -5,18 +5,14 @@
 
 .DESCRIPTION
     Para e remove os serviços NexusApp, NexusCaddy e NexusMySQL84, remove as
-    tarefas NexusTray e NexusBackup, encerra a bandeja e apaga
-    C:\Program Files\Nexus\app, C:\Program Files\Nexus\NexusTray,
-    C:\Program Files\Nexus\mysql, C:\Program Files\Nexus\caddy,
-    C:\Program Files\Nexus\tools, C:\Program Files\Nexus\scripts,
-    C:\ProgramData\Nexus\caddy e, se existir, C:\ProgramData\Caddy.
-    Também remove as versões antigas app.prev-*, app.failed-* e
-    app.prev-manual-* em C:\Program Files\Nexus e as regras de firewall do Nexus.
+    tarefas NexusTray e NexusBackup, encerra a bandeja e apaga o runtime
+    embutido: C:\Program Files\Nexus\app, node, mysql, caddy, tools, scripts,
+    payload, sql, NexusTray e as versões antigas app.prev-*/app.failed-*.
+    Também remove as regras de firewall do Nexus.
 
-    C:\ProgramData\Nexus e C:\ProgramData\MySQL\MySQL Server 8.4 são
-    PRESERVADOS (banco, uploads, configuração, backups e logs), exceto o
-    subdiretório caddy de C:\ProgramData\Nexus. Node.js e Git não são
-    desinstalados.
+    C:\ProgramData\Nexus é PRESERVADO (mysql\data, uploads, configuração,
+    backups e logs). O MySQL antigo em C:\ProgramData\MySQL não é removido:
+    os dados precisam de confirmação explícita do operador.
 #>
 [CmdletBinding()]
 param()
@@ -26,10 +22,10 @@ $ErrorActionPreference = "Stop"
 $ProgramRoot = "C:\Program Files\Nexus"
 $DataRoot = "C:\ProgramData\Nexus"
 $LogsDir = Join-Path $DataRoot "logs"
-$NexusCaddyData = Join-Path $DataRoot "caddy"
 $CaddyData = "C:\ProgramData\Caddy"
 $MySqlService = "NexusMySQL84"
 $MySqlDir = Join-Path $ProgramRoot "mysql"
+$LegacyMySqlRoot = "C:\ProgramData\MySQL\MySQL Server 8.4"
 $FirewallRuleNames = @("Nexus HTTP", "Nexus HTTPS", "Nexus MySQL (LAN)", "Nexus Next (LAN)")
 $NssmExe = Join-Path $ProgramRoot "tools\nssm\nssm.exe"
 $ScExe = Join-Path $env:SystemRoot "System32\sc.exe"
@@ -283,7 +279,7 @@ try {
 
     if ($script:Failures -gt 0) {
         Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray, versões antigas e binários do MySQL serão preservados."
-        Write-Log "C:\ProgramData\Nexus e C:\ProgramData\MySQL\MySQL Server 8.4 preservados."
+        Write-Log "C:\ProgramData\Nexus preservado."
         exit 1
     }
 
@@ -295,16 +291,20 @@ try {
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "caddy") -Label "Caddy"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "tools") -Label "Ferramentas (NSSM)"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "scripts") -Label "Scripts de operação"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "payload") -Label "Payload do instalador"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "sql") -Label "SQL do instalador"
     Remove-NexusDirectory -Path $MySqlDir -Label "Binários do MySQL dedicado"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "node") -Label "Node.js portátil"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "app") -Label "Aplicação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusTray") -Label "Bandeja"
-    Remove-NexusDirectory -Path $NexusCaddyData -Label "Dados do Caddy (Nexus)"
     Remove-NexusDirectory -Path $CaddyData -Label "Dados legados do Caddy"
     Remove-NexusFirewallRules
 
-    Write-Log "C:\ProgramData\Nexus preservado (exceto caddy): banco, uploads, configuração, backups e logs."
-    Write-Log "C:\ProgramData\MySQL\MySQL Server 8.4 preservado (dados do MySQL dedicado)."
-    Write-Log "Node.js e Git não foram desinstalados."
+    Write-Log "C:\ProgramData\Nexus preservado: mysql\data, uploads, configuração, backups e logs."
+    if (Test-Path -LiteralPath $LegacyMySqlRoot) {
+        Write-Log "C:\ProgramData\MySQL\MySQL Server 8.4 preservado (dados do MySQL antigo; remova manualmente se não precisar)."
+    }
+    Write-Log "Node.js, MySQL e Git do sistema não foram desinstalados (o Nexus usava runtimes embutidos)."
 
     if ($script:Failures -gt 0) {
         Write-Log "Desinstalação concluída com $($script:Failures) falha(s)."

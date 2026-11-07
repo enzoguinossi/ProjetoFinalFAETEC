@@ -10,24 +10,18 @@
     C:\ProgramData\Nexus\logs\instalador-<timestamp>.log e mostra MessageBox de
     sucesso ou de falha.
 
+    O pacote é autocontido: não há Git, npm, Prisma nem download no destino.
+
 .PARAMETER Hostname
     Nome DNS usado pelo Caddy (ex.: nexus.galpao.local).
 
 .PARAMETER TrayExe
     Caminho do NexusTray.exe extraído pelo instalador.
-
-.PARAMETER RepoUrl
-    URL do repositório. Padrão: manifesto.json.
-
-.PARAMETER Tag
-    Tag a instalar (o instalador passa a tag do build).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Hostname,
-    [string]$TrayExe = "",
-    [string]$RepoUrl = "",
-    [string]$Tag = ""
+    [string]$TrayExe = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,8 +84,6 @@ function Show-Message {
 function Invoke-Bootstrap {
     $argumentLine = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Hostname "{1}"' -f $Bootstrap, $Hostname
     if ($TrayExe) { $argumentLine += ' -TrayExe "{0}"' -f $TrayExe }
-    if ($RepoUrl) { $argumentLine += ' -RepoUrl "{0}"' -f $RepoUrl }
-    if ($Tag) { $argumentLine += ' -Tag "{0}"' -f $Tag }
 
     Write-Log "Executando bootstrap."
     $process = Start-Process -FilePath $PsExe -ArgumentList $argumentLine `
@@ -111,7 +103,6 @@ catch {
 
 Write-Log "Instalador do Nexus iniciado."
 Write-Log ("Hostname: {0}" -f $Hostname)
-if ($Tag) { Write-Log ("Tag: {0}" -f $Tag) }
 
 if (-not (Test-Path -LiteralPath $Bootstrap -PathType Leaf)) {
     $message = "bootstrap.ps1 não encontrado em '$Bootstrap'.`n`nReinstale o Nexus com o instalador oficial."

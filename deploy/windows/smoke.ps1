@@ -68,6 +68,34 @@ function Test-UsersAce {
 
 Write-Step "Smoke test do Nexus"
 
+$manifest = Get-Manifest
+
+$nodeExe = $script:NexusNodeExe
+if (Test-Path -LiteralPath $nodeExe -PathType Leaf) {
+    $nodeVersion = ([string](& $nodeExe "--version" 2>$null | Select-Object -First 1)).Trim()
+    $expectedNode = "v" + [string]$manifest.node.version
+    if ($nodeVersion -eq $expectedNode) {
+        Write-Ok "Node.js portátil: $nodeVersion em $nodeExe."
+    }
+    else {
+        Write-Warn "Node.js portátil: '$nodeVersion'; esperado '$expectedNode' ($nodeExe)."
+        Add-Failure "Node.js portátil em versão diferente da esperada"
+    }
+}
+else {
+    Write-Warn "Node.js portátil não encontrado em $nodeExe."
+    Add-Failure "Node.js portátil ausente"
+}
+
+$mysqldExe = Join-Path $script:NexusMySqlDir "bin\mysqld.exe"
+if (Test-Path -LiteralPath $mysqldExe -PathType Leaf) {
+    Write-Ok "MySQL embutido: $mysqldExe."
+}
+else {
+    Write-Warn "mysqld.exe não encontrado em $mysqldExe."
+    Add-Failure "binários do MySQL dedicado ausentes"
+}
+
 foreach ($serviceName in @($script:NexusMySqlService, "NexusApp", "NexusCaddy")) {
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($service -and $service.Status.ToString() -eq "Running") {

@@ -1,41 +1,38 @@
 {
+  "app": {
+    "zip": "out/standalone/app.zip"
+  },
   "node": {
     "version": "24.19.0",
-    "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-x64.msi",
-    "sha256": ""
+    "archive": "node-v24.19.0-win-x64.zip",
+    "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-win-x64.zip",
+    "sha256": "57f71ab3652e797d84acddc79c81cc9ff1c6ddb2a1974cdb83f00fee9bff4c73"
   },
   "mysql": {
     "version": "8.4.13",
     "channel": "lts",
+    "archive": "mysql-8.4.13-winx64.zip",
     "url": "https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.13-winx64.zip",
     "md5": "7b94489d5524dea9b27097068bea25a8",
     "sha256": ""
   },
   "nssm": {
     "version": "2.24",
+    "exe": "nssm.exe",
     "url": "https://nssm.cc/release/nssm-2.24.zip",
-    "mirrors": [
-      "https://raw.githubusercontent.com/enzoguinossi/ProjetoFinalFAETEC/v11.02.11.2026/deploy/windows/tools/nssm/nssm.exe"
-    ],
     "exe_sha256": "F689EE9AF94B00E9E3F0BB072B34CAAF207F32DCB4F5782FC9CA351DF9A06C97",
     "sha256": ""
   },
   "vcredist": {
     "version": "14.x",
+    "archive": "vc_redist.x64.exe",
     "url": "https://aka.ms/vs/17/release/vc_redist.x64.exe",
     "sha256": ""
   },
-  "git": {
-    "version": "latest",
-    "url": "",
-    "sha256": ""
-  },
   "caddy": {
-    "version": "latest",
-    "url": "",
-    "sha256": ""
-  },
-  "repo": {
-    "url": "https://github.com/enzoguinossi/ProjetoFinalFAETEC.git"
+    "version": "2.11.9",
+    "archive": "caddy_2.11.9_windows_amd64.zip",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.9/caddy_2.11.9_windows_amd64.zip",
+    "sha512": "98753d5d42650383d00619ac70917a217141f9e92314185bf6c1b8b439cfcfdf8393da0ebb4675c8cb3b23d29a19aabe99dc5aca64fa1bfc3a1ba22509b06871"
   }
 }
