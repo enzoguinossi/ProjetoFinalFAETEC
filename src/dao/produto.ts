@@ -7,10 +7,31 @@ import { buildPagination, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
 
+/** Filtros da listagem de produtos (não se aplicam aos seletores operacionais). */
+export type ProdutoListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
+  perecivel?: boolean;
+  composto?: boolean;
+  id_tipo_codigo?: number[];
+};
+
 export class ProdutoDAO {
-  async list(params: ListParams = {}, exceptoIds: number[] = []) {
+  /** `where` base dos filtros de listagem/busca (ativo é tri-state). */
+  private filtrosWhere(filtros: ProdutoListFiltros = {}): Prisma.ProdutoWhereInput {
+    const where: Prisma.ProdutoWhereInput = {};
+    if (filtros.ativo !== null) where.ativo = filtros.ativo ?? true;
+    if (filtros.perecivel !== undefined) where.perecivel = filtros.perecivel;
+    if (filtros.composto !== undefined) where.composto = filtros.composto;
+    if (filtros.id_tipo_codigo && filtros.id_tipo_codigo.length > 0) {
+      where.produtoCodigos = { some: { id_tipo_codigo: { in: filtros.id_tipo_codigo } } };
+    }
+    return where;
+  }
+
+  async list(params: ListParams & ProdutoListFiltros = {}, exceptoIds: number[] = []) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.ProdutoWhereInput = { ativo: true };
+    const where = this.filtrosWhere(params);
     if (params.search) where.descricao = { contains: params.search };
     if (exceptoIds.length > 0) where.id_produto = { notIn: exceptoIds };
     const [data, total] = await Promise.all([
@@ -26,39 +47,54 @@ export class ProdutoDAO {
   /**
    * Busca priorizada: código exato → prefixo → contém código → descrição.
    * Mantém a ordem de prioridade e remove duplicados entre os lotes.
+   * Os filtros da listagem entram em `AND` em todas as condições.
    */
   private async buscarPriorizado<T extends { id_produto: number }>(
     query: string,
     take: number,
     find: (where: Prisma.ProdutoWhereInput) => Promise<T[]>,
+    filtros: ProdutoListFiltros = {},
   ): Promise<T[]> {
+    const base = this.filtrosWhere(filtros);
     const condicoes: Prisma.ProdutoWhereInput[] = [
-      { ativo: true, produtoCodigos: { some: { codigo: { equals: query } } } },
+      { AND: [base, { produtoCodigos: { some: { codigo: { equals: query } } } }] },
       {
-        ativo: true,
-        produtoCodigos: { some: { codigo: { startsWith: query } } },
-        NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+        AND: [
+          base,
+          {
+            produtoCodigos: { some: { codigo: { startsWith: query } } },
+            NOT: { produtoCodigos: { some: { codigo: { equals: query } } } },
+          },
+        ],
       },
       {
-        ativo: true,
-        produtoCodigos: { some: { codigo: { contains: query } } },
-        NOT: {
-          OR: [
-            { produtoCodigos: { some: { codigo: { equals: query } } } },
-            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-          ],
-        },
+        AND: [
+          base,
+          {
+            produtoCodigos: { some: { codigo: { contains: query } } },
+            NOT: {
+              OR: [
+                { produtoCodigos: { some: { codigo: { equals: query } } } },
+                { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+              ],
+            },
+          },
+        ],
       },
       {
-        ativo: true,
-        descricao: { contains: query },
-        NOT: {
-          OR: [
-            { produtoCodigos: { some: { codigo: { equals: query } } } },
-            { produtoCodigos: { some: { codigo: { startsWith: query } } } },
-            { produtoCodigos: { some: { codigo: { contains: query } } } },
-          ],
-        },
+        AND: [
+          base,
+          {
+            descricao: { contains: query },
+            NOT: {
+              OR: [
+                { produtoCodigos: { some: { codigo: { equals: query } } } },
+                { produtoCodigos: { some: { codigo: { startsWith: query } } } },
+                { produtoCodigos: { some: { codigo: { contains: query } } } },
+              ],
+            },
+          },
+        ],
       },
     ];
 
@@ -79,30 +115,43 @@ export class ProdutoDAO {
     return resultados.slice(0, take);
   }
 
-  async searchPriorizado(query: string, take = 20) {
-    return this.buscarPriorizado(query, take, (where) =>
-      prisma.produto.findMany({
-        where,
-        select: { id_produto: true, descricao: true },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
+  async searchPriorizado(query: string, take = 20, filtros: ProdutoListFiltros = {}) {
+    return this.buscarPriorizado(
+      query,
+      take,
+      (where) =>
+        prisma.produto.findMany({
+          where,
+          select: { id_produto: true, descricao: true },
+          take,
+          orderBy: { descricao: "asc" },
+        }),
+      filtros,
     );
   }
 
-  async searchPriorizadoComSaldo(query: string, take = 50) {
-    return this.buscarPriorizado(query, take, (where) =>
-      prisma.produto.findMany({
-        where,
-        select: {
-          id_produto: true,
-          descricao: true,
-          saldo: true,
-          saldo_reservado: true,
-        },
-        take,
-        orderBy: { descricao: "asc" },
-      }),
+  async searchPriorizadoComSaldo(
+    query: string,
+    take = 50,
+    filtros: ProdutoListFiltros = {},
+  ) {
+    return this.buscarPriorizado(
+      query,
+      take,
+      (where) =>
+        prisma.produto.findMany({
+          where,
+          select: {
+            id_produto: true,
+            descricao: true,
+            saldo: true,
+            saldo_reservado: true,
+            ativo: true,
+          },
+          take,
+          orderBy: { descricao: "asc" },
+        }),
+      filtros,
     );
   }
 

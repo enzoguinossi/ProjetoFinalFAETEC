@@ -51,6 +51,48 @@ describe("produtoDAO", () => {
       expect(resultado.totalPages).toBe(1);
       expect(resultado.data.map((p) => p.id_produto)).toEqual([manter.id_produto]);
     });
+
+    it("filtra a situação: só inativos com ativo:false e ambos com ativo:null", async () => {
+      const ativo = await criarProduto({ descricao: "Ativo lista" });
+      const inativo = await criarProduto({ descricao: "Inativo lista", ativo: false });
+
+      const soInativos = await produtoDAO.list({ ativo: false });
+      expect(soInativos.data.map((p) => p.id_produto)).toEqual([inativo.id_produto]);
+      expect(soInativos.total).toBe(1);
+
+      const todos = await produtoDAO.list({ ativo: null });
+      expect(todos.total).toBe(2);
+      expect(todos.data.map((p) => p.id_produto)).toEqual([
+        ativo.id_produto,
+        inativo.id_produto,
+      ]);
+    });
+
+    it("filtra por perecível, composto e tipo de código", async () => {
+      const tipo = await criarTipoCodigo("DIGITACAO");
+      const perecivel = await criarProduto({ descricao: "Perecível", perecivel: true });
+      const composto = await criarProduto({ descricao: "Composto", composto: true });
+      const comTipo = await criarProduto({ descricao: "Com tipo" });
+      await prismaTeste.produtoCodigo.create({
+        data: {
+          id_produto: comTipo.id_produto,
+          id_tipo_codigo: tipo.id_tipo_codigo,
+          codigo: "TIPO-1",
+        },
+      });
+
+      const soPerecivel = await produtoDAO.list({ perecivel: true });
+      expect(soPerecivel.data.map((p) => p.id_produto)).toEqual([perecivel.id_produto]);
+
+      const soComposto = await produtoDAO.list({ composto: true });
+      expect(soComposto.data.map((p) => p.id_produto)).toEqual([composto.id_produto]);
+
+      const soTipo = await produtoDAO.list({ id_tipo_codigo: [tipo.id_tipo_codigo] });
+      expect(soTipo.data.map((p) => p.id_produto)).toEqual([comTipo.id_produto]);
+
+      const semFiltro = await produtoDAO.list({});
+      expect(semFiltro.total).toBe(3);
+    });
   });
 
   describe("searchPriorizado", () => {
@@ -148,6 +190,58 @@ describe("produtoDAO", () => {
       expect(linhas.get(comConversao.id_produto)).not.toHaveProperty("unidade");
       expect(linhas.get(semConversao.id_produto)).not.toHaveProperty("unidade");
       expect(resultado[0]).not.toHaveProperty("conversaoPadrao");
+    });
+
+    it("respeita os filtros da listagem na busca priorizada", async () => {
+      const tipo = await criarTipoCodigo("DIGITACAO");
+      const outroTipo = await criarTipoCodigo("EAN13");
+      const ativo = await criarProduto({ descricao: "Arroz ativo", perecivel: true });
+      const inativo = await criarProduto({
+        descricao: "Arroz inativo",
+        perecivel: true,
+        ativo: false,
+      });
+      const semPerecivel = await criarProduto({ descricao: "Arroz seco" });
+      await prismaTeste.produtoCodigo.createMany({
+        data: [
+          { id_produto: ativo.id_produto, id_tipo_codigo: tipo.id_tipo_codigo, codigo: "ABC1" },
+          {
+            id_produto: inativo.id_produto,
+            id_tipo_codigo: tipo.id_tipo_codigo,
+            codigo: "ABC2",
+          },
+          {
+            id_produto: semPerecivel.id_produto,
+            id_tipo_codigo: outroTipo.id_tipo_codigo,
+            codigo: "ABC3",
+          },
+        ],
+      });
+
+      const padrao = await produtoDAO.searchPriorizadoComSaldo("ABC");
+      expect(padrao.map((p) => p.id_produto)).toEqual([
+        ativo.id_produto,
+        semPerecivel.id_produto,
+      ]);
+      expect(padrao.every((p) => typeof p.ativo === "boolean")).toBe(true);
+
+      const soInativos = await produtoDAO.searchPriorizadoComSaldo("ABC", 50, { ativo: false });
+      expect(soInativos.map((p) => p.id_produto)).toEqual([inativo.id_produto]);
+
+      const pereciveis = await produtoDAO.searchPriorizadoComSaldo("ABC", 50, {
+        ativo: null,
+        perecivel: true,
+      });
+      expect(pereciveis.map((p) => p.id_produto)).toEqual([
+        ativo.id_produto,
+        inativo.id_produto,
+      ]);
+
+      const doTipo = await produtoDAO.searchPriorizadoComSaldo("ABC", 50, {
+        ativo: null,
+        id_tipo_codigo: [tipo.id_tipo_codigo],
+      });
+      expect(doTipo.map((p) => p.id_produto)).toEqual([ativo.id_produto, inativo.id_produto]);
     });
   });
 

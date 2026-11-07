@@ -8,6 +8,7 @@ export type ProdutoListRow = {
   descricao: string;
   qtd: string;
   livre: string;
+  ativo: boolean;
 };
 
 /** Colunas da listagem/seletor de produto (Código → Descrição → Quantidade → Qtd. Livre). */
@@ -23,6 +24,7 @@ type ProdutoComSaldo = {
   descricao: string;
   saldo: number;
   saldo_reservado: number;
+  ativo: boolean;
 };
 
 /**
@@ -39,5 +41,6 @@ export function produtoParaLinha(p: ProdutoComSaldo): ProdutoListRow {
     descricao: p.descricao,
     qtd: String(saldo),
     livre: String(saldo - reservado),
+    ativo: p.ativo,
   };
 }

@@ -12,7 +12,7 @@
     restrita (--defaults-extra-file). A senha nunca vai para -p, log ou
     argumento de linha de comando.
 
-    Ao final valida as contagens de referência: 81 permissões, 2 perfis e as
+    Ao final valida as contagens de referência: 82 permissões, 2 perfis e as
     3 conversões UNIDADE/PCT10/CX50 (PCT10 fator 10, CX50 fator 50).
 
 .PARAMETER MysqlExe
@@ -247,7 +247,7 @@ try {
     $conversions = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE nome IN ('UNIDADE','PCT10','CX50');" -Label "contagem de conversões"
     $renamed = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE (nome = 'PCT10' AND fator = 10) OR (nome = 'CX50' AND fator = 50);" -Label "conferência de PCT10/CX50"
 
-    $expected = @{ permissions = 81; profiles = 2; conversions = 3; renamed = 2 }
+    $expected = @{ permissions = 82; profiles = 2; conversions = 3; renamed = 2 }
     $actual = @{ permissions = $permissions; profiles = $profiles; conversions = $conversions; renamed = $renamed }
     foreach ($key in @("permissions", "profiles", "conversions", "renamed")) {
         if ([string]($actual[$key]) -ne [string]$expected[$key]) {
@@ -255,7 +255,7 @@ try {
                 "obtido '$($actual[$key])'.")
         }
     }
-    Write-Ok "Referência validada: 81 permissões, 2 perfis, 3 conversões (PCT10/CX50)."
+    Write-Ok "Referência validada: 82 permissões, 2 perfis, 3 conversões (PCT10/CX50)."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

@@ -302,7 +302,7 @@ o banco existente é reutilizado. O `bootstrap` chama o
 
 O SQL usa `mysql.exe` com `--defaults-extra-file` (senha nunca em `-p`). Ao final valida:
 
-- **81 permissões**;
+- **82 permissões**;
 - **2 perfis** (`Operador` e `Auxiliar`);
 - **3 conversões** `UNIDADE` (fator 1, padrão), `PCT10` (10) e `CX50` (50).
 
@@ -430,7 +430,7 @@ A mudança de 10.02 para 1.07 instala Node portátil, troca o MySQL para o `Data
 4. Valide com `smoke.ps1` e o primeiro acesso.
 
 O upgrade real 10.02→1.07 foi validado na máquina de teste: health 1.07, HTTPS 200, os três
-serviços `Running`, bandeja presente e contagens **81 permissões / 2 perfis / 3 conversões**.
+serviços `Running`, bandeja presente e contagens **82 permissões / 2 perfis / 3 conversões**.
 
 O bootstrap não sobrescreve `nssm.exe`/`caddy.exe` em uso quando o hash/versão já confere
 (caminho normal do upgrade); em divergência, para e reinicia os serviços antes da cópia. Se a
@@ -819,7 +819,7 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | MySQL `NexusMySQL84` não inicia / 3214 fechada | `my.ini`, `Data` ou serviço | confira `C:\ProgramData\Nexus\mysql\my.ini`, o erro em `...\mysql\data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214`; restaure `my.ini-*.bak` |
 | migração do Data não aconteceu | `C:\ProgramData\Nexus\mysql\data` já tinha conteúdo | o `instalar-mysql.ps1` só copia para destino vazio; faça backup e esvazie/renomeie o destino se for migrar |
 | SQL falha em Fresh | banco já tem tabelas | use `-Mode Update` (migração 001 + seed) ou um banco vazio; confira `aplicar-sql.ps1` |
-| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 81 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
+| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 82 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
 | `NexusApp` não sobe | Node/`server.js`/`.env`/dependência MySQL | confira `C:\Program Files\Nexus\node\node.exe`, `app\server.js`, `app\.env` e `DATABASE_URL` na 3214; veja `app.err.log` |
 | health 503 (`db=false`) | `NexusMySQL84` parado, senha/banco ausente | `Get-Service NexusMySQL84`; teste com `C:\Program Files\Nexus\mysql\bin\mysql.exe --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3214 -D nexus_prod -e "SELECT 1"` |
 | HTTPS falha/CA não confiada | Caddy/CA/ACL/hostname | veja `C:\ProgramData\Nexus\caddy\logs\caddy.err.log`; confira `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` e o `hosts`/DNS |
@@ -1009,7 +1009,7 @@ Para remoção total, depois de copiar o que precisa:
       MySQL 8.4.13 dedicado, SQL, serviços, tray, firewall e `smoke.ps1`.
 - [ ] **Upgrade 10.02→1.07** na máquina de teste: dados migrados de
       `C:\ProgramData\MySQL\MySQL Server 8.4\Data` para `C:\ProgramData\Nexus\mysql\data`,
-      health 1.07, HTTPS 200, serviços Running, tray e **81/2/3**.
+      health 1.07, HTTPS 200, serviços Running, tray e **82/2/3**.
 - [ ] Verificar que o MySQL existente na 3306 (se houver) não foi parado/alterado.
 - [ ] Testar `atualizar.ps1 -Package` em uma instalação 1.07 (app+SQL) e o rollback.
 - [ ] Testar backup/restauração e desinstalação preservando `C:\ProgramData\Nexus`.

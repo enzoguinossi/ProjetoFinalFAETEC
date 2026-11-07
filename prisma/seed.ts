@@ -48,6 +48,7 @@ async function main() {
     ...entidadesCadastro.map((e) => `${e}.desativar`),
     ...entidadesCadastro.map((e) => `${e}.excluir`),
     "perfil.excluir",
+    "produto.ver_inativos",
     "unidade_conversao.listar", "unidade_conversao.criar", "unidade_conversao.alterar",
     "unidade_conversao.consultar", "unidade_conversao.excluir",
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",

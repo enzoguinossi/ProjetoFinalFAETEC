@@ -67,6 +67,7 @@ function listaPermissoes() {
     ...entidadesCadastro.map((e) => `${e}.desativar`),
     ...entidadesCadastro.map((e) => `${e}.excluir`),
     "perfil.excluir",
+    "produto.ver_inativos",
     "unidade_conversao.listar",
     "unidade_conversao.criar",
     "unidade_conversao.alterar",
@@ -408,7 +409,7 @@ function validar() {
     console.log(`  seed.sql reaplicado: ${JSON.stringify(segunda)}`);
 
     const erros = [];
-    if (primeira.permissoes !== "81") erros.push(`permissões: ${primeira.permissoes} (esperado 81)`);
+    if (primeira.permissoes !== "82") erros.push(`permissões: ${primeira.permissoes} (esperado 82)`);
     if (primeira.perfis !== "2") erros.push(`perfis: ${primeira.perfis} (esperado 2)`);
     if (primeira.conversoes !== "UNIDADE:1:1,PCT10:10:0,CX50:50:0") {
       erros.push(`conversões: ${primeira.conversoes}`);
@@ -419,7 +420,7 @@ function validar() {
     }
     if (erros.length > 0) throw new Error(`Validação falhou:\n  - ${erros.join("\n  - ")}`);
 
-    console.log("  OK: 81 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), seed idempotente");
+    console.log("  OK: 82 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), seed idempotente");
   } finally {
     if (keep) {
       console.log(`  banco mantido: ${checkDb}`);

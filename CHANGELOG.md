@@ -21,6 +21,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 - **Liga/desliga pela bandeja (KAN-170):** `iniciar-nexus.ps1`, `encerrar-nexus.ps1`,
   `abrir-bandeja.vbs` e `nexus-state.json`; atalho **Bandeja do Nexus** na Área de Trabalho
   (tarefa `NexusTray`, sem UAC) ao lado do atalho **Nexus** do site. Sem watchdog.
+- **Filtros de produtos e permissão de inativos (KAN-170):** nova permissão
+  `produto.ver_inativos` (seed Prisma e SQL de produção, agora 82 permissões) permite
+  visualizar produtos inativos em `/produtos`, com filtro **Situação** e coluna própria. A
+  listagem ganhou filtros em chips de **Perecível**, **Composto** e **Tipo de código**. Sem a
+  permissão, a tela continua só com ativos, e os seletores operacionais não mudam.
 
 ### Changed
 - **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup

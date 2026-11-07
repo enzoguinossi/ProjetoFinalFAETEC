@@ -7,7 +7,10 @@ const DEBOUNCE_MS = 300;
 const MIN_BUSCA = 2;
 
 /** Filtros de domínio adicionais enviados junto da paginação/busca. */
-export type FiltrosLista = Record<string, string | string[] | undefined>;
+export type FiltrosLista = Record<
+  string,
+  string | string[] | number | number[] | boolean | null | undefined
+>;
 
 export function useListaPaginada<T>(
   buscar: (params: ListParams & FiltrosLista) => Promise<PaginatedResult<T>>,
@@ -52,8 +55,8 @@ export function useListaPaginada<T>(
   const paramsAtuais = useCallback(
     (page: number, limit: number): ListParams & FiltrosLista => {
       const search = termoAtual.current.length >= MIN_BUSCA ? termoAtual.current : undefined;
-      // O índice de `FiltrosLista` só admite `string | string[] | undefined`;
-      // `page`/`limit` são numéricos, então o tipo de interseção é afirmado aqui.
+      // `page`/`limit` são numéricos e o índice de `FiltrosLista` também admite
+      // números; a asserção mantém o tipo de interseção esperado pelos chamadores.
       return { page, limit, search, ...filtrosAtuais.current } as ListParams & FiltrosLista;
     },
     [],

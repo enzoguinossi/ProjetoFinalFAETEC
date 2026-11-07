@@ -39,15 +39,41 @@ export type ProdutoFormData = {
   insumos: { id: number; descricao: string; qtd: number }[];
 };
 
+export type ProdutoListaFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
+  perecivel?: boolean;
+  composto?: boolean;
+  id_tipo_codigo?: number[];
+};
+
 export async function listarProdutos(
-  params: ListParams & { excludeIds?: number[] } = {},
+  params: ListParams &
+    ProdutoListaFiltros & { incluirInativos?: boolean; excludeIds?: number[] } = {},
 ): Promise<PaginatedResult<ProdutoListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "produto.listar"))) return resultadoVazio(params);
 
+  // A permissão é conferida no servidor: sem ela, o payload não consegue
+  // forçar produtos inativos — o filtro de situação cai sempre em "só ativos".
+  const podeVerInativos = await usuarioPode(user, "produto.ver_inativos");
+  const incluir = podeVerInativos && params.incluirInativos === true;
+  const ativoRecebido =
+    typeof params.ativo === "boolean" || params.ativo === null ? params.ativo : undefined;
+  const ativo = incluir ? ativoRecebido : true;
+
+  const filtros = {
+    ativo,
+    perecivel: typeof params.perecivel === "boolean" ? params.perecivel : undefined,
+    composto: typeof params.composto === "boolean" ? params.composto : undefined,
+    id_tipo_codigo: Array.isArray(params.id_tipo_codigo)
+      ? params.id_tipo_codigo.filter((id) => Number.isInteger(id))
+      : undefined,
+  };
+
   if (params.search) {
     const excluidos = new Set(params.excludeIds ?? []);
-    const data = (await produtoDAO.searchPriorizadoComSaldo(params.search))
+    const data = (await produtoDAO.searchPriorizadoComSaldo(params.search, 50, filtros))
       .map(produtoParaLinha)
       .filter((linha) => !excluidos.has(linha.id_produto));
     return {
@@ -59,7 +85,10 @@ export async function listarProdutos(
     };
   }
 
-  const resultado = await produtoDAO.list(params, params.excludeIds ?? []);
+  const resultado = await produtoDAO.list(
+    { ...params, ...filtros },
+    params.excludeIds ?? [],
+  );
   return { ...resultado, data: resultado.data.map(produtoParaLinha) };
 }
 

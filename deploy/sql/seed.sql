@@ -58,6 +58,7 @@ INSERT INTO `permissao` (`nome`, `ativo`) VALUES
   ('veiculo.excluir', TRUE),
   ('produto.excluir', TRUE),
   ('perfil.excluir', TRUE),
+  ('produto.ver_inativos', TRUE),
   ('unidade_conversao.listar', TRUE),
   ('unidade_conversao.criar', TRUE),
   ('unidade_conversao.alterar', TRUE),
