@@ -64,10 +64,10 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    pré-checagem de `bootstrap.ps1`/`common.ps1`/`manifesto.json`.
 5. **Manual:** `bootstrap.ps1` sem `-NoPrompt`/`-CredentialsFile` continua pedindo as senhas
    no console; `-ProgressFile` é opcional.
-6. **Validação:** ISCC 7 compila o setup (412.973.350 bytes, SHA-256 `E703C1…`); as APIs de
+6. **Validação:** ISCC 7 compila o setup (412.972.782 bytes, SHA-256 `2DF475…`); as APIs de
    formulário/barra/timer foram exercitadas em um setup descartável; `icacls` com SIDs aplicou
-   a ACL; o teste `-NoPrompt` sem senhas falha com mensagem clara. O wizard real ainda não foi
-   executado interativamente.
+   a ACL; o teste `-NoPrompt` sem senhas falha com mensagem clara. O wizard real foi executado
+   no upgrade e encontrou um bug de NSSM em uso (corrigido; ver abaixo).
 
 ## Produção Windows — legado (até 11.02)
 
@@ -177,8 +177,8 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 
 ## Verificação — wizard (pós-1.07, `[Unreleased]`)
 
-- `ISCC` 7.1.0 → exit 0; `NexusSetup-1.07.11.2026.exe`, **412.973.350 bytes**, SHA-256
-  `E703C100FE019DFB315362EF52677B17FE56E873B9CB0DE060AE68B1487B2477`.
+- `ISCC` 7.1.0 → exit 0; `NexusSetup-1.07.11.2026.exe`, **412.972.782 bytes**, SHA-256
+  `2DF4756AA947689B3150430FBBA6CE4D13AAA06B47F83F19A855FCE1F2E2149F`.
 - Parser PowerShell 5.1 → OK nos **12** `.ps1` de `deploy/windows` (o `instalar-gui.ps1` foi
   removido).
 - Setup descartável em `%TEMP%` validou em runtime `CreateCustomForm`, `TNewProgressBar`,
@@ -187,8 +187,15 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
   Administrators/SYSTEM.
 - Teste do executor com `bootstrap.ps1 -NoPrompt`: sem senhas → exit 1 com mensagem clara;
   com root+app → leitura do arquivo de credenciais OK.
-- **Pendente:** execução interativa do wizard (página de senhas, barra/fase, upgrade com
-  campos vazios, falha e Alt+F4 bloqueado) nesta máquina ou em VM limpa.
+- **Upgrade real (13:37):** o wizard abriu, pediu as senhas e iniciou o bootstrap; a fase 1
+  falhou ao sobrescrever `nssm.exe` em uso pelos serviços (`bootstrap-20261107-133741.log`).
+  `NexusMySQL84`/`NexusApp`/`NexusCaddy` continuaram Running e o health 1.07 `db=true`.
+  Corrigido em `87928ec`: hash do NSSM igual ao payload → não copia; divergente → para e
+  reinicia App/Caddy; Caddy ganhou a mesma checagem de versão.
+- O `bootstrap.ps1 -Resume` para concluir a validação **não rodou**: o UAC foi cancelado.
+- **Pendente:** fechar o wizard antigo (processos `NexusSetup-...-wizard` ainda abertos),
+  rodar o setup corrigido (`out` ou `-wizard-fix.exe`) e concluir o upgrade; depois testar
+  instalação nova em VM limpa.
 
 ## Verificação — histórico até 11.02
 
@@ -240,10 +247,12 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 ## Pendências
 
 1. **Testar o wizard pós-1.07 em máquina limpa/colega:** usar o setup novo em
-   `deploy/windows/out/NexusSetup-1.07.11.2026.exe` (não o da Área de Trabalho, que é o build
-   anterior); validar a página de senhas, a janela de progresso, a extração do payload, a
-   migração do MySQL, o SQL, os serviços, o HTTPS e a bandeja. Testar também o upgrade com
-   os quatro campos vazios e com senhas preenchidas.
+   `deploy/windows/out/NexusSetup-1.07.11.2026.exe` ou
+   `C:\Users\Enzo\Desktop\NexusSetup-1.07.11.2026-wizard-fix.exe` (SHA `2DF4…`); o
+   `NexusSetup-...-wizard.exe` (SHA `E703…`) é o build anterior, com o bug do NSSM em uso.
+   Fechar o wizard antigo antes. Validar a página de senhas, a janela de progresso, a extração
+   do payload, a migração do MySQL, o SQL, os serviços, o HTTPS e a bandeja. Testar o upgrade
+   com os quatro campos vazios e com senhas preenchidas.
 2. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
 3. **Docs:** o runbook `docs/processo/PRODUCAO.md` foi atualizado para o wizard; revisar

@@ -22,6 +22,12 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   as credenciais do `backup.cnf`. O `bootstrap.ps1` ganhou `-CredentialsFile`,
   `-ProgressFile` e `-NoPrompt`; a instalação manual continua pedindo as senhas no console.
 
+### Fixed
+- **Upgrade com NSSM/Caddy em uso (KAN-170):** o bootstrap compara o hash do `nssm.exe` e a
+  versão do `caddy.exe` com o payload; se já estão corretos, não toca nos binários (evita o
+  erro “arquivo em uso” dos serviços). Se divergirem, para `NexusCaddy`/`NexusApp`, copia e
+  reinicia.
+
 ### Removed
 - **`instalar-gui.ps1` (KAN-170):** removido do repositório e do `[Files]`. O instalador não
   abre mais janela de console nem grava `instalador-*.log`; o log do Inno fica em

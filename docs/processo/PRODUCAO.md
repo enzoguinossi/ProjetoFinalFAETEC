@@ -234,7 +234,7 @@ O setup não baixa nada. O payload é copiado para `Instalador\payload` e o SQL 
 | Fase | O que faz |
 | --- | --- |
 | **0 — Pré-checagem offline** | confere Administrador, payload obrigatório, 64 bits, 5 GB livres, portas 3214/3000/80/443; cria entrada no `hosts` se o hostname não resolver; **não acessa a internet** |
-| **1 — Runtime embutido** | instala VC++ (se ausente), extrai Node 24.19.0 para `C:\Program Files\Nexus\node`, copia NSSM 2.24 e Caddy 2.11.9 do payload |
+| **1 — Runtime embutido** | instala VC++ (se ausente), extrai Node 24.19.0 para `C:\Program Files\Nexus\node`, reaproveita NSSM 2.24/Caddy 2.11.9 se já estão na versão do payload (senão para e reinicia `NexusCaddy`/`NexusApp` antes de copiar) |
 | **2 — MySQL dedicado** | usa as credenciais da página do wizard (ou o `backup.cnf` no upgrade) e chama `instalar-mysql.ps1`: extrai MySQL 8.4.13, migra o `Data` legado, grava `C:\ProgramData\Nexus\mysql\my.ini`, cria/reconfigura `NexusMySQL84` na 3214; depois o `pos-instalacao-mysql.ps1` cria `nexus_prod`/`nexus_app` e o bootstrap grava o `backup.cnf` |
 | **3 — Diretórios e ACLs** | cria `ProgramData\Nexus\{mysql,uploads,logs,backups,config,caddy}`, aplica ACLs restritas, gera o `Caddyfile` e cria as quatro regras de firewall |
 | **4 — Banco e aplicação** | para o Caddy e o App; extrai `app.zip` em `C:\Program Files\Nexus\app` (preserva `.env`), grava/atualiza o `.env`, aplica o SQL de produção (`aplicar-sql.ps1`, modo Auto) e ajusta o cache |
@@ -419,6 +419,10 @@ A mudança de 10.02 para 1.07 instala Node portátil, troca o MySQL para o `Data
 
 O upgrade real 10.02→1.07 foi validado na máquina de teste: health 1.07, HTTPS 200, os três
 serviços `Running`, bandeja presente e contagens **81 permissões / 2 perfis / 3 conversões**.
+
+O bootstrap não sobrescreve `nssm.exe`/`caddy.exe` em uso quando o hash/versão já confere
+(caminho normal do upgrade); em divergência, para e reinicia os serviços antes da cópia. Se a
+fase 1 falhar, os serviços são reiniciados e o wizard mostra o código e os logs.
 
 ### 7.2 Atualização de aplicação/SQL por pacote
 
