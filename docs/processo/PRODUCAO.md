@@ -182,8 +182,9 @@ as regras precisam ser revistas.
   `127.0.0.1 <hostname>` no `hosts` do servidor quando o nome não resolve; as estações
   precisam de DNS/hosts próprio.
 - **Sem internet no destino**: o setup carrega Node, MySQL, Caddy, VC++, NSSM, app e SQL.
-- Senhas do **root do MySQL dedicado** e do **`nexus_app`** (12–64 caracteres; letras,
-  números, `.`, `_`, `-`; sem `@`, `:`, `/`, espaço ou aspas).
+- Senhas do **root do MySQL dedicado** (não vazia, sem quebra de linha) e do **`nexus_app`**
+  (até 256 caracteres; sem `@`, `/`, `?`, `#`, `"`, `\`, `;`, espaço/tab ou caracteres de
+  controle; não há mínimo nem exigência de composição).
 - Um MySQL existente na **3306** não precisa ser removido nem parado; o Nexus usa a 3214.
 
 > **Payload:** a instalação depende de `C:\Program Files\Nexus\Instalador\payload` (ou
@@ -787,8 +788,9 @@ O bootstrap remove a herança de `C:\ProgramData` e aplica ACLs explícitas:
   redigidos.
 - Transcripts são suspensos durante a leitura das senhas.
 - `JWT_SECRET` é gerado com 48 bytes aleatórios quando ausente e preservado nas atualizações.
-- Senhas: `nexus_app` 12–64 caracteres do conjunto seguro; root sem quebra de linha; nunca
-  use `-p<senha>` na linha de comando.
+- Senhas: o `nexus_app` aceita até 256 caracteres e recusa `@`, `/`, `?`, `#`, `"`, `\`,
+  `;`, espaço/tab e caracteres de controle (sem mínimo nem composição); o root só não pode
+  ser vazio nem ter quebra de linha; nunca use `-p<senha>` na linha de comando.
 
 O `smoke.ps1` verifica que `backups`, `config` e `app\.env` não tenham ACE para
 `BUILTIN\Users` (S-1-5-32-545); rode-o elevado.
