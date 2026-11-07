@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { saldoDAO } from "@/dao/estoque";
 import { notaEntradaDAO } from "@/dao/nota-entrada";
 import { notaEntradaService } from "@/services/nota-entrada";
-import { criarConversao, criarEstoque, criarNotaEntrada, criarProduto, criarUsuario } from "../helpers/factories";
+import { criarConversao, criarEstoque, criarFornecedor, criarNotaEntrada, criarProduto, criarUsuario } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
 import { prismaTeste } from "../helpers/prisma";
 
@@ -630,5 +630,93 @@ describe("notaEntradaDAO.list", () => {
     expect(pagina.data).toHaveLength(1);
     expect(pagina.data[0]?.itens).toHaveLength(1);
     expect(pagina.data[0]?.chave_acesso).toHaveLength(44);
+  });
+
+  it("filtra pelo período do recebimento e, sem recebimento, pela criação (dia local)", async () => {
+    const criarNota = (dados: {
+      data_recebimento?: Date | null;
+      data_criacao?: Date;
+    }) =>
+      prismaTeste.notaEntrada.create({
+        data: {
+          tipo: "ENTRADA",
+          data_recebimento: dados.data_recebimento ?? null,
+          data_criacao: dados.data_criacao ?? new Date(),
+        },
+      });
+
+    await criarNota({ data_recebimento: new Date("2026-10-19T00:00:00.000Z") });
+    await criarNota({ data_recebimento: new Date("2026-10-20T00:00:00.000Z") });
+    // Nota sem recebimento: usa `data_criacao`, às 23:30 do dia local (já é
+    // 02:30 UTC do dia seguinte — a implementação não pode perder o dia).
+    await criarNota({
+      data_criacao: new Date("2026-10-19T23:30:00.000-03:00"),
+    });
+    await criarNota({
+      data_criacao: new Date("2026-10-20T00:10:00.000-03:00"),
+    });
+
+    const dia19 = await notaEntradaDAO.list({ de: "2026-10-19", ate: "2026-10-19" });
+    expect(dia19.total).toBe(2);
+    const recebimentos19 = dia19.data
+      .map((nota) => nota.data_recebimento?.toISOString().slice(0, 10) ?? "sem")
+      .sort();
+    expect(recebimentos19).toEqual(["2026-10-19", "sem"]);
+
+    const dia20 = await notaEntradaDAO.list({ de: "2026-10-20", ate: "2026-10-20" });
+    expect(dia20.total).toBe(2);
+    const recebimentos20 = dia20.data
+      .map((nota) => nota.data_recebimento?.toISOString().slice(0, 10) ?? "sem")
+      .sort();
+    expect(recebimentos20).toEqual(["2026-10-20", "sem"]);
+
+    // Sem filtro, o resultado é o mesmo de antes (todas as ENTRADA ativas).
+    const semFiltro = await notaEntradaDAO.list();
+    expect(semFiltro.total).toBe(4);
+  });
+
+  it("filtra por fornecedor e combina a busca (razão social ou chave) sem sobrescrever", async () => {
+    const alfa = await criarFornecedor({ razaoSocial: "Fornecedor Alfa" });
+    const beta = await criarFornecedor({ razaoSocial: "Fornecedor Beta" });
+    const chaveAlfa = `3${"4".repeat(43)}`;
+
+    const criarNota = (idFornecedor: number, chave?: string) =>
+      prismaTeste.notaEntrada.create({
+        data: {
+          tipo: "ENTRADA",
+          data_criacao: new Date(),
+          id_fornecedor: idFornecedor,
+          chave_acesso: chave ?? null,
+        },
+      });
+
+    await criarNota(alfa.fornecedor.id_fornecedor, chaveAlfa);
+    await criarNota(beta.fornecedor.id_fornecedor);
+
+    const porFornecedor = await notaEntradaDAO.list({
+      id_fornecedor: [alfa.fornecedor.id_fornecedor],
+    });
+    expect(porFornecedor.total).toBe(1);
+    expect(porFornecedor.data[0]?.id_fornecedor).toBe(alfa.fornecedor.id_fornecedor);
+
+    const doisFornecedores = await notaEntradaDAO.list({
+      id_fornecedor: [alfa.fornecedor.id_fornecedor, beta.fornecedor.id_fornecedor],
+    });
+    expect(doisFornecedores.total).toBe(2);
+
+    const porRazaoSocial = await notaEntradaDAO.list({ search: "Beta" });
+    expect(porRazaoSocial.total).toBe(1);
+    expect(porRazaoSocial.data[0]?.id_fornecedor).toBe(beta.fornecedor.id_fornecedor);
+
+    const porChave = await notaEntradaDAO.list({ search: chaveAlfa });
+    expect(porChave.total).toBe(1);
+    expect(porChave.data[0]?.chave_acesso).toBe(chaveAlfa);
+
+    // Busca + filtro de domínio: os dois valem ao mesmo tempo.
+    const combinado = await notaEntradaDAO.list({
+      id_fornecedor: [alfa.fornecedor.id_fornecedor],
+      search: "Beta",
+    });
+    expect(combinado.total).toBe(0);
   });
 });

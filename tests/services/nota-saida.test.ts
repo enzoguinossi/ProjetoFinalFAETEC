@@ -989,6 +989,72 @@ describe("notaSaidaDAO.list", () => {
     expect(pagina.data[0]?.destinatario?.pessoaJuridica.razao_social).toBe("Escola Municipal");
     expect(pagina.data[0]?.itens).toHaveLength(1);
   });
+
+  it("filtra por período (dia local), tipo, status, destinatário e urgente com busca combinada", async () => {
+    const { destinatario: alfa } = await criarDestinatario({ razaoSocial: "Escola Alfa" });
+    const { destinatario: beta } = await criarDestinatario({ razaoSocial: "Escola Beta" });
+
+    // 23:30 no dia 19 local (02:30 UTC do dia 20): o filtro não pode perder.
+    await criarNotaSaida({
+      idDestinatario: alfa.id_destinatario,
+      dataCriacao: new Date("2026-10-19T23:30:00.000-03:00"),
+    });
+    await criarNotaSaida({
+      idDestinatario: beta.id_destinatario,
+      urgente: true,
+      status: "EM_PERCURSO",
+      dataCriacao: new Date("2026-10-20T10:00:00.000-03:00"),
+    });
+    await criarNotaSaida({
+      tipo: "AVARIA",
+      status: "BAIXA_TOTAL",
+      dataCriacao: new Date("2026-10-20T11:00:00.000-03:00"),
+    });
+    // Inativa: nunca aparece, mesmo casando os filtros.
+    await criarNotaSaida({
+      idDestinatario: alfa.id_destinatario,
+      status: "CANCELADA",
+      ativo: false,
+      dataCriacao: new Date("2026-10-19T12:00:00.000-03:00"),
+    });
+
+    const dia19 = await notaSaidaDAO.list({ de: "2026-10-19", ate: "2026-10-19" });
+    expect(dia19.total).toBe(1);
+
+    const dia20 = await notaSaidaDAO.list({ de: "2026-10-20", ate: "2026-10-20" });
+    expect(dia20.total).toBe(2);
+    // A remessa aberta no dia 19 continua no dia 19, mesmo em UTC já sendo 20.
+    expect(dia20.data.some((nota) => nota.tipo === "SAIDA" && nota.status === "ABERTA")).toBe(false);
+
+    const porTipo = await notaSaidaDAO.list({ tipos: ["AVARIA"] });
+    expect(porTipo.total).toBe(1);
+    expect(porTipo.data[0]?.tipo).toBe("AVARIA");
+
+    const porStatus = await notaSaidaDAO.list({ status: ["EM_PERCURSO", "BAIXA_TOTAL"] });
+    expect(porStatus.total).toBe(2);
+
+    const porDestinatario = await notaSaidaDAO.list({
+      id_destinatario: [alfa.id_destinatario],
+    });
+    expect(porDestinatario.total).toBe(1);
+    expect(porDestinatario.data[0]?.id_destinatario).toBe(alfa.id_destinatario);
+
+    const urgentes = await notaSaidaDAO.list({ urgente: true });
+    expect(urgentes.total).toBe(1);
+    expect(urgentes.data[0]?.urgente).toBe(true);
+
+    const busca = await notaSaidaDAO.list({ search: "Beta" });
+    expect(busca.total).toBe(1);
+    expect(busca.data[0]?.id_destinatario).toBe(beta.id_destinatario);
+
+    // Busca e filtro de domínio valem juntos (AND), sem um sobrescrever o outro.
+    const combinado = await notaSaidaDAO.list({ search: "Beta", tipos: ["AVARIA"] });
+    expect(combinado.total).toBe(0);
+
+    // Sem filtro, o resultado é o mesmo de antes (todas as notas ativas).
+    const semFiltro = await notaSaidaDAO.list();
+    expect(semFiltro.total).toBe(3);
+  });
 });
 
 describe("saída sem remessa (avaria e consumo interno)", () => {

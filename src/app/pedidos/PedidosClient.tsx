@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DataTable, { type Column } from "@/components/DataTable";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
 import type { PaginatedResult } from "@/types";
@@ -46,6 +48,28 @@ interface Props {
 const CLASSE_CAMPO =
   "h-10 rounded-lg border border-border-input bg-white px-3 font-sans text-sm text-ink outline-none focus:border-brand";
 
+const STATUS_FILTRO: { valor: string; rotulo: string }[] = [
+  { valor: "PENDENTE", rotulo: "Pendente" },
+  { valor: "CONFIRMADO", rotulo: "Aprovado" },
+  { valor: "RECUSADO", rotulo: "Recusado" },
+];
+
+const NOTA_FILTRO: { valor: string; rotulo: string }[] = [
+  { valor: "com", rotulo: "Com nota" },
+  { valor: "sem", rotulo: "Sem nota" },
+];
+
+/** Números inteiros positivos, sem duplicatas; vazio vira `undefined`. */
+function idsNumericos(
+  valores: string[] | { de: string; ate: string } | undefined,
+): number[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
+
 const statusCls: Record<string, string> = {
   PENDENTE: "bg-[#fff4e5] text-[#7a4100]",
   CONFIRMADO: "bg-[#e7f6ec] text-[#0f5132]",
@@ -71,54 +95,97 @@ export default function PedidosClient({
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState(filtros.busca);
-  const [escola, setEscola] = useState(filtros.escola);
-  const [status, setStatus] = useState(filtros.status);
-  const [de, setDe] = useState(filtros.de);
-  const [ate, setAte] = useState(filtros.ate);
-  const [produto, setProduto] = useState(filtros.produto);
-  const [nota, setNota] = useState(filtros.nota);
   const [analisando, setAnalisando] = useState<number | null>(null);
   const [recusando, setRecusando] = useState<PedidoListRow | null>(null);
 
-  function parametros(page = 1, limit = resultado.limit): PedidoFiltrosPayload {
+  const valoresIniciais: Valores = {
+    periodo: { de: filtros.de, ate: filtros.ate },
+    escola: filtros.escola ? [filtros.escola] : [],
+    status: filtros.status ? [filtros.status] : [],
+    produto: filtros.produto ? [filtros.produto] : [],
+    nota: filtros.nota && filtros.nota !== "todos" ? [filtros.nota] : [],
+  };
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>(valoresIniciais);
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+  const filtrosAtuais = useRef<Valores>(valoresIniciais);
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    {
+      id: "escola",
+      rotulo: "Escola",
+      tipo: "multi",
+      opcoes: escolas.map((escola) => ({
+        valor: String(escola.id_destinatario),
+        rotulo: escola.razao_social,
+      })),
+    },
+    { id: "status", rotulo: "Status", tipo: "multi", opcoes: STATUS_FILTRO },
+    {
+      id: "produto",
+      rotulo: "Produto",
+      tipo: "multi",
+      opcoes: produtos.map((produto) => ({
+        valor: String(produto.id_produto),
+        rotulo: `${produto.codigo} - ${produto.descricao}`,
+      })),
+    },
+    { id: "nota", rotulo: "Nota", tipo: "multi", opcoes: NOTA_FILTRO },
+  ];
+
+  function parametros(
+    page = 1,
+    limit = resultado.limit,
+    valores = filtrosAtuais.current,
+    termo = busca,
+  ): PedidoFiltrosPayload {
+    const periodo = Array.isArray(valores.periodo) ? undefined : valores.periodo;
+    const status = Array.isArray(valores.status) ? valores.status : [];
+    const nota = Array.isArray(valores.nota) ? valores.nota : [];
+
     return {
       page,
       limit,
-      search: busca.trim() || undefined,
-      id_destinatario: escola ? Number(escola) : null,
-      status: status || null,
-      de: de || null,
-      ate: ate || null,
-      id_produto: produto ? Number(produto) : null,
-      com_nota: (nota as "todos" | "com" | "sem") || "todos",
+      search: termo.trim() || undefined,
+      id_destinatario: idsNumericos(valores.escola),
+      status: status.length > 0 ? status : null,
+      de: periodo?.de || null,
+      ate: periodo?.ate || null,
+      id_produto: idsNumericos(valores.produto),
+      com_nota:
+        nota.length === 1 && (nota[0] === "com" || nota[0] === "sem")
+          ? nota[0]
+          : "todos",
     };
   }
 
-  async function carregar(page = 1, limit = resultado.limit) {
+  async function carregar(
+    page = 1,
+    limit = resultado.limit,
+    valores = filtrosAtuais.current,
+    termo = busca,
+  ) {
     setCarregando(true);
     try {
-      setResultado(await listarPedidos(parametros(page, limit)));
+      setResultado(await listarPedidos(parametros(page, limit, valores, termo)));
     } finally {
       setCarregando(false);
     }
   }
 
+  function aplicarFiltrosTela(novos: Valores) {
+    filtrosAtuais.current = novos;
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    void carregar(1, resultado.limit, novos);
+  }
+
   function limparFiltros() {
     setBusca("");
-    setEscola("");
-    setStatus("");
-    setDe("");
-    setAte("");
-    setProduto("");
-    setNota("todos");
-    void (async () => {
-      setCarregando(true);
-      try {
-        setResultado(await listarPedidos({ page: 1, limit: resultado.limit }));
-      } finally {
-        setCarregando(false);
-      }
-    })();
+    filtrosAtuais.current = {};
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    void carregar(1, resultado.limit, {}, "");
   }
 
   async function aprovar(id: number) {
@@ -253,99 +320,18 @@ export default function PedidosClient({
             className={CLASSE_CAMPO}
           />
         </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          Escola
-          <select
-            value={escola}
-            onChange={(e) => setEscola(e.target.value)}
-            className={CLASSE_CAMPO}
-          >
-            <option value="">Todas</option>
-            {escolas.map((opcao) => (
-              <option key={opcao.id_destinatario} value={opcao.id_destinatario}>
-                {opcao.razao_social}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          Status
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className={CLASSE_CAMPO}
-          >
-            <option value="">Todos</option>
-            <option value="PENDENTE">Pendente</option>
-            <option value="CONFIRMADO">Aprovado</option>
-            <option value="RECUSADO">Recusado</option>
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          Produto
-          <select
-            value={produto}
-            onChange={(e) => setProduto(e.target.value)}
-            className={CLASSE_CAMPO}
-          >
-            <option value="">Todos</option>
-            {produtos.map((opcao) => (
-              <option key={opcao.id_produto} value={opcao.id_produto}>
-                {opcao.codigo} - {opcao.descricao}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          De
-          <input
-            type="date"
-            value={de}
-            onChange={(e) => setDe(e.target.value)}
-            className={CLASSE_CAMPO}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          Até
-          <input
-            type="date"
-            value={ate}
-            onChange={(e) => setAte(e.target.value)}
-            className={CLASSE_CAMPO}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 font-sans text-xs text-[#697077]">
-          Nota
-          <select
-            value={nota}
-            onChange={(e) => setNota(e.target.value)}
-            className={CLASSE_CAMPO}
-          >
-            <option value="todos">Com ou sem</option>
-            <option value="com">Com nota</option>
-            <option value="sem">Sem nota</option>
-          </select>
-        </label>
-
-        <div className="ml-auto flex items-center gap-2">
-          <Button label="Limpar" variant="ghost" onClick={limparFiltros} />
-          <Button
-            label="Filtrar"
-            variant="primary"
-            onClick={() => void carregar(1)}
-            disabled={carregando}
-          />
-          {podeCriar && (
-            <Button label="Novo pedido" href="/pedidos/novo" />
-          )}
-        </div>
       </div>
+
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltros}
+        acoes={
+          podeCriar ? <Button label="Novo pedido" href="/pedidos/novo" /> : undefined
+        }
+      />
 
       <DataTable
         columns={columns}

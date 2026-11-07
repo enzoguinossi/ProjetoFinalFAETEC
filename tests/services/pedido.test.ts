@@ -7,6 +7,8 @@ import {
   criarDestinatario,
   criarEstoque,
   criarInventarioComItem,
+  criarItemPedidoEscola,
+  criarPedidoEscola,
   criarProduto,
   criarUsuario,
 } from "../helpers/factories";
@@ -134,6 +136,17 @@ describe("pedidoService lista e filtros", () => {
     expect(porEscola.total).toBe(1);
     expect(porEscola.data[0]!.id_destinatario).toBe(outra.destinatario.id_destinatario);
 
+    // Chips de escola/status enviam listas: mais de um valor não filtra só o último.
+    const porDuasEscolas = await pedidoService.listar({
+      destinatarios: [destinatario.id_destinatario, outra.destinatario.id_destinatario],
+    });
+    expect(porDuasEscolas.total).toBe(2);
+
+    const porDoisStatus = await pedidoService.listar({
+      status: ["PENDENTE", "CONFIRMADO"],
+    });
+    expect(porDoisStatus.total).toBe(2);
+
     const pendentes = await pedidoService.listar({ status: ["PENDENTE"] });
     expect(pendentes.total).toBe(1);
 
@@ -160,6 +173,45 @@ describe("pedidoService lista e filtros", () => {
       ate: "2000-01-02",
     });
     expect(foraDoPeriodo.total).toBe(0);
+  });
+
+  it("aceita listas nos filtros dos chips (escola, status e produto)", async () => {
+    const { destinatario: alfa } = await criarDestinatario({ razaoSocial: "Escola Alfa" });
+    const { destinatario: beta } = await criarDestinatario({ razaoSocial: "Escola Beta" });
+    const produtoX = await criarProduto();
+    const produtoY = await criarProduto();
+
+    const pedidoAlfa = await criarPedidoEscola(alfa.id_destinatario);
+    await criarItemPedidoEscola(pedidoAlfa.id_pedido_escola, produtoX.id_produto, 1);
+
+    const pedidoBeta = await criarPedidoEscola(beta.id_destinatario);
+    await criarItemPedidoEscola(pedidoBeta.id_pedido_escola, produtoY.id_produto, 2);
+    await prismaTeste.pedidoEscola.update({
+      where: { id_pedido_escola: pedidoBeta.id_pedido_escola },
+      data: { status: "CONFIRMADO" },
+    });
+
+    const duasEscolas = await pedidoService.listar({
+      destinatarios: [alfa.id_destinatario, beta.id_destinatario],
+    });
+    expect(duasEscolas.total).toBe(2);
+
+    const doisProdutos = await pedidoService.listar({
+      produtos: [produtoX.id_produto, produtoY.id_produto],
+    });
+    expect(doisProdutos.total).toBe(2);
+
+    const doisStatus = await pedidoService.listar({
+      status: ["PENDENTE", "CONFIRMADO"],
+    });
+    expect(doisStatus.total).toBe(2);
+
+    // Listas combinadas continuam sendo interseção (AND entre filtros).
+    const combinado = await pedidoService.listar({
+      produtos: [produtoX.id_produto],
+      status: ["CONFIRMADO"],
+    });
+    expect(combinado.total).toBe(0);
   });
 });
 

@@ -8,6 +8,7 @@ import { notaSaidaDAO } from "@/dao/nota-saida";
 import { produtoDAO } from "@/dao/produto";
 import { mensagemDeErro } from "@/dao/_errors";
 import { requireUser } from "@/lib/auth";
+import { limitesDoDiaUtc } from "@/lib/datas";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { notaEntradaService } from "@/services/nota-entrada";
@@ -17,8 +18,12 @@ import { itemSaidaDetalhe } from "./nota-saida-linha";
 import {
   buildPagination,
   resultadoVazio,
+  STATUS_NOTA_SAIDA,
+  TIPO_NOTA_SAIDA,
   type PaginationParams,
   type PaginatedResult,
+  type StatusNotaSaida,
+  type TipoNotaSaida,
 } from "@/types";
 import type {
   AtualizacaoEntradaPayload,
@@ -44,6 +49,53 @@ const PERMISSOES_VER = ["estoque.ver_saldo", "estoque.entrada"];
 const PERMISSOES_VER_SAIDA = ["estoque.ver_saldo", "estoque.saida"];
 const PERMISSOES_SELECAO_PRODUTO = ["estoque.entrada", "estoque.saida"];
 
+/** Ids inteiros positivos, sem duplicatas; vazio/inválido não filtra. */
+function idsFiltro(valores: unknown): number[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
+
+/** Data `YYYY-MM-DD` válida; qualquer outro valor não filtra. */
+function dataFiltro(valor: unknown): string | undefined {
+  if (typeof valor !== "string") return undefined;
+  const texto = valor.trim();
+  return limitesDoDiaUtc(texto, null).inicio ? texto : undefined;
+}
+
+/** Valores de um enum aceito pela tela; desconhecidos são descartados. */
+function enumFiltro<T extends string>(
+  valores: unknown,
+  permitidos: readonly T[],
+): T[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const aceitos = valores.filter((valor): valor is T =>
+    permitidos.includes(valor as T),
+  );
+  return aceitos.length > 0 ? [...new Set(aceitos)] : undefined;
+}
+
+/** Parâmetros da listagem de entrada (paginados e filtráveis). */
+export type NotaEntradaFiltrosPayload = {
+  de?: string;
+  ate?: string;
+  id_fornecedor?: number[];
+  search?: string;
+};
+
+/** Parâmetros da listagem de saída (paginados e filtráveis). */
+export type NotaSaidaFiltrosPayload = {
+  de?: string;
+  ate?: string;
+  tipos?: string[];
+  status?: string[];
+  id_destinatario?: number[];
+  urgente?: boolean;
+  search?: string;
+};
+
 /** Normaliza os parâmetros de uma listagem de seletor (página, limite e filtro). */
 function parametrosSelecao(params: SelecaoParams): {
   page: number;
@@ -68,12 +120,19 @@ function formatarData(data: Date | null, utc = false): string {
 }
 
 export async function listarNotasEntrada(
-  params: PaginationParams = {},
+  params: PaginationParams & NotaEntradaFiltrosPayload = {},
 ): Promise<PaginatedResult<NotaEntradaListRow>> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, PERMISSOES_VER))) return resultadoVazio(params);
 
-  const resultado = await notaEntradaDAO.list(params);
+  const resultado = await notaEntradaDAO.list({
+    page: params.page,
+    limit: params.limit,
+    de: dataFiltro(params.de),
+    ate: dataFiltro(params.ate),
+    id_fornecedor: idsFiltro(params.id_fornecedor),
+    search: params.search?.trim() || undefined,
+  });
   return {
     ...resultado,
     data: resultado.data.map((nota) => ({
@@ -279,6 +338,7 @@ const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
 
 const ROTULOS_TIPO_NOTA_SAIDA: Record<string, string> = {
   SAIDA: "Remessa",
+  DESMONTAGEM: "Desmontagem",
   AVARIA: "Avaria",
   CONSUMO_INTERNO: "Consumo interno",
 };
@@ -289,12 +349,25 @@ const STATUS_NOTA_SAIDA_CANCELAVEL = ["ABERTA"];
 const STATUS_NOTA_SAIDA_EDITAVEL = ["ABERTA"];
 
 export async function listarNotasSaida(
-  params: PaginationParams = {},
+  params: PaginationParams & NotaSaidaFiltrosPayload = {},
 ): Promise<PaginatedResult<NotaSaidaListRow>> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, PERMISSOES_VER_SAIDA))) return resultadoVazio(params);
 
-  const resultado = await notaSaidaDAO.list(params);
+  const tipos = enumFiltro<TipoNotaSaida>(params.tipos, TIPO_NOTA_SAIDA);
+  const status = enumFiltro<StatusNotaSaida>(params.status, STATUS_NOTA_SAIDA);
+
+  const resultado = await notaSaidaDAO.list({
+    page: params.page,
+    limit: params.limit,
+    de: dataFiltro(params.de),
+    ate: dataFiltro(params.ate),
+    tipos,
+    status,
+    id_destinatario: idsFiltro(params.id_destinatario),
+    urgente: params.urgente === true ? true : undefined,
+    search: params.search?.trim() || undefined,
+  });
   return {
     ...resultado,
     data: resultado.data.map((nota) => {

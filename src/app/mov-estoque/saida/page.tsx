@@ -1,5 +1,5 @@
 import SaidaClient from "../SaidaClient";
-import { listarNotasSaida } from "../actions";
+import { listarDestinatariosSelecao, listarNotasSaida } from "../actions";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
@@ -19,11 +19,16 @@ export default async function MovEstoqueSaidaPage() {
       usuarioPode(user, "nota_saida.cancelar"),
     ]);
 
-  const inicialSaida = await listarNotasSaida({ page: 1, limit: 20 });
+  const [inicialSaida, destinatarios] = await Promise.all([
+    listarNotasSaida({ page: 1, limit: 20 }),
+    // Opções do filtro de destinatário (vazio sem permissão de saída).
+    listarDestinatariosSelecao({ page: 1, limit: 100 }),
+  ]);
 
   return (
     <SaidaClient
       inicialSaida={inicialSaida}
+      destinatarios={destinatarios.data}
       podeCriarSaida={podeCriarSaida}
       podeConsultarNota={podeConsultarNota}
       podeAlterarNota={podeAlterarNota}

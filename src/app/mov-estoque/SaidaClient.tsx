@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import type { Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
 import type { PaginatedResult } from "@/types";
 import SaidaForm from "./SaidaForm";
-import { cancelarNotaSaida, listarNotasSaida, obterNotaSaida } from "./actions";
-import type { NotaSaidaFormData, NotaSaidaListRow } from "./tipos";
+import {
+  cancelarNotaSaida,
+  listarNotasSaida,
+  obterNotaSaida,
+  type NotaSaidaFiltrosPayload,
+} from "./actions";
+import type {
+  DestinatarioSelecaoRow,
+  NotaSaidaFormData,
+  NotaSaidaListRow,
+} from "./tipos";
 
 interface Props {
   inicialSaida: PaginatedResult<NotaSaidaListRow>;
+  /** Opções do filtro de destinatário. */
+  destinatarios: DestinatarioSelecaoRow[];
   podeCriarSaida: boolean;
   /** `nota_saida.consultar`: habilita a visualização da nota. */
   podeConsultarNota: boolean;
@@ -26,12 +39,41 @@ interface Props {
 
 type ModoModal = "view" | "edit";
 
+const TIPOS_FILTRO: { valor: string; rotulo: string }[] = [
+  { valor: "SAIDA", rotulo: "Remessa" },
+  { valor: "DESMONTAGEM", rotulo: "Desmontagem" },
+  { valor: "CONSUMO_INTERNO", rotulo: "Consumo interno" },
+  { valor: "AVARIA", rotulo: "Avaria" },
+];
+
+const STATUS_FILTRO: { valor: string; rotulo: string }[] = [
+  { valor: "ABERTA", rotulo: "Aberta" },
+  { valor: "EM_PERCURSO", rotulo: "Em percurso" },
+  { valor: "PENDENTE", rotulo: "Pendente" },
+  { valor: "BAIXA_TOTAL", rotulo: "Baixa total" },
+  { valor: "BAIXA_PARCIAL", rotulo: "Baixa parcial" },
+  { valor: "BAIXA_COM_CORTE", rotulo: "Baixa com corte" },
+  { valor: "CANCELADA", rotulo: "Cancelada" },
+];
+
+/** Números inteiros positivos, sem duplicatas; vazio vira `undefined`. */
+function idsNumericos(
+  valores: string[] | { de: string; ate: string } | undefined,
+): number[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
+
 function formatarNumero(valor: number): string {
   return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 6 }).format(valor);
 }
 
 export default function SaidaClient({
   inicialSaida,
+  destinatarios,
   podeCriarSaida,
   podeConsultarNota,
   podeAlterarNota,
@@ -44,6 +86,25 @@ export default function SaidaClient({
   const [modalSaidaAberto, setModalSaidaAberto] = useState(false);
   const [cancelandoId, setCancelandoId] = useState<number | null>(null);
   const [notaParaCancelar, setNotaParaCancelar] = useState<NotaSaidaListRow | null>(null);
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+  const filtrosAtuais = useRef<NotaSaidaFiltrosPayload>({});
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    { id: "tipo", rotulo: "Tipo", tipo: "multi", opcoes: TIPOS_FILTRO },
+    { id: "status", rotulo: "Status", tipo: "multi", opcoes: STATUS_FILTRO },
+    {
+      id: "destinatario",
+      rotulo: "Destinatário",
+      tipo: "multi",
+      opcoes: destinatarios.map((destinatario) => ({
+        valor: String(destinatario.id_destinatario),
+        rotulo: destinatario.razao_social,
+      })),
+    },
+    { id: "urgente", rotulo: "Urgente", tipo: "checkbox" },
+  ];
 
   const [notaModal, setNotaModal] = useState<{
     mode: ModoModal;
@@ -54,11 +115,42 @@ export default function SaidaClient({
   async function carregarSaida(page = 1, limit = resultadoSaida.limit) {
     setCarregandoSaida(true);
     try {
-      const atualizado = await listarNotasSaida({ page, limit });
+      const atualizado = await listarNotasSaida({
+        page,
+        limit,
+        ...filtrosAtuais.current,
+      });
       setResultadoSaida(atualizado);
     } finally {
       setCarregandoSaida(false);
     }
+  }
+
+  function aplicarFiltrosTela(novos: Valores) {
+    const periodo = Array.isArray(novos.periodo) ? undefined : novos.periodo;
+    const tipos = Array.isArray(novos.tipo) ? novos.tipo : [];
+    const status = Array.isArray(novos.status) ? novos.status : [];
+    filtrosAtuais.current = {
+      de: periodo?.de || undefined,
+      ate: periodo?.ate || undefined,
+      tipos: tipos.length > 0 ? tipos : undefined,
+      status: status.length > 0 ? status : undefined,
+      id_destinatario: idsNumericos(novos.destinatario),
+      urgente:
+        Array.isArray(novos.urgente) && novos.urgente.includes("1")
+          ? true
+          : undefined,
+    };
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    void carregarSaida(1);
+  }
+
+  function limparFiltrosTela() {
+    filtrosAtuais.current = {};
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    void carregarSaida(1);
   }
 
   /** Recarrega a página atual (depois de editar/cancelar, sem pular de página). */
@@ -256,6 +348,14 @@ export default function SaidaClient({
           </span>
         )}
       </div>
+
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
+      />
 
       <DataTable
         columns={columnsSaida}

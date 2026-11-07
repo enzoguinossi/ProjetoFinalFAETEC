@@ -204,6 +204,7 @@ export async function criarNotaSaida(
   opts: {
     idDestinatario?: number;
     urgente?: boolean;
+    tipo?: "SAIDA" | "DESMONTAGEM" | "CONSUMO_INTERNO" | "AVARIA";
     status?:
       | "ABERTA"
       | "EM_PERCURSO"
@@ -220,7 +221,7 @@ export async function criarNotaSaida(
     data: {
       id_destinatario: opts.idDestinatario,
       data_criacao: opts.dataCriacao ?? new Date(),
-      tipo: "SAIDA",
+      tipo: opts.tipo ?? "SAIDA",
       status: opts.status ?? "ABERTA",
       urgente: opts.urgente ?? false,
       ativo: opts.ativo ?? true,

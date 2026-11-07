@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Button from "@/components/Button";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
+import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
+import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import type { Action, Column } from "@/components/DataTable";
 import type { PaginatedResult } from "@/types";
 import EntradaForm from "./EntradaForm";
-import { listarNotasEntrada, obterNotaEntrada } from "./actions";
+import {
+  listarNotasEntrada,
+  obterNotaEntrada,
+  type NotaEntradaFiltrosPayload,
+} from "./actions";
 import type {
   ConversaoUnidadeItem,
+  FornecedorSelecaoRow,
   NotaEntradaFormData,
   NotaEntradaListRow,
 } from "./tipos";
@@ -18,6 +25,8 @@ import type {
 interface Props {
   inicial: PaginatedResult<NotaEntradaListRow>;
   conversoes: ConversaoUnidadeItem[];
+  /** Opções do filtro de fornecedor. */
+  fornecedores: FornecedorSelecaoRow[];
   podeCriar: boolean;
   /** `nota_entrada.consultar`: habilita a visualização da nota. */
   podeConsultar: boolean;
@@ -30,6 +39,17 @@ interface Props {
 }
 
 type ModoModal = "create" | "edit" | "view" | null;
+
+/** Números inteiros positivos, sem duplicatas; vazio vira `undefined`. */
+function idsNumericos(
+  valores: string[] | { de: string; ate: string } | undefined,
+): number[] | undefined {
+  if (!Array.isArray(valores)) return undefined;
+  const ids = valores
+    .map((valor) => Number(valor))
+    .filter((valor) => Number.isInteger(valor) && valor > 0);
+  return ids.length > 0 ? [...new Set(ids)] : undefined;
+}
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
   { key: "data", label: "Data", width: "1fr", align: "center" },
@@ -55,6 +75,7 @@ const TITULOS: Record<Exclude<ModoModal, null>, string> = {
 export default function EntradaClient({
   inicial,
   conversoes,
+  fornecedores,
   podeCriar,
   podeConsultar,
   podeAlterar,
@@ -67,15 +88,54 @@ export default function EntradaClient({
   const [modalMode, setModalMode] = useState<ModoModal>(null);
   const [formData, setFormData] = useState<NotaEntradaFormData | null>(null);
   const [carregandoNota, setCarregandoNota] = useState(false);
+  const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [chaveFiltros, setChaveFiltros] = useState(0);
+  const filtrosAtuais = useRef<NotaEntradaFiltrosPayload>({});
+
+  const camposFiltro: CampoFiltro[] = [
+    { id: "periodo", rotulo: "Período", tipo: "periodo" },
+    {
+      id: "fornecedor",
+      rotulo: "Fornecedor",
+      tipo: "multi",
+      opcoes: fornecedores.map((fornecedor) => ({
+        valor: String(fornecedor.id_fornecedor),
+        rotulo: fornecedor.razao_social,
+      })),
+    },
+  ];
 
   async function carregar(page = 1, limit = resultado.limit) {
     setCarregando(true);
     try {
-      const atualizado = await listarNotasEntrada({ page, limit });
+      const atualizado = await listarNotasEntrada({
+        page,
+        limit,
+        ...filtrosAtuais.current,
+      });
       setResultado(atualizado);
     } finally {
       setCarregando(false);
     }
+  }
+
+  function aplicarFiltrosTela(novos: Valores) {
+    const periodo = Array.isArray(novos.periodo) ? undefined : novos.periodo;
+    filtrosAtuais.current = {
+      de: periodo?.de || undefined,
+      ate: periodo?.ate || undefined,
+      id_fornecedor: idsNumericos(novos.fornecedor),
+    };
+    setValoresFiltros(novos);
+    setChaveFiltros((chave) => chave + 1);
+    void carregar(1);
+  }
+
+  function limparFiltrosTela() {
+    filtrosAtuais.current = {};
+    setValoresFiltros({});
+    setChaveFiltros((chave) => chave + 1);
+    void carregar(1);
   }
 
   function fecharModal() {
@@ -149,6 +209,14 @@ export default function EntradaClient({
           </span>
         )}
       </div>
+
+      <BarraFiltrosBase
+        key={chaveFiltros}
+        campos={camposFiltro}
+        valores={valoresFiltros}
+        onAplicar={aplicarFiltrosTela}
+        onLimpar={limparFiltrosTela}
+      />
 
       <DataTable
         columns={columnsEntrada}

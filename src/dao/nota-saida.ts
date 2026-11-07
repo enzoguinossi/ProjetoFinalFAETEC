@@ -1,9 +1,10 @@
-import type { StatusNotaSaida } from "@prisma/client";
+import type { StatusNotaSaida, TipoNotaSaida } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { pedidoDAO } from "./pedido";
 import { buildPagination, type PaginationParams } from "@/types";
+import { limitesDoDiaSaoPaulo } from "@/lib/datas";
 import { saldoDAO } from "./estoque";
 
 export type NotaSaidaItemCriacao = {
@@ -143,11 +144,61 @@ async function saldoDisponivelNoCliente(
   };
 }
 
+/** Filtros de domínio da listagem de notas de saída. */
+export type NotaSaidaListFiltros = {
+  /** Início do período de `data_criacao` (`YYYY-MM-DD`, dia local). */
+  de?: string;
+  /** Fim do período (`YYYY-MM-DD`, inclusivo). */
+  ate?: string;
+  tipos?: TipoNotaSaida[];
+  status?: StatusNotaSaida[];
+  id_destinatario?: number[];
+  /** `true` = somente urgentes; ausente/false não filtra. */
+  urgente?: boolean;
+  /** Razão social do destinatário. */
+  search?: string;
+};
+
+function whereDe(filtros: NotaSaidaListFiltros): Prisma.NotaSaidaWhereInput {
+  const where: Prisma.NotaSaidaWhereInput = { ativo: true };
+  const adicionais: Prisma.NotaSaidaWhereInput[] = [];
+
+  if (filtros.tipos?.length) adicionais.push({ tipo: { in: filtros.tipos } });
+  if (filtros.status?.length) adicionais.push({ status: { in: filtros.status } });
+  if (filtros.id_destinatario?.length) {
+    adicionais.push({ id_destinatario: { in: filtros.id_destinatario } });
+  }
+  if (filtros.urgente === true) adicionais.push({ urgente: true });
+
+  const { inicio, fim } = limitesDoDiaSaoPaulo(filtros.de, filtros.ate);
+  if (inicio || fim) {
+    adicionais.push({
+      data_criacao: {
+        ...(inicio ? { gte: inicio } : {}),
+        ...(fim ? { lte: fim } : {}),
+      },
+    });
+  }
+
+  const busca = filtros.search?.trim();
+  if (busca) {
+    // `AND` mantém a busca livre independente dos demais filtros.
+    adicionais.push({
+      destinatario: {
+        pessoaJuridica: { razao_social: { contains: busca } },
+      },
+    });
+  }
+
+  if (adicionais.length > 0) where.AND = adicionais;
+  return where;
+}
+
 export class NotaSaidaDAO {
   /** Todas as notas de saída ativas (Remessa, Avaria e Consumo Interno). */
-  async list(params: PaginationParams = {}) {
+  async list(params: PaginationParams & NotaSaidaListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where = { ativo: true };
+    const where = whereDe(params);
 
     const [data, total] = await Promise.all([
       prisma.notaSaida.findMany({

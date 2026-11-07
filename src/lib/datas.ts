@@ -78,6 +78,34 @@ export function limitesDoDiaUtc(
   return { inicio: converter(de), fim: converter(ate) };
 }
 
+/**
+ * Limites de um período sobre uma coluna de instante (`DATETIME`), no dia
+ * civil de São Paulo (inclusivo).
+ *
+ * O início é `00:00:00.000-03:00` e o fim é `23:59:59.999-03:00`, então uma
+ * nota criada às 23:30 continua no dia local, mesmo que em UTC já seja o dia
+ * seguinte. Entradas inválidas viram `null`.
+ */
+export function limitesDoDiaSaoPaulo(
+  de: string | null | undefined,
+  ate: string | null | undefined,
+): { inicio: Date | null; fim: Date | null } {
+  const converter = (
+    valor: string | null | undefined,
+    fimDoDia: boolean,
+  ): Date | null => {
+    if (!valor) return null;
+    const texto = valor.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+    const hora = fimDoDia ? "23:59:59.999" : "00:00:00.000";
+    const data = new Date(`${texto}T${hora}-03:00`);
+    if (Number.isNaN(data.getTime())) return null;
+    // Rejeita datas normalizadas pelo JS (ex.: 2026-02-31 → 03/03).
+    return diaISOSaoPaulo(data) === texto ? data : null;
+  };
+  return { inicio: converter(de, false), fim: converter(ate, true) };
+}
+
 /** Data `YYYY-MM-DD` do dia civil de São Paulo. */
 export function diaISOSaoPaulo(valor: Date): string {
   const { ano, mes, dia } = partesDataSaoPaulo(valor);

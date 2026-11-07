@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { buildPagination, type PaginationParams } from "@/types";
+import { limitesDoDiaSaoPaulo, limitesDoDiaUtc } from "@/lib/datas";
+import type { Prisma } from "@prisma/client";
 import { saldoDAO } from "./estoque";
 
 export type NotaEntradaItemCriacao = {
@@ -37,6 +39,78 @@ export type NotaEntradaAtualizacao = {
 
 const AUDIT_ENTIDADE = "NotaEntrada";
 
+/** Filtros de domínio da listagem de notas de entrada. */
+export type NotaEntradaListFiltros = {
+  /** Início do período de `data_recebimento ?? data_criacao` (`YYYY-MM-DD`). */
+  de?: string;
+  /** Fim do período (`YYYY-MM-DD`, inclusivo). */
+  ate?: string;
+  id_fornecedor?: number[];
+  /** Razão social do fornecedor ou chave de acesso. */
+  search?: string;
+};
+
+/** Período de uma nota: usa `data_recebimento` ou, quando nula, `data_criacao`. */
+function filtroPeriodo(
+  de?: string,
+  ate?: string,
+): Prisma.NotaEntradaWhereInput | null {
+  const recebimento = limitesDoDiaUtc(de, ate);
+  const criacao = limitesDoDiaSaoPaulo(de, ate);
+  if (!recebimento.inicio && !recebimento.fim) return null;
+
+  return {
+    OR: [
+      {
+        data_recebimento: {
+          ...(recebimento.inicio ? { gte: recebimento.inicio } : {}),
+          ...(recebimento.fim ? { lte: recebimento.fim } : {}),
+        },
+      },
+      {
+        data_recebimento: null,
+        data_criacao: {
+          ...(criacao.inicio ? { gte: criacao.inicio } : {}),
+          ...(criacao.fim ? { lte: criacao.fim } : {}),
+        },
+      },
+    ],
+  };
+}
+
+function whereDe(filtros: NotaEntradaListFiltros): Prisma.NotaEntradaWhereInput {
+  const where: Prisma.NotaEntradaWhereInput = {
+    ativo: true,
+    tipo: "ENTRADA",
+  };
+  const adicionais: Prisma.NotaEntradaWhereInput[] = [];
+
+  if (filtros.id_fornecedor?.length) {
+    adicionais.push({ id_fornecedor: { in: filtros.id_fornecedor } });
+  }
+
+  const periodo = filtroPeriodo(filtros.de, filtros.ate);
+  if (periodo) adicionais.push(periodo);
+
+  const busca = filtros.search?.trim();
+  if (busca) {
+    // `AND` mantém a busca livre independente dos demais filtros.
+    adicionais.push({
+      OR: [
+        {
+          fornecedor: {
+            pessoaJuridica: { razao_social: { contains: busca } },
+          },
+        },
+        { chave_acesso: { contains: busca } },
+      ],
+    });
+  }
+
+  if (adicionais.length > 0) where.AND = adicionais;
+  return where;
+}
+
 /** Snapshot da nota usado na auditoria (antes e depois da edição). */
 function snapshotNota(
   nota: {
@@ -66,9 +140,9 @@ function snapshotNota(
 
 export class NotaEntradaDAO {
   /** Notas de entrada (tipo ENTRADA), da mais recente para a mais antiga. */
-  async list(params: PaginationParams = {}) {
+  async list(params: PaginationParams & NotaEntradaListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where = { ativo: true, tipo: "ENTRADA" as const };
+    const where = whereDe(params);
 
     const [data, total] = await Promise.all([
       prisma.notaEntrada.findMany({

@@ -54,11 +54,14 @@ export type PedidoFiltrosPayload = {
   page?: number;
   limit?: number;
   search?: string;
-  id_destinatario?: number | null;
-  status?: string | null;
+  /** Um id ou uma lista (chips enviam lista). */
+  id_destinatario?: number | number[] | null;
+  /** Um status ou uma lista (chips enviam lista). */
+  status?: string | string[] | null;
   de?: string | null;
   ate?: string | null;
-  id_produto?: number | null;
+  /** Um id ou uma lista (chips enviam lista). */
+  id_produto?: number | number[] | null;
   com_nota?: "todos" | "com" | "sem";
   /** Paginação da lista usa o mesmo formato dos demais módulos. */
   pageSize?: number;
@@ -90,22 +93,34 @@ function idPositivo(valor: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+/** Aceita um id ou uma lista; devolve só os inteiros positivos. */
+function idsPositivos(valor: unknown): number[] {
+  const lista = Array.isArray(valor) ? valor : [valor];
+  return lista
+    .map(idPositivo)
+    .filter((id): id is number => id !== null);
+}
+
+const STATUS_PEDIDO_VALIDOS = ["PENDENTE", "CONFIRMADO", "RECUSADO"] as const;
+
+function statusDoPayload(valor: unknown): PedidoFiltros["status"] {
+  const lista = Array.isArray(valor) ? valor : [valor];
+  const aceitos = lista.filter((item): item is (typeof STATUS_PEDIDO_VALIDOS)[number] =>
+    (STATUS_PEDIDO_VALIDOS as readonly unknown[]).includes(item),
+  );
+  return aceitos.length > 0 ? [...new Set(aceitos)] : [];
+}
+
 function filtrosDoPayload(params: PedidoFiltrosPayload = {}): PedidoFiltros {
-  const status = params.status;
   return {
     page: params.page,
     limit: params.limit ?? params.pageSize,
     search: params.search?.trim() || undefined,
-    destinatarios: idPositivo(params.id_destinatario)
-      ? [Number(params.id_destinatario)]
-      : [],
-    status:
-      status === "PENDENTE" || status === "CONFIRMADO" || status === "RECUSADO"
-        ? [status]
-        : [],
+    destinatarios: params.id_destinatario ? idsPositivos(params.id_destinatario) : [],
+    status: statusDoPayload(params.status),
     de: params.de || undefined,
     ate: params.ate || undefined,
-    produtos: idPositivo(params.id_produto) ? [Number(params.id_produto)] : [],
+    produtos: params.id_produto ? idsPositivos(params.id_produto) : [],
     com_nota:
       params.com_nota === "com" ? true : params.com_nota === "sem" ? false : null,
   };

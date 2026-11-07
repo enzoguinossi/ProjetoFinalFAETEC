@@ -35,6 +35,13 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   chips no servidor. Em **Expedições**: período de data prevista, status, veículo e condutor.
   Em **Inventário**: período de data de início, status (lista) e contagem cega. Os filtros
   combinam com a busca livre e continuam sem alterar o resultado quando nenhum é aplicado.
+- **Chips em Pedidos e filtros de Entrada/Saída (KAN-170):** a listagem de **Pedidos** troca
+  o formulário de selects/datas pela barra de filtros em chips (período, escola, status,
+  produto e nota), mantendo a busca livre por Enter, a paginação e as ações; escola, status e
+  produto passam a aceitar listas na action. Em **Entrada** há filtros de período
+  (`data_recebimento`, ou `data_criacao` quando nulo, no dia local) e fornecedor (multi). Em
+  **Saída** há período, tipo (4), status (7), destinatário (multi) e urgente. Todos filtram no
+  servidor, combinados com a busca, e sem filtro o resultado é o mesmo de antes.
 
 ### Changed
 - **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup

@@ -1,5 +1,9 @@
 import EntradaClient from "../EntradaClient";
-import { listarNotasEntrada, listarUnidadesEntrada } from "../actions";
+import {
+  listarFornecedoresSelecao,
+  listarNotasEntrada,
+  listarUnidadesEntrada,
+} from "../actions";
 import { tipoCodigoDAO } from "@/dao/tipo-codigo";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -19,18 +23,21 @@ export default async function MovEstoqueEntradaPage() {
   const podeMontarNota = podeCriar || podeAlterar;
   const podeCriarFornecedor = podeMontarNota && (await usuarioPode(user, "fornecedor.criar"));
 
-  const [inicial, conversoes, tiposCodigo] = await Promise.all([
+  const [inicial, conversoes, tiposCodigo, fornecedores] = await Promise.all([
     listarNotasEntrada({ page: 1, limit: 20 }),
     podeMontarNota ? listarUnidadesEntrada() : Promise.resolve<ConversaoUnidadeItem[]>([]),
     podeCriarFornecedor
       ? tipoCodigoDAO.listParaEntidade("FORNECEDOR")
       : Promise.resolve<{ id_tipo_codigo: number; nome: string }[]>([]),
+    // Opções do filtro de fornecedor (a action já devolve vazio sem permissão).
+    listarFornecedoresSelecao({ page: 1, limit: 100 }),
   ]);
 
   return (
     <EntradaClient
       inicial={inicial}
       conversoes={conversoes}
+      fornecedores={fornecedores.data}
       podeCriar={podeCriar}
       podeConsultar={podeConsultar}
       podeAlterar={podeAlterar}
