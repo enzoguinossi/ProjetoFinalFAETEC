@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
   // `scripts/empacotar-standalone.mjs` completa o pacote com `.next/static` e
   // `public` (sem uploads) para o instalador autocontido.
   output: "standalone",
+  // O rastro do Next perde as DLLs do libvips em `@img/sharp-win32-x64/lib`.
+  // `empacotar-standalone.mjs` copia `sharp`/`@img` por inteiro; este include
+  // é um reforço (não substitui a cópia).
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/sharp/**/*", "./node_modules/@img/**/*"],
+  },
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version ?? "",
   },

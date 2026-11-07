@@ -37,7 +37,7 @@ estações da rede
 
 | Peça | Papel |
 | --- | --- |
-| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~380,9 MB); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
+| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~388,7 MB); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
 | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
@@ -63,7 +63,7 @@ estações da rede
 | VC++ Redistributable | **14.x**, `vc_redist.x64.exe` | `manifesto.json` / payload |
 | Bandeja | **.NET 10**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
 | Instalador | **Inno Setup 7**; `ISCC.exe` local ou NuGet **7.1.0** no build | `build-instalador.ps1` |
-| Setup | **380,9 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~400 MB | `deploy/windows/out/` |
+| Setup | **388,7 MB** (`NexusSetup-1.07.11.2026.exe`); payload ~408 MB | `deploy/windows/out/` |
 
 > O destino **não usa** Git, npm, `next build`, `db push` ou Prisma CLI. O cliente Prisma já
 > vem no `app.zip`; o schema é aplicado por SQL com `mysql.exe`.
@@ -182,7 +182,7 @@ as regras precisam ser revistas.
 
 - Windows **64 bits** (10/11 ou Server compatível), com Windows PowerShell 5.1.
 - **PowerShell elevado** para instalar, atualizar, desinstalar e restaurar.
-- Pelo menos **5 GB livres em `C:`** (o payload ocupa ~400 MB e o MySQL cresce depois).
+- Pelo menos **5 GB livres em `C:`** (o payload ocupa ~408 MB e o MySQL cresce depois).
 - Portas **3214**, 3000, 80 e 443 livres (ou já usadas pelos próprios serviços do Nexus).
   A 3306 é independente e pode estar ocupada.
 - **Hostname DNS** válido, sem `http://`, porta ou caminho. O bootstrap cria uma entrada
@@ -316,7 +316,11 @@ em releases futuras exigem uma **nova migração** — ver §15.
 ### 5.5 Aplicação standalone e serviço `NexusApp`
 
 O `app.zip` contém `server.js` na raiz, `.next/static`, `public` sem `uploads`, `node_modules`
-e o client Prisma. O bootstrap para o `NexusCaddy`, move a aplicação anterior para
+e o client Prisma. O pacote inclui `node_modules/sharp` e `node_modules/@img` **completos**,
+inclusive as DLLs do libvips (`libvips-42.dll`); o rastro do Next sozinho perde essas DLLs e o
+app instalado falha com `ERR_DLOPEN_FAILED`. Ao parar/iniciar o `NexusApp`, os scripts de
+`common.ps1` liberam a porta 3000 de um node órfão do Nexus (nunca de outro processo) antes de
+subir o serviço, evitando o serviço `Paused`. O bootstrap para o `NexusCaddy`, move a aplicação anterior para
 `app.prev-manual-<timestamp>`, extrai o novo `app.zip` e preserva o `.env` anterior quando
 existe.
 
@@ -985,7 +989,7 @@ Para remoção total, depois de copiar o que precisa:
       8.4.13, Caddy 2.11.9, VC++, NSSM, `app\app.zip`, `sql\{schema,seed,migracoes\001}`;
       os hashes definidos no manifesto são verificados.
 - [ ] `deploy/windows/build-instalador.ps1` (chama `preparar-payload`) gera
-      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~380,9 MB).
+      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~388,7 MB).
 - [ ] O setup contém `payload\` e `sql\`; nenhum download/Git/npm/Prisma é necessário no
       destino.
 
@@ -1071,7 +1075,7 @@ Para remoção total, depois de copiar o que precisa:
     remoção total, apague `C:\ProgramData\Nexus` e exclua a CA em `certlm.msc`.
 
 12. **O setup é grande e o payload não é versionado.**
-    O `NexusSetup-1.07.11.2026.exe` tem ~380,9 MB; `deploy/windows/payload` é ignorado pelo
+    O `NexusSetup-1.07.11.2026.exe` tem ~388,7 MB; `deploy/windows/payload` é ignorado pelo
     Git e precisa ser montado no build. O destino é offline, mas o build exige internet e os
     arquivos de origem (app.zip, NSSM, SQL).
 

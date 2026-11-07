@@ -53,7 +53,6 @@ catch {
 
 $appName = "NexusApp"
 $caddyName = "NexusCaddy"
-$nssmExe = Join-Path $script:NexusProgramRoot "tools\nssm\nssm.exe"
 
 try {
     Write-Step "Reinício do Nexus ($timestamp)"
@@ -73,26 +72,18 @@ try {
     }
     Write-Ok "$caddyName parado."
 
-    Write-Ok "Reiniciando $appName..."
-    if (Test-Path -LiteralPath $nssmExe -PathType Leaf) {
-        & $nssmExe restart $appName
-        if ($LASTEXITCODE -ne 0) {
-            Stop-RestartFailure "nssm restart $appName falhou (código $LASTEXITCODE)."
-        }
+    Write-Ok "Parando $appName e liberando a porta 3000..."
+    if (-not (Stop-NexusAppProcess)) {
+        Stop-RestartFailure "Não foi possível parar o $appName e liberar a porta 3000."
     }
-    else {
-        if ($appService.Status.ToString() -ne "Stopped") {
-            Stop-Service -Name $appName -Force
-            if (-not (Wait-ServiceState -Name $appName -Status "Stopped" -TimeoutSeconds 60)) {
-                Stop-RestartFailure "O serviço $appName não parou."
-            }
-        }
-        Start-Service -Name $appName
+    Write-Ok "Iniciando $appName..."
+    try {
+        Start-NexusApp -TimeoutSeconds 180
+    }
+    catch {
+        Stop-RestartFailure $_.Exception.Message
     }
 
-    if (-not (Wait-ServiceState -Name $appName -Status "Running" -TimeoutSeconds 120)) {
-        Stop-RestartFailure "O serviço $appName não iniciou."
-    }
     $health = Wait-AppHealth
     if (-not $health.Ok) {
         Stop-RestartFailure "O health local não respondeu 200 com db=true após reiniciar $appName."

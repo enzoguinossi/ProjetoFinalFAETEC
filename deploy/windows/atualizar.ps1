@@ -144,27 +144,6 @@ function Resolve-SqlDir {
     throw "SQL de produção não encontrado. Informe -Sql com a pasta que contém schema.sql/seed.sql."
 }
 
-function Stop-NexusApp {
-    $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-    if ($service -and $service.Status.ToString() -ne "Stopped") {
-        Stop-Service -Name "NexusApp" -Force
-        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
-            throw "O serviço NexusApp não parou."
-        }
-    }
-}
-
-function Start-NexusApp {
-    $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-    if (-not $service) { throw "O serviço NexusApp não existe." }
-    if ($service.Status.ToString() -ne "Running") {
-        Start-Service -Name "NexusApp"
-    }
-    if (-not (Wait-ServiceState -Name "NexusApp" -Status "Running" -TimeoutSeconds 120)) {
-        throw "O serviço NexusApp não iniciou."
-    }
-}
-
 function Stop-NexusCaddy {
     $service = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
     if ($service -and $service.Status.ToString() -ne "Stopped") {
@@ -321,8 +300,10 @@ try {
     Write-Ok "Versão atual: $currentVersion"
     Write-Ok "Parando NexusCaddy..."
     Stop-NexusCaddy
-    Write-Ok "Parando NexusApp..."
-    Stop-NexusApp
+    Write-Ok "Parando NexusApp e liberando a porta 3000..."
+    if (-not (Stop-NexusAppProcess)) {
+        throw "Não foi possível parar o NexusApp/liberar a porta 3000."
+    }
 
     Write-Ok "Movendo a aplicação atual para $previousDir..."
     Move-Item -LiteralPath $AppDir -Destination $previousDir -ErrorAction Stop
@@ -424,7 +405,12 @@ catch {
     Write-Warn "Falha na atualização: $message"
 
     try { Stop-NexusCaddy } catch { Write-Warn "Não foi possível parar o NexusCaddy: $($_.Exception.Message)" }
-    try { Stop-NexusApp } catch { Write-Warn "Não foi possível parar o NexusApp: $($_.Exception.Message)" }
+    try {
+        if (-not (Stop-NexusAppProcess)) {
+            Write-Warn "Não foi possível parar o NexusApp/liberar a porta 3000."
+        }
+    }
+    catch { Write-Warn "Não foi possível parar o NexusApp: $($_.Exception.Message)" }
 
     if ($oldAppMoved -and (Test-Path -LiteralPath $AppDir)) {
         Write-Warn "Movendo a versão com falha para $failedDir..."

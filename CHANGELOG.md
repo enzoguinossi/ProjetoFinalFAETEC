@@ -51,6 +51,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   abre mais janela de console nem grava `instalador-*.log`; o log do Inno fica em
   `%TEMP%\Setup Log*.txt`.
 
+### Fixed
+- **sharp/libvips e NexusApp travada (KAN-170):** o pacote standalone passa a incluir
+  `sharp`/`@img` completos (DLLs do libvips), corrigindo o `ERR_DLOPEN_FAILED`; o serviço é
+  reiniciado sem deixar node órfão na porta 3000, evitando `NexusApp: Paused`.
+
 ## [1.07.11.2026] - 2026-11-07
 
 Esta seção consolida o instalador autocontido: Node portátil, MySQL 8.4, Caddy, VC++, NSSM e

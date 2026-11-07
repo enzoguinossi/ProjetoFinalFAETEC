@@ -6,12 +6,16 @@
  * (`npm run build:standalone`). O script:
  *
  *   1. copia `.next/standalone/*` para `out/standalone/app`;
- *   2. copia `.next/static` para `out/standalone/app/.next/static`;
- *   3. copia `public` para `out/standalone/app/public`, exceto `public/uploads`
+ *   2. copia os pacotes nativos `sharp` e `@img` do repositório. O rastro do
+ *      Next inclui o JS do sharp e o `.node`, mas perde as DLLs do libvips em
+ *      `@img/sharp-win32-x64/lib`; copiá-los explicitamente evita o
+ *      `ERR_DLOPEN_FAILED` do app instalado;
+ *   3. copia `.next/static` para `out/standalone/app/.next/static`;
+ *   4. copia `public` para `out/standalone/app/public`, exceto `public/uploads`
  *      (uploads de runtime vivem em `UPLOADS_DIR`, fora da instalação);
- *   4. remove qualquer arquivo `.env*` que tenha entrado no rastro (o pacote
+ *   5. remove qualquer arquivo `.env*` que tenha entrado no rastro (o pacote
  *      nunca carrega segredos);
- *   5. gera `out/standalone/app.zip` com `Compress-Archive` do Windows.
+ *   6. gera `out/standalone/app.zip` com `Compress-Archive` do Windows.
  *
  * Não adiciona dependência: o zip usa o PowerShell já presente no Windows,
  * alvo do instalador (desktop only).
@@ -56,13 +60,28 @@ fs.mkdirSync(OUT_ROOT, { recursive: true });
 fs.cpSync(STANDALONE_BUILD, APP_DIR, { recursive: true });
 info(`standalone → ${path.relative(ROOT, APP_DIR)}`);
 
-// 2. Assets estáticos (o standalone não os copia por padrão).
+// 2. Pacotes nativos do sharp. O rastro do Next perde as DLLs do libvips
+// (`@img/sharp-win32-x64/lib/libvips*.dll`), então copiamos os pacotes
+// completos do repositório por cima do que veio no standalone.
+for (const pkg of ["sharp", "@img"]) {
+  const src = path.join(ROOT, "node_modules", pkg);
+  const dst = path.join(APP_DIR, "node_modules", pkg);
+  if (fs.existsSync(src)) {
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.cpSync(src, dst, { recursive: true, force: true });
+    info(`node_modules/${pkg} → ${path.relative(ROOT, dst)}`);
+  } else {
+    info(`[AVISO] node_modules/${pkg} ausente no repositório; pacote nativo pode ficar incompleto`);
+  }
+}
+
+// 3. Assets estáticos (o standalone não os copia por padrão).
 const staticDest = path.join(APP_DIR, ".next", "static");
 fs.mkdirSync(path.dirname(staticDest), { recursive: true });
 fs.cpSync(STATIC_BUILD, staticDest, { recursive: true });
 info(`.next/static → ${path.relative(ROOT, staticDest)}`);
 
-// 3. `public` sem uploads de runtime. O standalone pode trazer `public/uploads`
+// 4. `public` sem uploads de runtime. O standalone pode trazer `public/uploads`
 // pelo rastro da rota de uploads; a cópia abaixo substitui o diretório inteiro.
 const publicDest = path.join(APP_DIR, "public");
 fs.rmSync(publicDest, { recursive: true, force: true });
@@ -84,7 +103,7 @@ if (fs.existsSync(path.join(publicDest, "uploads"))) {
   fail("public/uploads entrou no pacote; uploads de runtime não fazem parte da instalação.");
 }
 
-// 4. Nenhum segredo no pacote: remove `.env*` em qualquer nível.
+// 5. Nenhum segredo no pacote: remove `.env*` em qualquer nível.
 function removeEnvFiles(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const full = path.join(directory, entry.name);
@@ -106,6 +125,25 @@ for (const required of ["server.js", path.join(".next", "static")]) {
   }
 }
 
+// O sharp nativo precisa do `.node` e das DLLs do libvips; sem elas o app
+// instalado falha com ERR_DLOPEN_FAILED ao processar imagens.
+const sharpLibDir = path.join(APP_DIR, "node_modules", "@img", "sharp-win32-x64", "lib");
+const sharpNode = fs.existsSync(sharpLibDir)
+  ? fs.readdirSync(sharpLibDir).find((name) => name.endsWith(".node"))
+  : undefined;
+const libvipsDll = fs.existsSync(sharpLibDir)
+  ? fs.readdirSync(sharpLibDir).find((name) => /^libvips-.*\.dll$/i.test(name))
+  : undefined;
+if (!sharpNode || !libvipsDll) {
+  fail(
+    `Pacote nativo do sharp incompleto em ${path.relative(ROOT, sharpLibDir)}: ` +
+      `esperado o arquivo .node e libvips-42.dll (encontrado ` +
+      `${sharpNode ?? "nenhum .node"}, ${libvipsDll ?? "nenhuma DLL do libvips"}). ` +
+      "Confira node_modules/@img no repositório.",
+  );
+}
+info(`sharp nativo completo: ${sharpNode} + ${libvipsDll}`);
+
 // Client Prisma: confirma o rastro e avisa (não falha) se não veio.
 const prismaClient = path.join(APP_DIR, "node_modules", ".prisma", "client", "index.js");
 if (fs.existsSync(prismaClient)) {
@@ -114,7 +152,7 @@ if (fs.existsSync(prismaClient)) {
   info("[AVISO] client Prisma não encontrado em node_modules/.prisma/client");
 }
 
-// 5. Zip (Compress-Archive, sem dependência nova).
+// 6. Zip (Compress-Archive, sem dependência nova).
 if (process.platform !== "win32") {
   fail("O empacotamento usa Compress-Archive do Windows (plataforma alvo do instalador).");
 }

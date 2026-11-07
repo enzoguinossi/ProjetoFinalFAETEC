@@ -108,11 +108,22 @@ try {
 
     Write-Ok "Iniciando $appName..."
     $app = Get-Service -Name $appName -ErrorAction SilentlyContinue
-    if (-not $app -or $app.Status.ToString() -ne "Running") {
-        Start-Service -Name $appName -ErrorAction SilentlyContinue
+    $appReady = $false
+    if ($app -and $app.Status.ToString() -eq "Running") {
+        # Já estava Running: só reinicia se o health não responder.
+        $probe = Wait-AppHealth -TimeoutSeconds 30
+        if ($probe.Ok) { $appReady = $true }
     }
-    if (-not (Wait-ServiceState -Name $appName -Status "Running" -TimeoutSeconds 120)) {
-        Stop-InitFailure "O serviço $appName não iniciou."
+    if (-not $appReady) {
+        if (-not (Stop-NexusAppProcess)) {
+            Stop-InitFailure "Não foi possível parar o $appName/liberar a porta 3000."
+        }
+        try {
+            Start-NexusApp -TimeoutSeconds 180
+        }
+        catch {
+            Stop-InitFailure $_.Exception.Message
+        }
     }
     $health = Wait-AppHealth -TimeoutSeconds 180
     if (-not $health.Ok) {

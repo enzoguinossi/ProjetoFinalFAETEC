@@ -220,12 +220,9 @@ function Install-PortableNode {
         Write-Warn "Node.js portátil em versão inesperada ('$current'); reinstalando $expectedVersion."
     }
 
-    $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-    if ($appService -and $appService.Status.ToString() -ne "Stopped") {
-        Stop-Service -Name "NexusApp" -Force
-        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
-            Fail "O serviço NexusApp não parou para atualizar o Node portátil."
-        }
+    Write-Ok "Parando NexusApp e liberando a porta 3000 para atualizar o Node portátil..."
+    if (-not (Stop-NexusAppProcess)) {
+        Fail "Não foi possível parar o NexusApp e liberar a porta 3000 para atualizar o Node portátil."
     }
 
     $tempRoot = Join-Path $env:TEMP ("nexus-node-" + [guid]::NewGuid().ToString("N"))
@@ -417,13 +414,9 @@ function Install-VcRedist {
 
 function Expand-AppPackage {
     $appZip = Get-PayloadFile -RelativePath "app\app.zip" -Label "aplicação standalone"
-    $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-    if ($appService -and $appService.Status.ToString() -ne "Stopped") {
-        Write-Ok "Parando NexusApp para atualizar a aplicação..."
-        Stop-Service -Name "NexusApp" -Force
-        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
-            Fail "O serviço NexusApp não parou para atualizar a aplicação."
-        }
+    Write-Ok "Parando NexusApp e liberando a porta 3000 para atualizar a aplicação..."
+    if (-not (Stop-NexusAppProcess)) {
+        Fail "Não foi possível parar o NexusApp/liberar a porta 3000 antes de atualizar a aplicação."
     }
 
     $previousDir = ""
@@ -1155,14 +1148,13 @@ try {
             -ObjectName "NT AUTHORITY\LocalService"
         Write-Ok "Serviço NexusCaddy configurado (NT AUTHORITY\LocalService)."
 
-        $appService = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
-        if (-not $appService -or $appService.Status.ToString() -ne "Running") {
-            Start-Service -Name "NexusApp"
+        Write-Ok "Iniciando NexusApp..."
+        try {
+            Start-NexusApp -TimeoutSeconds 180
         }
-        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Running" -TimeoutSeconds 120)) {
-            Fail "O serviço NexusApp não iniciou. Veja $LogsDir\app.err.log."
+        catch {
+            Fail ("O serviço NexusApp não iniciou: " + $_.Exception.Message + " Veja $LogsDir\app.err.log.")
         }
-        Write-Ok "NexusApp em execução."
 
         $health = Wait-HttpHealth -Url "http://127.0.0.1:3000/api/health" -TimeoutSeconds 180
         if (-not $health.Ok) {

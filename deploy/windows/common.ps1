@@ -247,6 +247,150 @@ function Test-Health {
     return $result
 }
 
+function Stop-NexusAppProcess {
+    <#
+    .SYNOPSIS
+        Para o serviço NexusApp e libera a porta 3000 de um node órfão do Nexus.
+
+    .DESCRIPTION
+        O serviço pode ficar Paused (ou Stopped) com um node antigo ainda
+        escutando em 127.0.0.1:3000. Só encerra processos comprovadamente do
+        Nexus: o node portátil da instalação e/ou `server.js` em `app`/`app.prev`.
+        Nunca mata outro processo apenas por ocupar a porta. Quando um processo
+        na porta não pode ser inspecionado, registra aviso e retorna $false.
+
+    .OUTPUTS
+        $true quando o serviço está parado e a porta 3000 está livre; $false caso
+        contrário (o chamador decide falhar).
+    #>
+    $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+    if ($service -and $service.Status.ToString() -ne "Stopped") {
+        Write-Ok "Parando o serviço NexusApp ($($service.Status))..."
+        try {
+            Stop-Service -Name "NexusApp" -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warn "Não foi possível parar o serviço NexusApp: $($_.Exception.Message)"
+        }
+        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
+            Write-Warn "O serviço NexusApp não chegou a Stopped em 60 segundos."
+            return $false
+        }
+        Write-Ok "Serviço NexusApp parado."
+    }
+
+    $failed = $false
+    $connections = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
+    foreach ($connection in $connections) {
+        $ownerId = [int]$connection.OwningProcess
+        $process = Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId={0}" -f $ownerId) -ErrorAction SilentlyContinue
+        if (-not $process) {
+            Write-Warn "A porta 3000 está ocupada pelo PID $ownerId, mas o processo não pôde ser inspecionado; ele não será encerrado."
+            $failed = $true
+            continue
+        }
+
+        $executable = [string]$process.ExecutablePath
+        $commandLine = [string]$process.CommandLine
+        $isNexusNode = ($executable -and ($executable -ieq $script:NexusNodeExe)) -or
+            ($commandLine -and ($commandLine.IndexOf($script:NexusNodeExe, [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
+        $isNexusApp = $commandLine -and (
+            ($commandLine.IndexOf("server.js", [System.StringComparison]::OrdinalIgnoreCase) -ge 0) -or
+            ($commandLine.IndexOf($script:NexusAppDir, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) -or
+            ($commandLine.IndexOf("app.prev", [System.StringComparison]::OrdinalIgnoreCase) -ge 0))
+        if (-not ($isNexusNode -and $isNexusApp)) {
+            Write-Warn "A porta 3000 está ocupada pelo PID $ownerId ($executable), que não é o node do Nexus; ele não será encerrado."
+            $failed = $true
+            continue
+        }
+
+        try {
+            Stop-Process -Id $ownerId -Force -ErrorAction Stop
+            Write-Ok "Encerrado node órfão do Nexus na porta 3000 (PID $ownerId)."
+        }
+        catch {
+            Write-Warn "Não foi possível encerrar o PID ${ownerId}: $($_.Exception.Message)"
+            $failed = $true
+        }
+    }
+
+    # Espera a porta 3000 ficar livre (até 30 s), mesmo quando não havia órfão.
+    $deadline = (Get-Date).AddSeconds(30)
+    $listening = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
+    while ($listening.Count -gt 0 -and (Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 1
+        $listening = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)
+    }
+    if ($listening.Count -gt 0) {
+        Write-Warn "A porta 3000 continua ocupada após 30 segundos."
+        return $false
+    }
+    if ($failed) {
+        return $false
+    }
+    return $true
+}
+
+function Start-NexusApp {
+    <#
+    .SYNOPSIS
+        Inicia o serviço NexusApp com a porta 3000 livre e valida o health local.
+
+    .DESCRIPTION
+        Um NexusApp em Paused (o node novo recebeu EACCES na 3000) é parado com
+        Stop-Service -Force. Em seguida Stop-NexusAppProcess limpa qualquer node
+        órfão do Nexus, o serviço volta a Automatic e é iniciado. Lança erro se
+        não chegar a Running ou se o health local não responder 200 com db=true;
+        nunca retorna sucesso com o serviço Paused.
+
+    .PARAMETER TimeoutSeconds
+        Tempo máximo de espera pelo health local (padrão 180 segundos).
+    #>
+    param([int]$TimeoutSeconds = 180)
+
+    $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+    if (-not $service) {
+        throw "O serviço NexusApp não existe."
+    }
+
+    if ($service.Status.ToString() -eq "Paused") {
+        Write-Warn "O serviço NexusApp está Paused; reiniciando do zero..."
+        Stop-Service -Name "NexusApp" -Force -ErrorAction SilentlyContinue
+        if (-not (Wait-ServiceState -Name "NexusApp" -Status "Stopped" -TimeoutSeconds 60)) {
+            throw "O serviço NexusApp não parou (estava Paused)."
+        }
+    }
+
+    if (-not (Stop-NexusAppProcess)) {
+        throw "Não foi possível liberar a porta 3000 antes de iniciar o NexusApp."
+    }
+
+    Set-Service -Name "NexusApp" -StartupType Automatic -ErrorAction SilentlyContinue
+    $service = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+    if (-not $service -or $service.Status.ToString() -ne "Running") {
+        Start-Service -Name "NexusApp" -ErrorAction Stop
+    }
+    if (-not (Wait-ServiceState -Name "NexusApp" -Status "Running" -TimeoutSeconds 120)) {
+        $status = "não encontrado"
+        $current = Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue
+        if ($current) { $status = $current.Status.ToString() }
+        throw "O serviço NexusApp não iniciou (status $status). Veja $script:NexusLogsDir\app.err.log."
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $health = $null
+    do {
+        $health = Test-Health -Url "http://127.0.0.1:3000/api/health" -ExpectDb
+        if ($health.Ok) { break }
+        Start-Sleep -Seconds 3
+    } while ((Get-Date) -lt $deadline)
+    if (-not $health -or -not $health.Ok) {
+        throw "O health local do NexusApp não respondeu 200 com db=true. Veja $script:NexusLogsDir\app.err.log."
+    }
+
+    Write-Ok "NexusApp em execução; health local OK (versão $($health.Versao))."
+}
+
 function Get-AccessIdentity {
     param([Parameter(Mandatory = $true)][string]$Identity)
     if ($Identity -match '^S-\d-\d+(-\d+)+$') {
