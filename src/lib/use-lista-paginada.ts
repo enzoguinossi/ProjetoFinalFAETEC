@@ -6,18 +6,24 @@ import type { ListParams, PaginatedResult } from "@/types";
 const DEBOUNCE_MS = 300;
 const MIN_BUSCA = 2;
 
+/** Filtros de domínio adicionais enviados junto da paginação/busca. */
+export type FiltrosLista = Record<string, string | string[] | undefined>;
+
 export function useListaPaginada<T>(
-  buscar: (params: ListParams) => Promise<PaginatedResult<T>>,
+  buscar: (params: ListParams & FiltrosLista) => Promise<PaginatedResult<T>>,
   inicial: PaginatedResult<T>,
+  filtrosIniciais: FiltrosLista = {},
 ) {
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
+  const [filtros, setFiltros] = useState<FiltrosLista>(() => ({ ...filtrosIniciais }));
   const requisicao = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const termoAtual = useRef("");
+  const filtrosAtuais = useRef<FiltrosLista>({ ...filtrosIniciais });
 
   const carregar = useCallback(
-    async (params: ListParams) => {
+    async (params: ListParams & FiltrosLista) => {
       const id = ++requisicao.current;
       setCarregando(true);
       try {
@@ -44,9 +50,11 @@ export function useListaPaginada<T>(
   );
 
   const paramsAtuais = useCallback(
-    (page: number, limit: number): ListParams => {
+    (page: number, limit: number): ListParams & FiltrosLista => {
       const search = termoAtual.current.length >= MIN_BUSCA ? termoAtual.current : undefined;
-      return { page, limit, search };
+      // O índice de `FiltrosLista` só admite `string | string[] | undefined`;
+      // `page`/`limit` são numéricos, então o tipo de interseção é afirmado aqui.
+      return { page, limit, search, ...filtrosAtuais.current } as ListParams & FiltrosLista;
     },
     [],
   );
@@ -80,5 +88,22 @@ export function useListaPaginada<T>(
     [carregar, paramsAtuais],
   );
 
-  return { resultado, carregando, buscarPorTermo, irParaPagina, mudarTamanho };
+  const aplicarFiltros = useCallback(
+    (novos: FiltrosLista) => {
+      filtrosAtuais.current = { ...novos };
+      setFiltros({ ...novos });
+      void carregar(paramsAtuais(1, resultado.limit));
+    },
+    [carregar, paramsAtuais, resultado.limit],
+  );
+
+  return {
+    resultado,
+    carregando,
+    buscarPorTermo,
+    irParaPagina,
+    mudarTamanho,
+    aplicarFiltros,
+    filtros,
+  };
 }

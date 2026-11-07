@@ -4,14 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAviso } from "@/components/AvisoProvider";
 import { useListaPaginada } from "./use-lista-paginada";
+import type { FiltrosLista } from "./use-lista-paginada";
 import type { Action, PaginacaoServidor } from "@/components/DataTable";
 import type { ListParams, PaginatedResult, PermissoesEntidade } from "@/types";
 
 export type ModoModal = "create" | "edit" | "view" | null;
 
 interface OpcoesCrud<TRow, TForm> {
-  buscar: (params: ListParams) => Promise<PaginatedResult<TRow>>;
+  buscar: (params: ListParams & FiltrosLista) => Promise<PaginatedResult<TRow>>;
   inicial: PaginatedResult<TRow>;
+  filtrosIniciais?: FiltrosLista;
   carregar: (id: number) => Promise<TForm | null>;
   excluir: (id: number) => Promise<{ error?: string; success?: boolean }>;
   idDe: (row: TRow) => number;
@@ -22,6 +24,7 @@ interface OpcoesCrud<TRow, TForm> {
 export function useCrudLista<TRow, TForm>({
   buscar,
   inicial,
+  filtrosIniciais,
   carregar,
   excluir,
   idDe,
@@ -30,7 +33,7 @@ export function useCrudLista<TRow, TForm>({
 }: OpcoesCrud<TRow, TForm>) {
   const router = useRouter();
   const mostrarAviso = useAviso();
-  const lista = useListaPaginada(buscar, inicial);
+  const lista = useListaPaginada(buscar, inicial, filtrosIniciais);
 
   const [modalMode, setModalMode] = useState<ModoModal>(null);
   const [formData, setFormData] = useState<TForm | null>(null);
@@ -113,6 +116,8 @@ export function useCrudLista<TRow, TForm>({
     resultado: lista.resultado,
     carregando: lista.carregando,
     buscarPorTermo: lista.buscarPorTermo,
+    aplicarFiltros: lista.aplicarFiltros,
+    filtros: lista.filtros,
     paginacaoServidor,
     actions,
     modalMode,
