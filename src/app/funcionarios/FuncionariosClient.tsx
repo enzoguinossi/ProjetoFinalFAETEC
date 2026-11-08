@@ -7,10 +7,12 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import FuncionarioForm from "./novo/FuncionarioForm";
+import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
+import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import {
   listarFuncionarios,
   getFuncionario,
@@ -32,6 +34,13 @@ const columns: Column<FuncionarioListRow>[] = [
   { key: "nome", label: "Nome", width: "3fr", align: "left" },
   { key: "cargo", label: "Cargo", width: "2fr", align: "left" },
   { key: "condutor", label: "Condutor", width: "1fr", align: "center" },
+  {
+    key: "ativo",
+    label: "Situação",
+    width: "1fr",
+    align: "center",
+    render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
+  },
 ];
 
 export default function FuncionariosClient({ inicial, tiposCodigo, cargos, perms }: Props) {
@@ -66,6 +75,12 @@ export default function FuncionariosClient({ inicial, tiposCodigo, cargos, perms
 
   const camposFiltro: CampoFiltro[] = [
     {
+      id: "situacao",
+      rotulo: "Situação",
+      tipo: "multi",
+      opcoes: [...OPCOES_SITUACAO],
+    },
+    {
       id: "cargo",
       rotulo: "Cargo",
       tipo: "multi",
@@ -80,6 +95,7 @@ export default function FuncionariosClient({ inicial, tiposCodigo, cargos, perms
     const cargo = novos.cargo;
     const condutor = novos.condutor;
     aplicarFiltros({
+      ativo: situacaoParaAtivo(novos.situacao),
       cargos: Array.isArray(cargo) && cargo.length > 0 ? cargo : undefined,
       condutor: Array.isArray(condutor) && condutor.includes("1") ? true : undefined,
     });

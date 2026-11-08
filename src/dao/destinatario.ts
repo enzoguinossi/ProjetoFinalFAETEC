@@ -10,6 +10,8 @@ type Db = Prisma.TransactionClient;
 
 /** Filtros da listagem de destinatários (não se aplicam aos seletores operacionais). */
 export type DestinatarioListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
   tipos?: TipoDestinatario[];
   ufs?: string[];
 };
@@ -17,7 +19,8 @@ export type DestinatarioListFiltros = {
 export class DestinatarioDAO {
   async list(params: ListParams & DestinatarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.DestinatarioWhereInput = { ativo: true };
+    const where: Prisma.DestinatarioWhereInput = {};
+    if (params.ativo !== null) where.ativo = params.ativo ?? true;
     if (params.search) {
       where.pessoaJuridica = { razao_social: { contains: params.search } };
     }

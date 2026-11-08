@@ -14,6 +14,7 @@ export type VeiculoListRow = {
   descricao: string;
   placa: string;
   status: string;
+  ativo: boolean;
 };
 
 export type VeiculoFormData = {
@@ -26,7 +27,7 @@ export type VeiculoFormData = {
 };
 
 export async function listarVeiculos(
-  params: ListParams & { status?: string[] } = {},
+  params: ListParams & { status?: string[]; ativo?: boolean | null } = {},
 ): Promise<PaginatedResult<VeiculoListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "veiculo.listar"))) return resultadoVazio(params);
@@ -36,8 +37,12 @@ export async function listarVeiculos(
         (STATUS_VEICULO as readonly string[]).includes(valor),
       )
     : undefined;
+  const ativo =
+    typeof params.ativo === "boolean" || params.ativo === null
+      ? params.ativo
+      : undefined;
 
-  const resultado = await veiculoDAO.list({ ...params, status });
+  const resultado = await veiculoDAO.list({ ...params, status, ativo });
   return {
     ...resultado,
     data: resultado.data.map((v) => ({
@@ -51,6 +56,7 @@ export async function listarVeiculos(
           : v.status === "EM_EXPEDICAO"
             ? "Em expedição"
             : "Indisponível",
+      ativo: v.ativo,
     })),
   };
 }

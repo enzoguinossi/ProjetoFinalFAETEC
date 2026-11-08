@@ -64,6 +64,22 @@ describe("veiculoDAO", () => {
       const semStatus = await veiculoDAO.list({ status: [] });
       expect(semStatus.total).toBe(3);
     });
+
+    it("filtra por situação: default só ativos, inativos e todos", async () => {
+      const ativo = await criarVeiculo({ placa: "ATV1234" });
+      const inativo = await criarVeiculo({ placa: "INA1234", ativo: false });
+
+      const padrao = await veiculoDAO.list({});
+      expect(padrao.data.map((v) => v.id_veiculo)).toEqual([ativo.id_veiculo]);
+
+      const inativos = await veiculoDAO.list({ ativo: false });
+      expect(inativos.data.map((v) => v.id_veiculo)).toEqual([inativo.id_veiculo]);
+
+      const todos = await veiculoDAO.list({ ativo: null });
+      expect(todos.data.map((v) => v.id_veiculo).sort((a, b) => a - b)).toEqual(
+        [ativo.id_veiculo, inativo.id_veiculo].sort((a, b) => a - b),
+      );
+    });
   });
 
   describe("getById", () => {

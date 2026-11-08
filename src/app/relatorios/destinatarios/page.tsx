@@ -57,8 +57,8 @@ export default async function RelatorioDestinatariosPage({
         rotulo: rotuloTipoDestinatario(tipo),
       })),
     },
-    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox" },
-    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox" },
+    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox", fixo: true },
+    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox", fixo: true },
   ];
 
   const valores = {

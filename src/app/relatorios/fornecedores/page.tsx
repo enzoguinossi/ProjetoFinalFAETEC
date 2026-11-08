@@ -43,8 +43,8 @@ export default async function RelatorioFornecedoresPage({
         rotulo: rotuloSituacaoCadastro(situacao),
       })),
     },
-    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox" },
-    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox" },
+    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox", fixo: true },
+    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox", fixo: true },
   ];
 
   const valores = {

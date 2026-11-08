@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { criarFuncionario, criarUsuario, criarVeiculo } from "../helpers/factories";
+import {
+  criarDestinatario,
+  criarExpedicao,
+  criarFuncionario,
+  criarNotaSaida,
+  criarUsuario,
+  criarVeiculo,
+} from "../helpers/factories";
+import { prismaTeste } from "../helpers/prisma";
 
 /**
  * As opções dos filtros de Expedições (veículo/condutor) são consultas de
@@ -24,6 +32,7 @@ vi.mock("@/services/permissao", () => ({
 
 import {
   listarCondutoresParaExpedicao,
+  listarDestinatariosParaExpedicao,
   listarVeiculosParaExpedicao,
 } from "@/app/expedicoes/actions";
 
@@ -58,5 +67,32 @@ describe("opções dos filtros de expedições", () => {
 
     expect((await listarVeiculosParaExpedicao()).total).toBe(0);
     expect((await listarCondutoresParaExpedicao()).total).toBe(0);
+    expect(await listarDestinatariosParaExpedicao()).toEqual([]);
+  });
+
+  it("lista os destinatários das notas de expedições ativas", async () => {
+    await preparar(["expedicao.consultar"]);
+    const escola = await criarDestinatario({ razaoSocial: "Escola Filtro" });
+    await criarDestinatario({ razaoSocial: "Escola Fora" });
+
+    const expedicao = await criarExpedicao();
+    const nota = await criarNotaSaida({
+      idDestinatario: escola.destinatario.id_destinatario,
+    });
+    await prismaTeste.expedicaoNota.create({
+      data: {
+        id_expedicao: expedicao.id_expedicao,
+        id_nota_saida: nota.id_nota_saida,
+        ordem_visita: 1,
+        data_adicao: new Date(),
+      },
+    });
+
+    expect(await listarDestinatariosParaExpedicao()).toEqual([
+      {
+        id_destinatario: escola.destinatario.id_destinatario,
+        razao_social: "Escola Filtro",
+      },
+    ]);
   });
 });

@@ -71,6 +71,31 @@ describe("funcionarioDAO", () => {
         separador.funcionario.id_funcionario,
       ]);
     });
+
+    it("filtra por situação: default só ativos, inativos e todos", async () => {
+      const ativo = await criarFuncionario({ nome: "Funcionário Ativo" });
+      const inativo = await criarFuncionario({
+        nome: "Funcionário Inativo",
+        ativo: false,
+      });
+
+      const padrao = await funcionarioDAO.list({});
+      expect(padrao.data.map((f) => f.id_funcionario)).toEqual([
+        ativo.funcionario.id_funcionario,
+      ]);
+
+      const inativos = await funcionarioDAO.list({ ativo: false });
+      expect(inativos.data.map((f) => f.id_funcionario)).toEqual([
+        inativo.funcionario.id_funcionario,
+      ]);
+
+      const todos = await funcionarioDAO.list({ ativo: null });
+      expect(todos.data.map((f) => f.id_funcionario).sort((a, b) => a - b)).toEqual(
+        [ativo.funcionario.id_funcionario, inativo.funcionario.id_funcionario].sort(
+          (a, b) => a - b,
+        ),
+      );
+    });
   });
 
   describe("listCargos", () => {

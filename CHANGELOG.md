@@ -42,8 +42,20 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   (`data_recebimento`, ou `data_criacao` quando nulo, no dia local) e fornecedor (multi). Em
   **Saída** há período, tipo (4), status (7), destinatário (multi) e urgente. Todos filtram no
   servidor, combinados com a busca, e sem filtro o resultado é o mesmo de antes.
+- **Situação nos cadastros e destinatário em Expedições (KAN-170):** **Destinatários**,
+  **Fornecedores**, **Funcionários**, **Veículos** e **Usuários** ganham o filtro **Situação**
+  (Ativos/Inativos, no servidor) e a coluna **Situação** com badge Ativo/Inativo. Sem seleção
+  a lista continua só com ativos; só Inativos mostra os inativos e ambos mostram todos. Não há
+  permissão nova (a `produto.ver_inativos` continua só em Produtos) e os seletores operacionais
+  seguem apenas com ativos. **Expedições** ganha o filtro **Destinatário** (multi), aplicado
+  pelas notas de saída vinculadas.
 
 ### Changed
+- **Nenhum filtro sempre visível (KAN-170):** na barra de filtros, os checkboxes de filtro
+  (Condutor, Somente super admin, Perecível, Composto, Contagem cega, Urgente) passam a ser
+  chips adicionáveis/removíveis, como os demais. Só os checkboxes de apresentação dos
+  relatórios (**Listar fotos/códigos/contatos**) continuam sempre visíveis, marcados como
+  `fixo`.
 - **Backup com o Nexus parado (KAN-170):** `backup.ps1` registra “MySQL parado; backup
   ignorado” e sai 0, sem falhar a tarefa diária.
 - **ACL do usuário da instalação (KAN-170):** o SID do usuário que executou o setup recebe

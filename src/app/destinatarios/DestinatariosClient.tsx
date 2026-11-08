@@ -7,8 +7,10 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import DestinatarioForm from "./novo/DestinatarioForm";
+import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
+import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import {
   ROTULOS_TIPO_DESTINATARIO,
   TIPO_DESTINATARIO,
@@ -42,6 +44,13 @@ const columns: Column<DestinatarioListRow>[] = [
     align: "center",
     render: (value) =>
       ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
+  },
+  {
+    key: "ativo",
+    label: "Situação",
+    width: "1fr",
+    align: "center",
+    render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
   },
 ];
 
@@ -77,6 +86,12 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
 
   const camposFiltro: CampoFiltro[] = [
     {
+      id: "situacao",
+      rotulo: "Situação",
+      tipo: "multi",
+      opcoes: [...OPCOES_SITUACAO],
+    },
+    {
       id: "tipo",
       rotulo: "Tipo",
       tipo: "multi",
@@ -99,6 +114,7 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
     const tipo = novos.tipo;
     const uf = novos.uf;
     aplicarFiltros({
+      ativo: situacaoParaAtivo(novos.situacao),
       tipos: Array.isArray(tipo) && tipo.length > 0 ? tipo : undefined,
       ufs: Array.isArray(uf) && uf.length > 0 ? uf : undefined,
     });

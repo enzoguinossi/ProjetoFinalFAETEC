@@ -22,6 +22,7 @@ export type FuncionarioListRow = {
   nome: string;
   cargo: string;
   condutor: string;
+  ativo: boolean;
 };
 
 export type FuncionarioFormData = {
@@ -62,7 +63,7 @@ function lerRemoverAnexos(formData: FormData): number[] {
 }
 
 export async function listarFuncionarios(
-  params: ListParams & { cargos?: string[]; condutor?: boolean } = {},
+  params: ListParams & { cargos?: string[]; condutor?: boolean; ativo?: boolean | null } = {},
 ): Promise<PaginatedResult<FuncionarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "funcionario.listar"))) return resultadoVazio(params);
@@ -72,11 +73,16 @@ export async function listarFuncionarios(
         (cargo): cargo is string => typeof cargo === "string" && cargo.trim().length > 0,
       )
     : undefined;
+  const ativo =
+    typeof params.ativo === "boolean" || params.ativo === null
+      ? params.ativo
+      : undefined;
 
   const resultado = await funcionarioDAO.list({
     ...params,
     cargos,
     condutor: params.condutor === true ? true : undefined,
+    ativo,
   });
   return {
     ...resultado,
@@ -86,6 +92,7 @@ export async function listarFuncionarios(
       nome: f.pessoaFisica.nome,
       cargo: f.cargo ?? "",
       condutor: f.condutor ? "Sim" : "Não",
+      ativo: f.ativo,
     })),
   };
 }

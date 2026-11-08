@@ -99,7 +99,7 @@ export default async function RelatorioExpedicoesPage({
         rotulo: rotuloStatusExpedicao(status),
       })),
     },
-    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
+    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox", fixo: true },
   ];
 
   const valores = {

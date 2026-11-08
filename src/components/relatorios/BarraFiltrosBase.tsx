@@ -2,13 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { campoVisivel } from "@/lib/filtros-barra";
 
 export type OpcaoFiltro = { valor: string; rotulo: string };
 
 export type CampoFiltro =
   | { id: string; rotulo: string; tipo: "multi"; opcoes: OpcaoFiltro[] }
   | { id: string; rotulo: string; tipo: "periodo" }
-  | { id: string; rotulo: string; tipo: "checkbox" };
+  | {
+      id: string;
+      rotulo: string;
+      tipo: "checkbox";
+      /** Checkbox de apresentação do relatório: sempre visível, sem remover. */
+      fixo?: boolean;
+    };
 
 /** Seleção atual de cada campo: lista de valores (multi) ou período de/até. */
 export type Valores = Record<string, string[] | { de: string; ate: string }>;
@@ -187,13 +194,10 @@ export default function BarraFiltrosBase({
     return Array.isArray(valor) && valor.length > 0;
   }
 
-  const visiveis = campos.filter(
-    (campo) =>
-      campo.tipo === "checkbox" || temValor(campo) || adicionados.includes(campo.id),
+  const visiveis = campos.filter((campo) =>
+    campoVisivel(campo, temValor(campo), adicionados),
   );
-  const disponiveis = campos.filter(
-    (campo) => campo.tipo !== "checkbox" && !visiveis.includes(campo),
-  );
+  const disponiveis = campos.filter((campo) => !visiveis.includes(campo));
   const quantidadeAtiva = visiveis.filter(temValor).length;
 
   function alterar(campo: CampoFiltro, valor: string[] | { de: string; ate: string }) {
@@ -217,7 +221,8 @@ export default function BarraFiltrosBase({
 
   function adicionar(campo: CampoFiltro) {
     setAdicionados((atuais) => (atuais.includes(campo.id) ? atuais : [...atuais, campo.id]));
-    setAberto(campo.id);
+    // Checkbox não tem painel: só vira chip e é marcado no próprio chip.
+    setAberto(campo.tipo === "checkbox" ? null : campo.id);
   }
 
   /** Valores normalizados: multi `string[]`, período `{ de, ate }`, checkbox `["1"]`/`[]`. */
@@ -283,21 +288,48 @@ export default function BarraFiltrosBase({
         {visiveis.map((campo) => {
           if (campo.tipo === "checkbox") {
             const marcado = temValor(campo);
+            const caixa = (
+              <input
+                type="checkbox"
+                checked={marcado}
+                onChange={(evento) =>
+                  alterar(campo, evento.target.checked ? ["1"] : [])
+                }
+                className="size-4 accent-[#1b9956]"
+              />
+            );
+            // Checkbox de apresentação (fixo) mantém o comportamento original:
+            // sempre visível, sem botão de remover.
+            if (campo.fixo === true) {
+              return (
+                <label
+                  key={campo.id}
+                  className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#c1c7cd] bg-white px-3 text-sm text-ink"
+                >
+                  {caixa}
+                  {campo.rotulo}
+                </label>
+              );
+            }
+            // Demais checkboxes são chips como os de multi/período.
             return (
-              <label
+              <div
                 key={campo.id}
-                className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#c1c7cd] bg-white px-3 text-sm text-ink"
+                className="flex h-9 items-center gap-1 rounded-lg border border-[#c1c7cd] bg-white pl-2.5 pr-1 text-sm text-ink"
               >
-                <input
-                  type="checkbox"
-                  checked={marcado}
-                  onChange={(evento) =>
-                    alterar(campo, evento.target.checked ? ["1"] : [])
-                  }
-                  className="size-4 accent-[#1b9956]"
-                />
-                {campo.rotulo}
-              </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  {caixa}
+                  {campo.rotulo}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => remover(campo)}
+                  aria-label={`Remover filtro ${campo.rotulo}`}
+                  className="rounded p-1 text-[#697077] transition-colors hover:bg-[#f2f4f8] hover:text-ink"
+                >
+                  <IconeX />
+                </button>
+              </div>
             );
           }
           const { texto, titulo } = resumo(campo);

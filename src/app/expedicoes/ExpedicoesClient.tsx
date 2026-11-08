@@ -23,6 +23,7 @@ import {
   listarVeiculosParaExpedicao,
   salvarExpedicao,
   type CondutorExpedicaoRow,
+  type DestinatarioExpedicaoRow,
   type ExpedicaoListRow,
   type PercursoExpedicaoRow,
   type VeiculoExpedicaoRow,
@@ -33,6 +34,7 @@ interface Props {
   perms: PermissoesEntidade;
   veiculos: VeiculoExpedicaoRow[];
   condutores: CondutorExpedicaoRow[];
+  destinatarios: DestinatarioExpedicaoRow[];
 }
 
 function formatarData(valor: string | null): string {
@@ -278,6 +280,7 @@ export default function ExpedicoesClient({
   perms,
   veiculos,
   condutores,
+  destinatarios,
 }: Props) {
   const router = useRouter();
   const mostrarAviso = useAviso();
@@ -321,6 +324,15 @@ export default function ExpedicoesClient({
         rotulo: condutor.nome,
       })),
     },
+    {
+      id: "destinatario",
+      rotulo: "Destinatário",
+      tipo: "multi",
+      opcoes: destinatarios.map((destinatario) => ({
+        valor: String(destinatario.id_destinatario),
+        rotulo: destinatario.razao_social,
+      })),
+    },
   ];
 
   function aplicarFiltrosTela(novos: Valores) {
@@ -335,6 +347,7 @@ export default function ExpedicoesClient({
       ate: periodo?.ate || undefined,
       id_veiculo: idsNumericos(novos.veiculo),
       id_funcionario_condutor: idsNumericos(novos.condutor),
+      id_destinatario: idsNumericos(novos.destinatario),
     });
   }
 

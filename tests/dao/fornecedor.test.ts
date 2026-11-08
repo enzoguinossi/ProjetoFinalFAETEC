@@ -49,6 +49,31 @@ describe("fornecedorDAO", () => {
       const todas = await fornecedorDAO.list({});
       expect(todas.total).toBe(3);
     });
+
+    it("filtra por situação: default só ativos, inativos e todos", async () => {
+      const ativo = await criarFornecedor({ razaoSocial: "Fornecedor Ativo" });
+      const inativo = await criarFornecedor({
+        razaoSocial: "Fornecedor Inativo",
+        ativo: false,
+      });
+
+      const padrao = await fornecedorDAO.list({});
+      expect(padrao.data.map((f) => f.id_fornecedor)).toEqual([
+        ativo.fornecedor.id_fornecedor,
+      ]);
+
+      const inativos = await fornecedorDAO.list({ ativo: false });
+      expect(inativos.data.map((f) => f.id_fornecedor)).toEqual([
+        inativo.fornecedor.id_fornecedor,
+      ]);
+
+      const todos = await fornecedorDAO.list({ ativo: null });
+      expect(todos.data.map((f) => f.id_fornecedor).sort((a, b) => a - b)).toEqual(
+        [ativo.fornecedor.id_fornecedor, inativo.fornecedor.id_fornecedor].sort(
+          (a, b) => a - b,
+        ),
+      );
+    });
   });
 
   describe("getById", () => {

@@ -14,6 +14,7 @@ export type UsuarioListRow = {
   codigo: string;
   login: string;
   nome: string;
+  ativo: boolean;
 };
 
 export type UsuarioFormData = {
@@ -27,14 +28,20 @@ export type UsuarioFormData = {
 };
 
 export async function listarUsuarios(
-  params: ListParams & { superAdmin?: boolean } = {},
+  params: ListParams & { superAdmin?: boolean; ativo?: boolean | null } = {},
 ): Promise<PaginatedResult<UsuarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "usuario.listar"))) return resultadoVazio(params);
 
+  const ativo =
+    typeof params.ativo === "boolean" || params.ativo === null
+      ? params.ativo
+      : undefined;
+
   const resultado = await usuarioDAO.list({
     ...params,
     superAdmin: params.superAdmin === true ? true : undefined,
+    ativo,
   });
   return {
     ...resultado,
@@ -43,6 +50,7 @@ export async function listarUsuarios(
       codigo: formatarCodigo(u.id_usuario),
       login: u.login,
       nome: u.funcionario.pessoaFisica.nome,
+      ativo: u.ativo,
     })),
   };
 }

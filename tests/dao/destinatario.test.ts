@@ -81,6 +81,31 @@ describe("destinatarioDAO", () => {
         escolaRj.destinatario.id_destinatario,
       ]);
     });
+
+    it("filtra por situação: default só ativos, inativos e todos", async () => {
+      const ativo = await criarDestinatario({ razaoSocial: "Escola Ativa" });
+      const inativo = await criarDestinatario({
+        razaoSocial: "Escola Inativa",
+        ativo: false,
+      });
+
+      const padrao = await destinatarioDAO.list({});
+      expect(padrao.data.map((d) => d.id_destinatario)).toEqual([
+        ativo.destinatario.id_destinatario,
+      ]);
+
+      const inativos = await destinatarioDAO.list({ ativo: false });
+      expect(inativos.data.map((d) => d.id_destinatario)).toEqual([
+        inativo.destinatario.id_destinatario,
+      ]);
+
+      const todos = await destinatarioDAO.list({ ativo: null });
+      expect(todos.data.map((d) => d.id_destinatario).sort((a, b) => a - b)).toEqual(
+        [ativo.destinatario.id_destinatario, inativo.destinatario.id_destinatario].sort(
+          (a, b) => a - b,
+        ),
+      );
+    });
   });
 
   describe("getById", () => {

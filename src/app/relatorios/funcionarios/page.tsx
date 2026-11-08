@@ -44,9 +44,9 @@ export default async function RelatorioFuncionariosPage({
         rotulo: rotuloSituacaoCadastro(situacao),
       })),
     },
-    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
-    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox" },
-    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox" },
+    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox", fixo: true },
+    { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox", fixo: true },
+    { id: "contatos", rotulo: "Listar contatos", tipo: "checkbox", fixo: true },
   ];
 
   const valores = {

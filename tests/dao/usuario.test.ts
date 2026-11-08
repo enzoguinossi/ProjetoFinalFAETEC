@@ -134,6 +134,28 @@ describe("usuarioDAO", () => {
         [admin.usuario.id_usuario, comum.usuario.id_usuario].sort((a, b) => a - b),
       );
     });
+
+    it("filtra por situação: default só ativos, inativos e todos", async () => {
+      const ativo = await criarUsuario({ login: "ativolist" });
+      const inativo = await criarUsuario({ login: "inativolist" });
+      await prismaTeste.usuario.update({
+        where: { id_usuario: inativo.usuario.id_usuario },
+        data: { ativo: false },
+      });
+
+      const padrao = await usuarioDAO.list({});
+      expect(padrao.data.map((u) => u.id_usuario)).toEqual([ativo.usuario.id_usuario]);
+
+      const inativos = await usuarioDAO.list({ ativo: false });
+      expect(inativos.data.map((u) => u.id_usuario)).toEqual([
+        inativo.usuario.id_usuario,
+      ]);
+
+      const todos = await usuarioDAO.list({ ativo: null });
+      expect(todos.data.map((u) => u.id_usuario).sort((a, b) => a - b)).toEqual(
+        [ativo.usuario.id_usuario, inativo.usuario.id_usuario].sort((a, b) => a - b),
+      );
+    });
   });
 
   describe("registrarAcesso", () => {

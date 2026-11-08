@@ -9,13 +9,16 @@ type Db = Prisma.TransactionClient;
 
 /** Filtros da listagem de veículos (status único ou múltiplo). */
 export type VeiculoListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
   status?: StatusVeiculo | StatusVeiculo[];
 };
 
 export class VeiculoDAO {
   async list(params: ListParams & VeiculoListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.VeiculoWhereInput = { ativo: true };
+    const where: Prisma.VeiculoWhereInput = {};
+    if (params.ativo !== null) where.ativo = params.ativo ?? true;
     if (Array.isArray(params.status)) {
       if (params.status.length > 0) where.status = { in: params.status };
     } else if (params.status) {

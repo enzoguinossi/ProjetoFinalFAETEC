@@ -10,6 +10,8 @@ type Db = Prisma.TransactionClient;
 
 /** Filtros da listagem de usuários. */
 export type UsuarioListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
   superAdmin?: boolean;
 };
 
@@ -41,7 +43,8 @@ export class UsuarioDAO {
 
   async list(params: ListParams & UsuarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.UsuarioWhereInput = { ativo: true };
+    const where: Prisma.UsuarioWhereInput = {};
+    if (params.ativo !== null) where.ativo = params.ativo ?? true;
     if (params.superAdmin === true) where.super_admin = true;
     if (params.search) {
       where.OR = [

@@ -7,10 +7,12 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import FornecedorForm from "./novo/FornecedorForm";
+import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { UFS } from "@/lib/uf";
+import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarFornecedores,
@@ -29,6 +31,13 @@ interface Props {
 const columns: Column<FornecedorListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr", align: "center" },
   { key: "razao", label: "Razão Social", width: "5fr", align: "left" },
+  {
+    key: "ativo",
+    label: "Situação",
+    width: "1fr",
+    align: "center",
+    render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
+  },
 ];
 
 export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Props) {
@@ -63,6 +72,12 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
 
   const camposFiltro: CampoFiltro[] = [
     {
+      id: "situacao",
+      rotulo: "Situação",
+      tipo: "multi",
+      opcoes: [...OPCOES_SITUACAO],
+    },
+    {
       id: "uf",
       rotulo: "UF",
       tipo: "multi",
@@ -74,7 +89,10 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
     setValoresFiltros(novos);
     setChaveFiltros((chave) => chave + 1);
     const uf = novos.uf;
-    aplicarFiltros({ ufs: Array.isArray(uf) && uf.length > 0 ? uf : undefined });
+    aplicarFiltros({
+      ativo: situacaoParaAtivo(novos.situacao),
+      ufs: Array.isArray(uf) && uf.length > 0 ? uf : undefined,
+    });
   }
 
   function limparFiltrosTela() {

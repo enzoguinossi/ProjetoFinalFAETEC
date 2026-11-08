@@ -122,6 +122,11 @@ export type CondutorExpedicaoRow = {
   nome: string;
 };
 
+export type DestinatarioExpedicaoRow = {
+  id_destinatario: number;
+  razao_social: string;
+};
+
 export type PercursoExpedicaoRow = {
   id_percurso: number;
   nome: string;
@@ -267,6 +272,7 @@ export async function listarExpedicoes(
     ate: dataFiltro(params.ate),
     id_veiculo: idsFiltro(params.id_veiculo),
     id_funcionario_condutor: idsFiltro(params.id_funcionario_condutor),
+    id_destinatario: idsFiltro(params.id_destinatario),
   });
   return { ...resultado, data: resultado.data.map(mapaResumo) };
 }
@@ -369,6 +375,30 @@ export async function listarCondutoresParaExpedicao(
       nome: condutor.pessoaFisica.nome,
     })),
   };
+}
+
+/**
+ * Destinatários ativos que aparecem em notas de expedições ativas — opções do
+ * filtro da listagem. Somente leitura: `listar`/`consultar` também precisam.
+ */
+export async function listarDestinatariosParaExpedicao(): Promise<
+  DestinatarioExpedicaoRow[]
+> {
+  const user = await requireUser();
+  if (
+    !(await usuarioPodeAlguma(user, [
+      "expedicao.listar",
+      "expedicao.consultar",
+    ]))
+  ) {
+    return [];
+  }
+
+  const destinatarios = await expedicaoDAO.listDestinatariosEmExpedicoes();
+  return destinatarios.map((destinatario) => ({
+    id_destinatario: destinatario.id_destinatario,
+    razao_social: destinatario.pessoaJuridica.razao_social,
+  }));
 }
 
 export async function listarPercursosParaExpedicao(

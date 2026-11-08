@@ -1547,4 +1547,112 @@ describe("expedicaoDAO.list", () => {
     });
     expect(buscaComPeriodo.data).toHaveLength(0);
   });
+
+  it("filtra por destinatário das notas, combinado com busca e status", async () => {
+    const escolaA = await criarDestinatario({ razaoSocial: "Escola Norte" });
+    const escolaB = await criarDestinatario({ razaoSocial: "Escola Sul" });
+
+    async function expedicaoComNota(
+      idDestinatario: number,
+      opts: { status?: "PLANEJADA" | "EM_PERCURSO" | "CONCLUIDA" } = {},
+    ) {
+      const expedicao = await criarExpedicao(opts);
+      const nota = await criarNotaSaida({ idDestinatario });
+      await prismaTeste.expedicaoNota.create({
+        data: {
+          id_expedicao: expedicao.id_expedicao,
+          id_nota_saida: nota.id_nota_saida,
+          ordem_visita: 1,
+          data_adicao: new Date(),
+        },
+      });
+      return expedicao;
+    }
+
+    const comA = await expedicaoComNota(escolaA.destinatario.id_destinatario);
+    const comB = await expedicaoComNota(escolaB.destinatario.id_destinatario, {
+      status: "CONCLUIDA",
+    });
+    await criarExpedicao();
+
+    const porDestinatario = await expedicaoDAO.list({
+      id_destinatario: [escolaA.destinatario.id_destinatario],
+      limit: 100,
+    });
+    expect(porDestinatario.data.map((item) => item.id_expedicao)).toEqual([
+      comA.id_expedicao,
+    ]);
+
+    const porOutroDestinatario = await expedicaoDAO.list({
+      id_destinatario: [escolaB.destinatario.id_destinatario],
+      limit: 100,
+    });
+    expect(porOutroDestinatario.data.map((item) => item.id_expedicao)).toEqual([
+      comB.id_expedicao,
+    ]);
+
+    const statusIncompativel = await expedicaoDAO.list({
+      id_destinatario: [escolaB.destinatario.id_destinatario],
+      status: ["PLANEJADA"],
+      limit: 100,
+    });
+    expect(statusIncompativel.data).toHaveLength(0);
+
+    await prismaTeste.expedicao.update({
+      where: { id_expedicao: comA.id_expedicao },
+      data: { observacao: "Rota Leste" },
+    });
+
+    const buscaComDestinatario = await expedicaoDAO.list({
+      search: "Leste",
+      id_destinatario: [escolaA.destinatario.id_destinatario],
+      limit: 100,
+    });
+    expect(buscaComDestinatario.data.map((item) => item.id_expedicao)).toEqual([
+      comA.id_expedicao,
+    ]);
+
+    const buscaComOutroDestinatario = await expedicaoDAO.list({
+      search: "Leste",
+      id_destinatario: [escolaB.destinatario.id_destinatario],
+      limit: 100,
+    });
+    expect(buscaComOutroDestinatario.data).toHaveLength(0);
+  });
+
+  it("lista destinatários ativos presentes em expedições ativas", async () => {
+    const aparece = await criarDestinatario({ razaoSocial: "Escola Aparece" });
+    const soEmInativa = await criarDestinatario({
+      razaoSocial: "Escola Expedicao Inativa",
+    });
+    const inativo = await criarDestinatario({
+      razaoSocial: "Escola Inativa",
+      ativo: false,
+    });
+    await criarDestinatario({ razaoSocial: "Escola Sem Expedicao" });
+
+    async function vincular(idDestinatario: number, ativo: boolean) {
+      const expedicao = await criarExpedicao({ ativo });
+      const nota = await criarNotaSaida({ idDestinatario });
+      await prismaTeste.expedicaoNota.create({
+        data: {
+          id_expedicao: expedicao.id_expedicao,
+          id_nota_saida: nota.id_nota_saida,
+          ordem_visita: 1,
+          data_adicao: new Date(),
+        },
+      });
+    }
+
+    await vincular(aparece.destinatario.id_destinatario, true);
+    await vincular(soEmInativa.destinatario.id_destinatario, false);
+    await vincular(inativo.destinatario.id_destinatario, true);
+
+    const opcoes = await expedicaoDAO.listDestinatariosEmExpedicoes();
+
+    expect(opcoes.map((opcao) => opcao.id_destinatario)).toEqual([
+      aparece.destinatario.id_destinatario,
+    ]);
+    expect(opcoes[0]?.pessoaJuridica.razao_social).toBe("Escola Aparece");
+  });
 });

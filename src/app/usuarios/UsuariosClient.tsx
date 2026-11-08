@@ -9,10 +9,12 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import UsuarioForm from "./novo/UsuarioForm";
+import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
+import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import {
   listarUsuarios,
   getUsuario,
@@ -34,6 +36,13 @@ const columns: Column<UsuarioListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr", align: "center" },
   { key: "nome", label: "Nome", width: "3fr", align: "left" },
   { key: "login", label: "Login", width: "2fr", align: "left" },
+  {
+    key: "ativo",
+    label: "Situação",
+    width: "1fr",
+    align: "center",
+    render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
+  },
 ];
 
 export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, perfilPermissoes, perms }: Props) {
@@ -68,6 +77,12 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
   const [chaveFiltros, setChaveFiltros] = useState(0);
 
   const camposFiltro: CampoFiltro[] = [
+    {
+      id: "situacao",
+      rotulo: "Situação",
+      tipo: "multi",
+      opcoes: [...OPCOES_SITUACAO],
+    },
     { id: "superAdmin", rotulo: "Somente super admin", tipo: "checkbox" },
   ];
 
@@ -76,6 +91,7 @@ export default function UsuariosClient({ inicial, funcionarios, grupos, perfis, 
     setChaveFiltros((chave) => chave + 1);
     const superAdmin = novos.superAdmin;
     aplicarFiltros({
+      ativo: situacaoParaAtivo(novos.situacao),
       superAdmin:
         Array.isArray(superAdmin) && superAdmin.includes("1") ? true : undefined,
     });

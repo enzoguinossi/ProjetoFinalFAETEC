@@ -69,7 +69,7 @@ export default async function RelatorioEntregasPage({
         rotulo: rotuloStatusNota(status),
       })),
     },
-    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox" },
+    { id: "fotos", rotulo: "Listar fotos", tipo: "checkbox", fixo: true },
   ];
 
   const valores = {

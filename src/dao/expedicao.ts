@@ -26,6 +26,8 @@ export type ExpedicaoListFiltros = {
   ate?: string;
   id_veiculo?: number[];
   id_funcionario_condutor?: number[];
+  /** Destinatários das notas de saída vinculadas. */
+  id_destinatario?: number[];
 };
 
 export type ResultadoEntrega = {
@@ -588,6 +590,15 @@ export class ExpedicaoDAO {
         id_funcionario_condutor: { in: params.id_funcionario_condutor },
       });
     }
+    if (params.id_destinatario && params.id_destinatario.length > 0) {
+      filtros.push({
+        notas: {
+          some: {
+            notaSaida: { id_destinatario: { in: params.id_destinatario } },
+          },
+        },
+      });
+    }
     const { inicio, fim } = limitesDoDiaUtc(params.de, params.ate);
     if (inicio || fim) {
       filtros.push({
@@ -655,6 +666,23 @@ export class ExpedicaoDAO {
       limit: take,
       totalPages: Math.ceil(total / take),
     };
+  }
+
+  /** Destinatários ativos que aparecem em notas de expedições ativas. */
+  async listDestinatariosEmExpedicoes() {
+    return prisma.destinatario.findMany({
+      where: {
+        ativo: true,
+        notasSaida: {
+          some: { expedicoes: { some: { expedicao: { ativo: true } } } },
+        },
+      },
+      select: {
+        id_destinatario: true,
+        pessoaJuridica: { select: { razao_social: true } },
+      },
+      orderBy: { pessoaJuridica: { razao_social: "asc" } },
+    });
   }
 
   /** Funcionários ativos marcados como condutores. */

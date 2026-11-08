@@ -12,6 +12,8 @@ type Db = Prisma.TransactionClient;
 
 /** Filtros da listagem de funcionários. */
 export type FuncionarioListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
   cargos?: string[];
   condutor?: boolean;
 };
@@ -19,7 +21,8 @@ export type FuncionarioListFiltros = {
 export class FuncionarioDAO {
   async list(params: ListParams & FuncionarioListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.FuncionarioWhereInput = { ativo: true };
+    const where: Prisma.FuncionarioWhereInput = {};
+    if (params.ativo !== null) where.ativo = params.ativo ?? true;
     if (params.search) where.pessoaFisica = { nome: { contains: params.search } };
     if (params.cargos && params.cargos.length > 0) {
       where.cargo = { in: params.cargos };

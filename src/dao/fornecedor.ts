@@ -10,13 +10,16 @@ type Db = Prisma.TransactionClient;
 
 /** Filtros da listagem de fornecedores. */
 export type FornecedorListFiltros = {
+  /** true = só ativos (default) | false = só inativos | null = todos */
+  ativo?: boolean | null;
   ufs?: string[];
 };
 
 export class FornecedorDAO {
   async list(params: ListParams & FornecedorListFiltros = {}) {
     const { skip, take } = buildPagination(params);
-    const where: Prisma.FornecedorWhereInput = { ativo: true };
+    const where: Prisma.FornecedorWhereInput = {};
+    if (params.ativo !== null) where.ativo = params.ativo ?? true;
     if (params.search) where.pessoaJuridica = { razao_social: { contains: params.search } };
     if (params.ufs && params.ufs.length > 0) {
       where.endereco = { uf: { in: params.ufs } };

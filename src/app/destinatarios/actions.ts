@@ -19,6 +19,7 @@ export type DestinatarioListRow = {
   codigo: string;
   razao: string;
   tipo_destinatario: TipoDestinatario;
+  ativo: boolean;
 };
 
 export type DestinatarioFormData = {
@@ -80,7 +81,7 @@ function lerTipoDestinatario(formData: FormData): TipoDestinatario {
 }
 
 export async function listarDestinatarios(
-  params: ListParams & { tipos?: string[]; ufs?: string[] } = {},
+  params: ListParams & { tipos?: string[]; ufs?: string[]; ativo?: boolean | null } = {},
 ): Promise<PaginatedResult<DestinatarioListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "destinatario.listar"))) return resultadoVazio(params);
@@ -92,8 +93,12 @@ export async function listarDestinatarios(
       )
     : undefined;
   const ufs = Array.isArray(params.ufs) ? params.ufs.filter(isUF) : undefined;
+  const ativo =
+    typeof params.ativo === "boolean" || params.ativo === null
+      ? params.ativo
+      : undefined;
 
-  const resultado = await destinatarioDAO.list({ ...params, tipos, ufs });
+  const resultado = await destinatarioDAO.list({ ...params, tipos, ufs, ativo });
   return {
     ...resultado,
     data: resultado.data.map((d) => ({
@@ -101,6 +106,7 @@ export async function listarDestinatarios(
       codigo: formatarCodigo(d.id_destinatario),
       razao: d.pessoaJuridica.razao_social,
       tipo_destinatario: d.tipo_destinatario,
+      ativo: d.ativo,
     })),
   };
 }

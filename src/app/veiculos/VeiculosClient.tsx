@@ -7,10 +7,12 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import VeiculoForm from "./novo/VeiculoForm";
+import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
 import { STATUS_VEICULO, type PaginatedResult, type PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
+import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import {
   listarVeiculos,
   getVeiculo,
@@ -30,6 +32,13 @@ const columns: Column<VeiculoListRow>[] = [
   { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
   { key: "placa", label: "Placa", width: "1.5fr", align: "center" },
   { key: "status", label: "Status", width: "1fr", align: "center" },
+  {
+    key: "ativo",
+    label: "Situação",
+    width: "1fr",
+    align: "center",
+    render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
+  },
 ];
 
 const ROTULOS_STATUS_FILTRO: Record<(typeof STATUS_VEICULO)[number], string> = {
@@ -70,6 +79,12 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
 
   const camposFiltro: CampoFiltro[] = [
     {
+      id: "situacao",
+      rotulo: "Situação",
+      tipo: "multi",
+      opcoes: [...OPCOES_SITUACAO],
+    },
+    {
       id: "status",
       rotulo: "Status",
       tipo: "multi",
@@ -85,6 +100,7 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
     setChaveFiltros((chave) => chave + 1);
     const status = novos.status;
     aplicarFiltros({
+      ativo: situacaoParaAtivo(novos.situacao),
       status: Array.isArray(status) && status.length > 0 ? status : undefined,
     });
   }

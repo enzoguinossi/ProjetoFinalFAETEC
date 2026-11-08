@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import ExpedicoesClient from "./ExpedicoesClient";
 import {
   listarCondutoresParaExpedicao,
+  listarDestinatariosParaExpedicao,
   listarExpedicoes,
   listarVeiculosParaExpedicao,
 } from "./actions";
@@ -14,10 +15,11 @@ export default async function ExpedicoesPage() {
   const perms = await resolverPermissoes("expedicao");
   if (!perms.canList) redirect("/dashboard");
 
-  const [inicial, veiculos, condutores] = await Promise.all([
+  const [inicial, veiculos, condutores, destinatarios] = await Promise.all([
     listarExpedicoes({ page: 1, limit: 20 }),
     listarVeiculosParaExpedicao({ page: 1, limit: 100 }),
     listarCondutoresParaExpedicao({ page: 1, limit: 100 }),
+    listarDestinatariosParaExpedicao(),
   ]);
 
   return (
@@ -28,6 +30,7 @@ export default async function ExpedicoesPage() {
         perms={perms}
         veiculos={veiculos.data}
         condutores={condutores.data}
+        destinatarios={destinatarios}
       />
     </>
   );

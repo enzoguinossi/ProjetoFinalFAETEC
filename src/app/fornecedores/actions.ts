@@ -18,6 +18,7 @@ export type FornecedorListRow = {
   id_fornecedor: number;
   codigo: string;
   razao: string;
+  ativo: boolean;
 };
 
 export type FornecedorFormData = {
@@ -70,20 +71,25 @@ function lerCep(formData: FormData): { cep?: string } | { error: string } {
 }
 
 export async function listarFornecedores(
-  params: ListParams & { ufs?: string[] } = {},
+  params: ListParams & { ufs?: string[]; ativo?: boolean | null } = {},
 ): Promise<PaginatedResult<FornecedorListRow>> {
   const user = await requireUser();
   if (!(await usuarioPode(user, "fornecedor.listar"))) return resultadoVazio(params);
 
   const ufs = Array.isArray(params.ufs) ? params.ufs.filter(isUF) : undefined;
+  const ativo =
+    typeof params.ativo === "boolean" || params.ativo === null
+      ? params.ativo
+      : undefined;
 
-  const resultado = await fornecedorDAO.list({ ...params, ufs });
+  const resultado = await fornecedorDAO.list({ ...params, ufs, ativo });
   return {
     ...resultado,
     data: resultado.data.map((f) => ({
       id_fornecedor: f.id_fornecedor,
       codigo: formatarCodigo(f.id_fornecedor),
       razao: f.pessoaJuridica.razao_social,
+      ativo: f.ativo,
     })),
   };
 }
