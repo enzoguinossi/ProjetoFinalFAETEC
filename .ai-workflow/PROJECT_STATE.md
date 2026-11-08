@@ -8,6 +8,8 @@
 ## Estado corrente — release 1.08.11.2026 (2026-11-08)
 
 - **Versão/tag:** `1.08.11.2026` / `v1.08.11.2026` (DateVer, primeira release do dia 08.11).
+- **Publicação:** `main` no commit `5733d16` e tag `v1.08.11.2026` publicadas em `origin`
+  (GitHub `enzoguinossi/ProjetoFinalFAETEC`).
 - **Instalador:** `deploy/windows/out/NexusSetup-1.08.11.2026.exe`, **439.748.699 bytes
   (419,4 MB)**, SHA-256 `5C976B33DC3E64805384FD0B42276C339C73B79371437E02454A4448DFE7194F`.
   Build por `npm run deploy:windows` (prisma generate, SQL, lint, Next standalone/app.zip,
@@ -25,7 +27,7 @@
 - **Matriz atual:** somente `RF011` (leitor/tela dedicada) e `RNF002` (medição < 2 s)
   permanecem parciais; `RF018`, `RF026` e `RNF009` seguem fora do escopo.
 - **Pendências reais:** instalar o setup em máquina limpa/colega, testar restauração **com
-  uploads**, testar a retirada e o XLSX em desktop e publicar a tag (push main + tag neste run).
+  uploads**, testar a retirada e o XLSX em desktop e validar o `atualizar.ps1 -Package`.
 
 ## Objetivo atual
 
@@ -423,8 +425,8 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 6. **Docs:** runbook, `IMPLEMENTACAO.md`, `ENTENDIMENTO.md` e `README`s atualizados para
    wizard/ACL/bandeja/sharp/filtros/tipos de destinatário/desmembramento/backup/retirada/XLSX;
    manter ao incluir novas telas.
-7. **Release 1.08.11.2026:** versão/tag definidas, `CHANGELOG` fechado, instalador compilado
-   e documentação revisada; falta publicar `main` + tag e instalar/testar o setup.
+7. **Release 1.08.11.2026:** versão/tag definidas, `CHANGELOG` fechado, instalador compilado,
+   documentação revisada e `main` + tag publicadas; falta instalar/testar o setup.
 8. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
 9. **NexusAgent/backup:** implementados (serviço, agendamento, restauração e painel
