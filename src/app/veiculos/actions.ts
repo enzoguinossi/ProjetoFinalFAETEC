@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
+import { textoFiltro } from "@/lib/filtros";
 import { resultadoVazio, STATUS_VEICULO, type ListParams, type PaginatedResult, type StatusVeiculo } from "@/types";
 
 export type VeiculoListRow = {
@@ -42,7 +43,12 @@ export async function listarVeiculos(
       ? params.ativo
       : undefined;
 
-  const resultado = await veiculoDAO.list({ ...params, status, ativo });
+  const resultado = await veiculoDAO.list({
+    ...params,
+    status,
+    ativo,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((v) => ({

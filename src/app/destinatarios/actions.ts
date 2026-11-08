@@ -9,6 +9,7 @@ import { comPermissao, comPermissaoAlguma, usuarioPode, usuarioPodeAlguma } from
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerEnderecoDoFormData, lerEnderecoParcialDoFormData } from "@/lib/form-data";
 import { formatarCodigo } from "@/lib/formatar";
+import { textoFiltro } from "@/lib/filtros";
 import { validarCnpj } from "@/lib/cnpj";
 import { validarCep } from "@/lib/cep";
 import { isUF } from "@/lib/uf";
@@ -98,7 +99,13 @@ export async function listarDestinatarios(
       ? params.ativo
       : undefined;
 
-  const resultado = await destinatarioDAO.list({ ...params, tipos, ufs, ativo });
+  const resultado = await destinatarioDAO.list({
+    ...params,
+    tipos,
+    ufs,
+    ativo,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((d) => ({

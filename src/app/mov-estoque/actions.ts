@@ -9,6 +9,7 @@ import { produtoDAO } from "@/dao/produto";
 import { mensagemDeErro } from "@/dao/_errors";
 import { requireUser } from "@/lib/auth";
 import { limitesDoDiaUtc } from "@/lib/datas";
+import { textoFiltro } from "@/lib/filtros";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
 import { notaEntradaService } from "@/services/nota-entrada";
@@ -95,11 +96,6 @@ export type NotaSaidaFiltrosPayload = {
   urgente?: boolean;
   search?: string;
 };
-
-/** Texto de busca: apenas `string` vira filtro (payload pode chegar cru). */
-function textoFiltro(valor: unknown): string | undefined {
-  return typeof valor === "string" ? valor.trim() || undefined : undefined;
-}
 
 /** Normaliza os parâmetros de uma listagem de seletor (página, limite e filtro). */
 function parametrosSelecao(params: SelecaoParams): {

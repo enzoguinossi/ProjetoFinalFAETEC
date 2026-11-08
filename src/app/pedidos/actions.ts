@@ -5,6 +5,7 @@ import type { PedidoFiltros } from "@/dao/pedido";
 import { produtoDAO } from "@/dao/produto";
 import { requireUser } from "@/lib/auth";
 import { limitesDoDiaSaoPaulo } from "@/lib/datas";
+import { textoFiltro } from "@/lib/filtros";
 import { comPermissao, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
@@ -110,11 +111,6 @@ function statusDoPayload(valor: unknown): PedidoFiltros["status"] {
     (STATUS_PEDIDO_VALIDOS as readonly unknown[]).includes(item),
   );
   return aceitos.length > 0 ? [...new Set(aceitos)] : [];
-}
-
-/** Texto de busca: apenas `string` vira filtro (payload pode chegar cru). */
-function textoFiltro(valor: unknown): string | undefined {
-  return typeof valor === "string" ? valor.trim() || undefined : undefined;
 }
 
 /** Data `YYYY-MM-DD` válida no dia civil de São Paulo; inválida não filtra. */

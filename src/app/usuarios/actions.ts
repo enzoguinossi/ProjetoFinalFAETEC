@@ -7,6 +7,7 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { parsePermissoes } from "@/lib/form-data";
 import { formatarCodigo } from "@/lib/formatar";
+import { textoFiltro } from "@/lib/filtros";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type UsuarioListRow = {
@@ -42,6 +43,7 @@ export async function listarUsuarios(
     ...params,
     superAdmin: params.superAdmin === true ? true : undefined,
     ativo,
+    search: textoFiltro(params.search),
   });
   return {
     ...resultado,

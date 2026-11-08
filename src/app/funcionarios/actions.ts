@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
+import { textoFiltro } from "@/lib/filtros";
 import { validarCpf } from "@/lib/cpf";
 import {
   processarImagemDoFormulario,
@@ -83,6 +84,7 @@ export async function listarFuncionarios(
     cargos,
     condutor: params.condutor === true ? true : undefined,
     ativo,
+    search: textoFiltro(params.search),
   });
   return {
     ...resultado,

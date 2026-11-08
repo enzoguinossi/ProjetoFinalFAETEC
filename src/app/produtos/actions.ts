@@ -13,6 +13,7 @@ import {
 } from "@/lib/imagem";
 import { anexoService } from "@/services/anexo";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
+import { textoFiltro } from "@/lib/filtros";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type { ProdutoListRow };
@@ -71,9 +72,11 @@ export async function listarProdutos(
       : undefined,
   };
 
-  if (params.search) {
+  const search = textoFiltro(params.search);
+
+  if (search) {
     const excluidos = new Set(params.excludeIds ?? []);
-    const data = (await produtoDAO.searchPriorizadoComSaldo(params.search, 50, filtros))
+    const data = (await produtoDAO.searchPriorizadoComSaldo(search, 50, filtros))
       .map(produtoParaLinha)
       .filter((linha) => !excluidos.has(linha.id_produto));
     return {
@@ -86,7 +89,7 @@ export async function listarProdutos(
   }
 
   const resultado = await produtoDAO.list(
-    { ...params, ...filtros },
+    { ...params, ...filtros, search },
     params.excludeIds ?? [],
   );
   return { ...resultado, data: resultado.data.map(produtoParaLinha) };

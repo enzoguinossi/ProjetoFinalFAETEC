@@ -18,6 +18,7 @@ import {
 import { produtoDAO } from "@/dao/produto";
 import { formatarCodigo } from "@/lib/formatar";
 import { limitesDoDiaUtc } from "@/lib/datas";
+import { textoFiltro } from "@/lib/filtros";
 import {
   resultadoVazio,
   STATUS_INVENTARIO,
@@ -282,6 +283,7 @@ export async function listarInventarios(
       inventarioDAO.list({
         ...params,
         status,
+        search: textoFiltro(params.search),
         de: dataFiltro(params.de),
         ate: dataFiltro(params.ate),
         contagemCega,
@@ -471,7 +473,11 @@ export async function listarProdutosSelecao(
 ): Promise<InventarioProdutoSelecao[] | { error: string }> {
   return comPermissao("inventario.abrir", async (user) => {
     const podeVerSistema = await usuarioPode(user, "estoque.ver_saldo");
-    const resultado = await produtoDAO.list({ search, page: 1, limit: 100 });
+    const resultado = await produtoDAO.list({
+      search: textoFiltro(search),
+      page: 1,
+      limit: 100,
+    });
     return resultado.data.map((produto) => ({
       id_produto: produto.id_produto,
       codigo: formatarCodigo(produto.id_produto),

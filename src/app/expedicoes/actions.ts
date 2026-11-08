@@ -12,6 +12,7 @@ import { limitesDoDiaUtc } from "@/lib/datas";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { formatarCodigo } from "@/lib/formatar";
+import { textoFiltro } from "@/lib/filtros";
 import {
   resultadoVazio,
   STATUS_EXPEDICAO,
@@ -268,6 +269,7 @@ export async function listarExpedicoes(
   const resultado = await expedicaoDAO.list({
     ...params,
     status,
+    search: textoFiltro(params.search),
     de: dataFiltro(params.de),
     ate: dataFiltro(params.ate),
     id_veiculo: idsFiltro(params.id_veiculo),
@@ -307,7 +309,10 @@ export async function listarNotasElegiveis(
     return resultadoVazio(params);
   }
 
-  const resultado = await expedicaoDAO.listNotasElegiveis(params);
+  const resultado = await expedicaoDAO.listNotasElegiveis({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((nota) => ({
@@ -338,7 +343,10 @@ export async function listarVeiculosParaExpedicao(
     return resultadoVazio(params);
   }
 
-  const resultado = await expedicaoDAO.listVeiculos(params);
+  const resultado = await expedicaoDAO.listVeiculos({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((veiculo) => ({
@@ -367,7 +375,10 @@ export async function listarCondutoresParaExpedicao(
     return resultadoVazio(params);
   }
 
-  const resultado = await expedicaoDAO.listCondutores(params);
+  const resultado = await expedicaoDAO.listCondutores({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((condutor) => ({
@@ -414,7 +425,10 @@ export async function listarPercursosParaExpedicao(
     return resultadoVazio(params);
   }
 
-  const resultado = await expedicaoDAO.listPercursos(params);
+  const resultado = await expedicaoDAO.listPercursos({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((percurso) => ({

@@ -85,6 +85,11 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `%TEMP%\Setup Log*.txt`.
 
 ### Fixed
+- **Busca não-string nas listagens (KAN-170):** as actions de listagem de Expedições (e
+  percursos), Inventário, Produtos, Destinatários, Fornecedores, Funcionários, Veículos e
+  Usuários passam `search` por `textoFiltro` (helper em `src/lib/filtros.ts`): número, objeto
+  ou array não viram filtro, não lançam `trim`/`contains` e não recortam a lista. Mov-estoque e
+  Pedidos passam a usar o mesmo helper, sem a cópia local.
 - **Filtro Situação “Ativos + Inativos” após refresh (KAN-170):** `filtroAtivo(null)` passa a
   contar como recorte explícito, então salvar/excluir não devolve mais a lista ao default (só
   ativos) enquanto o chip Situação continua mostrando os dois valores.

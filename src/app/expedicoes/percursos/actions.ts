@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
+import { textoFiltro } from "@/lib/filtros";
 import { resultadoVazio, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
 
 export type PercursoListRow = {
@@ -47,7 +48,10 @@ export async function listarPercursos(
   const user = await requireUser();
   if (!(await usuarioPode(user, "percurso.listar"))) return resultadoVazio(params);
 
-  const resultado = await percursoDAO.list(params);
+  const resultado = await percursoDAO.list({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((p) => ({
@@ -93,7 +97,10 @@ export async function listarDestinatariosParaPercurso(
     return resultadoVazio(params);
   }
 
-  const resultado = await percursoDAO.listDestinatarios(params);
+  const resultado = await percursoDAO.listDestinatarios({
+    ...params,
+    search: textoFiltro(params.search),
+  });
   return {
     ...resultado,
     data: resultado.data.map((d) => ({
