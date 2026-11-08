@@ -4,7 +4,12 @@ import { pedidoDAO, type PedidoFiltros } from "@/dao/pedido";
 import { produtoDAO } from "@/dao/produto";
 import { mensagemDeErro } from "@/dao/_errors";
 import { notaSaidaService } from "@/services/nota-saida";
-import { formatarDataRelatorio, formatarQuantidadeCsv } from "@/services/relatorio";
+import type { TabelaPlanilha } from "@/lib/planilha";
+import {
+  formatarDataRelatorio,
+  formatarQuantidadeCsv,
+  montarCsv,
+} from "@/services/relatorio";
 
 export const ROTULOS_STATUS_PEDIDO: Record<StatusPedido, string> = {
   PENDENTE: "Pendente",
@@ -308,37 +313,35 @@ export class PedidoService {
   }
 }
 
-function campoCsv(valor: string): string {
-  if (/[";\r\n]/.test(valor)) return `"${valor.replace(/"/g, '""')}"`;
-  return valor;
+/** Tabela do relatório de pedidos: mesmas colunas do CSV, total numérico. */
+export function tabelaPedidos(linhas: PedidoRelatorioRow[]): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Pedido",
+      "Data",
+      "Escola",
+      "Status",
+      "Itens",
+      "Total",
+      "Nota de saída",
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.data,
+      linha.escola,
+      linha.status,
+      linha.itens
+        .map((item) => `${item.descricao} (${formatarQuantidadeCsv(item.quantidade)})`)
+        .join(" | "),
+      linha.total,
+      linha.nota,
+    ]),
+  };
 }
 
 /** CSV do relatório de pedidos: BOM UTF-8, separador `;` e decimal com vírgula. */
 export function gerarCsvPedidos(linhas: PedidoRelatorioRow[]): string {
-  const cabecalho = [
-    "Pedido",
-    "Data",
-    "Escola",
-    "Status",
-    "Itens",
-    "Total",
-    "Nota de saída",
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.data,
-    linha.escola,
-    linha.status,
-    linha.itens
-      .map((item) => `${item.descricao} (${formatarQuantidadeCsv(item.quantidade)})`)
-      .join(" | "),
-    formatarQuantidadeCsv(linha.total),
-    linha.nota === null ? "" : String(linha.nota),
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaPedidos(linhas));
 }
 
 export const pedidoService = new PedidoService();

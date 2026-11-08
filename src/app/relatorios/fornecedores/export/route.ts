@@ -1,13 +1,18 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvFornecedores, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvFornecedores,
+  relatorioService,
+  tabelaFornecedores,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV da lista de Fornecedores (RF023/RF024), com o mesmo filtro de
- * situação da tela.
+ * Exportação CSV/XLSX da lista de Fornecedores (RF023/RF024), com o mesmo
+ * filtro de situação da tela.
  */
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -21,6 +26,17 @@ export async function GET(request: Request) {
     codigos: url.searchParams.get("codigos"),
     contatos: url.searchParams.get("contatos"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `fornecedores-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(
+        tabelaFornecedores(data, filtros.codigos, filtros.contatos),
+        { nome: "Fornecedores", nomeArquivo },
+      ),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvFornecedores(data, filtros.codigos, filtros.contatos), {
     headers: {

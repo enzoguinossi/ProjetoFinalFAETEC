@@ -81,7 +81,7 @@ export default async function PedidoDetalhePage({
         </div>
         <div className="flex flex-col gap-1 font-sans text-sm">
           <span className="text-xs text-[#697077]">Observação</span>
-          <span className="text-ink-strong">{pedido.observacao?.trim() || "—"}</span>
+          <span className="text-ink-strong">{pedido.observacao?.trim() || ""}</span>
         </div>
         <div className="flex flex-col gap-1 font-sans text-sm">
           <span className="text-xs text-[#697077]">Nota de saída</span>
@@ -124,7 +124,7 @@ export default async function PedidoDetalhePage({
                     {formatarQuantidade(item.quantidade)}
                   </td>
                   <td className="px-3 py-2 text-xs text-[#697077]">
-                    {item.observacao?.trim() || "—"}
+                    {item.observacao?.trim() || ""}
                   </td>
                 </tr>
               ))

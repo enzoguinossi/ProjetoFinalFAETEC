@@ -52,7 +52,7 @@ export default function VeiculoForm({ mode = "create", initialData, tiposCodigo,
       </div>
       <div className={ui.field}>
         <label className={ui.label}>Modelo</label>
-        {isView ? <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.modelo ?? "—"}</p> : <input name="modelo" defaultValue={initialData?.modelo ?? undefined} readOnly={isView} className={ui.input} />}
+        {isView ? <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.modelo ?? ""}</p> : <input name="modelo" defaultValue={initialData?.modelo ?? undefined} readOnly={isView} className={ui.input} />}
       </div>
       <div className={ui.field}>
         <label className={ui.label}>Status</label>

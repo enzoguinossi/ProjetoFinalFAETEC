@@ -1,13 +1,18 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvEntregas, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvEntregas,
+  relatorioService,
+  tabelaEntregas,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV de Entregas por Instituição (RF023/RF024). Route Handler é a
- * exceção prevista no AGENTS §15: o navegador baixa um arquivo, o que uma
+ * Exportação CSV/XLSX de Entregas por Instituição (RF023/RF024). Route Handler
+ * é a exceção prevista no AGENTS §15: o navegador baixa um arquivo, o que uma
  * Server Action não entrega com `Content-Disposition`.
  */
 export async function GET(request: Request) {
@@ -24,6 +29,17 @@ export async function GET(request: Request) {
     status: url.searchParams.getAll("status"),
     fotos: url.searchParams.get("fotos"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `entregas-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaEntregas(data, filtros.fotos), {
+        nome: "Entregas",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvEntregas(data, filtros.fotos), {
     headers: {

@@ -4,17 +4,14 @@ import FichaRelatorio from "@/components/relatorios/FichaRelatorio";
 import RelatorioCadastro from "@/components/relatorios/RelatorioCadastro";
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
-import {
-  SITUACOES_CADASTRO_RELATORIO,
-  TIPOS_DESTINATARIO_RELATORIO,
-} from "@/dao/relatorio";
+import { SITUACOES_CADASTRO_RELATORIO } from "@/dao/relatorio";
+import { tipoDestinatarioDAO } from "@/dao/tipo-destinatario";
 import { contagem } from "@/lib/formatar";
 import { fichaDestinatario } from "@/lib/fichas-relatorio";
 import {
   metadadosEmissao,
   relatorioService,
   rotuloSituacaoCadastro,
-  rotuloTipoDestinatario,
 } from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +31,11 @@ export default async function RelatorioDestinatariosPage({
   const user = await requireUser();
   if (!(await usuarioPode(user, "relatorio.gerar"))) redirect("/dashboard");
 
-  const { filtros, data } = await relatorioService.listarDestinatarios(await searchParams);
+  const params = await searchParams;
+  const [tiposDestinatario, { filtros, data }] = await Promise.all([
+    tipoDestinatarioDAO.list(),
+    relatorioService.listarDestinatarios(params),
+  ]);
   const emissao = metadadosEmissao();
   const emissor = await relatorioService.nomeEmissor(user.id_usuario);
 
@@ -52,9 +53,9 @@ export default async function RelatorioDestinatariosPage({
       id: "tipo",
       rotulo: "Tipo",
       tipo: "multi",
-      opcoes: TIPOS_DESTINATARIO_RELATORIO.map((tipo) => ({
-        valor: tipo,
-        rotulo: rotuloTipoDestinatario(tipo),
+      opcoes: tiposDestinatario.map((tipo) => ({
+        valor: String(tipo.id_tipo_destinatario),
+        rotulo: tipo.nome,
       })),
     },
     { id: "codigos", rotulo: "Listar códigos", tipo: "checkbox", fixo: true },
@@ -63,7 +64,7 @@ export default async function RelatorioDestinatariosPage({
 
   const valores = {
     situacao: [...filtros.situacoes],
-    tipo: [...filtros.tipos],
+    tipo: filtros.tipos.map(String),
     codigos: filtros.codigos ? ["1"] : [],
     contatos: filtros.contatos ? ["1"] : [],
   };
@@ -83,12 +84,18 @@ export default async function RelatorioDestinatariosPage({
   const tipoTexto =
     filtros.tipos.length === 0
       ? "Todos"
-      : filtros.tipos.map(rotuloTipoDestinatario).join(", ");
+      : filtros.tipos
+          .map(
+            (id) =>
+              tiposDestinatario.find((tipo) => tipo.id_tipo_destinatario === id)
+                ?.nome ?? String(id),
+          )
+          .join(", ");
 
   return (
     <RelatorioCadastro
       titulo="Destinatários"
-      descricao="Escolas, creches, CMEI e CMEIA atendidos, com tipo, situação, endereço e contato principal."
+      descricao="Destinatários atendidos, com tipo, situação, endereço e contato principal."
       exportHref={`/relatorios/destinatarios/export?${query.toString()}`}
       filtros={
         <BarraFiltros

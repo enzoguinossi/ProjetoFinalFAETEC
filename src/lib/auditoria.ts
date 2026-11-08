@@ -24,8 +24,10 @@ const ROTULOS_ENTIDADE: Record<string, string> = {
   percurso: "Percurso",
   mensagem_mural: "Mensagem do mural",
   tipo_codigo: "Tipo de código",
+  tipo_destinatario: "Tipo de escola",
   conversao_unidade: "Unidade de conversão",
   endereco: "Endereço",
+  backup: "Backup",
 };
 
 /** Rótulos das ações registradas. */
@@ -38,6 +40,9 @@ const ROTULOS_ACAO: Record<string, string> = {
   LOGIN_FALHA: "Falha de login",
   LOGOUT: "Logout",
   DEFINIR_SENHA: "Definir senha",
+  SOLICITAR_BACKUP: "Solicitar backup",
+  ALTERAR_AGENDA: "Alterar agenda",
+  RESTAURAR: "Restaurar",
 };
 
 /** Ações de autenticação não representam alteração de dados. */

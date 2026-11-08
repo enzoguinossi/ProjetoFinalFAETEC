@@ -129,7 +129,7 @@ export default async function RelatorioEntregasPage({
   return (
     <RelatorioCadastro
       titulo="Entregas por Instituição"
-      descricao="Notas de saída por destinatário no período, com itens esperados, entregues e pendentes."
+      descricao="Notas de saída por destinatário no período, com itens solicitados, entregues e pendentes."
       exportHref={`/relatorios/entregas/export?${query.toString()}`}
       filtros={
         <BarraFiltros
@@ -157,7 +157,7 @@ export default async function RelatorioEntregasPage({
       vazio="Nenhuma entrega encontrada no período."
       totais={[
         { rotulo: "Notas", valor: String(data.length) },
-        { rotulo: "Esperados", valor: formatarQuantidade(totais.esperado) },
+        { rotulo: "Solicitados", valor: formatarQuantidade(totais.esperado) },
         { rotulo: "Entregues", valor: formatarQuantidade(totais.entregue) },
         { rotulo: "Pendentes", valor: formatarQuantidade(totais.pendente) },
       ]}
@@ -168,7 +168,7 @@ export default async function RelatorioEntregasPage({
             <span>{grupo.nome}</span>
             <span>
               {grupo.notas.length} nota{grupo.notas.length === 1 ? "" : "s"} ·{" "}
-              {formatarQuantidade(grupo.esperado)} esperados ·{" "}
+              {formatarQuantidade(grupo.esperado)} solicitados ·{" "}
               {formatarQuantidade(grupo.entregue)} entregues ·{" "}
               {formatarQuantidade(grupo.pendente)} pendentes
             </span>
@@ -188,7 +188,7 @@ export default async function RelatorioEntregasPage({
                 <span>{linha.itens}</span>
               </div>
               <div className="registro-linha">
-                <span className="registro-rotulo">Esperado</span>
+                <span className="registro-rotulo">Solicitado</span>
                 <span>{formatarQuantidade(linha.esperado)}</span>
               </div>
               <div className="registro-linha">

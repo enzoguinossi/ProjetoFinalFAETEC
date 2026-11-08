@@ -11,6 +11,7 @@ import type { Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
 import type { PaginatedResult } from "@/types";
+import RetiradaModal, { type NotaRetirada } from "./RetiradaModal";
 import SaidaForm from "./SaidaForm";
 import {
   cancelarNotaSaida,
@@ -35,6 +36,8 @@ interface Props {
   podeAlterarNota: boolean;
   /** `nota_saida.cancelar`: habilita o cancelamento da nota. */
   podeCancelarNota: boolean;
+  /** `expedicao.alterar`: habilita a retirada direta de itens. */
+  podeRetirarNota: boolean;
 }
 
 type ModoModal = "view" | "edit";
@@ -78,6 +81,7 @@ export default function SaidaClient({
   podeConsultarNota,
   podeAlterarNota,
   podeCancelarNota,
+  podeRetirarNota,
 }: Props) {
   const mostrarAviso = useAviso();
 
@@ -86,6 +90,7 @@ export default function SaidaClient({
   const [modalSaidaAberto, setModalSaidaAberto] = useState(false);
   const [cancelandoId, setCancelandoId] = useState<number | null>(null);
   const [notaParaCancelar, setNotaParaCancelar] = useState<NotaSaidaListRow | null>(null);
+  const [retirada, setRetirada] = useState<NotaRetirada | null>(null);
   const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
   const [chaveFiltros, setChaveFiltros] = useState(0);
   const filtrosAtuais = useRef<NotaSaidaFiltrosPayload>({});
@@ -302,27 +307,37 @@ export default function SaidaClient({
               ? `Total solicitado: ${formatarNumero(nota.quantidade)} — Total entregue: ${formatarNumero(totalEntregue)}`
               : "Sem quantidade solicitada."}
           </span>
-          {nota.tipo !== "SAIDA" ? (
-            <span className="font-sans text-xs text-[#697077]">
-              Nota de {nota.tipoLabel.toLowerCase()} já baixada — histórico, sem edição ou
-              cancelamento (RN004).
-            </span>
-          ) : podeCancelarNota && nota.podeCancelar ? (
-            <Button
-              label={cancelandoId === nota.id_nota_saida ? "Cancelando..." : "Cancelar nota"}
-              variant="cancel"
-              onClick={() => setNotaParaCancelar(nota)}
-              disabled={cancelandoId !== null}
-            />
-          ) : nota.podeCancelar ? (
-            <span className="font-sans text-xs text-[#697077]">
-              Sem permissão para cancelar.
-            </span>
-          ) : (
-            <span className="font-sans text-xs text-[#697077]">
-              Não pode ser cancelada neste status.
-            </span>
-          )}
+          <div className="flex items-center justify-end gap-2">
+            {nota.tipo === "SAIDA" && podeRetirarNota && nota.podeRetirar && (
+              <Button
+                label="Retirar itens"
+                variant="primary"
+                onClick={() => setRetirada(nota)}
+                disabled={cancelandoId !== null}
+              />
+            )}
+            {nota.tipo !== "SAIDA" ? (
+              <span className="font-sans text-xs text-[#697077]">
+                Nota de {nota.tipoLabel.toLowerCase()} já baixada — histórico, sem edição ou
+                cancelamento (RN004).
+              </span>
+            ) : podeCancelarNota && nota.podeCancelar ? (
+              <Button
+                label={cancelandoId === nota.id_nota_saida ? "Cancelando..." : "Cancelar nota"}
+                variant="cancel"
+                onClick={() => setNotaParaCancelar(nota)}
+                disabled={cancelandoId !== null}
+              />
+            ) : nota.podeCancelar ? (
+              <span className="font-sans text-xs text-[#697077]">
+                Sem permissão para cancelar.
+              </span>
+            ) : (
+              <span className="font-sans text-xs text-[#697077]">
+                Não pode ser cancelada neste status.
+              </span>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -393,6 +408,11 @@ export default function SaidaClient({
           <SaidaForm
             mode={notaModal.mode}
             initialData={notaModal.data}
+            podeRetirar={podeRetirarNota}
+            onRetirar={(nota) => {
+              setNotaModal(null);
+              setRetirada(nota);
+            }}
             onCancel={() => setNotaModal(null)}
             onSaved={async () => {
               setNotaModal(null);
@@ -401,6 +421,24 @@ export default function SaidaClient({
           />
         )}
       </Modal>
+
+      {retirada && (
+        <RetiradaModal
+          open
+          nota={retirada}
+          onClose={() => setRetirada(null)}
+          onSaved={async (status) => {
+            setRetirada(null);
+            mostrarAviso(
+              `Itens retirados. Nota agora está ${
+                status === "BAIXA_TOTAL" ? "com baixa total" : "com baixa parcial"
+              }.`,
+              "sucesso",
+            );
+            await recarregarPaginaAtual();
+          }}
+        />
+      )}
 
       <ConfirmDialog
         open={notaParaCancelar !== null}

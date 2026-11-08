@@ -8,7 +8,6 @@ import { ui } from "@/lib/ui";
 import { salvarPercurso, listarDestinatariosParaPercurso } from "../actions";
 import type { DestinatarioPercursoRow, PercursoFormData } from "../actions";
 import type { Column } from "@/components/DataTable";
-import { ROTULOS_TIPO_DESTINATARIO, type TipoDestinatario } from "@/types";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -20,23 +19,20 @@ interface Props {
 type ItemSelecionado = {
   id_destinatario: number;
   razao_social: string;
-  tipo: TipoDestinatario;
+  tipo_nome: string | null;
   ordem_visita: number;
 };
 
 const COLUNAS_DESTINATARIO: Column<DestinatarioPercursoRow>[] = [
   { key: "razao_social", label: "Razão social", width: "3fr", align: "left" },
   {
-    key: "tipo",
+    key: "tipo_nome",
     label: "Tipo",
     width: "1fr",
     align: "center",
-    render: (value) =>
-      ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
+    render: (value) => (value ? String(value) : ""),
   },
 ];
-
-const ROTULO_TIPO = ROTULOS_TIPO_DESTINATARIO;
 
 function renumerar(lista: ItemSelecionado[]): ItemSelecionado[] {
   return lista.map((item, indice) => ({ ...item, ordem_visita: indice + 1 }));
@@ -67,7 +63,7 @@ export default function PercursoForm({
         {
           id_destinatario: destinatario.id_destinatario,
           razao_social: destinatario.razao_social,
-          tipo: destinatario.tipo,
+          tipo_nome: destinatario.tipo_nome,
           ordem_visita: atuais.length + 1,
         },
       ]),
@@ -199,9 +195,11 @@ export default function PercursoForm({
                 </div>
                 <div className="px-[0.6875rem] py-2 overflow-hidden text-ellipsis whitespace-nowrap">
                   {destinatario.razao_social}
-                  <span className="ml-2 text-[0.75rem] text-[#697077]">
-                    {ROTULO_TIPO[destinatario.tipo] ?? destinatario.tipo}
-                  </span>
+                  {destinatario.tipo_nome && (
+                    <span className="ml-2 text-[0.75rem] text-[#697077]">
+                      {destinatario.tipo_nome}
+                    </span>
+                  )}
                 </div>
                 {!isView && (
                   <div className="flex items-center justify-center gap-1 px-[0.6875rem] py-1">

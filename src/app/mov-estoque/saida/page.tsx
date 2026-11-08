@@ -11,12 +11,13 @@ export default async function MovEstoqueSaidaPage() {
   const podeVer = await usuarioPodeAlguma(user, ["estoque.ver_saldo", "estoque.saida"]);
   if (!podeVer) redirect("/dashboard");
 
-  const [podeCriarSaida, podeConsultarNota, podeAlterarNota, podeCancelarNota] =
+  const [podeCriarSaida, podeConsultarNota, podeAlterarNota, podeCancelarNota, podeRetirarNota] =
     await Promise.all([
       usuarioPode(user, "nota_saida.criar"),
       usuarioPode(user, "nota_saida.consultar"),
       usuarioPode(user, "nota_saida.alterar"),
       usuarioPode(user, "nota_saida.cancelar"),
+      usuarioPode(user, "expedicao.alterar"),
     ]);
 
   const [inicialSaida, destinatarios] = await Promise.all([
@@ -33,6 +34,7 @@ export default async function MovEstoqueSaidaPage() {
       podeConsultarNota={podeConsultarNota}
       podeAlterarNota={podeAlterarNota}
       podeCancelarNota={podeCancelarNota}
+      podeRetirarNota={podeRetirarNota}
     />
   );
 }

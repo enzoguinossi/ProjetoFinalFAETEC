@@ -79,7 +79,7 @@ export type ProdutoPedidoDetalhe = {
 export type EscolaSelecaoRow = {
   id_destinatario: number;
   razao_social: string;
-  tipo: string;
+  tipo_nome: string | null;
 };
 
 const PERMISSOES_VER = [
@@ -261,7 +261,7 @@ export async function listarEscolasSelecao(): Promise<EscolaSelecaoRow[]> {
   return resultado.data.map((destinatario) => ({
     id_destinatario: destinatario.id_destinatario,
     razao_social: destinatario.pessoaJuridica.razao_social,
-    tipo: destinatario.tipo_destinatario,
+    tipo_nome: destinatario.tipoDestinatario?.nome ?? null,
   }));
 }
 

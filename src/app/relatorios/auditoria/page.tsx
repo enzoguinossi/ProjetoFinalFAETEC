@@ -169,6 +169,11 @@ export default async function RelatorioAuditoriaPage({
             href={`/relatorios/auditoria/export?${query.toString()}`}
             variant="ghost"
           />
+          <Button
+            label="Exportar XLSX"
+            href={`/relatorios/auditoria/export?${query.toString()}&formato=xlsx`}
+            variant="ghost"
+          />
           <Button label="Voltar" href="/relatorios" variant="ghost" />
         </div>
       </div>

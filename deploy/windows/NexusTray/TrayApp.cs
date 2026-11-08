@@ -1,12 +1,15 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace NexusTray;
@@ -17,10 +20,27 @@ internal sealed class TrayApp : ApplicationContext
     private const int BalloonTimeoutMs = 5_000;
     private const int TooltipLimit = 63;
 
+    // Símbolo do Nexus (public/logo.svg) embutido no executável.
+    private const string LogoSymbolResource = "NexusTray.logo.svg";
+    private const float LogoViewWidth = 72f;
+    private const float LogoViewHeight = 80f;
+    private const int IconSize = 32;
+    private const float IconMargin = 1f;
+
     private static readonly Color GreenColor = Color.FromArgb(46, 158, 68);
     private static readonly Color YellowColor = Color.FromArgb(224, 161, 0);
     private static readonly Color RedColor = Color.FromArgb(214, 69, 69);
     private static readonly Color GrayColor = Color.FromArgb(128, 128, 128);
+
+    private static readonly Regex LogoSymbolPathRegex = new(
+        "\\sd=\"(?<data>[^\"]+)\"",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Regex LogoSymbolTokenRegex = new(
+        @"([A-Za-z])|(-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Lazy<IReadOnlyList<PointF[]>> LogoSymbol = new(LoadLogoSymbol);
 
     private readonly TrayConfig _config;
     private readonly HttpClient _http;
@@ -28,6 +48,7 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ContextMenuStrip _menu;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _startItem;
+    private readonly ToolStripMenuItem _stopItem;
     private readonly ToolStripMenuItem _openItem;
     private readonly ToolStripMenuItem _restartItem;
     private readonly ToolStripMenuItem _backupItem;
@@ -54,6 +75,9 @@ internal sealed class TrayApp : ApplicationContext
         _startItem = new ToolStripMenuItem("Iniciar Nexus");
         _startItem.Click += OnStartClick;
 
+        _stopItem = new ToolStripMenuItem("Encerrar Nexus");
+        _stopItem.Click += OnStopClick;
+
         _openItem = new ToolStripMenuItem("Abrir Nexus");
         _openItem.Click += (_, _) => OpenUrl(_config.BaseUrl);
 
@@ -76,6 +100,7 @@ internal sealed class TrayApp : ApplicationContext
         _menu.Items.AddRange(new ToolStripItem[]
         {
             _startItem,
+            _stopItem,
             _openItem,
             _statusItem,
             new ToolStripSeparator(),
@@ -207,7 +232,10 @@ internal sealed class TrayApp : ApplicationContext
         bool allRunning = hasSnapshot && snapshot.Services.AllRunning;
         bool healthOk = hasSnapshot && snapshot.Health.Ok;
 
+        _startItem.Visible = !allRunning;
         _startItem.Enabled = !busy && hasSnapshot && !allRunning;
+        _stopItem.Visible = hasSnapshot && allRunning;
+        _stopItem.Enabled = !busy && allRunning;
         _openItem.Enabled = !busy && allRunning && healthOk;
         _restartItem.Enabled = !busy && allRunning;
         _backupItem.Enabled = !busy && allRunning;
@@ -316,38 +344,24 @@ internal sealed class TrayApp : ApplicationContext
 
     private static (Icon? Icon, IntPtr Handle) CreateIcon(TrayState state)
     {
+        Color color = state switch
+        {
+            TrayState.Green => GreenColor,
+            TrayState.Yellow => YellowColor,
+            TrayState.Gray => GrayColor,
+            _ => RedColor
+        };
+
         try
         {
-            Color color = state switch
+            IReadOnlyList<PointF[]> shapes = LogoSymbol.Value;
+            if (shapes.Count == 0)
             {
-                TrayState.Green => GreenColor,
-                TrayState.Yellow => YellowColor,
-                TrayState.Gray => GrayColor,
-                _ => RedColor
-            };
-
-            using Bitmap bitmap = new(32, 32);
-            using (Graphics graphics = Graphics.FromImage(bitmap))
-            {
-                graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                graphics.Clear(Color.Transparent);
-
-                using (SolidBrush brush = new(color))
-                {
-                    graphics.FillEllipse(brush, 2, 2, 28, 28);
-                }
-
-                using (Pen border = new(Color.FromArgb(70, 0, 0, 0), 1.5f))
-                {
-                    graphics.DrawEllipse(border, 2.75f, 2.75f, 26.5f, 26.5f);
-                }
-
-                using (SolidBrush highlight = new(Color.FromArgb(80, Color.White)))
-                {
-                    graphics.FillEllipse(highlight, 9, 8, 9, 7);
-                }
+                // Recurso/parse indisponível: mantém o círculo e a bandeja de pé.
+                return CreateCircleIcon(color);
             }
 
+            using Bitmap bitmap = DrawLogoSymbol(shapes, color);
             IntPtr handle = bitmap.GetHicon();
             return (Icon.FromHandle(handle), handle);
         }
@@ -364,6 +378,183 @@ internal sealed class TrayApp : ApplicationContext
         {
             return FallbackIcon();
         }
+    }
+
+    private static IReadOnlyList<PointF[]> LoadLogoSymbol()
+    {
+        try
+        {
+            using Stream? stream = typeof(TrayApp).Assembly
+                .GetManifestResourceStream(LogoSymbolResource);
+            if (stream is null)
+            {
+                return Array.Empty<PointF[]>();
+            }
+
+            using StreamReader reader = new(stream, Encoding.UTF8);
+            string svg = reader.ReadToEnd();
+
+            List<PointF[]> shapes = new();
+            foreach (Match match in LogoSymbolPathRegex.Matches(svg))
+            {
+                PointF[] shape = ParseLogoSymbolPath(match.Groups["data"].Value);
+                if (shape.Length >= 3)
+                {
+                    shapes.Add(shape);
+                }
+            }
+
+            return shapes;
+        }
+        catch (Exception)
+        {
+            // Qualquer falha na leitura/parse do recurso cai no fallback circular.
+            return Array.Empty<PointF[]>();
+        }
+    }
+
+    private static PointF[] ParseLogoSymbolPath(string data)
+    {
+        // O símbolo usa apenas M, L, V, H e Z maiúsculos, sem curvas.
+        MatchCollection tokens = LogoSymbolTokenRegex.Matches(data);
+        List<PointF> points = new();
+        int index = 0;
+        char command = '\0';
+        float x = 0f;
+        float y = 0f;
+        float startX = 0f;
+        float startY = 0f;
+        bool hasStart = false;
+
+        float NextNumber()
+        {
+            if (index >= tokens.Count || !tokens[index].Groups[2].Success)
+            {
+                throw new FormatException("Número esperado no path do símbolo.");
+            }
+
+            string value = tokens[index].Groups[2].Value;
+            index++;
+            return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
+        }
+
+        while (index < tokens.Count)
+        {
+            Match token = tokens[index];
+            if (token.Groups[1].Success)
+            {
+                command = token.Groups[1].Value[0];
+                index++;
+                if (command is not ('M' or 'L' or 'V' or 'H' or 'Z'))
+                {
+                    throw new NotSupportedException($"Comando '{command}' não suportado no símbolo.");
+                }
+            }
+            else if (command is '\0' or 'Z')
+            {
+                throw new FormatException("Coordenada sem comando no path do símbolo.");
+            }
+
+            switch (command)
+            {
+                case 'M':
+                    x = NextNumber();
+                    y = NextNumber();
+                    startX = x;
+                    startY = y;
+                    hasStart = true;
+                    points.Add(new PointF(x, y));
+                    // Pares seguintes a um M são tratados como L, conforme o SVG.
+                    command = 'L';
+                    break;
+                case 'L':
+                    x = NextNumber();
+                    y = NextNumber();
+                    points.Add(new PointF(x, y));
+                    break;
+                case 'H':
+                    x = NextNumber();
+                    points.Add(new PointF(x, y));
+                    break;
+                case 'V':
+                    y = NextNumber();
+                    points.Add(new PointF(x, y));
+                    break;
+                case 'Z':
+                    if (!hasStart)
+                    {
+                        throw new FormatException("Z sem ponto inicial no path do símbolo.");
+                    }
+
+                    points.Add(new PointF(startX, startY));
+                    break;
+            }
+        }
+
+        return points.ToArray();
+    }
+
+    private static Bitmap DrawLogoSymbol(IReadOnlyList<PointF[]> shapes, Color color)
+    {
+        // Escala 72x80 para 32x32 preservando a proporção (~1 px de margem)
+        // e centraliza o símbolo no bitmap transparente.
+        float scale = Math.Min(
+            (IconSize - (IconMargin * 2f)) / LogoViewWidth,
+            (IconSize - (IconMargin * 2f)) / LogoViewHeight);
+        float offsetX = (IconSize - (LogoViewWidth * scale)) / 2f;
+        float offsetY = (IconSize - (LogoViewHeight * scale)) / 2f;
+
+        Bitmap bitmap = new(IconSize, IconSize);
+        using (Graphics graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.Clear(Color.Transparent);
+
+            using SolidBrush brush = new(color);
+            foreach (PointF[] shape in shapes)
+            {
+                PointF[] scaled = new PointF[shape.Length];
+                for (int i = 0; i < shape.Length; i++)
+                {
+                    scaled[i] = new PointF(
+                        offsetX + (shape[i].X * scale),
+                        offsetY + (shape[i].Y * scale));
+                }
+
+                graphics.FillPolygon(brush, scaled);
+            }
+        }
+
+        return bitmap;
+    }
+
+    private static (Icon? Icon, IntPtr Handle) CreateCircleIcon(Color color)
+    {
+        using Bitmap bitmap = new(IconSize, IconSize);
+        using (Graphics graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            graphics.Clear(Color.Transparent);
+
+            using (SolidBrush brush = new(color))
+            {
+                graphics.FillEllipse(brush, 2, 2, 28, 28);
+            }
+
+            using (Pen border = new(Color.FromArgb(70, 0, 0, 0), 1.5f))
+            {
+                graphics.DrawEllipse(border, 2.75f, 2.75f, 26.5f, 26.5f);
+            }
+
+            using (SolidBrush highlight = new(Color.FromArgb(80, Color.White)))
+            {
+                graphics.FillEllipse(highlight, 9, 8, 9, 7);
+            }
+        }
+
+        IntPtr handle = bitmap.GetHicon();
+        return (Icon.FromHandle(handle), handle);
     }
 
     private static (Icon? Icon, IntPtr Handle) FallbackIcon()
@@ -474,6 +665,11 @@ internal sealed class TrayApp : ApplicationContext
         await StartNexusAsync();
     }
 
+    private async void OnStopClick(object? sender, EventArgs e)
+    {
+        await StopNexusAsync();
+    }
+
     private async void OnRestartClick(object? sender, EventArgs e)
     {
         await RestartServiceAsync();
@@ -523,6 +719,59 @@ internal sealed class TrayApp : ApplicationContext
             _operationInProgress = false;
             UpdateMenuEnabled();
             _ = PollAfterAsync(TimeSpan.FromSeconds(2));
+        }
+    }
+
+    private async Task StopNexusAsync()
+    {
+        if (_operationInProgress || _closing)
+        {
+            return;
+        }
+
+        DialogResult answer = MessageBox.Show(
+            "Encerrar o Nexus? Isso vai parar o Node, o Caddy e o MySQL agora. " +
+            "A bandeja continua aberta para iniciar de novo.",
+            "Nexus - encerrar serviços",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning,
+            MessageBoxDefaultButton.Button2);
+
+        if (answer != DialogResult.Yes)
+        {
+            return;
+        }
+
+        _operationInProgress = true;
+        UpdateMenuEnabled();
+        try
+        {
+            ShowBalloon("Nexus", "Encerrando os serviços do Nexus…", ToolTipIcon.Info);
+            int exitCode = await RunScriptAsync(_config.StopScript, "encerrar o Nexus");
+            if (exitCode == 0)
+            {
+                ShowBalloon(
+                    "Nexus encerrado",
+                    "Os serviços foram parados. Use Iniciar Nexus para subir de novo.",
+                    ToolTipIcon.Info);
+            }
+            else
+            {
+                ShowBalloon(
+                    "Falha ao encerrar",
+                    $"O script terminou com código {exitCode}. Veja os logs em {_config.LogsDir}.",
+                    ToolTipIcon.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowBalloon("Falha ao encerrar", ex.Message, ToolTipIcon.Error);
+        }
+        finally
+        {
+            _operationInProgress = false;
+            UpdateMenuEnabled();
+            _ = PollAfterAsync(TimeSpan.FromSeconds(1));
         }
     }
 

@@ -373,7 +373,7 @@ export default function EntradaForm({
                           disabled={isView}
                           className={INPUT_CLASS}
                         >
-                          <option value="">—</option>
+                          <option value="">Sem conversão</option>
                           {conversoes.map((c) => (
                             <option key={c.id_conversao} value={c.id_conversao}>
                               {c.nome}

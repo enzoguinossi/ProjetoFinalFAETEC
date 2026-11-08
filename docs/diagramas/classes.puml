@@ -103,10 +103,19 @@ package "Cadastros" as Cadastros {
 
   class Destinatario {
     + ID_destinatario: Integer
-    + tipo_destinatario: Enum
+    + id_tipo_destinatario: Integer
     + ativo: Boolean
   }
+
+  class TipoDestinatario {
+    + ID_tipo_destinatario: Integer
+    + codigo: String
+    + nome: String
+    + padrao: Boolean
+  }
 }
+
+TipoDestinatario "0..1" <-- "0..*" Destinatario : classifica >
 
 ' Relacionamentos Pessoas
 PessoaFisica "1" <-- "1" Funcionario : é uma >

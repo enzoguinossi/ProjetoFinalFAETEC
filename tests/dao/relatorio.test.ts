@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { relatorioDAO } from "@/dao/relatorio";
+import { gerarCsvEntregas } from "@/services/relatorio";
 import { prismaTeste } from "../helpers/prisma";
 import {
   criarEstoque,
@@ -12,6 +13,7 @@ import {
   criarNotaSaida,
   criarProduto,
   criarTipoCodigo,
+  criarTipoDestinatario,
   criarUsuario,
   criarConversao,
   criarVeiculo,
@@ -941,6 +943,50 @@ describe("relatorioDAO", () => {
       ]);
     });
 
+    it("não inclui desmontagem, avaria e consumo interno como entregas", async () => {
+      const escola = await criarDestinatario({ razaoSocial: "Escola Municipal" });
+      const entrega = await prismaTeste.notaSaida.create({
+        data: {
+          id_destinatario: escola.destinatario.id_destinatario,
+          data_criacao: new Date("2026-10-10T12:00:00.000Z"),
+          tipo: "SAIDA",
+          status: "ABERTA",
+        },
+      });
+      const baixasInternas = [];
+      for (const tipo of [
+        "DESMONTAGEM",
+        "AVARIA",
+        "CONSUMO_INTERNO",
+      ] as const) {
+        baixasInternas.push(
+          await prismaTeste.notaSaida.create({
+            data: {
+              id_destinatario: null,
+              data_criacao: new Date("2026-10-11T12:00:00.000Z"),
+              tipo,
+              status: "BAIXA_TOTAL",
+            },
+          }),
+        );
+      }
+
+      const resultado = await relatorioDAO.listarEntregasRelatorio();
+
+      expect(resultado.data.map((nota) => nota.id_nota_saida)).toEqual([
+        entrega.id_nota_saida,
+      ]);
+      const csv = gerarCsvEntregas(resultado.data);
+      expect(csv).toContain(
+        `${String(entrega.id_nota_saida).padStart(6, "0")};`,
+      );
+      for (const baixa of baixasInternas) {
+        expect(csv).not.toContain(
+          `${String(baixa.id_nota_saida).padStart(6, "0")};`,
+        );
+      }
+    });
+
     it("devolve lista vazia e totais zerados sem notas", async () => {
       const resultado = await relatorioDAO.listarEntregasRelatorio();
       expect(resultado.data).toEqual([]);
@@ -1197,13 +1243,15 @@ describe("relatorioDAO", () => {
 
   describe("listarDestinatariosRelatorio", () => {
     it("lista com razão social, CNPJ, tipo, endereço e contato, filtrando situação e tipo", async () => {
+      const tipoEscola = await criarTipoDestinatario("Escola");
+      const tipoCreche = await criarTipoDestinatario("Creche");
       const escola = await criarDestinatario({
         razaoSocial: "Escola A",
-        tipo: "ESCOLA",
+        idTipoDestinatario: tipoEscola.id_tipo_destinatario,
       });
       const creche = await criarDestinatario({
         razaoSocial: "Creche B",
-        tipo: "CRECHE",
+        idTipoDestinatario: tipoCreche.id_tipo_destinatario,
         ativo: false,
       });
 
@@ -1256,11 +1304,11 @@ describe("relatorioDAO", () => {
         },
       });
 
-      const tipoEscola = await criarTipoCodigo("COD_ESCOLA");
+      const tipoCodigoEscola = await criarTipoCodigo("COD_ESCOLA");
       await prismaTeste.destinatarioCodigo.create({
         data: {
           id_destinatario: escola.destinatario.id_destinatario,
-          id_tipo_codigo: tipoEscola.id_tipo_codigo,
+          id_tipo_codigo: tipoCodigoEscola.id_tipo_codigo,
           codigo: "ESC-9",
         },
       });
@@ -1269,7 +1317,7 @@ describe("relatorioDAO", () => {
       expect(todos.data.map((d) => d.razao_social)).toEqual(["Creche B", "Escola A"]);
       expect(todos.data[0]).toMatchObject({
         id_destinatario: creche.destinatario.id_destinatario,
-        tipo: "Creche",
+        tipo_nome: "Creche",
         situacao: "Inativo",
         cnpj: null,
         email: null,
@@ -1281,7 +1329,7 @@ describe("relatorioDAO", () => {
       expect(todos.data[1]).toMatchObject({
         codigo: String(escola.destinatario.id_destinatario).padStart(6, "0"),
         cnpj: "11222333000181",
-        tipo: "Escola",
+        tipo_nome: "Escola",
         situacao: "Ativo",
         endereco: `${escola.endereco.logradouro}, 10 - Centro - Rio de Janeiro`,
         email: "escola@nexus.test",
@@ -1303,13 +1351,13 @@ describe("relatorioDAO", () => {
       expect(ativos.data.map((d) => d.razao_social)).toEqual(["Escola A"]);
 
       const creches = await relatorioDAO.listarDestinatariosRelatorio({
-        tipos: ["CRECHE"],
+        tipos: [tipoCreche.id_tipo_destinatario],
       });
       expect(creches.data.map((d) => d.razao_social)).toEqual(["Creche B"]);
 
       const combinado = await relatorioDAO.listarDestinatariosRelatorio({
         situacoes: ["ativos"],
-        tipos: ["CRECHE"],
+        tipos: [tipoCreche.id_tipo_destinatario],
       });
       expect(combinado.data).toEqual([]);
     });

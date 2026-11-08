@@ -38,7 +38,7 @@ const CHIP_ATIVO_OFF = "bg-[#eef1f4] text-[#697077]";
 
 function iniciaisDoNome(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return "—";
+  if (partes.length === 0) return "";
   if (partes.length === 1) return partes[0]!.slice(0, 2).toUpperCase();
   return (partes[0]![0]! + partes[partes.length - 1]![0]!).toUpperCase();
 }
@@ -48,7 +48,7 @@ function ValorLeitura({ label, value }: { label: string; value: React.ReactNode 
     <div className="flex flex-col gap-1">
       <span className="font-sans text-xs leading-4 text-[#697077]">{label}</span>
       <span className="font-sans text-sm leading-5 text-ink-strong">
-        {value ?? "—"}
+        {value ?? ""}
       </span>
     </div>
   );
@@ -199,7 +199,7 @@ export default function FuncionarioForm({
 
         <FormGrid columns={3}>
           {isView ? (
-            <ValorLeitura label="CPF" value={cpf || "—"} />
+            <ValorLeitura label="CPF" value={cpf} />
           ) : (
             <FormField label="CPF" htmlFor="funcionario-cpf">
               <input
@@ -216,7 +216,7 @@ export default function FuncionarioForm({
           )}
 
           {isView ? (
-            <ValorLeitura label="Cargo" value={cargo || "—"} />
+            <ValorLeitura label="Cargo" value={cargo} />
           ) : (
             <FormField label="Cargo" htmlFor="funcionario-cargo">
               <input

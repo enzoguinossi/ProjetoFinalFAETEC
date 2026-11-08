@@ -5,14 +5,15 @@
 
 .DESCRIPTION
     Instala o esquema e o seed de referência em um banco novo (Fresh) ou aplica
-    a migração 001 + seed em um banco existente (Update). O modo Auto detecta
-    pelo information_schema: banco sem tabelas → Fresh; com tabelas → Update.
+    todas as migrações de migracoes\*.sql, em ordem, + seed em um banco
+    existente (Update). O modo Auto detecta pelo information_schema: banco sem
+    tabelas → Fresh; com tabelas → Update.
 
     As credenciais são entregues ao mysql.exe por um arquivo temporário com ACL
     restrita (--defaults-extra-file). A senha nunca vai para -p, log ou
     argumento de linha de comando.
 
-    Ao final valida as contagens de referência: 82 permissões, 2 perfis e as
+    Ao final valida as contagens de referência: 89 permissões, 2 perfis e as
     3 conversões UNIDADE/PCT10/CX50 (PCT10 fator 10, CX50 fator 50).
 
 .PARAMETER MysqlExe
@@ -28,7 +29,7 @@
     Banco de destino. Padrão: nexus_prod.
 
 .PARAMETER Mode
-    Auto (padrão), Fresh (schema + seed) ou Update (migração 001 + seed).
+    Auto (padrão), Fresh (schema + seed) ou Update (migrações + seed).
 
 .PARAMETER SqlDir
     Diretório com schema.sql, seed.sql e migracoes\. Padrão: .\sql ao lado
@@ -88,7 +89,7 @@ function Resolve-SqlDir {
 $SqlDir = Resolve-SqlDir -Explicit $SqlDir
 $schemaFile = Join-Path $SqlDir "schema.sql"
 $seedFile = Join-Path $SqlDir "seed.sql"
-$migrationFile = Join-Path $SqlDir "migracoes\001-unidades-pct10-cx50.sql"
+$migrationsDir = Join-Path $SqlDir "migracoes"
 
 $tempRoot = Join-Path $env:TEMP ("nexus-sql-" + [guid]::NewGuid().ToString("N"))
 $cnfPath = Join-Path $tempRoot "client.cnf"
@@ -231,14 +232,20 @@ try {
         Invoke-Mysql -InputFile $seedFile -Label "seed.sql" | Out-Null
     }
     else {
-        if (-not (Test-Path -LiteralPath $migrationFile -PathType Leaf)) {
-            Fail "Migração 001 não encontrada em $migrationFile."
-        }
         if (-not (Test-Path -LiteralPath $seedFile -PathType Leaf)) {
             Fail "seed.sql não encontrado em $SqlDir."
         }
-        Write-Ok "Banco com $tableCount tabela(s): aplicando migração 001 e seed.sql."
-        Invoke-Mysql -InputFile $migrationFile -Label "migração 001" | Out-Null
+        if (-not (Test-Path -LiteralPath $migrationsDir -PathType Container)) {
+            Fail "Pasta de migrações não encontrada em $migrationsDir."
+        }
+        $migrations = @(Get-ChildItem -LiteralPath $migrationsDir -Filter "*.sql" -File | Sort-Object Name)
+        if ($migrations.Count -eq 0) {
+            Fail "Nenhuma migração *.sql encontrada em $migrationsDir."
+        }
+        Write-Ok ("Banco com {0} tabela(s): aplicando {1} migração(ões) e seed.sql." -f $tableCount, $migrations.Count)
+        foreach ($migration in $migrations) {
+            Invoke-Mysql -InputFile $migration.FullName -Label ("migração " + $migration.BaseName) | Out-Null
+        }
         Invoke-Mysql -InputFile $seedFile -Label "seed.sql" | Out-Null
     }
 
@@ -247,7 +254,7 @@ try {
     $conversions = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE nome IN ('UNIDADE','PCT10','CX50');" -Label "contagem de conversões"
     $renamed = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE (nome = 'PCT10' AND fator = 10) OR (nome = 'CX50' AND fator = 50);" -Label "conferência de PCT10/CX50"
 
-    $expected = @{ permissions = 82; profiles = 2; conversions = 3; renamed = 2 }
+    $expected = @{ permissions = 89; profiles = 2; conversions = 3; renamed = 2 }
     $actual = @{ permissions = $permissions; profiles = $profiles; conversions = $conversions; renamed = $renamed }
     foreach ($key in @("permissions", "profiles", "conversions", "renamed")) {
         if ([string]($actual[$key]) -ne [string]$expected[$key]) {
@@ -255,7 +262,7 @@ try {
                 "obtido '$($actual[$key])'.")
         }
     }
-    Write-Ok "Referência validada: 82 permissões, 2 perfis, 3 conversões (PCT10/CX50)."
+    Write-Ok "Referência validada: 89 permissões, 2 perfis, 3 conversões (PCT10/CX50)."
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

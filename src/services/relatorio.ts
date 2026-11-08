@@ -4,12 +4,10 @@ import {
   ROTULOS_SITUACAO_CADASTRO,
   ROTULOS_STATUS_EXPEDICAO,
   ROTULOS_STATUS_NOTA,
-  ROTULOS_TIPO_DESTINATARIO,
   SITUACOES_CADASTRO_RELATORIO,
   SITUACOES_PRODUTO_RELATORIO,
   STATUS_EXPEDICAO_RELATORIO,
   STATUS_NOTA_RELATORIO,
-  TIPOS_DESTINATARIO_RELATORIO,
   TIPOS_MOVIMENTACAO_RELATORIO,
   type AuditoriaRelatorioFiltros,
   type AuditoriaRelatorioRow,
@@ -40,13 +38,13 @@ import {
   type SituacaoProdutoRelatorio,
   type StatusExpedicaoRelatorio,
   type StatusNotaRelatorio,
-  type TipoDestinatarioRelatorio,
   type TipoMovimentacaoRelatorio,
   type UsuarioFiltroRelatorio,
 } from "@/dao/relatorio";
 import { usuarioDAO } from "@/dao/usuario";
 import { descricaoEvento, rotuloAcao, rotuloEntidade, acaoTemDiff } from "@/lib/auditoria";
 import { diffAuditoria, type ReferenciasAuditoria } from "@/lib/auditoria-diff";
+import type { CelulaPlanilha, TabelaPlanilha } from "@/lib/planilha";
 import { formatarTelefone, TIPO_TELEFONE_LABEL } from "@/lib/telefone";
 
 const FUSO = "America/Sao_Paulo";
@@ -133,7 +131,8 @@ export type FiltrosFornecedores = {
   contatos: boolean;
 };
 export type FiltrosDestinatarios = FiltrosFornecedores & {
-  tipos: TipoDestinatarioRelatorio[];
+  /** Ids de `tipo_destinatario`; vazio não filtra. */
+  tipos: number[];
 };
 
 /** Lê um parâmetro de query que pode chegar repetido (`?situacao=ativas&situacao=todas`). */
@@ -210,7 +209,7 @@ export function normalizarFiltrosDestinatarios(
 ): FiltrosDestinatarios {
   return {
     situacoes: opcoesNormalizadas(params.situacao, SITUACOES_CADASTRO_RELATORIO),
-    tipos: opcoesNormalizadas(params.tipo, TIPOS_DESTINATARIO_RELATORIO),
+    tipos: idsNormalizados(params.tipo),
     codigos: primeiro(params.codigos) === "1",
     contatos: primeiro(params.contatos) === "1",
   };
@@ -535,11 +534,6 @@ export function rotuloSituacaoCadastro(situacao: SituacaoCadastroRelatorio): str
   return ROTULOS_SITUACAO_CADASTRO[situacao];
 }
 
-/** Rótulo do tipo de destinatário (Escola/Creche/CMEI/CMEIA). */
-export function rotuloTipoDestinatario(tipo: TipoDestinatarioRelatorio): string {
-  return ROTULOS_TIPO_DESTINATARIO[tipo];
-}
-
 /** Rótulo do filtro "Dias para vencer": `30 dias` ... ou `Todos`. */
 export function rotuloDiasVencimento(dias: DiasVencimentoRelatorio): string {
   return dias === "todos" ? "Todos" : `${dias} dias`;
@@ -575,10 +569,17 @@ function campoCsv(valor: string): string {
   return valor;
 }
 
-/** Monta o CSV pt-BR: BOM para o Excel, separador `;` e quebra `\r\n`. */
-function montarCsv(cabecalho: string[], registros: string[][]): string {
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
+/**
+ * Monta o CSV pt-BR a partir da tabela do relatório: BOM para o Excel,
+ * separador `;`, decimal com vírgula e vazio para `null`.
+ */
+export function montarCsv(tabela: TabelaPlanilha): string {
+  const celula = (valor: CelulaPlanilha): string => {
+    if (valor === null) return "";
+    return typeof valor === "number" ? formatarQuantidadeCsv(valor) : valor;
+  };
+  const corpo = [tabela.cabecalho, ...tabela.registros]
+    .map((campos) => campos.map(celula).map(campoCsv).join(";"))
     .join("\r\n");
   return `\uFEFF${corpo}\r\n`;
 }
@@ -608,6 +609,37 @@ function telefonesCsv(telefones: FornecedorRelatorioRow["telefones"]): string {
 }
 
 /**
+ * Tabela da Lista de Produtos (RF024): colunas do CSV e do XLSX, com as
+ * quantidades em base como números nativos.
+ */
+export function tabelaProdutos(
+  linhas: ProdutoRelatorioRow[],
+  incluirFotos = false,
+  incluirCodigos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Código",
+      "Descrição",
+      "Quantidade",
+      "Qtd. Livre",
+      "Situação",
+      ...(incluirFotos ? ["Foto"] : []),
+      ...(incluirCodigos ? ["Códigos"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.descricao,
+      linha.quantidade,
+      linha.livre,
+      linha.situacao,
+      ...(incluirFotos ? [linha.foto_url ?? null] : []),
+      ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
+    ]),
+  };
+}
+
+/**
  * CSV da Lista de Produtos (RF024): BOM para o Excel pt-BR reconhecer UTF-8,
  * separador `;` e decimal com vírgula.
  */
@@ -616,25 +648,39 @@ export function gerarCsvProdutos(
   incluirFotos = false,
   incluirCodigos = false,
 ): string {
-  const cabecalho = [
-    "Código",
-    "Descrição",
-    "Quantidade",
-    "Qtd. Livre",
-    "Situação",
-    ...(incluirFotos ? ["Foto"] : []),
-    ...(incluirCodigos ? ["Códigos"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.descricao,
-    formatarQuantidadeCsv(linha.quantidade),
-    formatarQuantidadeCsv(linha.livre),
-    linha.situacao,
-    ...(incluirFotos ? [linha.foto_url ?? ""] : []),
-    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
-  ]);
-  return montarCsv(cabecalho, registros);
+  return montarCsv(tabelaProdutos(linhas, incluirFotos, incluirCodigos));
+}
+
+/** Tabela da Movimentação de Estoque / Extrato de Produto (RF023/RF024). */
+export function tabelaMovimentacoes(
+  linhas: MovimentacaoRelatorioRow[],
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Data",
+      "Produto",
+      "Tipo",
+      "Documento",
+      "Destinatário / Fornecedor",
+      "Quantidade",
+      "Saldo anterior",
+      "Saldo posterior",
+      "Usuário",
+      "Observação",
+    ],
+    registros: linhas.map((linha) => [
+      formatarDataHoraRelatorio(linha.data_hora),
+      `${linha.codigo} - ${linha.produto}`,
+      linha.tipo,
+      linha.documento,
+      linha.destinatario_fornecedor,
+      linha.quantidade,
+      linha.saldo_anterior === null ? "—" : linha.saldo_anterior,
+      linha.saldo_posterior === null ? "—" : linha.saldo_posterior,
+      linha.usuario,
+      linha.observacao ?? null,
+    ]),
+  };
 }
 
 /**
@@ -642,34 +688,38 @@ export function gerarCsvProdutos(
  * da Lista de Produtos: BOM UTF-8, separador `;` e decimal com vírgula.
  */
 export function gerarCsvMovimentacoes(linhas: MovimentacaoRelatorioRow[]): string {
-  const cabecalho = [
-    "Data",
-    "Produto",
-    "Tipo",
-    "Documento",
-    "Destinatário / Fornecedor",
-    "Quantidade",
-    "Saldo anterior",
-    "Saldo posterior",
-    "Usuário",
-    "Observação",
-  ];
-  const registros = linhas.map((linha) => [
-    formatarDataHoraRelatorio(linha.data_hora),
-    `${linha.codigo} - ${linha.produto}`,
-    linha.tipo,
-    linha.documento,
-    linha.destinatario_fornecedor,
-    formatarQuantidadeCsv(linha.quantidade),
-    linha.saldo_anterior === null ? "—" : formatarQuantidadeCsv(linha.saldo_anterior),
-    linha.saldo_posterior === null ? "—" : formatarQuantidadeCsv(linha.saldo_posterior),
-    linha.usuario,
-    linha.observacao ?? "",
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaMovimentacoes(linhas));
+}
+
+/** Tabela de Expedições por Período (RF023/RF024). */
+export function tabelaExpedicoes(
+  linhas: ExpedicaoRelatorioRow[],
+  incluirFotos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Data prevista",
+      "Status",
+      "Veículo",
+      "Condutor",
+      "Notas",
+      "Destinatários",
+      "Itens solicitados",
+      "Itens entregues",
+      ...(incluirFotos ? ["Fotos"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      formatarDataISO(linha.data_prevista),
+      linha.status,
+      linha.veiculo,
+      linha.condutor,
+      linha.notas,
+      linha.destinatarios,
+      linha.itens_esperados,
+      linha.itens_entregues,
+      ...(incluirFotos ? [linha.fotos.join(";")] : []),
+    ]),
+  };
 }
 
 /**
@@ -680,32 +730,40 @@ export function gerarCsvExpedicoes(
   linhas: ExpedicaoRelatorioRow[],
   incluirFotos = false,
 ): string {
-  const cabecalho = [
-    "Data prevista",
-    "Status",
-    "Veículo",
-    "Condutor",
-    "Notas",
-    "Destinatários",
-    "Itens esperados",
-    "Itens entregues",
-    ...(incluirFotos ? ["Fotos"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    formatarDataISO(linha.data_prevista),
-    linha.status,
-    linha.veiculo,
-    linha.condutor,
-    String(linha.notas),
-    linha.destinatarios,
-    formatarQuantidadeCsv(linha.itens_esperados),
-    formatarQuantidadeCsv(linha.itens_entregues),
-    ...(incluirFotos ? [linha.fotos.join(";")] : []),
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaExpedicoes(linhas, incluirFotos));
+}
+
+/** Tabela de Entregas por Instituição (RF023/RF024). */
+export function tabelaEntregas(
+  linhas: EntregaRelatorioRow[],
+  incluirFotos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Nota",
+      "Data",
+      "Destinatário",
+      "Status",
+      "Itens",
+      "Solicitado",
+      "Entregue",
+      "Pendente",
+      "Expedição",
+      ...(incluirFotos ? ["Fotos", "Justificativa"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      formatarDataRelatorio(linha.data),
+      linha.destinatario,
+      linha.status,
+      linha.itens,
+      linha.esperado,
+      linha.entregue,
+      linha.pendente,
+      linha.expedicao,
+      ...(incluirFotos ? [linha.fotos.join(";"), linha.justificativa ?? null] : []),
+    ]),
+  };
 }
 
 /**
@@ -716,34 +774,31 @@ export function gerarCsvEntregas(
   linhas: EntregaRelatorioRow[],
   incluirFotos = false,
 ): string {
-  const cabecalho = [
-    "Nota",
-    "Data",
-    "Destinatário",
-    "Status",
-    "Itens",
-    "Esperado",
-    "Entregue",
-    "Pendente",
-    "Expedição",
-    ...(incluirFotos ? ["Fotos", "Justificativa"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    formatarDataRelatorio(linha.data),
-    linha.destinatario,
-    linha.status,
-    String(linha.itens),
-    formatarQuantidadeCsv(linha.esperado),
-    formatarQuantidadeCsv(linha.entregue),
-    formatarQuantidadeCsv(linha.pendente),
-    linha.expedicao,
-    ...(incluirFotos ? [linha.fotos.join(";"), linha.justificativa ?? ""] : []),
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaEntregas(linhas, incluirFotos));
+}
+
+/** Tabela de Produtos Próximos ao Vencimento (RF023/RF024). */
+export function tabelaVencimento(
+  linhas: ProdutoVencimentoRelatorioRow[],
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Código",
+      "Produto",
+      "Quantidade",
+      "Validade",
+      "Dias restantes",
+      "Situação",
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.descricao,
+      linha.quantidade,
+      formatarDataISO(linha.validade),
+      linha.dias_restantes,
+      linha.situacao,
+    ]),
+  };
 }
 
 /**
@@ -751,26 +806,42 @@ export function gerarCsvEntregas(
  * com vírgula, como nos demais relatórios.
  */
 export function gerarCsvVencimento(linhas: ProdutoVencimentoRelatorioRow[]): string {
-  const cabecalho = [
-    "Código",
-    "Produto",
-    "Quantidade",
-    "Validade",
-    "Dias restantes",
-    "Situação",
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.descricao,
-    formatarQuantidadeCsv(linha.quantidade),
-    formatarDataISO(linha.validade),
-    String(linha.dias_restantes),
-    linha.situacao,
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaVencimento(linhas));
+}
+
+/** Tabela da lista de Funcionários (RF023/RF024). */
+export function tabelaFuncionarios(
+  linhas: FuncionarioRelatorioRow[],
+  incluirFotos = false,
+  incluirCodigos = false,
+  incluirContatos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Código",
+      "Nome",
+      "CPF",
+      "Cargo",
+      "Condutor",
+      "Situação",
+      ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
+      ...(incluirFotos ? ["Foto"] : []),
+      ...(incluirCodigos ? ["Códigos"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.nome,
+      linha.cpf ?? null,
+      linha.cargo ?? null,
+      linha.condutor ? "Sim" : "Não",
+      linha.situacao,
+      ...(incluirContatos
+        ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+        : [linha.email ?? null, linha.telefone ?? null]),
+      ...(incluirFotos ? [linha.foto_url ?? null] : []),
+      ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
+    ]),
+  };
 }
 
 /** CSV da lista de Funcionários (RF023/RF024). */
@@ -780,31 +851,41 @@ export function gerarCsvFuncionarios(
   incluirCodigos = false,
   incluirContatos = false,
 ): string {
-  const cabecalho = [
-    "Código",
-    "Nome",
-    "CPF",
-    "Cargo",
-    "Condutor",
-    "Situação",
-    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
-    ...(incluirFotos ? ["Foto"] : []),
-    ...(incluirCodigos ? ["Códigos"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.nome,
-    linha.cpf ?? "",
-    linha.cargo ?? "",
-    linha.condutor ? "Sim" : "Não",
-    linha.situacao,
-    ...(incluirContatos
-      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
-      : [linha.email ?? "", linha.telefone ?? ""]),
-    ...(incluirFotos ? [linha.foto_url ?? ""] : []),
-    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
-  ]);
-  return montarCsv(cabecalho, registros);
+  return montarCsv(
+    tabelaFuncionarios(linhas, incluirFotos, incluirCodigos, incluirContatos),
+  );
+}
+
+/** Tabela da lista de Destinatários (RF023/RF024). */
+export function tabelaDestinatarios(
+  linhas: DestinatarioRelatorioRow[],
+  incluirCodigos = false,
+  incluirContatos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Código",
+      "Razão social",
+      "CNPJ",
+      "Tipo",
+      "Situação",
+      "Endereço",
+      ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
+      ...(incluirCodigos ? ["Códigos"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.razao_social,
+      linha.cnpj ?? null,
+      linha.tipo_nome ?? null,
+      linha.situacao,
+      linha.endereco,
+      ...(incluirContatos
+        ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+        : [linha.email ?? null, linha.telefone ?? null]),
+      ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
+    ]),
+  };
 }
 
 /** CSV da lista de Destinatários (RF023/RF024). */
@@ -813,29 +894,37 @@ export function gerarCsvDestinatarios(
   incluirCodigos = false,
   incluirContatos = false,
 ): string {
-  const cabecalho = [
-    "Código",
-    "Razão social",
-    "CNPJ",
-    "Tipo",
-    "Situação",
-    "Endereço",
-    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
-    ...(incluirCodigos ? ["Códigos"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.razao_social,
-    linha.cnpj ?? "",
-    linha.tipo,
-    linha.situacao,
-    linha.endereco,
-    ...(incluirContatos
-      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
-      : [linha.email ?? "", linha.telefone ?? ""]),
-    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
-  ]);
-  return montarCsv(cabecalho, registros);
+  return montarCsv(tabelaDestinatarios(linhas, incluirCodigos, incluirContatos));
+}
+
+/** Tabela da lista de Fornecedores (RF023/RF024). */
+export function tabelaFornecedores(
+  linhas: FornecedorRelatorioRow[],
+  incluirCodigos = false,
+  incluirContatos = false,
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Código",
+      "Razão social",
+      "CNPJ",
+      "Situação",
+      "Endereço",
+      ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
+      ...(incluirCodigos ? ["Códigos"] : []),
+    ],
+    registros: linhas.map((linha) => [
+      linha.codigo,
+      linha.razao_social,
+      linha.cnpj ?? null,
+      linha.situacao,
+      linha.endereco,
+      ...(incluirContatos
+        ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
+        : [linha.email ?? null, linha.telefone ?? null]),
+      ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
+    ]),
+  };
 }
 
 /** CSV da lista de Fornecedores (RF023/RF024). */
@@ -844,27 +933,42 @@ export function gerarCsvFornecedores(
   incluirCodigos = false,
   incluirContatos = false,
 ): string {
-  const cabecalho = [
-    "Código",
-    "Razão social",
-    "CNPJ",
-    "Situação",
-    "Endereço",
-    ...(incluirContatos ? ["E-mails", "Telefones"] : ["E-mail", "Telefone"]),
-    ...(incluirCodigos ? ["Códigos"] : []),
-  ];
-  const registros = linhas.map((linha) => [
-    linha.codigo,
-    linha.razao_social,
-    linha.cnpj ?? "",
-    linha.situacao,
-    linha.endereco,
-    ...(incluirContatos
-      ? [emailsCsv(linha.emails), telefonesCsv(linha.telefones)]
-      : [linha.email ?? "", linha.telefone ?? ""]),
-    ...(incluirCodigos ? [codigosCsv(linha.codigos)] : []),
-  ]);
-  return montarCsv(cabecalho, registros);
+  return montarCsv(tabelaFornecedores(linhas, incluirCodigos, incluirContatos));
+}
+
+/** Tabela da Auditoria (RF023/RF024), com descrição e diff legível. */
+export function tabelaAuditoria(
+  linhas: AuditoriaRelatorioRow[],
+  referencias: ReferenciasAuditoria = new Map(),
+): TabelaPlanilha {
+  return {
+    cabecalho: [
+      "Data/hora",
+      "Usuário",
+      "Ação",
+      "Entidade",
+      "Registro",
+      "Descrição",
+      "Alterações",
+    ],
+    registros: linhas.map((linha) => [
+      formatarDataHoraRelatorio(linha.data_hora),
+      linha.usuario,
+      rotuloAcao(linha.acao),
+      rotuloEntidade(linha.entidade),
+      linha.id_entidade_afetada === null ? "—" : `#${linha.id_entidade_afetada}`,
+      descricaoEvento(linha, referencias) ?? null,
+      acaoTemDiff(linha.acao)
+        ? diffAuditoria(linha.dados_anteriores, linha.dados_novos, referencias)
+            .map((campo) =>
+              campo.grupo && campo.item
+                ? `${campo.grupo} · ${campo.item} · ${campo.campo}: ${campo.antes} → ${campo.depois}`
+                : `${campo.campo}: ${campo.antes} → ${campo.depois}`,
+            )
+            .join(" | ")
+        : null,
+    ]),
+  };
 }
 
 /**
@@ -875,36 +979,7 @@ export function gerarCsvAuditoria(
   linhas: AuditoriaRelatorioRow[],
   referencias: ReferenciasAuditoria = new Map(),
 ): string {
-  const cabecalho = [
-    "Data/hora",
-    "Usuário",
-    "Ação",
-    "Entidade",
-    "Registro",
-    "Descrição",
-    "Alterações",
-  ];
-  const registros = linhas.map((linha) => [
-    formatarDataHoraRelatorio(linha.data_hora),
-    linha.usuario,
-    rotuloAcao(linha.acao),
-    rotuloEntidade(linha.entidade),
-    linha.id_entidade_afetada === null ? "—" : `#${linha.id_entidade_afetada}`,
-    descricaoEvento(linha, referencias) ?? "",
-    acaoTemDiff(linha.acao)
-      ? diffAuditoria(linha.dados_anteriores, linha.dados_novos, referencias)
-          .map((campo) =>
-            campo.grupo && campo.item
-              ? `${campo.grupo} · ${campo.item} · ${campo.campo}: ${campo.antes} → ${campo.depois}`
-              : `${campo.campo}: ${campo.antes} → ${campo.depois}`,
-          )
-          .join(" | ")
-      : "",
-  ]);
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(campoCsv).join(";"))
-    .join("\r\n");
-  return `\uFEFF${corpo}\r\n`;
+  return montarCsv(tabelaAuditoria(linhas, referencias));
 }
 
 export class RelatorioService {

@@ -9,6 +9,8 @@ export type ProdutoListRow = {
   qtd: string;
   livre: string;
   ativo: boolean;
+  /** Produto composto (habilita a ação de desmembrar). */
+  composto: boolean;
 };
 
 /** Colunas da listagem/seletor de produto (Código → Descrição → Quantidade → Qtd. Livre). */
@@ -25,6 +27,7 @@ type ProdutoComSaldo = {
   saldo: number;
   saldo_reservado: number;
   ativo: boolean;
+  composto: boolean;
 };
 
 /**
@@ -42,5 +45,6 @@ export function produtoParaLinha(p: ProdutoComSaldo): ProdutoListRow {
     qtd: String(saldo),
     livre: String(saldo - reservado),
     ativo: p.ativo,
+    composto: p.composto,
   };
 }

@@ -208,7 +208,8 @@ async function buscarNotaElegivel(client: Db, id_nota_saida: number) {
 }
 
 /**
- * Registra a entrega de uma nota em `EM_PERCURSO` na expedição `EM_PERCURSO`.
+ * Registra a entrega de uma nota em `EM_PERCURSO` — ou com retirada/entrega
+ * anterior (`BAIXA_PARCIAL`) — na expedição `EM_PERCURSO`.
  * `itens` traz a quantidade entregue **total** por item; o delta é calculado
  * sobre `qtd_entregue`. Tudo na transação recebida: baixa de estoque +
  * reserva + item + status + auditoria. A transição condicional do status
@@ -264,7 +265,7 @@ async function finalizarNota(
     (item) => item.id_expedicao === id_expedicao,
   );
   if (!vinculo) throw new Error("Esta nota não pertence à expedição.");
-  if (nota.status !== "EM_PERCURSO") {
+  if (nota.status !== "EM_PERCURSO" && nota.status !== "BAIXA_PARCIAL") {
     throw new Error(
       "Esta nota não está em percurso: a entrega já foi registrada ou a nota não saiu.",
     );
@@ -308,7 +309,7 @@ async function finalizarNota(
     }
     if (!Number.isFinite(nova) || nova < 0 || nova > esperada) {
       throw new Error(
-        "Quantidade entregue inválida: precisa estar entre zero e a quantidade esperada do item.",
+        "Quantidade entregue inválida: precisa estar entre zero e a quantidade solicitada do item.",
       );
     }
     if (nova < atual) {
@@ -339,14 +340,16 @@ async function finalizarNota(
     );
   }
 
-  const status: StatusNotaSaida =
-    totalDelta === 0 && !cortar_restante
-      ? "PENDENTE"
-      : totalEntregue >= totalEsperada
-        ? "BAIXA_TOTAL"
-        : cortar_restante
-          ? "BAIXA_COM_CORTE"
-          : "BAIXA_PARCIAL";
+  let status: StatusNotaSaida;
+  if (totalDelta === 0 && !cortar_restante) {
+    // A nota pode já ter retirada/entrega parcial: o que foi entregue continua
+    // valendo e o status não regride para PENDENTE.
+    status = totalEntregue > 0 ? "BAIXA_PARCIAL" : "PENDENTE";
+  } else if (totalEntregue >= totalEsperada) {
+    status = "BAIXA_TOTAL";
+  } else {
+    status = cortar_restante ? "BAIXA_COM_CORTE" : "BAIXA_PARCIAL";
+  }
 
   // Aborta antes de mexer em qualquer saldo se a reserva não cobre o que será
   // entregue/cortado — `saldo_reservado` nunca pode ficar negativo.
@@ -379,7 +382,10 @@ async function finalizarNota(
   // Transição condicional: a segunda chamada (mesmo concorrente) não encontra
   // mais o status de origem e é recusada sem debitar.
   const transicao = await tx.notaSaida.updateMany({
-    where: { id_nota_saida, status: "EM_PERCURSO" },
+    where: {
+      id_nota_saida,
+      status: { in: ["EM_PERCURSO", "BAIXA_PARCIAL"] },
+    },
     data: { status },
   });
   if (transicao.count !== 1) {
@@ -1181,6 +1187,9 @@ export class ExpedicaoDAO {
           id_nota_saida: {
             in: antes.notas.map((nota) => nota.id_nota_saida),
           },
+          // A retirada/entrega já registrada manda no status: só a nota que
+          // ainda está em aberto/pendente entra em percurso.
+          status: { in: ["ABERTA", "PENDENTE"] },
         },
         data: { status: "EM_PERCURSO" },
       });

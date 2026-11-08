@@ -116,7 +116,7 @@ export function fichaDestinatario(
               rotulo: "CNPJ",
               valor: destinatario.cnpj ? formatarCnpj(destinatario.cnpj) : "—",
             },
-            { rotulo: "Tipo", valor: destinatario.tipo },
+            { rotulo: "Tipo", valor: destinatario.tipo_nome ?? "" },
           ],
           [{ rotulo: "Endereço", valor: destinatario.endereco }],
         ]
@@ -126,7 +126,7 @@ export function fichaDestinatario(
               rotulo: "CNPJ",
               valor: destinatario.cnpj ? formatarCnpj(destinatario.cnpj) : "—",
             },
-            { rotulo: "Tipo", valor: destinatario.tipo },
+            { rotulo: "Tipo", valor: destinatario.tipo_nome ?? "" },
             { rotulo: "Telefone", valor: destinatario.telefone ?? "—" },
           ],
           [

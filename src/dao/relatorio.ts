@@ -253,21 +253,6 @@ export const ROTULOS_SITUACAO_CADASTRO = {
   inativos: "Inativos",
 } as const;
 
-export const TIPOS_DESTINATARIO_RELATORIO = [
-  "ESCOLA",
-  "CRECHE",
-  "CMEI",
-  "CMEIA",
-] as const;
-export type TipoDestinatarioRelatorio = (typeof TIPOS_DESTINATARIO_RELATORIO)[number];
-
-export const ROTULOS_TIPO_DESTINATARIO = {
-  ESCOLA: "Escola",
-  CRECHE: "Creche",
-  CMEI: "CMEI",
-  CMEIA: "CMEIA",
-} as const;
-
 export type ProdutoVencimentoRelatorioRow = {
   id_produto: number;
   /** Código exibido no relatório (`formatarCodigo(ID_produto)`). */
@@ -337,7 +322,8 @@ export type DestinatarioRelatorioRow = {
   codigo: string;
   razao_social: string;
   cnpj: string | null;
-  tipo: (typeof ROTULOS_TIPO_DESTINATARIO)[TipoDestinatarioRelatorio];
+  /** Nome do tipo do cadastro; `null` = sem tipo. */
+  tipo_nome: string | null;
   situacao: "Ativo" | "Inativo";
   /** Logradouro, número, bairro e cidade. */
   endereco: string;
@@ -355,7 +341,8 @@ export type DestinatariosRelatorioResult = { data: DestinatarioRelatorioRow[] };
 
 export type DestinatariosRelatorioFiltros = {
   situacoes?: SituacaoCadastroRelatorio[];
-  tipos?: TipoDestinatarioRelatorio[];
+  /** Ids de `tipo_destinatario`; vazio não filtra. */
+  tipos?: number[];
   /** Inclui os códigos personalizados no relatório e no CSV. */
   codigos?: boolean;
   /** Inclui todos os contatos (e-mails e telefones) no relatório e no CSV. */
@@ -746,13 +733,14 @@ export class RelatorioDAO {
     const where: Prisma.DestinatarioWhereInput = {};
     const ativo = ativoFiltrado(filtros.situacoes);
     if (ativo !== undefined) where.ativo = ativo;
-    if (filtros.tipos?.length) where.tipo_destinatario = { in: filtros.tipos };
+    if (filtros.tipos?.length) where.id_tipo_destinatario = { in: filtros.tipos };
 
     const destinatarios = await prisma.destinatario.findMany({
       where,
       select: {
         id_destinatario: true,
-        tipo_destinatario: true,
+        id_tipo_destinatario: true,
+        tipoDestinatario: { select: { nome: true } },
         ativo: true,
         pessoaJuridica: { select: { razao_social: true, cnpj: true } },
         endereco: {
@@ -787,7 +775,7 @@ export class RelatorioDAO {
           codigo: formatarCodigo(destinatario.id_destinatario),
           razao_social: destinatario.pessoaJuridica.razao_social,
           cnpj: destinatario.pessoaJuridica.cnpj,
-          tipo: ROTULOS_TIPO_DESTINATARIO[destinatario.tipo_destinatario],
+          tipo_nome: destinatario.tipoDestinatario?.nome ?? null,
           situacao: destinatario.ativo ? "Ativo" : "Inativo",
           endereco: formatarEndereco(destinatario.endereco),
           email: principalEmail,
@@ -1191,14 +1179,16 @@ export class RelatorioDAO {
   }
 
   /**
-   * Entregas por instituição (RF023): notas de saída criadas no período, com
-   * destinatário, itens, quantidades e a expedição mais recente. A pendência é
-   * a diferença entre o esperado e o entregue, item a item. Data decrescente.
+   * Entregas por instituição (RF023): notas de saída `SAIDA` criadas no
+   * período, com destinatário, itens, quantidades e a expedição mais recente.
+   * A pendência é a diferença entre o esperado e o entregue, item a item.
+   * Data decrescente. Desmontagem, avaria e consumo interno são baixas
+   * internas, não entregas — ficam fora do relatório.
    */
   async listarEntregasRelatorio(
     filtros: EntregasRelatorioFiltros = {},
   ): Promise<EntregasRelatorioResult> {
-    const where: Prisma.NotaSaidaWhereInput = { ativo: true };
+    const where: Prisma.NotaSaidaWhereInput = { ativo: true, tipo: "SAIDA" };
 
     if (filtros.de || filtros.ate) {
       where.data_criacao = {};

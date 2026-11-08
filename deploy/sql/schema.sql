@@ -149,13 +149,26 @@ CREATE TABLE `fornecedor` (
 CREATE TABLE `destinatario` (
     `ID_destinatario` INTEGER NOT NULL AUTO_INCREMENT,
     `ID_pessoa_juridica` INTEGER NOT NULL,
-    `tipo_destinatario` ENUM('ESCOLA', 'CRECHE', 'CMEI', 'CMEIA') NOT NULL,
+    `ID_tipo_destinatario` INTEGER NULL,
     `ID_endereco` INTEGER NOT NULL,
     `ativo` BOOLEAN NOT NULL DEFAULT true,
 
     UNIQUE INDEX `destinatario_ID_pessoa_juridica_key`(`ID_pessoa_juridica`),
     INDEX `destinatario_ID_endereco_fkey`(`ID_endereco`),
+    INDEX `destinatario_ID_tipo_destinatario_fkey`(`ID_tipo_destinatario`),
     PRIMARY KEY (`ID_destinatario`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `tipo_destinatario` (
+    `ID_tipo_destinatario` INTEGER NOT NULL AUTO_INCREMENT,
+    `codigo` VARCHAR(191) NOT NULL,
+    `nome` VARCHAR(191) NOT NULL,
+    `padrao` BOOLEAN NOT NULL DEFAULT false,
+
+    UNIQUE INDEX `tipo_destinatario_codigo_key`(`codigo`),
+    UNIQUE INDEX `tipo_destinatario_nome_key`(`nome`),
+    PRIMARY KEY (`ID_tipo_destinatario`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -718,6 +731,9 @@ ALTER TABLE `destinatario` ADD CONSTRAINT `destinatario_ID_endereco_fkey` FOREIG
 
 -- AddForeignKey
 ALTER TABLE `destinatario` ADD CONSTRAINT `destinatario_ID_pessoa_juridica_fkey` FOREIGN KEY (`ID_pessoa_juridica`) REFERENCES `pessoa_juridica`(`ID_pessoa_juridica`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `destinatario` ADD CONSTRAINT `destinatario_ID_tipo_destinatario_fkey` FOREIGN KEY (`ID_tipo_destinatario`) REFERENCES `tipo_destinatario`(`ID_tipo_destinatario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `funcionario_telefone` ADD CONSTRAINT `funcionario_telefone_ID_funcionario_fkey` FOREIGN KEY (`ID_funcionario`) REFERENCES `funcionario`(`ID_funcionario`) ON DELETE RESTRICT ON UPDATE CASCADE;

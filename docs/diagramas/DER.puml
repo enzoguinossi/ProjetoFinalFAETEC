@@ -108,13 +108,6 @@ entity "usuario" as usuario {
 ' ENUMS
 ' =========================================================
 
-enum TipoDestinatario {
-  ESCOLA
-  CRECHE
-  CMEI
-  CMEIA
-}
-
 enum TipoTelefone {
   CELULAR
   FIXO
@@ -149,11 +142,19 @@ entity "fornecedor" as fornecedor {
   * ativo : BOOLEAN
 }
 
+entity "tipo_destinatario" as tipo_destinatario {
+  * ID_tipo_destinatario : INT <<PK>>
+  --
+  * codigo : VARCHAR(191) <<UK>>
+  * nome : VARCHAR(191) <<UK>>
+  * padrao : BOOLEAN
+}
+
 entity "destinatario" as destinatario {
   * ID_destinatario : INT <<PK>>
   --
   * ID_pessoa_juridica : INT <<FK, UK>>
-  * tipo_destinatario : TipoDestinatario
+  ID_tipo_destinatario : INT <<FK>>
   * ID_endereco : INT <<FK>>
   * ativo : BOOLEAN
 }
@@ -633,6 +634,7 @@ pj ||--|| destinatario
 ' Endereco
 endereco ||--|| destinatario
 endereco ||--o| fornecedor
+tipo_destinatario |o--o{ destinatario
 
 ' Contato
 funcionario ||--o{ func_tel

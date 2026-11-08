@@ -8,6 +8,7 @@ export { saldoDAO } from "./estoque";
 export { inventarioDAO, assertProdutoSemInventario, assertProdutosSemInventario } from "./inventario";
 export { notaEntradaDAO } from "./nota-entrada";
 export { tipoCodigoDAO } from "./tipo-codigo";
+export { tipoDestinatarioDAO } from "./tipo-destinatario";
 export { conversaoUnidadeDAO } from "./conversao-unidade";
 export { notaSaidaDAO } from "./nota-saida";
 export { percursoDAO } from "./percurso";

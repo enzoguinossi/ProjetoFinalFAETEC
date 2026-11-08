@@ -9,7 +9,10 @@ type AcaoAuditoria =
   | "LOGIN"
   | "LOGIN_FALHA"
   | "LOGOUT"
-  | "DEFINIR_SENHA";
+  | "DEFINIR_SENHA"
+  | "SOLICITAR_BACKUP"
+  | "ALTERAR_AGENDA"
+  | "RESTAURAR";
 
 type Db = Prisma.TransactionClient;
 
@@ -17,7 +20,7 @@ export async function registrarAuditoria(
   id_usuario: number,
   acao: AcaoAuditoria,
   entidade: string,
-  id_entidade_afetada: number,
+  id_entidade_afetada: number | null,
   dados_anteriores?: Record<string, unknown> | null,
   dados_novos?: Record<string, unknown> | null,
   client: Db = prisma,

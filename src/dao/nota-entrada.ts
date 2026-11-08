@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { buildPagination, type PaginationParams } from "@/types";
 import { limitesDoDiaSaoPaulo, limitesDoDiaUtc } from "@/lib/datas";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, TipoNotaEntrada } from "@prisma/client";
 import { saldoDAO } from "./estoque";
 
 export type NotaEntradaItemCriacao = {
@@ -48,7 +48,12 @@ export type NotaEntradaListFiltros = {
   id_fornecedor?: number[];
   /** Razão social do fornecedor ou chave de acesso. */
   search?: string;
+  /** Tipos exibidos; ausente = `ENTRADA` + `DESMONTAGEM` (a lista de entrada). */
+  tipos?: TipoNotaEntrada[];
 };
+
+/** Tipos que a lista de Entrada mostra por padrão. */
+const TIPOS_DA_LISTA_DE_ENTRADA: TipoNotaEntrada[] = ["ENTRADA", "DESMONTAGEM"];
 
 /** Período de uma nota: usa `data_recebimento` ou, quando nula, `data_criacao`. */
 function filtroPeriodo(
@@ -81,7 +86,9 @@ function filtroPeriodo(
 function whereDe(filtros: NotaEntradaListFiltros): Prisma.NotaEntradaWhereInput {
   const where: Prisma.NotaEntradaWhereInput = {
     ativo: true,
-    tipo: "ENTRADA",
+    tipo: {
+      in: filtros.tipos?.length ? filtros.tipos : TIPOS_DA_LISTA_DE_ENTRADA,
+    },
   };
   const adicionais: Prisma.NotaEntradaWhereInput[] = [];
 
@@ -139,7 +146,10 @@ function snapshotNota(
 }
 
 export class NotaEntradaDAO {
-  /** Notas de entrada (tipo ENTRADA), da mais recente para a mais antiga. */
+  /**
+   * Notas de entrada (`ENTRADA`) e de desmembramento (`DESMONTAGEM`), da mais
+   * recente para a mais antiga. Editar continua restrito a `ENTRADA`.
+   */
   async list(params: PaginationParams & NotaEntradaListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where = whereDe(params);
@@ -169,10 +179,18 @@ export class NotaEntradaDAO {
     };
   }
 
-  /** Nota de entrada com fornecedor, itens e o produto de cada item. */
+  /**
+   * Nota de entrada com fornecedor, itens e o produto de cada item. A
+   * visualização aceita `ENTRADA` e `DESMONTAGEM`; a edição usa a própria
+   * transação de `update`, restrita a `ENTRADA`.
+   */
   async getById(id: number) {
     return prisma.notaEntrada.findFirst({
-      where: { id_nota_entrada: id, tipo: "ENTRADA", ativo: true },
+      where: {
+        id_nota_entrada: id,
+        tipo: { in: TIPOS_DA_LISTA_DE_ENTRADA },
+        ativo: true,
+      },
       include: {
         fornecedor: {
           select: {

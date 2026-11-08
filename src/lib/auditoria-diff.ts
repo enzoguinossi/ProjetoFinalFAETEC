@@ -100,7 +100,7 @@ const ROTULOS_CAMPO: Record<string, string> = {
   observacao: "Observação",
   justificativa: "Justificativa",
   quantidade: "Quantidade",
-  qtd_esperada: "Qtd. esperada",
+  qtd_esperada: "Qtd. solicitada",
   qtd_entregue: "Qtd. entregue",
   saldo: "Saldo",
   saldo_reservado: "Reservado",

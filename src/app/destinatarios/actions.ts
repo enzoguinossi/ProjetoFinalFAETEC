@@ -1,6 +1,7 @@
 "use server";
 
 import { destinatarioDAO } from "@/dao/destinatario";
+import { tipoDestinatarioDAO } from "@/dao/tipo-destinatario";
 import { codigoService } from "@/services/codigo";
 import { cepService } from "@/services/cep";
 import { contatoService } from "@/services/contato";
@@ -13,13 +14,14 @@ import { textoFiltro } from "@/lib/filtros";
 import { validarCnpj } from "@/lib/cnpj";
 import { validarCep } from "@/lib/cep";
 import { isUF } from "@/lib/uf";
-import { resultadoVazio, TIPO_DESTINATARIO, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
+import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type DestinatarioListRow = {
   id_destinatario: number;
   codigo: string;
   razao: string;
-  tipo_destinatario: TipoDestinatario;
+  /** Nome do tipo vindo do cadastro; `null` = sem tipo. */
+  tipo_nome: string | null;
   ativo: boolean;
 };
 
@@ -28,7 +30,8 @@ export type DestinatarioFormData = {
   razao_social: string;
   nome_fantasia: string | null;
   cnpj: string | null;
-  tipo_destinatario: TipoDestinatario;
+  id_tipo_destinatario: number | null;
+  tipo_nome: string | null;
   ativo: boolean;
   endereco: {
     logradouro: string;
@@ -73,12 +76,21 @@ function lerCep(formData: FormData): { cep?: string } | { error: string } {
   return { cep: resultado.cep };
 }
 
-/** Tipo inválido cai no fallback seguro `ESCOLA`. */
-function lerTipoDestinatario(formData: FormData): TipoDestinatario {
-  const valor = String(formData.get("tipo_destinatario") ?? "").trim();
-  return (TIPO_DESTINATARIO as readonly string[]).includes(valor)
-    ? (valor as TipoDestinatario)
-    : "ESCOLA";
+/**
+ * Lê `id_tipo_destinatario`: vazio → `null` (sem tipo); ausente → `undefined`
+ * (mantém o valor atual / aplica o padrão na criação); inválido → erro.
+ */
+function lerTipoDestinatario(
+  formData: FormData,
+): { id: number | null | undefined } | { error: string } {
+  if (!formData.has("id_tipo_destinatario")) return { id: undefined };
+  const valor = String(formData.get("id_tipo_destinatario") ?? "").trim();
+  if (!valor) return { id: null };
+  const id = Number(valor);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { error: "Tipo de escola inválido." };
+  }
+  return { id };
 }
 
 export async function listarDestinatarios(
@@ -87,11 +99,15 @@ export async function listarDestinatarios(
   const user = await requireUser();
   if (!(await usuarioPode(user, "destinatario.listar"))) return resultadoVazio(params);
 
-  // Enums/UF são sanitizados no servidor: valores fora do domínio são ignorados.
+  // Os ids do cadastro de tipos e as UFs são sanitizados no servidor.
   const tipos = Array.isArray(params.tipos)
-    ? params.tipos.filter((tipo): tipo is TipoDestinatario =>
-        (TIPO_DESTINATARIO as readonly string[]).includes(tipo),
-      )
+    ? [
+        ...new Set(
+          params.tipos
+            .map((tipo) => Number(tipo))
+            .filter((id) => Number.isInteger(id) && id > 0),
+        ),
+      ]
     : undefined;
   const ufs = Array.isArray(params.ufs) ? params.ufs.filter(isUF) : undefined;
   const ativo =
@@ -112,7 +128,7 @@ export async function listarDestinatarios(
       id_destinatario: d.id_destinatario,
       codigo: formatarCodigo(d.id_destinatario),
       razao: d.pessoaJuridica.razao_social,
-      tipo_destinatario: d.tipo_destinatario,
+      tipo_nome: d.tipoDestinatario?.nome ?? null,
       ativo: d.ativo,
     })),
   };
@@ -135,7 +151,8 @@ export async function getDestinatario(id: number): Promise<DestinatarioFormData 
     razao_social: d.pessoaJuridica.razao_social,
     nome_fantasia: d.pessoaJuridica.nome_fantasia,
     cnpj: d.pessoaJuridica.cnpj,
-    tipo_destinatario: d.tipo_destinatario,
+    id_tipo_destinatario: d.id_tipo_destinatario,
+    tipo_nome: d.tipoDestinatario?.nome ?? null,
     ativo: d.ativo,
     endereco: {
       logradouro: d.endereco.logradouro,
@@ -169,16 +186,44 @@ export async function createDestinatario(formData: FormData) {
     const contatoResult = contatoService.resolverContatosParaSalvar(formData);
     if ("error" in contatoResult) return { error: contatoResult.error };
 
+    const tipoResult = lerTipoDestinatario(formData);
+    if ("error" in tipoResult) return { error: tipoResult.error };
+
+    const dados = {
+      razao_social: razao_social.trim(),
+      nome_fantasia: lerNomeFantasia(formData),
+      cnpj: cnpjResult.cnpj,
+      codigos: codigoResult.codigos,
+      ...contatoResult.contatos,
+      endereco: lerEnderecoDoFormData(formData),
+    };
+
     try {
-      await destinatarioDAO.create({
-        razao_social: razao_social.trim(),
-        nome_fantasia: lerNomeFantasia(formData),
-        cnpj: cnpjResult.cnpj,
-        tipo_destinatario: lerTipoDestinatario(formData),
-        codigos: codigoResult.codigos,
-        ...contatoResult.contatos,
-        endereco: lerEnderecoDoFormData(formData),
-      }, user.id_usuario);
+      // Campo ausente (cliente antigo): aplica o tipo padrão do cadastro. A
+      // leitura fica no try — se o padrão sumir na corrida, o cadastro segue
+      // sem tipo em vez de estourar a action.
+      let idTipo = tipoResult.id;
+      if (idTipo === undefined) {
+        idTipo = (await tipoDestinatarioDAO.getPadrao())?.id_tipo_destinatario ?? null;
+      }
+
+      try {
+        await destinatarioDAO.create(
+          { ...dados, id_tipo_destinatario: idTipo },
+          user.id_usuario,
+        );
+      } catch (e) {
+        const padraoSumiu =
+          tipoResult.id === undefined &&
+          idTipo !== null &&
+          e instanceof Error &&
+          e.message === "Tipo de escola não encontrado.";
+        if (!padraoSumiu) throw e;
+        await destinatarioDAO.create(
+          { ...dados, id_tipo_destinatario: null },
+          user.id_usuario,
+        );
+      }
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }
@@ -209,12 +254,15 @@ export async function updateDestinatario(formData: FormData) {
     const contatoResult = contatoService.resolverContatosParaSalvar(formData);
     if ("error" in contatoResult) return { error: contatoResult.error };
 
+    const tipoResult = lerTipoDestinatario(formData);
+    if ("error" in tipoResult) return { error: tipoResult.error };
+
     try {
       await destinatarioDAO.update(id, {
         razao_social: (formData.get("razao_social") as string)?.trim(),
         nome_fantasia: lerNomeFantasia(formData),
         cnpj: cnpjResult.cnpj,
-        tipo_destinatario: lerTipoDestinatario(formData),
+        id_tipo_destinatario: tipoResult.id,
         ativo,
         codigos: codigoResult.codigos,
         ...contatoResult.contatos,

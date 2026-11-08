@@ -128,6 +128,11 @@ export default async function RelatorioMovimentacaoPage({
             href={`/relatorios/movimentacao/export?${query.toString()}`}
             variant="ghost"
           />
+          <Button
+            label="Exportar XLSX"
+            href={`/relatorios/movimentacao/export?${query.toString()}&formato=xlsx`}
+            variant="ghost"
+          />
           <Button label="Voltar" href="/relatorios" variant="ghost" />
         </div>
       </div>

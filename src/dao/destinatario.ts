@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
-import { buildPagination, type ListParams, type TipoDestinatario } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
@@ -12,7 +12,8 @@ type Db = Prisma.TransactionClient;
 export type DestinatarioListFiltros = {
   /** true = só ativos (default) | false = só inativos | null = todos */
   ativo?: boolean | null;
-  tipos?: TipoDestinatario[];
+  /** Ids de `tipo_destinatario` (cadastro); vazio não filtra. */
+  tipos?: number[];
   ufs?: string[];
 };
 
@@ -25,7 +26,7 @@ export class DestinatarioDAO {
       where.pessoaJuridica = { razao_social: { contains: params.search } };
     }
     if (params.tipos && params.tipos.length > 0) {
-      where.tipo_destinatario = { in: params.tipos };
+      where.id_tipo_destinatario = { in: params.tipos };
     }
     if (params.ufs && params.ufs.length > 0) {
       where.endereco = { uf: { in: params.ufs } };
@@ -34,7 +35,7 @@ export class DestinatarioDAO {
       prisma.destinatario.findMany({
         skip, take,
         where,
-        include: { pessoaJuridica: true, endereco: true },
+        include: { pessoaJuridica: true, endereco: true, tipoDestinatario: true },
         orderBy: { id_destinatario: "desc" },
       }),
       prisma.destinatario.count({ where }),
@@ -48,6 +49,7 @@ export class DestinatarioDAO {
       include: {
         pessoaJuridica: true,
         endereco: true,
+        tipoDestinatario: true,
         telefones: { where: { ativo: true } },
         emails: true,
         destinatarioCodigos: { include: { tipoCodigo: true } },
@@ -58,13 +60,26 @@ export class DestinatarioDAO {
   async create(
     data: {
       razao_social: string; nome_fantasia?: string; cnpj?: string;
-      tipo_destinatario: TipoDestinatario;
+      id_tipo_destinatario: number | null;
       endereco: { logradouro: string; numero?: string; complemento?: string; bairro?: string; cidade: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
     id_usuario: number,
   ) {
     return prisma.$transaction(async (tx) => {
+      let tipo: { id: number; nome: string } | null = null;
+      if (data.id_tipo_destinatario !== null) {
+        const encontrado = await tx.tipoDestinatario.findUnique({
+          where: { id_tipo_destinatario: data.id_tipo_destinatario },
+          select: { id_tipo_destinatario: true, nome: true },
+        });
+        if (!encontrado) throw new Error("Tipo de escola não encontrado.");
+        tipo = {
+          id: encontrado.id_tipo_destinatario,
+          nome: encontrado.nome,
+        };
+      }
+
       const pj = await tx.pessoaJuridica.create({
         data: { razao_social: data.razao_social, nome_fantasia: data.nome_fantasia, cnpj: data.cnpj },
       });
@@ -77,12 +92,16 @@ export class DestinatarioDAO {
 
       const end = await tx.endereco.create({ data: data.endereco });
       const dest = await tx.destinatario.create({
-        data: { id_pessoa_juridica: pj.id_pessoa_juridica, tipo_destinatario: data.tipo_destinatario, id_endereco: end.id_endereco },
+        data: {
+          id_pessoa_juridica: pj.id_pessoa_juridica,
+          id_tipo_destinatario: data.id_tipo_destinatario,
+          id_endereco: end.id_endereco,
+        },
       });
       await registrarAuditoria(
         id_usuario, "CRIAR", "Destinatario", dest.id_destinatario,
         null,
-        { tipo: data.tipo_destinatario, id_endereco: end.id_endereco, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { tipo, id_endereco: end.id_endereco, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 
@@ -105,7 +124,7 @@ export class DestinatarioDAO {
 
       return tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: dest.id_destinatario },
-        include: { pessoaJuridica: true, endereco: true },
+        include: { pessoaJuridica: true, endereco: true, tipoDestinatario: true },
       });
     });
   }
@@ -113,7 +132,7 @@ export class DestinatarioDAO {
   async update(
     id: number,
     data: {
-      razao_social?: string; nome_fantasia?: string; cnpj?: string; tipo_destinatario?: TipoDestinatario; ativo?: boolean;
+      razao_social?: string; nome_fantasia?: string; cnpj?: string; id_tipo_destinatario?: number | null; ativo?: boolean;
       endereco?: { logradouro?: string; numero?: string; complemento?: string; bairro?: string; cidade?: string; uf?: string; cep?: string };
       codigos?: CodigoInput[];
     } & Partial<ContatosInput>,
@@ -122,8 +141,23 @@ export class DestinatarioDAO {
     return prisma.$transaction(async (tx) => {
       const antes = await tx.destinatario.findUniqueOrThrow({
         where: { id_destinatario: id },
-        include: { pessoaJuridica: true, endereco: true, destinatarioCodigos: true, emails: true, telefones: true },
+        include: { pessoaJuridica: true, endereco: true, destinatarioCodigos: true, emails: true, telefones: true, tipoDestinatario: true },
       });
+
+      /** O tipo vai para a auditoria com id e nome, para o diff ficar legível. */
+      let tipoDepois: { id: number; nome: string } | null = null;
+      if (data.id_tipo_destinatario === undefined) {
+        tipoDepois = antes.tipoDestinatario
+          ? { id: antes.tipoDestinatario.id_tipo_destinatario, nome: antes.tipoDestinatario.nome }
+          : null;
+      } else if (data.id_tipo_destinatario !== null) {
+        const tipo = await tx.tipoDestinatario.findUnique({
+          where: { id_tipo_destinatario: data.id_tipo_destinatario },
+          select: { id_tipo_destinatario: true, nome: true },
+        });
+        if (!tipo) throw new Error("Tipo de escola não encontrado.");
+        tipoDepois = { id: tipo.id_tipo_destinatario, nome: tipo.nome };
+      }
 
       if (data.razao_social !== undefined || data.cnpj !== undefined || data.nome_fantasia !== undefined) {
         await tx.pessoaJuridica.update({
@@ -149,7 +183,10 @@ export class DestinatarioDAO {
       const depois = await tx.destinatario.update({
         where: { id_destinatario: id },
         data: {
-          tipo_destinatario: data.tipo_destinatario ?? antes.tipo_destinatario,
+          id_tipo_destinatario:
+            data.id_tipo_destinatario === undefined
+              ? antes.id_tipo_destinatario
+              : data.id_tipo_destinatario,
           ativo: data.ativo ?? antes.ativo,
         },
       });
@@ -185,8 +222,8 @@ export class DestinatarioDAO {
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         "Destinatario",
         id,
-        { razao_social: antes.pessoaJuridica.razao_social, nome_fantasia: antes.pessoaJuridica.nome_fantasia, tipo: antes.tipo_destinatario, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia, tipo: depois.tipo_destinatario, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { razao_social: antes.pessoaJuridica.razao_social, nome_fantasia: antes.pessoaJuridica.nome_fantasia, tipo: antes.tipoDestinatario ? { id: antes.tipoDestinatario.id_tipo_destinatario, nome: antes.tipoDestinatario.nome } : null, ativo: antes.ativo, codigos: antes.destinatarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { razao_social: data.razao_social ?? antes.pessoaJuridica.razao_social, nome_fantasia: data.nome_fantasia ?? antes.pessoaJuridica.nome_fantasia, tipo: tipoDepois, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 

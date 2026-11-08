@@ -401,18 +401,30 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 6. **Docs:** runbook, `IMPLEMENTACAO.md`, `ENTENDIMENTO.md` e `README`s atualizados para
    wizard/ACL/bandeja/sharp/filtros; manter ao incluir novas telas.
 7. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar wizard/ACL/tray
-   .NET 10/sharp/filtros + seed com 82 permissões; o `CHANGELOG` está em `[Unreleased]` e o
-   setup em `out` é build local, sem tag.
+   .NET 10/sharp/filtros/tipos de escola/desmembramento/backup + seed com **89 permissões**; o
+   `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
 8. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
-9. **NexusAgent/painel:** os planos de `NexusAgent` .NET 10 + Task Scheduler e painel
-   `/administracao` de backup **não foram implementados**; os filtros das listas foram
-   concluídos (seção própria acima).
+9. **NexusAgent/backup:** implementados (serviço, agendamento, restauração e painel
+   `/administracao/backup`); falta testar a restauração **com uploads** e o setup em máquina
+   limpa. Os filtros das listas foram concluídos (seção própria acima).
 10. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
     `RunLevel Highest`; conta padrão exige um tray `asInvoker` + tarefa elevada de restart.
 11. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
     criar o usuário do representante e validar impressão/backup.
 12. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
     CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
-13. **RFs restantes:** RF011, RF012, RF019, RF021, RF023, RF024/XLSX; RF018/RF026/RNF009
-    fora do escopo.
+13. **RFs restantes:** RF011 (leitor/tela dedicada), RF021 (retirada direta de urgência) e
+    RF023/RF024/RNF008 (XLSX); RF012 e RF019 concluídos (transferências = entregas às escolas;
+    assistente de saída = aviso RN001); RF018/RF026/RNF009 fora do escopo.
+14. **Retiradas diretas de urgência (RF021):** dar baixa parcial na própria nota de saída
+    (`urgente`), item a item, baixando `produto.saldo` e liberando o `saldo_reservado`, com
+    `BAIXA_PARCIAL`/`BAIXA_TOTAL`, movimentação e auditoria. Deve funcionar também quando a
+    nota já está planejada em uma expedição: o já retirado conta como entregue e a expedição
+    oferece só o pendente (ou a nota sai da lista se estiver completa). Definir: permissão
+    (`nota_saida.alterar`/`estoque.saida`), local da ação (detalhe/lista da Saída), se permite
+    retirar antes do despacho e como a expedição é atualizada/avisada.
+15. **Exportação XLSX (RF024/RNF008; fecha o pendente do RF023):** rota/arquivo `.xlsx` para
+    cada relatório, repetindo os filtros e dados do CSV, com cabeçalho, larguras e
+    números/datas formatados, botão ao lado de CSV e testes. Avaliar biblioteca (ex.:
+    `exceljs`/`xlsx`) e impacto no bundle; manter CSV e PDF.

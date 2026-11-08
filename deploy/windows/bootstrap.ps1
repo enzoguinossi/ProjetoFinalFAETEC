@@ -13,7 +13,7 @@
     extraída de app.zip e executada por `node server.js` — sem Git, npm,
     `next build` ou Prisma no destino.
 
-    O SQL (schema/seed ou migração 001 + seed) é aplicado por aplicar-sql.ps1
+    O SQL (schema/seed ou migrações + seed) é aplicado por aplicar-sql.ps1
     com mysql.exe.
 
 .PARAMETER Hostname
@@ -99,6 +99,8 @@ $CaddyDataDir = $script:NexusCaddyDataDir
 $CaddyConfigDir = $script:NexusCaddyConfigDir
 $CaddyLogsDir = $script:NexusCaddyLogsDir
 $CaddyDir = Join-Path $ProgramRoot "caddy"
+$AgentDir = Join-Path $ProgramRoot "NexusAgent"
+$AgentTarget = Join-Path $AgentDir "NexusAgent.exe"
 $NodeDir = $script:NexusNodeDir
 $NodeExe = $script:NexusNodeExe
 $MySqlDir = $script:NexusMySqlDir
@@ -197,7 +199,8 @@ function Assert-Payload {
         @{ Path = "app\app.zip"; Label = "aplicação standalone (app.zip)" },
         @{ Path = "sql\schema.sql"; Label = "schema.sql" },
         @{ Path = "sql\seed.sql"; Label = "seed.sql" },
-        @{ Path = "sql\migracoes\001-unidades-pct10-cx50.sql"; Label = "migração 001" }
+        @{ Path = "sql\migracoes\001-unidades-pct10-cx50.sql"; Label = "migração 001" },
+        @{ Path = "sql\migracoes\002-tipos-destinatario.sql"; Label = "migração 002" }
     )
     foreach ($item in $required) {
         $path = Join-Path $PayloadDir $item.Path
@@ -558,8 +561,9 @@ if ($Resume -and -not $Force) {
     }
     if ($startPhase -lt 0) { $startPhase = 0 }
     if ($startPhase -gt 7) { $startPhase = 7 }
-    # Permite refazer a bandeja/tarefas quando a instalação já terminou.
-    if ($state.completedPhase -ge 7 -and -not $SkipTray) { $startPhase = 6 }
+    # Permite refazer a fase 6 (agente, scripts, bandeja) quando a instalação já
+    # terminou. -SkipTray pula só a bandeja: o agente continua sendo atualizado.
+    if ($state.completedPhase -ge 7) { $startPhase = 6 }
 }
 
 $transcriptPath = Join-Path $LogsDir ("bootstrap-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".log")
@@ -578,6 +582,66 @@ function Invoke-Nssm {
     }
     if ($code -ne 0) {
         Fail ("NSSM falhou: " + ($Arguments -join " ") + " (código $code)")
+    }
+}
+
+function Invoke-Sc {
+    <#
+    .SYNOPSIS
+        Executa sc.exe e falha com a saída bruta quando o código não é zero.
+
+    .DESCRIPTION
+        Usado pelo serviço NexusAgent, que não é gerenciado pelo NSSM. A saída
+        do sc.exe nunca contém segredos (o binPath é só o caminho do exe).
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [switch]$AllowFailure
+    )
+    $scExe = Join-Path $env:SystemRoot "System32\sc.exe"
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & $scExe @Arguments 2>&1
+        $code = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    if ($code -ne 0 -and -not $AllowFailure) {
+        $detail = (($output | ForEach-Object { "$_".Trim() }) | Where-Object { $_ }) -join " "
+        Fail ("sc.exe " + ($Arguments -join " ") + " falhou (código $code): $detail")
+    }
+    return [int]$code
+}
+
+function Invoke-ScRaw {
+    <#
+    .SYNOPSIS
+        Executa sc.exe com uma linha de argumentos crua e devolve código + saída.
+
+    .DESCRIPTION
+        O splatting do Windows PowerShell 5.1 remove as aspas de um argumento
+        como '"C:\Program Files\...\NexusAgent.exe"'. Para o SCM guardar o
+        binPath entre aspas é preciso passar a linha com aspas escapadas
+        (\"...\") diretamente ao CreateProcess; por isso esta função usa
+        ProcessStartInfo.Arguments em vez de argumentos separados.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Arguments)
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = (Join-Path $env:SystemRoot "System32\sc.exe")
+    $psi.Arguments = $Arguments
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $process = [System.Diagnostics.Process]::Start($psi)
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+    return @{
+        Code   = [int]$process.ExitCode
+        Output = (($stdout + "`n" + $stderr).Trim())
     }
 }
 
@@ -627,6 +691,14 @@ function Set-NexusService {
     Invoke-Nssm -Arguments @("set", $Name, "Description", $Description)
     if ($DependOnService) {
         Invoke-Nssm -Arguments @("set", $Name, "DependOnService", $DependOnService)
+    }
+    else {
+        # Sem dependência: limpa a que instalações anteriores gravaram (ex.: o
+        # NexusCaddy dependia do NexusApp e caía quando o app reiniciava).
+        $current = Get-Service -Name $Name -ErrorAction SilentlyContinue
+        if ($current -and $current.ServicesDependedOn -and $current.ServicesDependedOn.Count -gt 0) {
+            Invoke-Nssm -Arguments @("reset", $Name, "DependOnService")
+        }
     }
 }
 
@@ -692,7 +764,8 @@ function Set-NexusFirewallRules {
         @{ Name = "Nexus HTTP"; Port = 80; Action = "Allow" },
         @{ Name = "Nexus HTTPS"; Port = 443; Action = "Allow" },
         @{ Name = "Nexus MySQL (LAN)"; Port = $script:NexusMySqlPort; Action = "Block" },
-        @{ Name = "Nexus Next (LAN)"; Port = 3000; Action = "Block" }
+        @{ Name = "Nexus Next (LAN)"; Port = 3000; Action = "Block" },
+        @{ Name = "Nexus Agent (LAN)"; Port = 3215; Action = "Block" }
     )
     foreach ($rule in $rules) {
         Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue |
@@ -1169,9 +1242,8 @@ try {
             -Stdout (Join-Path $CaddyLogsDir "caddy.out.log") `
             -Stderr (Join-Path $CaddyLogsDir "caddy.err.log") `
             -Description "Nexus - proxy HTTPS (Caddy)" `
-            -DependOnService "NexusApp" `
             -ObjectName "NT AUTHORITY\LocalService"
-        Write-Ok "Serviço NexusCaddy configurado (NT AUTHORITY\LocalService)."
+        Write-Ok "Serviço NexusCaddy configurado (NT AUTHORITY\LocalService, sem dependência do NexusApp)."
 
         Write-Ok "Iniciando NexusApp..."
         try {
@@ -1236,7 +1308,7 @@ try {
 
     if ($startPhase -le 6) {
         Write-NexusProgress -Step 6
-        Write-Step "Fase 6/7 - Bandeja e backup diário"
+        Write-Step "Fase 6/7 - Agente, bandeja e backup"
         Assert-Admin
 
         $scriptsDir = Join-Path $ProgramRoot "scripts"
@@ -1262,21 +1334,207 @@ try {
             }
         }
         Set-AclReadExecute -Path $scriptsDir
+        Write-Ok "Scripts de operação copiados para $scriptsDir."
+
+        # --- NexusAgent: serviço, segredo, progresso e firewall ---------------
+        $agentSource = ""
+        foreach ($candidate in @(
+            (Join-Path $PSScriptRoot "NexusAgent\dist\NexusAgent.exe"),
+            (Join-Path $PSScriptRoot "NexusAgent.exe")
+        )) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                $agentSource = $candidate
+                break
+            }
+        }
+        if (-not $agentSource) {
+            Fail ("NexusAgent.exe não encontrado ao lado do bootstrap " +
+                "(NexusAgent\dist\NexusAgent.exe ou NexusAgent.exe). " +
+                "Gere o setup com build-instalador.ps1 ou publique o agente com NexusAgent\build.ps1.")
+        }
+
+        $agentService = Get-Service -Name "NexusAgent" -ErrorAction SilentlyContinue
+        if ($agentService -and $agentService.Status.ToString() -ne "Stopped") {
+            # A2: parar o agente no meio de um job deixaria o banco pela metade.
+            $busySecret = $null
+            $agentSecretFile = Join-Path $ConfigDir "agent.secret"
+            if (Test-Path -LiteralPath $agentSecretFile -PathType Leaf) {
+                $busySecret = ([System.IO.File]::ReadAllText($agentSecretFile)).Trim()
+            }
+            if ($busySecret) {
+                $agentBusy = Test-AgentJobActive -Secret $busySecret
+                $busySecret = $null
+                if ($agentBusy.Ok -and $agentBusy.Active) {
+                    Fail ("Há uma operação de backup/restauração em andamento no NexusAgent " +
+                        "(job $($agentBusy.JobId)). Aguarde terminar e rode o setup novamente.")
+                }
+            }
+            Write-Ok "Parando o serviço NexusAgent para atualizar o executável..."
+            Stop-Service -Name "NexusAgent" -Force -ErrorAction SilentlyContinue
+            if (-not (Wait-ServiceState -Name "NexusAgent" -Status "Stopped" -TimeoutSeconds 60)) {
+                Fail "O serviço NexusAgent não parou para atualizar o executável."
+            }
+        }
+        if (-not (Test-Path -LiteralPath $AgentDir)) {
+            New-Item -ItemType Directory -Force -Path $AgentDir | Out-Null
+        }
+        $agentCopied = $false
+        for ($attempt = 0; $attempt -lt 5; $attempt++) {
+            try {
+                Copy-Item -LiteralPath $agentSource -Destination $AgentTarget -Force -ErrorAction Stop
+                $agentCopied = $true
+                break
+            }
+            catch {
+                Start-Sleep -Seconds 2
+            }
+        }
+        if (-not $agentCopied) {
+            Fail "Não foi possível copiar o NexusAgent.exe para $AgentTarget; o arquivo continua em uso."
+        }
+        Unblock-File -LiteralPath $AgentTarget -ErrorAction SilentlyContinue
+        Write-Ok "NexusAgent.exe copiado para $AgentTarget."
+
+        # Segredo do agente: 48 bytes, preservado em upgrades, nunca logado.
+        $agentSecretPath = Join-Path $ConfigDir "agent.secret"
+        $agentSecret = $null
+        if (Test-Path -LiteralPath $agentSecretPath -PathType Leaf) {
+            $agentSecret = ([System.IO.File]::ReadAllText($agentSecretPath)).Trim()
+        }
+        if (-not $agentSecret) {
+            $agentSecret = New-RandomSecret -Bytes 48
+            if (-not (Test-Path -LiteralPath $agentSecretPath)) {
+                Write-Utf8NoBom -Path $agentSecretPath -Lines @("")
+            }
+            # Só Administrators/SYSTEM: nenhum serviço além do agente (SYSTEM) lê.
+            Protect-File -Path $agentSecretPath
+            Write-Utf8NoBom -Path $agentSecretPath -Lines @($agentSecret)
+            Write-Ok "Segredo do agente gerado em $agentSecretPath (Administrators/SYSTEM)."
+        }
+        else {
+            Protect-File -Path $agentSecretPath
+            Write-Ok "Segredo do agente preservado em $agentSecretPath."
+        }
+
+        Suspend-Transcript
+        try {
+            Set-EnvFile -Path $EnvPath -Key "AGENT_SECRET" -Value ('"{0}"' -f $agentSecret) -ReadIdentities @("S-1-5-20")
+            Set-EnvFile -Path $EnvPath -Key "AGENT_URL" -Value "http://127.0.0.1:3215" -ReadIdentities @("S-1-5-20")
+        }
+        finally {
+            Resume-Transcript
+        }
+        Write-Ok "AGENT_SECRET e AGENT_URL gravados em $EnvPath (o NexusApp lê no start)."
+
+        # Página de progresso servida pelo Caddy em /progresso/ (diretório do
+        # Caddy em ProgramData — é ele que o serviço serve, não Program Files).
+        $progressDir = Join-Path $script:NexusCaddyDir "progresso"
+        if (-not (Test-Path -LiteralPath $progressDir)) {
+            New-Item -ItemType Directory -Force -Path $progressDir | Out-Null
+        }
+        $progressPage = Join-Path $PSScriptRoot "progresso\index.html"
+        if (-not (Test-Path -LiteralPath $progressPage -PathType Leaf)) {
+            Fail "progresso\index.html não encontrado em $progressPage; o setup está incompleto."
+        }
+        Copy-Item -LiteralPath $progressPage -Destination (Join-Path $progressDir "index.html") -Force
+        Set-AclRestricted -Path $progressDir -ReadIdentities @("S-1-5-19")
+        Protect-File -Path (Join-Path $progressDir "index.html") -ReadIdentities @("S-1-5-19")
+        Write-Ok "Página de progresso publicada em $progressDir (leitura para LocalService)."
+
+        # Serviço do agente: LocalSystem, automático, sem dependência do MySQL
+        # (o próprio agente trata o banco parado). Falhas reiniciam com backoff.
+        # O caminho precisa chegar ao SCM entre aspas (unquoted service path).
+        $agentBinPath = '"{0}"' -f $AgentTarget
+        if (-not (Get-Service -Name "NexusAgent" -ErrorAction SilentlyContinue)) {
+            New-Service -Name "NexusAgent" -BinaryPathName $agentBinPath `
+                -StartupType Automatic -DisplayName "Nexus Agent" | Out-Null
+        }
+        else {
+            # Upgrade: o exe já foi trocado acima; atualiza o binPath com as
+            # aspas literais (o splatting do PowerShell as removeria).
+            $configResult = Invoke-ScRaw -Arguments ('config NexusAgent binPath= "\"' + $AgentTarget + '\""')
+            if ($configResult.Code -ne 0) {
+                Fail ("sc.exe config NexusAgent binPath falhou (código $($configResult.Code)): " +
+                    $configResult.Output)
+            }
+        }
+        $qcResult = Invoke-ScRaw -Arguments "qc NexusAgent"
+        if ($qcResult.Code -ne 0 -or
+            $qcResult.Output.IndexOf($agentBinPath, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            Fail ("O binPath do serviço NexusAgent não ficou entre aspas (esperado $agentBinPath). " +
+                "sc.exe qc: " + ($qcResult.Output -replace '[\r\n]+', ' '))
+        }
+        Invoke-Sc -Arguments @("description", "NexusAgent", "Backup, agendamento e restauração do Nexus") | Out-Null
+        Invoke-Sc -Arguments @(
+            "failure", "NexusAgent", "reset=", "86400",
+            "actions=", "restart/5000/restart/10000/restart/30000"
+        ) | Out-Null
+        Write-Ok "Serviço NexusAgent configurado (LocalSystem, automático, sem dependência; binPath com aspas)."
+
+        # Reaplica as regras (inclui o Block da 3215) também em retomadas na fase 6.
+        Set-NexusFirewallRules
+        Write-Ok "Firewall: porta 3215 bloqueada para LocalSubnet."
+
+        # A tarefa diária deixa de existir: o agente agenda o backup (02:00).
+        if (Get-Command Unregister-ScheduledTask -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName "NexusBackup" -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        else {
+            $schtasksExe = Join-Path $env:SystemRoot "System32\schtasks.exe"
+            & $schtasksExe /Delete /TN "NexusBackup" /F 2>&1 | Out-Null
+        }
+        Write-Ok "Tarefa NexusBackup removida; a agenda do agente assume o backup."
+
+        $agentService = Get-Service -Name "NexusAgent" -ErrorAction SilentlyContinue
+        if (-not $agentService -or $agentService.Status.ToString() -ne "Running") {
+            Start-Service -Name "NexusAgent" -ErrorAction SilentlyContinue
+        }
+        if (-not (Wait-ServiceState -Name "NexusAgent" -Status "Running" -TimeoutSeconds 60)) {
+            Fail "O serviço NexusAgent não iniciou. Veja o Visualizador de Eventos e os logs em $LogsDir."
+        }
+        Write-Ok "Serviço NexusAgent em execução."
+
+        $agentHealth = $null
+        $deadline = (Get-Date).AddSeconds(30)
+        do {
+            $agentHealth = Test-AgentHealth -Secret $agentSecret
+            if ($agentHealth.Ok) { break }
+            Start-Sleep -Seconds 2
+        } while ((Get-Date) -lt $deadline)
+        if (-not $agentHealth -or -not $agentHealth.Ok) {
+            Fail ("O NexusAgent não respondeu status=ok em http://127.0.0.1:3215/v1/health " +
+                "dentro de 30 segundos. Confira o serviço NexusAgent e $agentSecretPath.")
+        }
+        Write-Ok "Agente responde /v1/health (status=ok, versão $($agentHealth.Version), MySQL $($agentHealth.Mysql))."
+
+        # O .env é lido pelo Next no start: reinicia o app para carregar
+        # AGENT_SECRET/AGENT_URL sem exigir reboot.
+        if (Get-Service -Name "NexusApp" -ErrorAction SilentlyContinue) {
+            try {
+                Start-NexusApp -TimeoutSeconds 180
+            }
+            catch {
+                Fail ("O NexusApp não reiniciou para carregar AGENT_SECRET: " +
+                    $_.Exception.Message + " Veja $LogsDir\app.err.log.")
+            }
+            # B3: o restart do app não pode deixar o Caddy parado — é ele que
+            # serve /progresso/ e o HTTPS.
+            $caddyService = Get-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+            if (-not $caddyService -or $caddyService.Status.ToString() -ne "Running") {
+                Start-Service -Name "NexusCaddy" -ErrorAction SilentlyContinue
+            }
+            if (-not (Wait-ServiceState -Name "NexusCaddy" -Status "Running" -TimeoutSeconds 60)) {
+                Fail ("O serviço NexusCaddy não está em execução após reiniciar o NexusApp. " +
+                    "Veja $CaddyLogsDir\caddy.err.log.")
+            }
+            Write-Ok "NexusCaddy em execução após o restart do NexusApp."
+        }
 
         $backupScript = Join-Path $scriptsDir "backup.ps1"
         $restartScript = Join-Path $scriptsDir "restart.ps1"
         $startScript = Join-Path $scriptsDir "iniciar-nexus.ps1"
         $stopScript = Join-Path $scriptsDir "encerrar-nexus.ps1"
         $stateFile = Join-Path $ConfigDir "nexus-state.json"
-        $backupAction = New-ScheduledTaskAction -Execute $PsExe `
-            -Argument ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -RetentionDays 30' -f $backupScript)
-        $backupTrigger = New-ScheduledTaskTrigger -Daily -At "02:00"
-        $backupPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-        $backupSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-        Register-ScheduledTask -TaskName "NexusBackup" -Action $backupAction -Trigger $backupTrigger `
-            -Principal $backupPrincipal -Settings $backupSettings `
-            -Description "Backup diário do Nexus (banco, uploads e .env)" -Force | Out-Null
-        Write-Ok "Tarefa NexusBackup registrada (diária, 02:00)."
 
         if ($SkipTray) {
             Write-Warn "Bandeja ignorada (-SkipTray)."
@@ -1433,7 +1691,14 @@ try {
         Write-Host "  Dados:      $DataDir"
         Write-Host "  Logs:       $LogsDir"
         Write-Host "  Versão:     $expectedVersion"
-        Write-Host "  Backup:     tarefa NexusBackup (diária, 02:00)"
+        Write-Host "  Backup:     serviço NexusAgent (agenda 02:00) + /administracao/backup"
+        Write-Host "  Agente:     $AgentTarget (127.0.0.1:3215, somente loopback)"
+        if ($SkipTray) {
+            Write-Host "  Bandeja:    ignorada (-SkipTray; o agente foi instalado normalmente)"
+        }
+        else {
+            Write-Host "  Bandeja:    $ProgramRoot\NexusTray (logon do usuário)"
+        }
         Write-Host "  Atualizar:  .\atualizar.ps1 -Package <pasta com app\ e sql\>"
         Write-Host ""
         Write-NexusProgress -Step 8
@@ -1449,4 +1714,5 @@ finally {
     }
     $rootSecure = $null
     $appSecure = $null
+    $agentSecret = $null
 }

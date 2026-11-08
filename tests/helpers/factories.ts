@@ -118,6 +118,22 @@ export async function criarProduto(
   });
 }
 
+export async function criarProdutoInsumo(
+  idProdutoPai: number,
+  idProdutoFilho: number,
+  quantidade = 1,
+  ativo = true,
+) {
+  return prismaTeste.produtoInsumo.create({
+    data: {
+      id_produto_pai: idProdutoPai,
+      id_produto_filho: idProdutoFilho,
+      quantidade,
+      ativo,
+    },
+  });
+}
+
 export async function criarEstoque(
   idProduto: number,
   opts: {
@@ -134,11 +150,26 @@ export async function criarEstoque(
   });
 }
 
+export async function criarTipoDestinatario(
+  nome?: string,
+  opts: { padrao?: boolean; codigo?: string } = {},
+) {
+  const n = proximo();
+  return prismaTeste.tipoDestinatario.create({
+    data: {
+      codigo: opts.codigo ?? `TIPO_${n}`,
+      nome: nome ?? `Tipo ${n}`,
+      padrao: opts.padrao ?? false,
+    },
+  });
+}
+
 export async function criarDestinatario(
   opts: {
     razaoSocial?: string;
     nomeFantasia?: string;
-    tipo?: "ESCOLA" | "CRECHE" | "CMEI" | "CMEIA";
+    /** Tipo do cadastro; `null` = sem tipo. */
+    idTipoDestinatario?: number | null;
     uf?: string;
     ativo?: boolean;
   } = {},
@@ -154,7 +185,7 @@ export async function criarDestinatario(
     data: {
       id_pessoa_juridica: pessoaJuridica.id_pessoa_juridica,
       id_endereco: endereco.id_endereco,
-      tipo_destinatario: opts.tipo ?? "ESCOLA",
+      id_tipo_destinatario: opts.idTipoDestinatario ?? null,
       ativo: opts.ativo ?? true,
     },
   });

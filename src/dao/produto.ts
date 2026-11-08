@@ -161,6 +161,7 @@ export class ProdutoDAO {
             saldo: true,
             saldo_reservado: true,
             ativo: true,
+            composto: true,
           },
           take,
           orderBy: { descricao: "asc" },

@@ -23,15 +23,14 @@ export type TipoNotaEntrada = (typeof TIPO_NOTA_ENTRADA)[number];
 export const TIPO_TELEFONE = ["CELULAR", "FIXO", "COMERCIAL"] as const;
 export type TipoTelefone = (typeof TIPO_TELEFONE)[number];
 
-export const TIPO_DESTINATARIO = ["ESCOLA", "CRECHE", "CMEI", "CMEIA"] as const;
-export type TipoDestinatario = (typeof TIPO_DESTINATARIO)[number];
-
-/** Rótulos exatos exibidos para o tipo de destinatário. */
-export const ROTULOS_TIPO_DESTINATARIO: Record<TipoDestinatario, string> = {
-  ESCOLA: "Escola",
-  CRECHE: "Creche",
-  CMEI: "CMEI",
-  CMEIA: "CMEIA",
+/** Tipo de escola/destinatário vindo do cadastro editável (`tipo_destinatario`). */
+export type TipoDestinatarioItem = {
+  id_tipo_destinatario: number;
+  codigo: string;
+  nome: string;
+  padrao: boolean;
+  /** Quantidade de destinatários vinculados (usada no modal de tipos). */
+  total_destinatarios?: number;
 };
 
 export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_EXPEDICAO"] as const;

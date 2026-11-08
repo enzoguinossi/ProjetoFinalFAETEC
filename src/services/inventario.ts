@@ -1,4 +1,5 @@
 import { formatarCodigo } from "@/lib/formatar";
+import type { CelulaPlanilha, TabelaPlanilha } from "@/lib/planilha";
 import type { InventarioDAO } from "@/dao/inventario";
 
 export type InventarioCompleto = NonNullable<
@@ -59,13 +60,13 @@ function quantidadeCsv(valor: number | null | undefined): string {
 }
 
 /**
- * CSV do inventário fechado/cancelado. Uma linha por produto, com as contagens,
- * a decisão de ajuste e a movimentação vinculada. BOM UTF-8 e `;` para Excel pt-BR.
+ * Tabela do inventário fechado/cancelado: mesma coluna do CSV, com as
+ * quantidades e saldos como números nativos (e omitidos sem `incluirSistema`).
  */
-﻿export function gerarCsvInventario(
+export function tabelaInventario(
   inventario: InventarioCompleto,
   opcoes: { incluirSistema?: boolean } = {},
-): string {
+): TabelaPlanilha {
   const incluirSistema = opcoes.incluirSistema ?? true;
   const cabecalho = [
     "Inventário",
@@ -91,7 +92,7 @@ function quantidadeCsv(valor: number | null | undefined): string {
   const aprovadorInventario =
     inventario.usuarioAprovacao?.funcionario.pessoaFisica.nome ?? "";
   const dataInicio = inventario.data_inicio.toISOString().slice(0, 10);
-  const dataFim = inventario.data_fim?.toISOString().slice(0, 10) ?? "";
+  const dataFim = inventario.data_fim?.toISOString().slice(0, 10) ?? null;
 
   const registros = inventario.itens.map((item) => {
     const contagens = item.contagens
@@ -106,43 +107,58 @@ function quantidadeCsv(valor: number | null | undefined): string {
     const ajuste = ajustesPorProduto.get(item.id_produto);
     const movimento = ajuste?.movimentacoes[0];
 
-    return [
+    const registro: CelulaPlanilha[] = [
       inventario.id_inventario,
-      inventario.observacao ?? "",
+      inventario.observacao ?? null,
       ROTULOS_STATUS_INVENTARIO[inventario.status] ?? inventario.status,
       dataInicio,
       dataFim,
       formatarCodigo(item.id_produto),
       item.produto.descricao,
-      ...(incluirSistema ? [quantidadeCsv(Number(item.quantidade_sistema))] : []),
+      ...(incluirSistema ? [Number(item.quantidade_sistema)] : []),
       contagens,
-      quantidadeCsv(media),
-      item.origem ? (ROTULOS_ORIGEM_AJUSTE[item.origem] ?? item.origem) : "",
+      media,
+      item.origem ? (ROTULOS_ORIGEM_AJUSTE[item.origem] ?? item.origem) : null,
       ...(incluirSistema
         ? [
-            item.quantidade_final === null
-              ? ""
-              : quantidadeCsv(Number(item.quantidade_final)),
+            item.quantidade_final === null ? null : Number(item.quantidade_final),
             ajuste
               ? (ROTULOS_STATUS_AJUSTE[ajuste.status] ?? ajuste.status)
               : "Sem ajuste",
           ]
         : []),
-      ajuste?.justificativa ?? "",
+      ajuste?.justificativa ?? null,
       ajuste?.usuarioAprovacao?.funcionario.pessoaFisica.nome ??
         aprovadorInventario,
       ...(incluirSistema
         ? [
-            movimento ? `#${movimento.id_movimentacao}` : "",
-            movimento ? quantidadeCsv(Number(movimento.saldo_anterior)) : "",
-            movimento ? quantidadeCsv(Number(movimento.saldo_posterior)) : "",
+            movimento ? `#${movimento.id_movimentacao}` : null,
+            movimento ? Number(movimento.saldo_anterior) : null,
+            movimento ? Number(movimento.saldo_posterior) : null,
           ]
         : []),
     ];
+    return registro;
   });
 
-  const corpo = [cabecalho, ...registros]
-    .map((campos) => campos.map(valorCsv).join(";"))
+  return { cabecalho, registros };
+}
+
+/**
+ * CSV do inventário fechado/cancelado. Uma linha por produto, com as contagens,
+ * a decisão de ajuste e a movimentação vinculada. BOM UTF-8 e `;` para Excel pt-BR.
+ */
+﻿export function gerarCsvInventario(
+  inventario: InventarioCompleto,
+  opcoes: { incluirSistema?: boolean } = {},
+): string {
+  const tabela = tabelaInventario(inventario, opcoes);
+  const celula = (valor: CelulaPlanilha): string => {
+    if (valor === null) return "";
+    return typeof valor === "number" ? quantidadeCsv(valor) : valor;
+  };
+  const corpo = [tabela.cabecalho, ...tabela.registros]
+    .map((campos) => campos.map(celula).map(valorCsv).join(";"))
     .join("\r\n");
   return `\uFEFF${corpo}\r\n`;
 }

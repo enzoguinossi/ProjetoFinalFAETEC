@@ -8,6 +8,7 @@ import {
   criarPedidoEscola,
   criarPercursoComDestinatario,
   criarTipoCodigo,
+  criarTipoDestinatario,
   criarUsuario,
 } from "../helpers/factories";
 import { auditoriasDe } from "../helpers/db";
@@ -32,29 +33,34 @@ describe("destinatarioDAO", () => {
     });
 
     it("filtra por tipo e UF, combinados com a busca, sem expor inativos", async () => {
+      const tipoEscola = await criarTipoDestinatario("Escola");
+      const tipoCreche = await criarTipoDestinatario("Creche");
+      const tipoCmei = await criarTipoDestinatario("CMEI");
       const escolaRj = await criarDestinatario({
         razaoSocial: "Escola Alfa",
-        tipo: "ESCOLA",
+        idTipoDestinatario: tipoEscola.id_tipo_destinatario,
         uf: "RJ",
       });
       const crecheSp = await criarDestinatario({
         razaoSocial: "Creche Alfa",
-        tipo: "CRECHE",
+        idTipoDestinatario: tipoCreche.id_tipo_destinatario,
         uf: "SP",
       });
       const cmeiRj = await criarDestinatario({
         razaoSocial: "CMEI Alfa",
-        tipo: "CMEI",
+        idTipoDestinatario: tipoCmei.id_tipo_destinatario,
         uf: "RJ",
       });
       await criarDestinatario({
         razaoSocial: "Escola Alfa Inativa",
-        tipo: "ESCOLA",
+        idTipoDestinatario: tipoEscola.id_tipo_destinatario,
         uf: "RJ",
         ativo: false,
       });
 
-      const porTipo = await destinatarioDAO.list({ tipos: ["CRECHE", "CMEI"] });
+      const porTipo = await destinatarioDAO.list({
+        tipos: [tipoCreche.id_tipo_destinatario, tipoCmei.id_tipo_destinatario],
+      });
       expect(porTipo.data.map((d) => d.id_destinatario).sort((a, b) => a - b)).toEqual(
         [
           crecheSp.destinatario.id_destinatario,
@@ -67,13 +73,16 @@ describe("destinatarioDAO", () => {
         crecheSp.destinatario.id_destinatario,
       ]);
 
-      const combinado = await destinatarioDAO.list({ tipos: ["ESCOLA"], ufs: ["RJ"] });
+      const combinado = await destinatarioDAO.list({
+        tipos: [tipoEscola.id_tipo_destinatario],
+        ufs: ["RJ"],
+      });
       expect(combinado.data.map((d) => d.id_destinatario)).toEqual([
         escolaRj.destinatario.id_destinatario,
       ]);
 
       const comBusca = await destinatarioDAO.list({
-        tipos: ["ESCOLA"],
+        tipos: [tipoEscola.id_tipo_destinatario],
         ufs: ["RJ"],
         search: "Alfa",
       });
@@ -143,13 +152,14 @@ describe("destinatarioDAO", () => {
     it("cria pessoa jurídica, endereço, contatos e códigos com duas auditorias", async () => {
       const { usuario } = await criarUsuario();
       const tipo = await criarTipoCodigo("COD_ESCOLA");
+      const tipoDestinatario = await criarTipoDestinatario("Creche");
 
       const criado = await destinatarioDAO.create(
         {
           razao_social: "Escola Nova",
           nome_fantasia: "Escolinha Nova",
           cnpj: "11222333000144",
-          tipo_destinatario: "CRECHE",
+          id_tipo_destinatario: tipoDestinatario.id_tipo_destinatario,
           endereco: { logradouro: "Rua A", numero: "10", cidade: "Niterói", uf: "RJ" },
           codigos: [{ id_tipo_codigo: tipo.id_tipo_codigo, codigo: "ESC-2" }],
           emails: [{ endereco: "nova@edu.br", principal: true }],
@@ -170,13 +180,54 @@ describe("destinatarioDAO", () => {
         nome_fantasia: "Escolinha Nova",
       });
       expect(auditoriasDest.map((a) => a.acao)).toEqual(["CRIAR"]);
-      expect(auditoriasDest[0]?.dados_novos).toMatchObject({ tipo: "CRECHE" });
+      expect(auditoriasDest[0]?.dados_novos).toMatchObject({
+        tipo: {
+          id: tipoDestinatario.id_tipo_destinatario,
+          nome: "Creche",
+        },
+      });
+    });
+
+    it("cria destinatário sem tipo quando o id é null", async () => {
+      const { usuario } = await criarUsuario();
+
+      const criado = await destinatarioDAO.create(
+        {
+          razao_social: "Escola Sem Tipo",
+          id_tipo_destinatario: null,
+          endereco: { logradouro: "Rua B", cidade: "Niterói" },
+        },
+        usuario.id_usuario,
+      );
+
+      expect(criado.id_tipo_destinatario).toBeNull();
+      expect(criado.tipoDestinatario).toBeNull();
+      const auditorias = await auditoriasDe("Destinatario", criado.id_destinatario);
+      expect(auditorias[0]?.dados_novos).toMatchObject({ tipo: null });
+    });
+
+    it("recusa tipo inexistente sem gravar cadastro", async () => {
+      const { usuario } = await criarUsuario();
+
+      await expect(
+        destinatarioDAO.create(
+          {
+            razao_social: "Escola Inválida",
+            id_tipo_destinatario: 999999,
+            endereco: { logradouro: "Rua C", cidade: "Niterói" },
+          },
+          usuario.id_usuario,
+        ),
+      ).rejects.toThrowError("Tipo de escola não encontrado.");
+      expect(await prismaTeste.destinatario.count()).toBe(0);
+      expect(await prismaTeste.pessoaJuridica.count()).toBe(0);
     });
   });
 
   describe("update", () => {
     it("altera dados, atualiza endereço parcialmente e substitui listas", async () => {
       const { usuario } = await criarUsuario();
+      const tipoCreche = await criarTipoDestinatario("Creche");
       const { destinatario } = await criarDestinatario({
         razaoSocial: "Antiga",
         nomeFantasia: "Fantasia Antiga",
@@ -187,7 +238,7 @@ describe("destinatarioDAO", () => {
         {
           razao_social: "Nova",
           nome_fantasia: "Fantasia Nova",
-          tipo_destinatario: "CRECHE",
+          id_tipo_destinatario: tipoCreche.id_tipo_destinatario,
           ativo: true,
           endereco: { cidade: "São Gonçalo" },
           emails: [{ endereco: "nova@edu.br", principal: true }],
@@ -199,7 +250,8 @@ describe("destinatarioDAO", () => {
       const noBanco = await destinatarioDAO.getById(destinatario.id_destinatario);
       expect(noBanco?.pessoaJuridica.razao_social).toBe("Nova");
       expect(noBanco?.pessoaJuridica.nome_fantasia).toBe("Fantasia Nova");
-      expect(noBanco?.tipo_destinatario).toBe("CRECHE");
+      expect(noBanco?.id_tipo_destinatario).toBe(tipoCreche.id_tipo_destinatario);
+      expect(noBanco?.tipoDestinatario?.nome).toBe("Creche");
       expect(noBanco?.endereco.cidade).toBe("São Gonçalo");
       expect(noBanco?.endereco.logradouro).toContain("Rua");
       expect(noBanco?.emails.map((e) => e.endereco)).toEqual(["nova@edu.br"]);
@@ -214,7 +266,31 @@ describe("destinatarioDAO", () => {
       expect(auditorias[0]?.dados_novos).toMatchObject({
         razao_social: "Nova",
         nome_fantasia: "Fantasia Nova",
+        tipo: { id: tipoCreche.id_tipo_destinatario, nome: "Creche" },
       });
+    });
+
+    it("remove o tipo quando recebe null", async () => {
+      const { usuario } = await criarUsuario();
+      const tipo = await criarTipoDestinatario("Escola");
+      const { destinatario } = await criarDestinatario({
+        idTipoDestinatario: tipo.id_tipo_destinatario,
+      });
+
+      await destinatarioDAO.update(
+        destinatario.id_destinatario,
+        { id_tipo_destinatario: null },
+        usuario.id_usuario,
+      );
+
+      const noBanco = await destinatarioDAO.getById(destinatario.id_destinatario);
+      expect(noBanco?.id_tipo_destinatario).toBeNull();
+      expect(noBanco?.tipoDestinatario).toBeNull();
+      const auditorias = await auditoriasDe("Destinatario", destinatario.id_destinatario);
+      expect(auditorias[0]?.dados_anteriores).toMatchObject({
+        tipo: { id: tipo.id_tipo_destinatario, nome: "Escola" },
+      });
+      expect(auditorias[0]?.dados_novos).toMatchObject({ tipo: null });
     });
 
     it("registra DESATIVAR quando ativo vira false", async () => {

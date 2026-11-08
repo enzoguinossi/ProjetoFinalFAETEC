@@ -988,8 +988,7 @@ describe("expedicaoService — execução da entrega", () => {
     ).toBe(0);
   });
 
-  it("reenvio parcial aceita só o item com pendência e mantém o já entregue", async () => {
-    const ctx = await montarEntregaEmPercurso([10, 20], {
+  it("reenvio parcial aceita só o item com pendência e mantém o já entregue", async () => {    const ctx = await montarEntregaEmPercurso([10, 20], {
       entregues: [4, 20],
     });
 
@@ -1008,6 +1007,91 @@ describe("expedicaoService — execução da entrega", () => {
       orderBy: { id_item_nota_saida: "asc" },
     });
     expect(itens.map((item) => Number(item.qtd_entregue))).toEqual([10, 20]);
+  });
+
+  it("completa a nota em BAIXA_PARCIAL com a entrega do restante", async () => {
+    const ctx = await montarEntregaEmPercurso([10]);
+
+    const parcial = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { itens: entregaDe(ctx.itens, [4]) },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in parcial) throw new Error(parcial.error);
+    expect(parcial.entrega.status).toBe("BAIXA_PARCIAL");
+
+    // A nota já não está em EM_PERCURSO, mas a expedição continua: a segunda
+    // entrega é aceita a partir de BAIXA_PARCIAL.
+    const total = await expedicaoService.registrarEntrega(
+      ctx.expedicao.id_expedicao,
+      ctx.nota.id_nota_saida,
+      { itens: entregaDe(ctx.itens, [10]) },
+      ctx.usuario.id_usuario,
+    );
+    if ("error" in total) throw new Error(total.error);
+    expect(total.entrega.status).toBe("BAIXA_TOTAL");
+
+    const estoque = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: ctx.estoques[0]!.id_produto },
+    });
+    expect(estoque.saldo).toBe(90);
+    expect(estoque.saldo_reservado).toBe(0);
+
+    const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
+      where: { id_nota_saida: ctx.nota.id_nota_saida },
+    });
+    expect(nota.status).toBe("BAIXA_TOTAL");
+  });
+
+  it("despachar preserva notas com BAIXA_PARCIAL e BAIXA_TOTAL", async () => {
+    const { usuario } = await criarUsuario();
+    const { destinatario } = await criarDestinatario();
+    const parcial = await criarNota(destinatario.id_destinatario, {
+      status: "BAIXA_PARCIAL",
+      esperada: 10,
+      entregue: 4,
+    });
+    const total = await criarNota(destinatario.id_destinatario, {
+      status: "BAIXA_TOTAL",
+      esperada: 5,
+      entregue: 5,
+    });
+
+    const expedicao = await criarExpedicao({ status: "PLANEJADA" });
+    await prismaTeste.expedicaoNota.createMany({
+      data: [
+        {
+          id_expedicao: expedicao.id_expedicao,
+          id_nota_saida: parcial.id_nota_saida,
+          ordem_visita: 1,
+          data_adicao: new Date(),
+        },
+        {
+          id_expedicao: expedicao.id_expedicao,
+          id_nota_saida: total.id_nota_saida,
+          ordem_visita: 2,
+          data_adicao: new Date(),
+        },
+      ],
+    });
+
+    const despachada = await expedicaoService.despachar(
+      expedicao.id_expedicao,
+      usuario.id_usuario,
+    );
+    if ("error" in despachada) throw new Error(despachada.error);
+
+    const status = await prismaTeste.notaSaida.findMany({
+      where: {
+        id_nota_saida: { in: [parcial.id_nota_saida, total.id_nota_saida] },
+      },
+      orderBy: { id_nota_saida: "asc" },
+    });
+    expect(status.map((nota) => nota.status)).toEqual([
+      "BAIXA_PARCIAL",
+      "BAIXA_TOTAL",
+    ]);
   });
 
   it("recusa item já completo e redução do já entregue", async () => {
@@ -1156,7 +1240,8 @@ describe("expedicaoService — execução da entrega", () => {
       ctx.usuario.id_usuario,
     );
     if ("error" in resultado) throw new Error(resultado.error);
-    expect(resultado.entrega.status).toBe("PENDENTE");
+    // A nota já tem entrega parcial: o status não regride para PENDENTE.
+    expect(resultado.entrega.status).toBe("BAIXA_PARCIAL");
 
     const itens = await prismaTeste.itemNotaSaida.findMany({
       where: { id_nota_saida: ctx.nota.id_nota_saida },

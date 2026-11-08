@@ -122,7 +122,7 @@ export default function UsuarioForm({
             <label className="font-display text-[0.9375rem] font-medium text-ink">Funcionário</label>
             {isView ? (
               <p className="h-10 px-3 border border-[#c1c7cd] rounded-lg font-sans text-sm outline-none transition-[border-color] duration-[120ms] w-full box-border focus:border-brand focus:shadow-[0_0_0_2px_rgba(27,153,86,0.12)] leading-[2.5]">
-                {initialData?.nome_funcionario ?? "—"}
+                {initialData?.nome_funcionario ?? ""}
               </p>
             ) : (
               <select

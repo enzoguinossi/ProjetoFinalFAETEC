@@ -174,9 +174,11 @@ As convenções documentadas são:
   `produto.saldo_reservado` (default `0`). Não existe tabela `estoque`, linha de estoque
   nem lote; a data de entrada fica no histórico de movimentações e a atividade é
   `produto.ativo`.
-* **Exceções (sem `ativo`, exclusão física):** `conversao_unidade` e `percurso` são
-  excluídos fisicamente e não possuem `ativo`; as demais entidades de cadastro continuam
-  com desativação (`ativo = false`). A unidade **padrão** do sistema (UNIDADE/1) é a
+* **Exceções (sem `ativo`, exclusão física):** `conversao_unidade`, `percurso` e
+  `tipo_destinatario` são excluídos fisicamente e não possuem `ativo`; as demais entidades de
+  cadastro continuam com desativação (`ativo = false`). A exclusão do tipo de destinatário
+  deixa os destinatários sem tipo (`ON DELETE SET NULL`), com auditoria do tipo excluído e dos
+  destinatários afetados. A unidade **padrão** do sistema (UNIDADE/1) é a
   exceção dentro da exceção: não pode ser excluída nem ter nome ou fator alterados
   — só a descrição é editável. Ao excluir uma unidade que não é a padrão, os produtos
   que a usavam são revinculados à unidade padrão **nos dois vínculos** — Conversão Padrão
@@ -470,8 +472,10 @@ para excluir fisicamente entidades de cadastro.
 
 Quando a entidade possuir `ativo`, utilize a desativação prevista pelo domínio.
 
-**Exceções:** `conversao_unidade` e `percurso` são excluídos fisicamente e **não possuem
-`ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria. A unidade
+**Exceções:** `conversao_unidade`, `percurso` e `tipo_destinatario` são excluídos fisicamente
+e **não possuem `ativo`** — a exclusão é permanente e o snapshot anterior fica na auditoria.
+No tipo de destinatário, a exclusão deixa os destinatários sem tipo (`ON DELETE SET NULL`) e a
+auditoria guarda o tipo excluído e os destinatários afetados. A unidade
 **padrão** (`padrao = true`, UNIDADE/1) **não pode ser excluída** nem ter nome ou
 fator alterados; ao excluir uma unidade que não é a padrão, os produtos que a usavam são
 **revinculados à unidade padrão nos dois campos** (`ID_conversao_padrao` e

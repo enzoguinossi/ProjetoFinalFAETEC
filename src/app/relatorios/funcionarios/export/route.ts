@@ -1,13 +1,18 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvFuncionarios, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvFuncionarios,
+  relatorioService,
+  tabelaFuncionarios,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV da lista de Funcionários (RF023/RF024), com os mesmos filtros
- * da tela.
+ * Exportação CSV/XLSX da lista de Funcionários (RF023/RF024), com os mesmos
+ * filtros da tela.
  */
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -22,6 +27,22 @@ export async function GET(request: Request) {
     codigos: url.searchParams.get("codigos"),
     contatos: url.searchParams.get("contatos"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `funcionarios-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(
+        tabelaFuncionarios(
+          data,
+          filtros.fotos,
+          filtros.codigos,
+          filtros.contatos,
+        ),
+        { nome: "Funcionários", nomeArquivo },
+      ),
+      nomeArquivo,
+    );
+  }
 
   return new Response(
     gerarCsvFuncionarios(data, filtros.fotos, filtros.codigos, filtros.contatos),

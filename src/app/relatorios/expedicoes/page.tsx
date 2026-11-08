@@ -192,7 +192,7 @@ export default async function RelatorioExpedicoesPage({
       vazio="Nenhuma expedição encontrada no período."
       totais={[
         { rotulo: "Notas", valor: String(totais.notas) },
-        { rotulo: "Esperados", valor: formatarQuantidade(totais.esperados) },
+        { rotulo: "Solicitados", valor: formatarQuantidade(totais.esperados) },
         { rotulo: "Entregues", valor: formatarQuantidade(totais.entregues) },
       ]}
     >
@@ -221,7 +221,7 @@ export default async function RelatorioExpedicoesPage({
               <div className="registro-linha">
                 <span className="registro-rotulo">Itens</span>
                 <span>
-                  {formatarQuantidade(linha.itens_esperados)} esperados ·{" "}
+                  {formatarQuantidade(linha.itens_esperados)} solicitados ·{" "}
                   {formatarQuantidade(linha.itens_entregues)} entregues
                 </span>
               </div>

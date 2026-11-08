@@ -28,7 +28,8 @@
     "figma:check": "tsx tools/figma-export/plugin-check.ts",
     "figma:compare": "tsx tools/figma-export/compare.ts",
     "figma:diff": "tsx tools/figma-export/diff.ts",
-    "figma:fixtures": "tsx tools/figma-export/fixtures.ts"
+    "figma:fixtures": "tsx tools/figma-export/fixtures.ts",
+    "deploy:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-windows.ps1"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.9.1",
@@ -40,6 +41,7 @@
     "cep-promise": "^4.4.1",
     "chart.js": "^4.6.1",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "jose": "^6.2.12",
     "lucide-react": "^1.61.0",
     "mariadb": "^3.5.4",

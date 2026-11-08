@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { notaSaidaDAO } from "@/dao/nota-saida";
-import { pedidoService, gerarCsvPedidos } from "@/services/pedido";
+import { pedidoService, gerarCsvPedidos, tabelaPedidos } from "@/services/pedido";
 import { hojeISO } from "@/lib/formatar";
 import {
   criarConversao,
@@ -564,5 +564,37 @@ describe("relatório de pedidos", () => {
     expect(csv).toContain(String(importado.nota.id_nota_saida));
 
     expect(await pedidoService.relatorio({ com_nota: false })).toHaveLength(0);
+  });
+});
+
+describe("tabela do relatório de pedidos", () => {
+  it("mantém as colunas do CSV e o total numérico", () => {
+    const tabela = tabelaPedidos([
+      {
+        id_pedido_escola: 1,
+        id_destinatario: 2,
+        codigo: "000001",
+        data: "01/10/2026",
+        escola: "Escola A",
+        status: "Aprovado",
+        itens: [{ descricao: "Arroz", quantidade: 2.5 }],
+        total: 2.5,
+        nota: null,
+      },
+    ]);
+
+    expect(tabela.cabecalho).toEqual([
+      "Pedido",
+      "Data",
+      "Escola",
+      "Status",
+      "Itens",
+      "Total",
+      "Nota de saída",
+    ]);
+    expect(tabela.registros[0]![4]).toBe("Arroz (2,5)");
+    expect(tabela.registros[0]![5]).toBe(2.5);
+    expect(typeof tabela.registros[0]![5]).toBe("number");
+    expect(tabela.registros[0]![6]).toBeNull();
   });
 });

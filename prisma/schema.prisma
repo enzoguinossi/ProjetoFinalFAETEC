@@ -169,23 +169,38 @@ model Fornecedor {
 }
 
 model Destinatario {
-  id_destinatario     Int                    @id @default(autoincrement()) @map("ID_destinatario")
-  id_pessoa_juridica  Int                    @unique @map("ID_pessoa_juridica")
-  tipo_destinatario   TipoDestinatario       @map("tipo_destinatario")
-  id_endereco         Int                    @map("ID_endereco")
-  ativo               Boolean                @default(true) @map("ativo")
-  coletas             Coleta[]
-  endereco            Endereco               @relation(fields: [id_endereco], references: [id_endereco])
-  pessoaJuridica      PessoaJuridica         @relation(fields: [id_pessoa_juridica], references: [id_pessoa_juridica])
-  destinatarioCodigos DestinatarioCodigo[]
-  emails              DestinatarioEmail[]
-  telefones           DestinatarioTelefone[]
-  pedidos             PedidoEscola[]
-  percursos           PercursoDestinatario[]
-  notasSaida          NotaSaida[]
+  id_destinatario      Int                    @id @default(autoincrement()) @map("ID_destinatario")
+  id_pessoa_juridica   Int                    @unique @map("ID_pessoa_juridica")
+  id_tipo_destinatario Int?                   @map("ID_tipo_destinatario")
+  id_endereco          Int                    @map("ID_endereco")
+  ativo                Boolean                @default(true) @map("ativo")
+  coletas              Coleta[]
+  endereco             Endereco               @relation(fields: [id_endereco], references: [id_endereco])
+  pessoaJuridica       PessoaJuridica         @relation(fields: [id_pessoa_juridica], references: [id_pessoa_juridica])
+  tipoDestinatario     TipoDestinatario?      @relation(fields: [id_tipo_destinatario], references: [id_tipo_destinatario], onDelete: SetNull)
+  destinatarioCodigos  DestinatarioCodigo[]
+  emails               DestinatarioEmail[]
+  telefones            DestinatarioTelefone[]
+  pedidos              PedidoEscola[]
+  percursos            PercursoDestinatario[]
+  notasSaida           NotaSaida[]
 
   @@index([id_endereco], map: "destinatario_ID_endereco_fkey")
+  @@index([id_tipo_destinatario], map: "destinatario_ID_tipo_destinatario_fkey")
   @@map("destinatario")
+}
+
+/// Tipo de escola/destinatário editável. Exatamente um pode ser o padrão; o
+/// vínculo com o destinatário é opcional e a exclusão física deixa os
+/// destinatários sem tipo (`ON DELETE SET NULL`).
+model TipoDestinatario {
+  id_tipo_destinatario Int            @id @default(autoincrement()) @map("ID_tipo_destinatario")
+  codigo               String         @unique @map("codigo")
+  nome                 String         @unique @map("nome")
+  padrao               Boolean        @default(false) @map("padrao")
+  destinatarios        Destinatario[]
+
+  @@map("tipo_destinatario")
 }
 
 model Endereco {
@@ -760,13 +775,6 @@ model MensagemMural {
 
   @@index([id_usuario], map: "mensagem_mural_ID_usuario_fkey")
   @@map("mensagem_mural")
-}
-
-enum TipoDestinatario {
-  ESCOLA
-  CRECHE
-  CMEI
-  CMEIA
 }
 
 enum TipoTelefone {

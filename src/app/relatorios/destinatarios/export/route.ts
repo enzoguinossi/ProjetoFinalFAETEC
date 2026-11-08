@@ -1,13 +1,18 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvDestinatarios, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvDestinatarios,
+  relatorioService,
+  tabelaDestinatarios,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV da lista de Destinatários (RF023/RF024), com os mesmos filtros
- * de situação e tipo da tela.
+ * Exportação CSV/XLSX da lista de Destinatários (RF023/RF024), com os mesmos
+ * filtros de situação e tipo da tela.
  */
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -22,6 +27,17 @@ export async function GET(request: Request) {
     codigos: url.searchParams.get("codigos"),
     contatos: url.searchParams.get("contatos"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `destinatarios-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(
+        tabelaDestinatarios(data, filtros.codigos, filtros.contatos),
+        { nome: "Destinatários", nomeArquivo },
+      ),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvDestinatarios(data, filtros.codigos, filtros.contatos), {
     headers: {

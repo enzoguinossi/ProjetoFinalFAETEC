@@ -53,6 +53,7 @@ function idsNumericos(
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
   { key: "data", label: "Data", width: "1fr", align: "center" },
+  { key: "tipoLabel", label: "Tipo", width: "1fr", align: "center" },
   { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left" },
   { key: "itens", label: "Itens", width: "0.7fr", align: "right" },
   {
@@ -95,6 +96,15 @@ export default function EntradaClient({
   const camposFiltro: CampoFiltro[] = [
     { id: "periodo", rotulo: "Período", tipo: "periodo" },
     {
+      id: "tipo",
+      rotulo: "Tipo",
+      tipo: "multi",
+      opcoes: [
+        { valor: "ENTRADA", rotulo: "Entrada" },
+        { valor: "DESMONTAGEM", rotulo: "Desmontagem" },
+      ],
+    },
+    {
       id: "fornecedor",
       rotulo: "Fornecedor",
       tipo: "multi",
@@ -121,9 +131,15 @@ export default function EntradaClient({
 
   function aplicarFiltrosTela(novos: Valores) {
     const periodo = Array.isArray(novos.periodo) ? undefined : novos.periodo;
+    const tipos = Array.isArray(novos.tipo)
+      ? novos.tipo.filter(
+          (tipo) => tipo === "ENTRADA" || tipo === "DESMONTAGEM",
+        )
+      : [];
     filtrosAtuais.current = {
       de: periodo?.de || undefined,
       ate: periodo?.ate || undefined,
+      tipos: tipos.length > 0 ? tipos : undefined,
       id_fornecedor: idsNumericos(novos.fornecedor),
     };
     setValoresFiltros(novos);
@@ -181,6 +197,8 @@ export default function EntradaClient({
           {
             icon: "/icons/actions/Editar.svg",
             label: "Editar",
+            // Desmontagem é histórico: só visualiza (RN004).
+            visible: (row: NotaEntradaListRow) => row.tipo === "ENTRADA",
             onClick: (row: NotaEntradaListRow) => {
               void abrirNota(row, "edit");
             },

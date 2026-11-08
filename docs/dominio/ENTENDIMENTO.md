@@ -227,10 +227,22 @@ fornecedor
 destinatario
 ├── ID_destinatario        INT PK auto_increment
 ├── ID_pessoa_juridica     INT FK UNIQUE NOT NULL
-├── tipo_destinatario      ENUM('ESCOLA','CRECHE','CMEI','CMEIA')
+├── ID_tipo_destinatario   INT FK → tipo_destinatario NULL  ← opcional
 ├── ID_endereco            INT FK → endereco NOT NULL  ← obrigatório
 └── ativo                  BOOLEAN DEFAULT TRUE
+
+tipo_destinatario
+├── ID_tipo_destinatario   INT PK auto_increment
+├── codigo                 VARCHAR(191) UNIQUE NOT NULL  ← imutável
+├── nome                   VARCHAR(191) UNIQUE NOT NULL  ← editável
+└── padrao                 BOOLEAN DEFAULT FALSE  ← no máximo um
 ```
+
+O tipo de destinatário é **cadastro editável** (não enum): criar, editar e excluir
+fisicamente; a exclusão deixa os destinatários sem tipo (`ON DELETE SET NULL`). No
+máximo um tipo é padrão, aplicado como seleção inicial de um novo destinatário; o campo é
+opcional e pode ser limpo a qualquer momento. O seed cria Escola/Creche/CMEI/CMEIA somente
+quando o cadastro está vazio, com Escola como padrão.
 
 ---
 
@@ -379,6 +391,15 @@ Regras:
   2. Gera entrada no saldo de cada filho (`produto.saldo += X * quantidade_insumo`)
   3. Registra as movimentações correspondentes (baixa do pai e entrada dos filhos) — sem
      coluna de tipo: a natureza é inferida pelas notas (`tipo = 'DESMONTAGEM'`)
+
+Implementação (`src/services/desmembramento.ts`): a operação parte do botão **Desmembrar**
+na visualização do produto ou da ação condicional na listagem (só compostos ativos) e exige
+`estoque.entrada` **e** `estoque.saida`. Na mesma transação, cria a `nota_saida`
+`DESMONTAGEM` `BAIXA_TOTAL` com um item do pai e a `nota_entrada` `DESMONTAGEM` com um item
+por insumo ativo (repetidos são somados), registra as movimentações pelos totais e audita as
+duas notas. O `saldo_reservado` não é alterado; saldo disponível insuficiente apenas avisa
+(RN001; o saldo pode ficar negativo) e o bloqueio por inventário vale para o pai e para todos
+os filhos. As notas `DESMONTAGEM` aparecem na lista de Entrada e são somente leitura.
 
 ---
 
@@ -1053,7 +1074,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**82** no total):
+Permissões criadas por `prisma/seed.ts` (**89** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -1073,7 +1094,9 @@ Permissões criadas por `prisma/seed.ts` (**82** no total):
 | `inventario` | abrir, contar, aprovar_ajuste |
 | `relatorio` | gerar |
 | `unidade_conversao` | listar, criar, alterar, consultar, excluir (sem desativar) |
+| `tipo_destinatario` | criar, alterar, excluir (sem `ativo`, exclusão física) |
 | `mural` | criar, alterar, excluir |
+| `backup` | listar, executar, agendar, restaurar |
 
 > Perfil **não é desativado**: `perfil.excluir` é exclusão física (`src/services/permissao.ts`).
 > O seed remove a permissão obsoleta `perfil.desativar` caso ela exista no banco.
@@ -1082,7 +1105,7 @@ Permissões criadas por `prisma/seed.ts` (**82** no total):
 > A permissão obsoleta `inventario.ver_contagem_cega` não faz parte do seed nem da UI; em
 > banco antigo ela pode continuar existindo e deve ser removida manualmente.
 
-A permissão **`produto.ver_inativos`** (a 82ª) é a única que expõe registros inativos: libera
+A permissão **`produto.ver_inativos`** é a única que expõe registros inativos: libera
 o chip e a coluna **Situação** em `/produtos`, a busca por produtos inativos e o detalhe/edição
 por ID. Ela **não** libera seletores operacionais (movimentação, pedidos, inventário e insumos),
 que continuam apenas com produtos ativos; as notas históricas seguem exibindo os produtos

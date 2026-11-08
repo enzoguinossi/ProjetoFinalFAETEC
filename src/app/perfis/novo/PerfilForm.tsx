@@ -58,7 +58,7 @@ export default function PerfilForm({
         <div className={ui.field}>
           <label className={ui.label}>Descrição</label>
           {isView ? (
-            <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.descricao ?? "—"}</p>
+            <p className={`${ui.input} leading-[2.5] m-0`}>{initialData?.descricao ?? ""}</p>
           ) : (
             <input
               name="descricao"

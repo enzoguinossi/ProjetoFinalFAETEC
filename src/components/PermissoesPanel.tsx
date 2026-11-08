@@ -34,6 +34,7 @@ const ROTULOS_GRUPO: Record<string, string> = {
   produto: "Produtos",
   perfil: "Perfis",
   unidade_conversao: "Unidades de conversão",
+  tipo_destinatario: "Tipos de escola",
   estoque: "Estoque",
   nota_entrada: "Notas de entrada",
   nota_saida: "Notas de saída",
@@ -42,6 +43,7 @@ const ROTULOS_GRUPO: Record<string, string> = {
   inventario: "Inventário",
   relatorio: "Relatórios",
   mural: "Mural",
+  backup: "Backup",
 };
 
 const ROTULOS_ACAO: Record<string, string> = {
@@ -62,6 +64,9 @@ const ROTULOS_ACAO: Record<string, string> = {
   aprovar_ajuste: "Aprovar ajuste",
   ver_inativos: "Ver inativos",
   gerar: "Gerar",
+  executar: "Executar",
+  agendar: "Agendar",
+  restaurar: "Restaurar",
 };
 
 function capitalizar(texto: string): string {

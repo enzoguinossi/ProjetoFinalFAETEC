@@ -23,9 +23,9 @@ domínio, a especificação e o processo — quando um deles divergir do código
 | `processo/` | [`VERSIONAMENTO.md`](processo/VERSIONAMENTO.md) | versionamento DateVer e o padrão do changelog |
 | `processo/` | [`JIRA.md`](processo/JIRA.md) | Jira: issues, smart commits e worklog |
 | `processo/` | [`WORKFLOW.md`](processo/WORKFLOW.md) | fluxo multiagente, worktrees e rastreabilidade |
-| `processo/` | [`PRODUCAO.md`](processo/PRODUCAO.md) | runbook do servidor Windows: instalação, atualização, backup, bandeja e desinstalação |
-| `diagramas/` | [`classes.puml`](diagramas/classes.puml) | diagrama de classes conceitual (48 classes) |
-| `diagramas/` | [`DER.puml`](diagramas/DER.puml) | diagrama entidade-relacionamento (48 entidades) |
+| `processo/` | [`PRODUCAO.md`](processo/PRODUCAO.md) | runbook do servidor Windows: instalação, atualização, backup/restauração (NexusAgent + UI), bandeja e desinstalação |
+| `diagramas/` | [`classes.puml`](diagramas/classes.puml) | diagrama de classes conceitual (49 classes) |
+| `diagramas/` | [`DER.puml`](diagramas/DER.puml) | diagrama entidade-relacionamento (49 entidades) |
 | `diagramas/` | [`fluxo_atual.puml`](diagramas/fluxo_atual.puml) e [`fluxosAtuais/`](diagramas/fluxosAtuais/) | o fluxo **AS-IS manual** (papel, Trello, Excel) — **não** é o fluxo alvo do sistema |
 | `relatorios/` | [`relatorios/README.md`](relatorios/README.md) | modelo A4 dos relatórios impressos e componentes de filtro compartilhados |
 

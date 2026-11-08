@@ -1,10 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { produtoDAO } from "@/dao/produto";
 import { codigoService } from "@/services/codigo";
+import {
+  agregarInsumosDoComposto,
+  desmembramentoService,
+  type ResultadoDesmembramento,
+} from "@/services/desmembramento";
 import { requireUser } from "@/lib/auth";
 import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
+import { formatarCodigo } from "@/lib/formatar";
 import { lerJson } from "@/lib/form-data";
 import {
   processarImagemDoFormulario,
@@ -169,6 +176,167 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
       descricao: i.produtoFilho.descricao,
       qtd: Number(i.quantidade),
     })),
+  };
+}
+
+/** Prévia do desmembramento: produto e insumos ativos (agregados). */
+export type DesmembramentoPreview = {
+  produto: {
+    id_produto: number;
+    descricao: string;
+    saldo: number;
+    saldo_reservado: number;
+    disponivel: number;
+    composto: boolean;
+    ativo: boolean;
+  };
+  insumos: {
+    id_produto: number;
+    descricao: string;
+    quantidade_por_unidade: number;
+    saldo: number;
+  }[];
+};
+
+/** As duas permissões da operação (entrada nos filhos e baixa no pai). */
+async function podeDesmembrar(user: Awaited<ReturnType<typeof requireUser>>) {
+  return (
+    (await usuarioPode(user, "estoque.entrada")) &&
+    (await usuarioPode(user, "estoque.saida"))
+  );
+}
+
+/**
+ * Prévia do desmembramento de um produto composto. Exige `estoque.entrada` e
+ * `estoque.saida`; devolve produto/saldo e os insumos ativos com a quantidade
+ * por unidade (insumos repetidos são somados, como no serviço).
+ */
+export async function previewDesmembramento(
+  id_produto: number,
+): Promise<DesmembramentoPreview | { error: string }> {
+  const user = await requireUser();
+  if (!(await podeDesmembrar(user))) return { error: "Sem permissão." };
+
+  const id = Number(id_produto);
+  if (!Number.isInteger(id) || id <= 0) return { error: "Produto inválido." };
+
+  const produto = await produtoDAO.getById(id);
+  if (!produto) return { error: "Produto não encontrado." };
+  if (!produto.composto) {
+    return { error: "O produto não é composto e não pode ser desmembrado." };
+  }
+  if (!produto.ativo) {
+    return { error: "Produto inativo não pode ser desmembrado." };
+  }
+
+  // A prévia usa a mesma validação do serviço: quantidade inválida, insumo
+  // inativo ou composto sem insumos ativos retornam o mesmo erro.
+  const validado = agregarInsumosDoComposto(
+    produto.insumosPai
+      .filter((insumo) => insumo.ativo)
+      .map((insumo) => ({
+        id_produto: insumo.produtoFilho.id_produto,
+        descricao: insumo.produtoFilho.descricao,
+        ativo: insumo.produtoFilho.ativo,
+        quantidade_por_unidade: Number(insumo.quantidade),
+      })),
+  );
+  if ("error" in validado) return { error: validado.error };
+
+  const saldoPorProduto = new Map<number, number>();
+  for (const insumo of produto.insumosPai) {
+    if (!insumo.ativo) continue;
+    saldoPorProduto.set(
+      insumo.produtoFilho.id_produto,
+      Number(insumo.produtoFilho.saldo),
+    );
+  }
+
+  const insumos = validado.insumos.map((insumo) => ({
+    ...insumo,
+    saldo: saldoPorProduto.get(insumo.id_produto) ?? 0,
+  }));
+
+  const saldo = Number(produto.saldo);
+  const saldoReservado = Number(produto.saldo_reservado);
+  return {
+    produto: {
+      id_produto: produto.id_produto,
+      descricao: produto.descricao,
+      saldo,
+      saldo_reservado: saldoReservado,
+      disponivel: saldo - saldoReservado,
+      composto: produto.composto,
+      ativo: produto.ativo,
+    },
+    insumos,
+  };
+}
+
+/** Resultado exibido no modal: as duas notas geradas e o aviso de RN001. */
+export type ResultadoDesmembramentoProduto =
+  | {
+      success: true;
+      notaSaida: { id_nota_saida: number; codigo: string };
+      notaEntrada: { id_nota_entrada: number; codigo: string };
+      aviso: string | null;
+    }
+  | { error: string };
+
+/**
+ * Desmembra o produto composto: baixa do pai e entrada dos filhos em duas
+ * notas `DESMONTAGEM` na mesma transação. Exige `estoque.entrada` e
+ * `estoque.saida`; o saldo insuficiente só avisa (RN001).
+ */
+export async function desmembrarProduto(
+  formData: FormData,
+): Promise<ResultadoDesmembramentoProduto> {
+  const user = await requireUser();
+  if (!(await podeDesmembrar(user))) return { error: "Sem permissão." };
+
+  const id = Number(formData.get("id_produto"));
+  const quantidade = Number(formData.get("quantidade"));
+  if (!Number.isInteger(id) || id <= 0) return { error: "Produto inválido." };
+  if (!Number.isFinite(quantidade) || quantidade <= 0) {
+    return { error: "A quantidade a desmembrar deve ser maior que zero." };
+  }
+
+  const observacao = String(formData.get("observacao") ?? "").trim();
+
+  let resultado: ResultadoDesmembramento;
+  try {
+    resultado = await desmembramentoService.desmembrar({
+      id_produto: id,
+      quantidade,
+      id_usuario: user.id_usuario,
+      observacao: observacao || null,
+    });
+  } catch (e) {
+    return { error: mensagemDeErro(e) };
+  }
+  if ("error" in resultado) return resultado;
+
+  // A operação já foi confirmada: revalidar a tela não pode transformar o
+  // sucesso em erro (o usuário repetiria e criaria outras duas notas).
+  try {
+    revalidatePath("/produtos");
+    revalidatePath("/mov-estoque/entrada");
+    revalidatePath("/mov-estoque/saida");
+  } catch (e) {
+    console.error("Falha ao revalidar as telas após o desmembramento:", e);
+  }
+
+  return {
+    success: true,
+    notaSaida: {
+      id_nota_saida: resultado.id_nota_saida,
+      codigo: formatarCodigo(resultado.id_nota_saida),
+    },
+    notaEntrada: {
+      id_nota_entrada: resultado.id_nota_entrada,
+      codigo: formatarCodigo(resultado.id_nota_entrada),
+    },
+    aviso: resultado.aviso,
   };
 }
 

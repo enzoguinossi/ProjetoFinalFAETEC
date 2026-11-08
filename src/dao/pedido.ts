@@ -86,7 +86,7 @@ const includePedido = {
   destinatario: {
     select: {
       id_destinatario: true,
-      tipo_destinatario: true,
+      tipoDestinatario: { select: { nome: true } },
       pessoaJuridica: { select: { razao_social: true } },
     },
   },

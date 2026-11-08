@@ -10,13 +10,12 @@ import DestinatarioForm from "./novo/DestinatarioForm";
 import SituacaoBadge from "@/components/SituacaoBadge";
 import type { Column } from "@/components/DataTable";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { OPCOES_SITUACAO, situacaoParaAtivo } from "@/lib/filtros-situacao";
 import {
-  ROTULOS_TIPO_DESTINATARIO,
-  TIPO_DESTINATARIO,
   type PaginatedResult,
   type PermissoesEntidade,
-  type TipoDestinatario,
+  type TipoDestinatarioItem,
 } from "@/types";
 import { UFS } from "@/lib/uf";
 import { useCrudLista } from "@/lib/use-crud-lista";
@@ -31,19 +30,20 @@ import {
 interface Props {
   inicial: PaginatedResult<DestinatarioListRow>;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
+  tiposDestinatario: TipoDestinatarioItem[];
   perms: PermissoesEntidade;
+  permsTipo: PermissoesEntidade;
 }
 
 const columns: Column<DestinatarioListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr", align: "center" },
   { key: "razao", label: "Razão Social", width: "4fr", align: "left" },
   {
-    key: "tipo_destinatario",
+    key: "tipo_nome",
     label: "Tipo",
     width: "1fr",
     align: "center",
-    render: (value) =>
-      ROTULOS_TIPO_DESTINATARIO[value as TipoDestinatario] ?? String(value),
+    render: (value) => (value ? String(value) : ""),
   },
   {
     key: "ativo",
@@ -54,7 +54,16 @@ const columns: Column<DestinatarioListRow>[] = [
   },
 ];
 
-export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Props) {
+export default function DestinatariosClient({
+  inicial,
+  tiposCodigo,
+  tiposDestinatario,
+  perms,
+  permsTipo,
+}: Props) {
+  const router = useRouter();
+  const [tipos, setTipos] = useState<TipoDestinatarioItem[]>(tiposDestinatario);
+
   const {
     resultado,
     carregando,
@@ -95,9 +104,9 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
       id: "tipo",
       rotulo: "Tipo",
       tipo: "multi",
-      opcoes: TIPO_DESTINATARIO.map((tipo) => ({
-        valor: tipo,
-        rotulo: ROTULOS_TIPO_DESTINATARIO[tipo],
+      opcoes: tipos.map((tipo) => ({
+        valor: String(tipo.id_tipo_destinatario),
+        rotulo: tipo.nome,
       })),
     },
     {
@@ -126,6 +135,12 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
     aplicarFiltros({});
   }
 
+  function aoMudarTipos(lista: TipoDestinatarioItem[]) {
+    setTipos(lista);
+    setChaveFiltros((chave) => chave + 1);
+    router.refresh();
+  }
+
   return (
     <>
       <SearchBar
@@ -151,7 +166,15 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
       />
 
       <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">
-        <DestinatarioForm mode="create" tiposCodigo={tiposCodigo} onSuccess={aoSalvar} onCancel={fecharModal} />
+        <DestinatarioForm
+          mode="create"
+          tiposCodigo={tiposCodigo}
+          tiposDestinatario={tipos}
+          permsTipo={permsTipo}
+          onTiposDestinatarioChange={aoMudarTipos}
+          onSuccess={aoSalvar}
+          onCancel={fecharModal}
+        />
       </Modal>
 
       <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="960px">
@@ -160,6 +183,9 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
             mode="edit"
             initialData={formData}
             tiposCodigo={tiposCodigo}
+            tiposDestinatario={tipos}
+            permsTipo={permsTipo}
+            onTiposDestinatarioChange={aoMudarTipos}
             canDeactivate={perms.canDeactivate}
             onSuccess={aoSalvar}
             onCancel={fecharModal}
@@ -169,7 +195,13 @@ export default function DestinatariosClient({ inicial, tiposCodigo, perms }: Pro
 
       <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="960px">
         {formData && (
-          <DestinatarioForm mode="view" initialData={formData} tiposCodigo={tiposCodigo} onCancel={fecharModal} />
+          <DestinatarioForm
+            mode="view"
+            initialData={formData}
+            tiposCodigo={tiposCodigo}
+            tiposDestinatario={tipos}
+            onCancel={fecharModal}
+          />
         )}
       </Modal>
 

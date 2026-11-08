@@ -6,7 +6,7 @@ interface Props {
   /** Valor controlado — dígitos ou já formatado; a exibição é sempre formatada. */
   value: string;
   onChange: (valor: string) => void;
-  /** Modo visualização: mostra o CNPJ formatado (ou "—"). */
+  /** Modo visualização: mostra o CNPJ formatado (vazio quando não houver). */
   readOnly?: boolean;
   disabled?: boolean;
   label?: string;
@@ -41,7 +41,7 @@ export default function CnpjField({
       <div className="flex flex-col gap-1.5">
         <label className={labelClass}>{label}</label>
         <p className="flex h-10 w-full items-center rounded-lg border border-border-input px-4 font-sans text-base">
-          {value ? formatarCnpj(value) : "—"}
+          {value ? formatarCnpj(value) : ""}
         </p>
       </div>
     );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inventarioDAO } from "@/dao/inventario";
 import { criarEstoque, criarProduto, criarUsuario } from "../helpers/factories";
-import { gerarCsvInventario } from "@/services/inventario";
+import { gerarCsvInventario, tabelaInventario } from "@/services/inventario";
 
 describe("CSV do inventário", () => {
   it("exporta contagens, média, decisão e movimentação do inventário fechado", async () => {
@@ -63,5 +63,26 @@ describe("CSV do inventário", () => {
     expect(semSistema).not.toContain("Saldo posterior");
     expect(semSistema).not.toContain("Quantidade contada");
     expect(semSistema).not.toContain("Sem ajuste");
+
+    const tabela = tabelaInventario(fechado!);
+    const linhaArroz = tabela.registros.find((registro) =>
+      registro.includes("Arroz para CSV"),
+    );
+    expect(linhaArroz).toBeDefined();
+    const indiceSistema = tabela.cabecalho.indexOf("Quantidade do sistema");
+    const indiceMedia = tabela.cabecalho.indexOf("Média");
+    const indiceContada = tabela.cabecalho.indexOf("Quantidade contada");
+    expect(indiceSistema).toBeGreaterThanOrEqual(0);
+    expect(typeof linhaArroz![indiceSistema]).toBe("number");
+    expect(typeof linhaArroz![indiceMedia]).toBe("number");
+    expect(typeof linhaArroz![indiceContada]).toBe("number");
+    expect(typeof linhaArroz![tabela.cabecalho.indexOf("Saldo anterior")]).toBe(
+      "number",
+    );
+
+    const tabelaSemSistema = tabelaInventario(fechado!, { incluirSistema: false });
+    expect(tabelaSemSistema.cabecalho).not.toContain("Quantidade do sistema");
+    expect(tabelaSemSistema.cabecalho).not.toContain("Saldo anterior");
+    expect(tabelaSemSistema.cabecalho).not.toContain("Quantidade contada");
   });
 });

@@ -145,6 +145,17 @@ async function main() {
   }
 
   /* ── Destinatários (escolas e creches) ── */
+  const tiposDestinatarioDemo = new Map(
+    (await prisma.tipoDestinatario.findMany({
+      select: { id_tipo_destinatario: true, codigo: true },
+    })).map((tipo) => [tipo.codigo, tipo.id_tipo_destinatario]),
+  );
+  const tipoDestinatarioId = (codigo: string): number => {
+    const id = tiposDestinatarioDemo.get(codigo);
+    if (!id) throw new Error(`Tipo de destinatário ${codigo} ausente. Rode npm run db:seed.`);
+    return id;
+  };
+
   for (const d of DESTINATARIOS_DEMO) {
     const pessoa = await prisma.pessoaJuridica.upsert({
       where: { cnpj: d.cnpj },
@@ -172,7 +183,7 @@ async function main() {
       });
       destinatario = await prisma.destinatario.update({
         where: { id_destinatario: existente.id_destinatario },
-        data: { tipo_destinatario: d.tipo, ativo: true },
+        data: { id_tipo_destinatario: tipoDestinatarioId(d.tipo), ativo: true },
       });
     } else {
       const novoEndereco = await prisma.endereco.create({ data: endereco });
@@ -180,7 +191,7 @@ async function main() {
         data: {
           id_pessoa_juridica: pessoa.id_pessoa_juridica,
           id_endereco: novoEndereco.id_endereco,
-          tipo_destinatario: d.tipo,
+          id_tipo_destinatario: tipoDestinatarioId(d.tipo),
           ativo: true,
         },
       });

@@ -1,12 +1,17 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvProdutos, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvProdutos,
+  relatorioService,
+  tabelaProdutos,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV da Lista de Produtos (RF024).
+ * Exportação CSV/XLSX da Lista de Produtos (RF024).
  * Route Handler é a exceção prevista no AGENTS §15: o navegador baixa um arquivo,
  * o que uma Server Action não entrega com `Content-Disposition`.
  */
@@ -22,6 +27,17 @@ export async function GET(request: Request) {
     fotos: url.searchParams.get("fotos"),
     codigos: url.searchParams.get("codigos"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `produtos-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaProdutos(data, filtros.fotos, filtros.codigos), {
+        nome: "Produtos",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvProdutos(data, filtros.fotos, filtros.codigos), {
     headers: {

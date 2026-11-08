@@ -94,6 +94,11 @@ export default async function RelatorioInventarioPage({
             href={`/inventario/${id}/relatorio/export`}
             variant="ghost"
           />
+          <Button
+            label="Exportar XLSX"
+            href={`/inventario/${id}/relatorio/export?formato=xlsx`}
+            variant="ghost"
+          />
           <Button label="Voltar" href={`/inventario/${id}`} variant="ghost" />
         </div>
       </div>

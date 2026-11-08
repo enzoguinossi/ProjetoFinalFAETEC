@@ -33,6 +33,16 @@ export default function RelatorioCadastro({
   totais?: { rotulo: string; valor: string }[];
   children: ReactNode;
 }) {
+  const exportXlsxHref = exportHref
+    ? `${exportHref}${
+        exportHref.endsWith("?") || exportHref.endsWith("&")
+          ? ""
+          : exportHref.includes("?")
+            ? "&"
+            : "?"
+      }formato=xlsx`
+    : undefined;
+
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3" data-print-hide>
@@ -44,6 +54,9 @@ export default function RelatorioCadastro({
           <ImprimirButton />
           {exportHref && (
             <Button label="Exportar CSV" href={exportHref} variant="ghost" />
+          )}
+          {exportXlsxHref && (
+            <Button label="Exportar XLSX" href={exportXlsxHref} variant="ghost" />
           )}
           <Button label="Voltar" href="/relatorios" variant="ghost" />
         </div>

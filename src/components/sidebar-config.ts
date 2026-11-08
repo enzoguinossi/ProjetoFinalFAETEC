@@ -66,6 +66,7 @@ export const expedicaoItems: SidebarNavItemWithPermission[] = [
 ];
 
 // Ordem do menu: Dashboard · Mov. Estoque · Expedições · Cadastros · Pedidos · Relatórios.
+// A administração (backup) fica no ícone de engrenagem da topbar, fora do menu.
 export const navTopItems: SidebarNavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
 ];
@@ -215,6 +216,7 @@ export const sidebarGruposStore = criarStoreLocalStorage<GruposSidebar>(
           typeof salvo.expedicoes === "boolean" ? salvo.expedicoes : gruposSidebarPadrao.expedicoes,
         cadastros:
           typeof salvo.cadastros === "boolean" ? salvo.cadastros : gruposSidebarPadrao.cadastros,
+        // Chaves desconhecidas (ex.: o antigo `administracao`) são ignoradas.
       };
     } catch {
       return null;

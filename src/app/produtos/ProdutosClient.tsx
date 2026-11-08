@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import SearchBar from "@/components/SearchBar";
 import DataTable from "@/components/DataTable";
 import Modal from "@/components/Modal";
@@ -9,7 +10,8 @@ import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import ProdutoForm from "./novo/ProdutoForm";
 import ProdutoView from "./novo/ProdutoView";
-import type { Column } from "@/components/DataTable";
+import DesmembrarProdutoModal from "./novo/DesmembrarProdutoModal";
+import type { Action, Column } from "@/components/DataTable";
 import type { PaginatedResult, PermissoesEntidade } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
@@ -27,6 +29,8 @@ interface Props {
   perms: PermissoesEntidade;
   /** `produto.ver_inativos`: habilita o filtro de situação e a coluna Situação. */
   podeVerInativos: boolean;
+  /** `estoque.entrada` + `estoque.saida`: habilita a ação Desmembrar. */
+  podeDesmembrar: boolean;
 }
 
 const columnsBase: Column<ProdutoListRow>[] = [
@@ -60,14 +64,16 @@ export default function ProdutosClient({
   tiposCodigo,
   perms,
   podeVerInativos,
+  podeDesmembrar,
 }: Props) {
+  const router = useRouter();
   const {
     resultado,
     carregando,
     buscarPorTermo,
     aplicarFiltros,
     paginacaoServidor,
-    actions,
+    actions: acoesCrud,
     modalMode,
     formData,
     abrirNovo,
@@ -89,6 +95,17 @@ export default function ProdutosClient({
 
   const [chaveFiltros, setChaveFiltros] = useState(0);
   const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [desmembrarId, setDesmembrarId] = useState<number | null>(null);
+
+  const actions: Action<ProdutoListRow>[] = [
+    ...acoesCrud,
+    {
+      icon: "/icons/actions/Desmembrar.svg",
+      label: "Desmembrar",
+      visible: (row) => podeDesmembrar && row.composto && row.ativo,
+      onClick: (row) => setDesmembrarId(row.id_produto),
+    },
+  ];
 
   const camposFiltro: CampoFiltro[] = [
     ...(podeVerInativos
@@ -208,9 +225,19 @@ export default function ProdutosClient({
             tiposCodigo={tiposCodigo}
             data={formData}
             onClose={fecharModal}
+            podeDesmembrar={podeDesmembrar}
+            onChanged={() => router.refresh()}
           />
         )}
       </Modal>
+
+      {desmembrarId !== null && (
+        <DesmembrarProdutoModal
+          idProduto={desmembrarId}
+          onClose={() => setDesmembrarId(null)}
+          onSuccess={() => router.refresh()}
+        />
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

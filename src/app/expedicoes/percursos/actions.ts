@@ -7,7 +7,7 @@ import { comPermissao, usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { lerJson } from "@/lib/form-data";
 import { textoFiltro } from "@/lib/filtros";
-import { resultadoVazio, type ListParams, type PaginatedResult, type TipoDestinatario } from "@/types";
+import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
 export type PercursoListRow = {
   id_percurso: number;
@@ -18,7 +18,7 @@ export type PercursoListRow = {
 export type PercursoDestinatarioForm = {
   id_destinatario: number;
   razao_social: string;
-  tipo: TipoDestinatario;
+  tipo_nome: string | null;
   ordem_visita: number;
 };
 
@@ -32,7 +32,7 @@ export type PercursoFormData = {
 export type DestinatarioPercursoRow = {
   id_destinatario: number;
   razao_social: string;
-  tipo: TipoDestinatario;
+  tipo_nome: string | null;
 };
 
 export type DestinatarioPercursoParams = {
@@ -78,7 +78,7 @@ export async function getPercurso(id: number): Promise<PercursoFormData | null> 
     destinatarios: percurso.destinatarios.map((d) => ({
       id_destinatario: d.id_destinatario,
       razao_social: d.destinatario.pessoaJuridica.razao_social,
-      tipo: d.destinatario.tipo_destinatario,
+      tipo_nome: d.destinatario.tipoDestinatario?.nome ?? null,
       ordem_visita: d.ordem_visita,
     })),
   };
@@ -106,7 +106,7 @@ export async function listarDestinatariosParaPercurso(
     data: resultado.data.map((d) => ({
       id_destinatario: d.id_destinatario,
       razao_social: d.pessoaJuridica.razao_social,
-      tipo: d.tipo_destinatario,
+      tipo_nome: d.tipoDestinatario?.nome ?? null,
     })),
   };
 }

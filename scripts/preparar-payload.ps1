@@ -306,23 +306,38 @@ Assert-ZipEntry -Path $appZip -Label "app standalone" -Patterns @('(^|[\\/])serv
 
 # --- SQL --------------------------------------------------------------------
 $sqlTarget = Join-Path $PayloadDir "sql"
+$sqlMigrationsSource = Join-Path $SqlSource "migracoes"
 $sqlFiles = @(
     @{ Source = (Join-Path $SqlSource "schema.sql"); Destination = (Join-Path $sqlTarget "schema.sql") },
-    @{ Source = (Join-Path $SqlSource "seed.sql"); Destination = (Join-Path $sqlTarget "seed.sql") },
-    @{ Source = (Join-Path $SqlSource "migracoes\001-unidades-pct10-cx50.sql"); Destination = (Join-Path $sqlTarget "migracoes\001-unidades-pct10-cx50.sql") }
+    @{ Source = (Join-Path $SqlSource "seed.sql"); Destination = (Join-Path $sqlTarget "seed.sql") }
 )
+if (-not (Test-Path -LiteralPath $sqlMigrationsSource -PathType Container)) {
+    Fail "Pasta de migrações não encontrada: $sqlMigrationsSource"
+}
+$sqlMigrations = @(Get-ChildItem -LiteralPath $sqlMigrationsSource -Filter "*.sql" -File | Sort-Object Name)
+if ($sqlMigrations.Count -eq 0) {
+    Fail "Nenhuma migração *.sql encontrada em $sqlMigrationsSource."
+}
+foreach ($migration in $sqlMigrations) {
+    $sqlFiles += @{
+        Source = $migration.FullName
+        Destination = (Join-Path (Join-Path $sqlTarget "migracoes") $migration.Name)
+    }
+}
 foreach ($sqlFile in $sqlFiles) {
     Copy-PayloadFile -Source $sqlFile.Source -Destination $sqlFile.Destination -Label (Split-Path -Leaf $sqlFile.Source)
 }
-Write-Ok "SQL copiado (schema, seed e migração 001)."
+Write-Ok ("SQL copiado (schema, seed e {0} migração(ões))." -f $sqlMigrations.Count)
 
 # --- Resumo -----------------------------------------------------------------
 Write-Step "Resumo do payload"
 $files = @(
     $nodeZip, $mysqlZip, $caddyZip, $vcRedist, $nssmTarget, $appZip,
-    (Join-Path $sqlTarget "schema.sql"), (Join-Path $sqlTarget "seed.sql"),
-    (Join-Path $sqlTarget "migracoes\001-unidades-pct10-cx50.sql")
+    (Join-Path $sqlTarget "schema.sql"), (Join-Path $sqlTarget "seed.sql")
 )
+foreach ($migration in $sqlMigrations) {
+    $files += (Join-Path (Join-Path $sqlTarget "migracoes") $migration.Name)
+}
 $total = 0
 foreach ($file in $files) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {

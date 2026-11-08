@@ -36,6 +36,8 @@ export interface Action<T> {
   icon: string;
   label: string;
   onClick: (row: T) => void;
+  /** Quando informado, a ação só aparece nas linhas em que retornar `true`. */
+  visible?: (row: T) => boolean;
 }
 
 export interface PaginacaoServidor {
@@ -356,20 +358,22 @@ export default function DataTable<T extends Record<string, unknown>>({
                       {actions !== undefined && (
                         <td className={`${actionsCellCls} text-center`}>
                           <div className={actionsCls}>
-                            {actions.map((action, i) => (
-                              <button
-                                key={i}
-                                className={actionBtnCls}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  action.onClick(original);
-                                }}
-                                title={action.label}
-                                type="button"
-                              >
-                                <img src={action.icon} alt={action.label} />
-                              </button>
-                            ))}
+                            {actions
+                              .filter((action) => action.visible?.(original) ?? true)
+                              .map((action, i) => (
+                                <button
+                                  key={i}
+                                  className={actionBtnCls}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    action.onClick(original);
+                                  }}
+                                  title={action.label}
+                                  type="button"
+                                >
+                                  <img src={action.icon} alt={action.label} />
+                                </button>
+                              ))}
                           </div>
                         </td>
                       )}

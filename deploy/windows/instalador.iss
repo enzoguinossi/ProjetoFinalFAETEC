@@ -65,12 +65,18 @@ Source: "{#PayloadDir}\*"; DestDir: "{app}\payload"; Flags: ignoreversion recurs
 Source: "{#PayloadDir}\sql\*"; DestDir: "{app}\sql"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Obrigatório: a bandeja é copiada pelo bootstrap para {commonpf}\Nexus\NexusTray.
 Source: "NexusTray\dist\NexusTray.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Ícone do atalho Bandeja do Nexus (o atalho chama wscript.exe; o símbolo vem daqui).
+Source: "NexusTray\NexusTray.ico"; DestDir: "{app}"; Flags: ignoreversion
+; Obrigatório: o bootstrap copia para {commonpf}\Nexus\NexusAgent e registra o serviço.
+Source: "NexusAgent\dist\NexusAgent.exe"; DestDir: "{app}"; Flags: ignoreversion
+; Página de progresso servida pelo Caddy em /progresso/ (copiada pelo bootstrap).
+Source: "progresso\index.html"; DestDir: "{app}\progresso"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"
 Name: "{group}\Desinstalar Nexus"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Nexus"; Filename: "https://{code:GetHostname}"; Comment: "Abrir o Nexus"; Tasks: desktopicon
-Name: "{autodesktop}\Bandeja do Nexus"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\abrir-bandeja.vbs"""; IconFilename: "{app}\NexusTray.exe"; Comment: "Reabrir a bandeja do Nexus"; Tasks: desktopicon
+Name: "{autodesktop}\Bandeja do Nexus"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\abrir-bandeja.vbs"""; IconFilename: "{app}\NexusTray.ico"; Comment: "Reabrir a bandeja do Nexus"; Tasks: desktopicon
 
 [Code]
 var
@@ -277,7 +283,7 @@ begin
     3: Result := 'Fase 3/7 - Diretórios e ACLs';
     4: Result := 'Fase 4/7 - Banco e aplicação';
     5: Result := 'Fase 5/7 - Serviços NexusApp e NexusCaddy';
-    6: Result := 'Fase 6/7 - Bandeja e backup diário';
+    6: Result := 'Fase 6/7 - Agente, bandeja e backup';
     7: Result := 'Fase 7/7 - Smoke test e resumo';
     8: Result := 'Concluído';
   else

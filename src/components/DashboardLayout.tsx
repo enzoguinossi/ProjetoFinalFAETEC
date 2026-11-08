@@ -30,6 +30,11 @@ export default function DashboardLayout({
   const alternarSidebar = () => sidebarRecolhidaStore.definir((v) => !v);
   const expandirSidebar = () => sidebarRecolhidaStore.definir(() => false);
 
+  // Só aparece depois que o usuário carrega e apenas com acesso ao backup.
+  const podeAdministrar = Boolean(
+    user && (user.super_admin || user.permissoes?.includes("backup.listar")),
+  );
+
   return (
     <div
       className="flex flex-col h-screen bg-white text-ink overflow-hidden"
@@ -58,9 +63,16 @@ export default function DashboardLayout({
           data-print-hide
         >
           <div className="flex items-center gap-1 shrink-0 ml-auto">
-            <button type="button" className={headerIconBtnCls} aria-label="Configurações">
-              <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
-            </button>
+            {podeAdministrar && (
+              <Link
+                href="/administracao/backup"
+                className={headerIconBtnCls}
+                aria-label="Backup e administração"
+                title="Backup"
+              >
+                <Settings size={18} strokeWidth={1.75} aria-hidden="true" />
+              </Link>
+            )}
             <MuralBell />
             <UserMenu user={user} />
           </div>

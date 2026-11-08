@@ -30,7 +30,15 @@ import {
   rotuloSituacaoCadastro,
   rotuloStatusExpedicao,
   rotuloStatusNota,
-  rotuloTipoDestinatario,
+  tabelaAuditoria,
+  tabelaDestinatarios,
+  tabelaEntregas,
+  tabelaExpedicoes,
+  tabelaFuncionarios,
+  tabelaFornecedores,
+  tabelaMovimentacoes,
+  tabelaProdutos,
+  tabelaVencimento,
 } from "@/services/relatorio";
 import type {
   AuditoriaRelatorioRow,
@@ -437,7 +445,7 @@ describe("serviço de relatórios", () => {
 
       expect(csv.startsWith("\uFEFF")).toBe(true);
       expect(csv).toBe(
-        "\uFEFFData prevista;Status;Veículo;Condutor;Notas;Destinatários;Itens esperados;Itens entregues\r\n" +
+        "\uFEFFData prevista;Status;Veículo;Condutor;Notas;Destinatários;Itens solicitados;Itens entregues\r\n" +
           "05/10/2026;Concluída;AAA1111;Ana Condutora;2;Escola A, Escola B;15;10,5\r\n",
       );
 
@@ -472,7 +480,7 @@ describe("serviço de relatórios", () => {
 
       expect(csv.startsWith("\uFEFF")).toBe(true);
       expect(csv).toBe(
-        "\uFEFFNota;Data;Destinatário;Status;Itens;Esperado;Entregue;Pendente;Expedição\r\n" +
+        "\uFEFFNota;Data;Destinatário;Status;Itens;Solicitado;Entregue;Pendente;Expedição\r\n" +
           "000012;10/10/2026;Escola Municipal;Baixa parcial;2;15;6;9;EXP #3\r\n",
       );
 
@@ -580,13 +588,13 @@ describe("serviço de relatórios", () => {
       expect(
         normalizarFiltrosDestinatarios({
           situacao: "ativos",
-          tipo: ["CRECHE", "ESCOLA", "CRECHE", "qualquer"],
+          tipo: ["12", "7", "12", "qualquer", "0", "-3"],
           codigos: "1",
           contatos: "1",
         }),
       ).toEqual({
         situacoes: ["ativos"],
-        tipos: ["CRECHE", "ESCOLA"],
+        tipos: [12, 7],
         codigos: true,
         contatos: true,
       });
@@ -594,7 +602,6 @@ describe("serviço de relatórios", () => {
 
     it("rotula as opções dos filtros", () => {
       expect(rotuloSituacaoCadastro("ativos")).toBe("Ativos");
-      expect(rotuloTipoDestinatario("CRECHE")).toBe("Creche");
       expect(rotuloDiasVencimento(30)).toBe("30 dias");
       expect(rotuloDiasVencimento("todos")).toBe("Todos");
     });
@@ -698,7 +705,7 @@ describe("serviço de relatórios", () => {
         codigo: "000001",
         razao_social: "Escola A",
         cnpj: "11222333000181",
-        tipo: "Escola",
+        tipo_nome: "Escola",
         situacao: "Ativo",
         endereco: "Rua A, 10 - Centro - Rio de Janeiro",
         email: "escola@nexus.test",
@@ -773,7 +780,7 @@ describe("serviço de relatórios", () => {
             codigo: "000001",
             razao_social: "Escola A",
             cnpj: null,
-            tipo: "Escola",
+            tipo_nome: "Escola",
             situacao: "Ativo",
             endereco: "Rua A",
             email: null,
@@ -818,7 +825,7 @@ describe("serviço de relatórios", () => {
             codigo: "000001",
             razao_social: "Escola A",
             cnpj: null,
-            tipo: "Escola",
+            tipo_nome: "Escola",
             situacao: "Ativo",
             endereco: "Rua A",
             email: "escola@nexus.test",
@@ -1025,6 +1032,184 @@ describe("serviço de relatórios", () => {
       expect(csv).toContain(
         "Itens · Item #34 · Lápis de cor · Qtd. entregue: 0 → 4",
       );
+    });
+  });
+
+  describe("tabelas para XLSX", () => {
+    it("tabela de produtos mantém o cabeçalho e as quantidades numéricas", () => {
+      const tabela = tabelaProdutos([linha]);
+
+      expect(tabela.cabecalho).toEqual([
+        "Código",
+        "Descrição",
+        "Quantidade",
+        "Qtd. Livre",
+        "Situação",
+      ]);
+      expect(tabela.registros[0]![2]).toBe(10);
+      expect(tabela.registros[0]![3]).toBe(7.5);
+      expect(typeof tabela.registros[0]![2]).toBe("number");
+    });
+
+    it("tabela de movimentação mantém os saldos numéricos e o travessão do nulo", () => {
+      const tabela = tabelaMovimentacoes([
+        {
+          id_movimentacao: 1,
+          data_hora: new Date("2026-10-01T12:00:00.000Z"),
+          id_produto: 1,
+          codigo: "000001",
+          produto: "Arroz",
+          tipo: "Entrada",
+          documento: "NE #3",
+          destinatario_fornecedor: "Escola Municipal",
+          quantidade: 10.5,
+          saldo_anterior: 0,
+          saldo_posterior: 10.5,
+          usuario: "Maria Operadora",
+          observacao: null,
+        },
+        {
+          id_movimentacao: 2,
+          data_hora: new Date("2026-10-02T12:00:00.000Z"),
+          id_produto: 2,
+          codigo: "000002",
+          produto: "Feijão",
+          tipo: "Ajuste",
+          documento: "—",
+          destinatario_fornecedor: "—",
+          quantidade: -1,
+          saldo_anterior: null,
+          saldo_posterior: null,
+          usuario: "João",
+          observacao: null,
+        },
+      ]);
+
+      expect(tabela.cabecalho).toHaveLength(10);
+      expect(tabela.registros[0]![5]).toBe(10.5);
+      expect(tabela.registros[0]![6]).toBe(0);
+      expect(tabela.registros[0]![7]).toBe(10.5);
+      expect(tabela.registros[0]![9]).toBeNull();
+      expect(tabela.registros[1]![6]).toBe("—");
+      expect(tabela.registros[1]![7]).toBe("—");
+    });
+
+    it("tabelas de expedições e entregas usam números nativos", () => {
+      const expedicoes = tabelaExpedicoes([
+        {
+          id_expedicao: 7,
+          data_prevista: "2026-10-05",
+          status: "Concluída",
+          veiculo: "AAA1111",
+          condutor: "Ana Condutora",
+          notas: 2,
+          destinatarios: "Escola A, Escola B",
+          itens_esperados: 15,
+          itens_entregues: 10.5,
+          fotos: [],
+        },
+      ]);
+      expect(expedicoes.registros[0]![4]).toBe(2);
+      expect(expedicoes.registros[0]![6]).toBe(15);
+      expect(expedicoes.registros[0]![7]).toBe(10.5);
+
+      const entregas = tabelaEntregas([
+        {
+          id_nota_saida: 12,
+          id_destinatario: 3,
+          codigo: "000012",
+          data: new Date("2026-10-10T12:00:00.000Z"),
+          destinatario: "Escola Municipal",
+          status: "Baixa parcial",
+          itens: 2,
+          esperado: 15,
+          entregue: 6,
+          pendente: 9,
+          expedicao: "EXP #3",
+          fotos: [],
+          justificativa: null,
+        },
+      ]);
+      expect(entregas.registros[0]![4]).toBe(2);
+      expect(entregas.registros[0]![5]).toBe(15);
+      expect(entregas.registros[0]![6]).toBe(6);
+      expect(entregas.registros[0]![7]).toBe(9);
+    });
+
+    it("tabela de vencimento mantém dias restantes numérico", () => {
+      const tabela = tabelaVencimento([
+        {
+          id_produto: 1,
+          codigo: "000001",
+          descricao: "Leite",
+          quantidade: 10.5,
+          validade: "2026-10-20",
+          dias_restantes: -4,
+          situacao: "Vencido (4)",
+        },
+      ]);
+
+      expect(tabela.registros[0]![2]).toBe(10.5);
+      expect(tabela.registros[0]![4]).toBe(-4);
+    });
+
+    it("tabelas dos cadastros e da auditoria mantêm as colunas do CSV", () => {
+      const funcionarios = tabelaFuncionarios([
+        {
+          id_funcionario: 1,
+          codigo: "000001",
+          nome: "Ana",
+          cpf: null,
+          cargo: null,
+          condutor: true,
+          situacao: "Ativo",
+          email: null,
+          telefone: null,
+          emails: [],
+          telefones: [],
+          codigos: [],
+          foto_url: null,
+        },
+      ]);
+      expect(funcionarios.cabecalho).toEqual([
+        "Código",
+        "Nome",
+        "CPF",
+        "Cargo",
+        "Condutor",
+        "Situação",
+        "E-mail",
+        "Telefone",
+      ]);
+      expect(funcionarios.registros[0]![4]).toBe("Sim");
+      expect(funcionarios.registros[0]![6]).toBeNull();
+
+      expect(tabelaDestinatarios([]).cabecalho).toContain("Razão social");
+      expect(tabelaFornecedores([]).cabecalho).toContain("Endereço");
+
+      const auditoria = tabelaAuditoria([
+        {
+          id_registro_auditoria: 7,
+          data_hora: new Date("2026-10-24T15:30:00.000Z"),
+          usuario: "Ana Auditora",
+          acao: "ALTERAR",
+          entidade: "Produto",
+          id_entidade_afetada: 10,
+          dados_anteriores: null,
+          dados_novos: null,
+        },
+      ]);
+      expect(auditoria.cabecalho).toEqual([
+        "Data/hora",
+        "Usuário",
+        "Ação",
+        "Entidade",
+        "Registro",
+        "Descrição",
+        "Alterações",
+      ]);
+      expect(auditoria.registros[0]![4]).toBe("#10");
+      expect(auditoria.registros[0]![5]).toBeNull();
     });
   });
 });

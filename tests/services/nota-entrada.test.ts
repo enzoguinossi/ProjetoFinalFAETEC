@@ -719,4 +719,73 @@ describe("notaEntradaDAO.list", () => {
     });
     expect(combinado.total).toBe(0);
   });
+
+  it("inclui as notas de desmontagem e filtra por tipo", async () => {
+    const entrada = await criarNotaEntrada();
+    const desmontagem = await prismaTeste.notaEntrada.create({
+      data: {
+        tipo: "DESMONTAGEM",
+        data_criacao: new Date(),
+        data_recebimento: new Date("2026-10-19T00:00:00.000Z"),
+      },
+    });
+
+    const todas = await notaEntradaDAO.list();
+    expect(todas.data.map((nota) => nota.id_nota_entrada).sort()).toEqual(
+      [entrada.id_nota_entrada, desmontagem.id_nota_entrada].sort(),
+    );
+
+    const soEntrada = await notaEntradaDAO.list({ tipos: ["ENTRADA"] });
+    expect(soEntrada.data.map((nota) => nota.id_nota_entrada)).toEqual([
+      entrada.id_nota_entrada,
+    ]);
+
+    const soDesmontagem = await notaEntradaDAO.list({
+      tipos: ["DESMONTAGEM"],
+    });
+    expect(soDesmontagem.data.map((nota) => nota.id_nota_entrada)).toEqual([
+      desmontagem.id_nota_entrada,
+    ]);
+
+    const detalhe = await notaEntradaDAO.getById(desmontagem.id_nota_entrada);
+    expect(detalhe?.tipo).toBe("DESMONTAGEM");
+  });
+
+  it("não permite editar uma nota de desmontagem", async () => {
+    const { usuario } = await criarUsuario();
+    const produto = await criarProduto();
+    const desmontagem = await prismaTeste.notaEntrada.create({
+      data: { tipo: "DESMONTAGEM", data_criacao: new Date() },
+    });
+    const item = await prismaTeste.itemNotaEntrada.create({
+      data: {
+        id_nota_entrada: desmontagem.id_nota_entrada,
+        id_produto: produto.id_produto,
+        quantidade: 2,
+      },
+    });
+
+    const resultado = await notaEntradaService.atualizar(
+      desmontagem.id_nota_entrada,
+      {
+        itens: [
+          {
+            id_item_nota_entrada: item.id_item_nota_entrada,
+            id_produto: produto.id_produto,
+            quantidade: 3,
+          },
+        ],
+      },
+      usuario.id_usuario,
+    );
+
+    expect(resultado).toEqual({
+      error: "Notas de desmontagem são histórico e não podem ser editadas (RN004).",
+    });
+    expect(
+      await prismaTeste.itemNotaEntrada.findUniqueOrThrow({
+        where: { id_item_nota_entrada: item.id_item_nota_entrada },
+      }),
+    ).toMatchObject({ quantidade: 2 });
+  });
 });

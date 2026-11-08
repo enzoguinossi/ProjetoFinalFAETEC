@@ -4,6 +4,8 @@ import {
   type NotaSaidaAtualizacao,
   type NotaSaidaCriacao,
   type NotaSaidaItemAtualizacao,
+  type ResultadoRetiradaNotaSaida,
+  type RetiradaItem,
 } from "@/dao/nota-saida";
 
 export type SaidaItemInput = {
@@ -205,7 +207,7 @@ export class NotaSaidaService {
     if (existente.tipo !== "SAIDA") {
       return {
         error:
-          "Notas de avaria e consumo interno são histórico e não podem ser editadas (RN004).",
+          "Notas de desmontagem, avaria e consumo interno são histórico e não podem ser editadas (RN004).",
       };
     }
 
@@ -265,6 +267,54 @@ export class NotaSaidaService {
     if (!idNota) return { error: "Nota de saída inválida." };
 
     return notaSaidaDAO.cancelarNotaSaida(idNota, id_usuario);
+  }
+
+  /**
+   * Retirada direta de itens: normaliza o payload (item da nota, quantidade
+   * finita e não negativa, sem itens repetidos) e delega ao DAO, que baixa o
+   * retirado do saldo/reserva, soma em `qtd_entregue` e grava a auditoria na
+   * mesma transação. A permissão (`expedicao.alterar`) é checada na action.
+   */
+  async retirar(
+    id: number,
+    itens: unknown,
+    id_usuario: number,
+  ): Promise<ResultadoRetiradaNotaSaida> {
+    const idNota = idPositivo(id);
+    if (!idNota) return { error: "Nota de saída inválida." };
+
+    if (!Array.isArray(itens) || itens.length === 0) {
+      return { error: "Informe ao menos um item para retirar." };
+    }
+
+    const vistos = new Set<number>();
+    const normalizados: RetiradaItem[] = [];
+    for (const bruto of itens) {
+      if (!bruto || typeof bruto !== "object") {
+        return { error: "Item de retirada inválido." };
+      }
+      const registro = bruto as Record<string, unknown>;
+      const idItem = idPositivo(registro.id_item_nota_saida);
+      if (!idItem) {
+        return { error: "Item inválido na nota de saída." };
+      }
+      if (vistos.has(idItem)) {
+        return { error: "Cada item da nota deve ser informado uma única vez." };
+      }
+      vistos.add(idItem);
+
+      const quantidade = Number(registro.quantidade);
+      if (!Number.isFinite(quantidade) || quantidade < 0) {
+        return { error: "Quantidade de retirada inválida." };
+      }
+      normalizados.push({ id_item_nota_saida: idItem, quantidade });
+    }
+
+    if (!normalizados.some((item) => item.quantidade > 0)) {
+      return { error: "Informe ao menos uma quantidade para retirar." };
+    }
+
+    return notaSaidaDAO.registrarRetirada(idNota, normalizados, id_usuario);
   }
 }
 

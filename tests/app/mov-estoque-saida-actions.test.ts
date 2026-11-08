@@ -29,6 +29,7 @@ import {
   cancelarNotaSaida,
   criarNotaSaida,
   obterNotaSaida,
+  retirarItensNotaSaida,
 } from "@/app/mov-estoque/actions";
 
 describe("actions da nota de saída", () => {
@@ -200,5 +201,62 @@ describe("actions da nota de saída", () => {
       where: { id_nota_saida: notaId },
     });
     expect(nota.status).toBe("CANCELADA");
+  });
+
+  it("recusa retirar itens sem expedicao.alterar", async () => {
+    const { estoque, notaId, item } = await prepararSaida([
+      "nota_saida.alterar",
+      "nota_saida.consultar",
+    ]);
+
+    const resultado = await retirarItensNotaSaida(notaId, [
+      { id_item_nota_saida: item.id_item_nota_saida, quantidade: 1 },
+    ]);
+
+    expect(resultado).toEqual({ error: "Sem permissão." });
+
+    const itemDepois = await prismaTeste.itemNotaSaida.findUniqueOrThrow({
+      where: { id_item_nota_saida: item.id_item_nota_saida },
+    });
+    expect(Number(itemDepois.qtd_entregue)).toBe(0);
+
+    const produtoDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
+    });
+    expect(produtoDepois.saldo).toBe(10);
+    expect(produtoDepois.saldo_reservado).toBe(5);
+    expect(
+      await prismaTeste.movimentacaoEstoque.count({
+        where: { id_nota_saida: notaId },
+      }),
+    ).toBe(0);
+  });
+
+  it("retira itens com expedicao.alterar e devolve o novo status", async () => {
+    const { estoque, notaId, item } = await prepararSaida([
+      "expedicao.alterar",
+    ]);
+
+    const resultado = await retirarItensNotaSaida(notaId, [
+      { id_item_nota_saida: item.id_item_nota_saida, quantidade: 2 },
+    ]);
+
+    expect(resultado).toMatchObject({
+      success: true,
+      id_nota_saida: notaId,
+      status: "BAIXA_PARCIAL",
+      itens: [{ id_item_nota_saida: item.id_item_nota_saida, qtd_entregue: 2 }],
+    });
+
+    const nota = await prismaTeste.notaSaida.findUniqueOrThrow({
+      where: { id_nota_saida: notaId },
+    });
+    expect(nota.status).toBe("BAIXA_PARCIAL");
+
+    const produtoDepois = await prismaTeste.produto.findUniqueOrThrow({
+      where: { id_produto: estoque.id_produto },
+    });
+    expect(produtoDepois.saldo).toBe(8);
+    expect(produtoDepois.saldo_reservado).toBe(3);
   });
 });

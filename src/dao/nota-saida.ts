@@ -67,8 +67,42 @@ const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
 /** Status em que a nota ainda pode ser editada; os demais são histórico (RN004). */
 export const STATUS_NOTA_SAIDA_EDITAVEL: StatusNotaSaida[] = ["ABERTA"];
 
+/**
+ * Status em que a nota de Remessa ainda aceita retirada direta de itens
+ * (baixa do pendente). `BAIXA_TOTAL`, `BAIXA_COM_CORTE` e `CANCELADA` são
+ * histórico.
+ */
+export const STATUS_NOTA_SAIDA_RETIRAVEL: StatusNotaSaida[] = [
+  "ABERTA",
+  "EM_PERCURSO",
+  "PENDENTE",
+  "BAIXA_PARCIAL",
+];
+
 export type ResultadoCancelamentoNotaSaida =
   | { success: true; id_nota_saida: number; status: "CANCELADA" }
+  | { error: string };
+
+/** Item da retirada direta: quanto retirar agora do item da nota. */
+export type RetiradaItem = {
+  id_item_nota_saida: number;
+  quantidade: number;
+};
+
+export type ResultadoRetiradaNotaSaida =
+  | {
+      success: true;
+      id_nota_saida: number;
+      status: "BAIXA_PARCIAL" | "BAIXA_TOTAL";
+      itens: { id_item_nota_saida: number; qtd_entregue: number }[];
+      movimentacoes: {
+        id_movimentacao: number;
+        id_produto: number;
+        quantidade: number;
+        saldo_anterior: number;
+        saldo_posterior: number;
+      }[];
+    }
   | { error: string };
 
 /** Snapshot da nota usado na auditoria (antes e depois da edição). */
@@ -104,8 +138,37 @@ function snapshotNotaSaida(
   };
 }
 
-/** Fator da unidade de saída, usado só para calcular o total no lançamento. */
-async function fatorSaidaDoProduto(
+/** Snapshot da retirada direta: status, itens, saldos e expedições vinculadas. */
+function snapshotRetirada(
+  nota: { id_nota_saida: number; status: string; urgente: boolean },
+  itens: {
+    id_item_nota_saida: number;
+    id_produto: number;
+    qtd_esperada: number;
+    qtd_entregue: number;
+  }[],
+  saldos: { id_produto: number; saldo: number; saldo_reservado: number }[],
+  expedicoes: { id_expedicao: number; status: string }[],
+  movimentacoes?: {
+    id_movimentacao: number;
+    id_produto: number;
+    quantidade: number;
+    saldo_anterior: number;
+    saldo_posterior: number;
+  }[],
+) {
+  return {
+    id_nota_saida: nota.id_nota_saida,
+    status: nota.status,
+    urgente: nota.urgente,
+    itens,
+    saldos,
+    expedicoes,
+    ...(movimentacoes ? { movimentacoes } : {}),
+  };
+}
+
+/** Fator da unidade de saída, usado só para calcular o total no lançamento. */async function fatorSaidaDoProduto(
   client: Prisma.TransactionClient,
   id_produto: number,
 ) {
@@ -222,6 +285,13 @@ export class NotaSaidaDAO {
               },
             },
             orderBy: { id_item_nota_saida: "asc" },
+          },
+          expedicoes: {
+            orderBy: { data_adicao: "asc" },
+            select: {
+              id_expedicao: true,
+              expedicao: { select: { id_expedicao: true, status: true } },
+            },
           },
         },
         orderBy: { data_criacao: "desc" },
@@ -443,6 +513,7 @@ export class NotaSaidaDAO {
           select: {
             id_destinatario: true,
             pessoaJuridica: { select: { razao_social: true } },
+            tipoDestinatario: { select: { nome: true } },
           },
         },
         itens: {
@@ -687,7 +758,7 @@ export class NotaSaidaDAO {
       if (nota.tipo !== "SAIDA") {
         return {
           error:
-            "Notas de avaria e consumo interno dão baixa na criação e são histórico — não podem ser canceladas (RN004).",
+            "Notas de desmontagem, avaria e consumo interno dão baixa na criação e são histórico — não podem ser canceladas (RN004).",
         };
       }
 
@@ -767,6 +838,250 @@ export class NotaSaidaDAO {
 
       return { success: true, id_nota_saida, status: "CANCELADA" };
     });
+  }
+
+  /**
+   * Retirada direta de itens de uma nota de Remessa: baixa o total retirado
+   * (`saldo` e `saldo_reservado`) e soma em `qtd_entregue`. O retirado conta
+   * como entregue; a nota vira `BAIXA_PARCIAL` ou `BAIXA_TOTAL`.
+   *
+   * A linha da nota é travada (`FOR UPDATE`) antes da leitura para que duas
+   * retiradas concorrentes não somem além do pendente. Cobre nota aberta,
+   * pendente, em percurso e com baixa parcial; finalizada/cancelada e os
+   * demais tipos são histórico. Não grava tentativa (justificativa/fotos): a
+   * retirada não é uma entrega da expedição.
+   */
+  async registrarRetirada(
+    id_nota_saida: number,
+    itens: RetiradaItem[],
+    id_usuario: number,
+  ): Promise<ResultadoRetiradaNotaSaida> {
+    return prisma.$transaction(
+      async (tx) => {
+        // Trava a nota antes de ler os itens: serializa retiradas concorrentes.
+        const travada = await tx.$queryRaw<{ id_nota_saida: number }[]>`
+          SELECT ID_nota_saida FROM nota_saida
+          WHERE ID_nota_saida = ${id_nota_saida}
+          FOR UPDATE
+        `;
+        if (travada.length === 0) {
+          return { error: "Nota de saída não encontrada." };
+        }
+
+        const nota = await tx.notaSaida.findFirst({
+          where: { id_nota_saida, ativo: true },
+          include: {
+            itens: {
+              orderBy: { id_item_nota_saida: "asc" },
+              include: { produto: { select: { descricao: true } } },
+            },
+            expedicoes: {
+              orderBy: { data_adicao: "asc" },
+              select: {
+                id_expedicao: true,
+                expedicao: { select: { status: true } },
+              },
+            },
+          },
+        });
+        if (!nota) return { error: "Nota de saída não encontrada." };
+
+        if (nota.tipo !== "SAIDA") {
+          return {
+            error:
+              "Só notas de remessa permitem retirada de itens; avaria e consumo interno já dão baixa na criação (RN004).",
+          };
+        }
+
+        if (!STATUS_NOTA_SAIDA_RETIRAVEL.includes(nota.status)) {
+          const rotulo = ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status;
+          return {
+            error: `Nota de saída ${rotulo} não permite retirada de itens.`,
+          };
+        }
+
+        const EPS = 0.000001;
+        const porId = new Map(
+          nota.itens.map((item) => [item.id_item_nota_saida, item]),
+        );
+        const deltas = new Map<number, number>();
+
+        for (const informado of itens) {
+          const item = porId.get(informado.id_item_nota_saida);
+          if (!item) {
+            return {
+              error: "Item informado não pertence a esta nota de saída.",
+            };
+          }
+          if (
+            !Number.isFinite(informado.quantidade) ||
+            informado.quantidade < 0
+          ) {
+            return { error: "Quantidade de retirada inválida." };
+          }
+          if (informado.quantidade === 0) {
+            deltas.set(item.id_item_nota_saida, 0);
+            continue;
+          }
+
+          const pendente =
+            Number(item.qtd_esperada) - Number(item.qtd_entregue);
+          if (pendente <= EPS) {
+            return {
+              error: `O item ${item.produto.descricao} já está completo e não pode receber retirada.`,
+            };
+          }
+          if (informado.quantidade > pendente + EPS) {
+            return {
+              error: `A quantidade retirada de ${item.produto.descricao} não pode ser maior que o pendente (${pendente}).`,
+            };
+          }
+          deltas.set(item.id_item_nota_saida, informado.quantidade);
+        }
+
+        const plano = nota.itens.map((item) => {
+          const delta = deltas.get(item.id_item_nota_saida) ?? 0;
+          const atual = Number(item.qtd_entregue);
+          return {
+            item,
+            delta,
+            nova: atual + delta,
+          };
+        });
+
+        if (!plano.some((item) => item.delta > 0)) {
+          return { error: "Informe ao menos uma quantidade para retirar." };
+        }
+
+        const completo = plano.every(
+          (item) =>
+            item.nova >= Number(item.item.qtd_esperada) - EPS,
+        );
+        const status: "BAIXA_PARCIAL" | "BAIXA_TOTAL" = completo
+          ? "BAIXA_TOTAL"
+          : "BAIXA_PARCIAL";
+
+        const idsProdutos = [
+          ...new Set(nota.itens.map((item) => item.id_produto)),
+        ];
+        const lerSaldos = async () => {
+          const produtos = await tx.produto.findMany({
+            where: { id_produto: { in: idsProdutos } },
+            select: {
+              id_produto: true,
+              saldo: true,
+              saldo_reservado: true,
+            },
+            orderBy: { id_produto: "asc" },
+          });
+          return produtos.map((produto) => ({
+            id_produto: produto.id_produto,
+            saldo: Number(produto.saldo),
+            saldo_reservado: Number(produto.saldo_reservado),
+          }));
+        };
+
+        const expedicoes = nota.expedicoes.map((vinculo) => ({
+          id_expedicao: vinculo.id_expedicao,
+          status: vinculo.expedicao.status,
+        }));
+
+        const antes = snapshotRetirada(
+          nota,
+          nota.itens.map((item) => ({
+            id_item_nota_saida: item.id_item_nota_saida,
+            id_produto: item.id_produto,
+            qtd_esperada: Number(item.qtd_esperada),
+            qtd_entregue: Number(item.qtd_entregue),
+          })),
+          await lerSaldos(),
+          expedicoes,
+        );
+
+        const movimentacoes: {
+          id_movimentacao: number;
+          id_produto: number;
+          quantidade: number;
+          saldo_anterior: number;
+          saldo_posterior: number;
+        }[] = [];
+
+        for (const linha of plano) {
+          if (linha.delta <= 0) continue;
+
+          await tx.itemNotaSaida.update({
+            where: { id_item_nota_saida: linha.item.id_item_nota_saida },
+            data: { qtd_entregue: linha.nova },
+          });
+
+          const baixa = await saldoDAO.baixar(
+            {
+              id_produto: linha.item.id_produto,
+              id_nota_saida,
+              id_usuario,
+              quantidade: linha.delta,
+              observacao: "Retirada direta de itens da nota de saída",
+            },
+            tx,
+          );
+          movimentacoes.push({
+            id_movimentacao: baixa.movimentacao.id_movimentacao,
+            id_produto: linha.item.id_produto,
+            quantidade: Number(baixa.movimentacao.quantidade),
+            saldo_anterior: baixa.saldo_anterior,
+            saldo_posterior: baixa.saldo_posterior,
+          });
+        }
+
+        // Transição condicional: se a nota saiu do status de origem entre a
+        // trava e a gravação (não deveria acontecer), nada é aplicado.
+        const transicao = await tx.notaSaida.updateMany({
+          where: {
+            id_nota_saida,
+            status: { in: STATUS_NOTA_SAIDA_RETIRAVEL },
+          },
+          data: { status },
+        });
+        if (transicao.count !== 1) {
+          throw new Error("A nota de saída não permite mais retirada de itens.");
+        }
+
+        const depois = snapshotRetirada(
+          { ...nota, status },
+          plano.map((linha) => ({
+            id_item_nota_saida: linha.item.id_item_nota_saida,
+            id_produto: linha.item.id_produto,
+            qtd_esperada: Number(linha.item.qtd_esperada),
+            qtd_entregue: linha.nova,
+          })),
+          await lerSaldos(),
+          expedicoes,
+          movimentacoes,
+        );
+
+        await registrarAuditoria(
+          id_usuario,
+          "ALTERAR",
+          AUDIT_ENTIDADE,
+          id_nota_saida,
+          antes,
+          depois,
+          tx,
+        );
+
+        return {
+          success: true as const,
+          id_nota_saida,
+          status,
+          itens: plano.map((linha) => ({
+            id_item_nota_saida: linha.item.id_item_nota_saida,
+            qtd_entregue: linha.nova,
+          })),
+          movimentacoes,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }
 

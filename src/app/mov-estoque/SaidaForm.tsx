@@ -35,6 +35,10 @@ interface Props {
   initialData?: NotaSaidaFormData;
   onSaved: () => Promise<void> | void;
   onCancel: () => void;
+  /** `expedicao.alterar`: habilita a retirada direta de itens na visualização. */
+  podeRetirar?: boolean;
+  /** Abre o modal de retirada a partir da visualização da nota. */
+  onRetirar?: (nota: NotaSaidaFormData) => void;
 }
 
 type ItemForm = {
@@ -70,7 +74,7 @@ let proximoUid = 1;
  * destinatário, urgência e reserva; Avaria e Consumo Interno não têm
  * destinatário e dão baixa real no estoque ao gravar a nota.
  */
-export default function SaidaForm({ mode = "create", initialData, onSaved, onCancel }: Props) {
+export default function SaidaForm({ mode = "create", initialData, onSaved, onCancel, podeRetirar, onRetirar }: Props) {
   const mostrarAviso = useAviso();
   const isView = mode === "view";
   const podeEditar = mode === "create" || (mode === "edit" && initialData?.podeEditar === true);
@@ -81,7 +85,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
       ? {
           id_destinatario: initialData.id_destinatario,
           razao_social: initialData.destinatario ?? "",
-          tipo: "ESCOLA",
+          tipo_nome: initialData.tipo_nome,
         }
       : null,
   );
@@ -414,7 +418,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
             <label className={LABEL_CLASS}>Observação do pedido</label>
             <input
               readOnly
-              value={pedidoPreview.observacao?.trim() || "—"}
+              value={pedidoPreview.observacao?.trim() || ""}
               className={INPUT_CLASS}
             />
           </div>
@@ -445,7 +449,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                     }).format(item.quantidade)}
                   </td>
                   <td className="px-3 py-2 text-xs text-[#697077]">
-                    {item.observacao?.trim() || "—"}
+                    {item.observacao?.trim() || ""}
                   </td>
                 </tr>
               ))}
@@ -669,7 +673,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                 <input
                   readOnly
                   value={produtoPendente?.descricao ?? ""}
-                  placeholder="—"
+                  placeholder=""
                   className={INPUT_CLASS}
                 />
               </div>
@@ -681,7 +685,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                     <input
                       readOnly
                       value={produtoSaidaDetalhe?.unidade_saida ?? ""}
-                      placeholder="—"
+                      placeholder=""
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -691,7 +695,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                     <input
                       readOnly
                       value={produtoSaidaDetalhe?.fator ?? ""}
-                      placeholder="—"
+                      placeholder=""
                       className={INPUT_CLASS}
                     />
                   </div>
@@ -772,7 +776,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                     <>
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-[#697077]">Unidade de saída</span>
-                        <span className="text-sm text-ink">{item.unidade_saida ?? "—"}</span>
+                        <span className="text-sm text-ink">{item.unidade_saida ?? ""}</span>
                       </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-xs text-[#697077]">Fator</span>
@@ -851,7 +855,7 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
                 <span className="font-semibold">
                   EXP #{tentativa.id_expedicao}
                 </span>
-                <span className="text-[#697077]">{tentativa.data ?? "—"}</span>
+                <span className="text-[#697077]">{tentativa.data ?? ""}</span>
                 <span className="rounded-full bg-[#f2f4f8] px-2 py-0.5 text-xs font-semibold text-[#4a4f55]">
                   {tentativa.status}
                 </span>
@@ -895,7 +899,16 @@ export default function SaidaForm({ mode = "create", initialData, onSaved, onCan
 
       <div className={ui.rowActions}>
         {isView ? (
-          <Button label="Fechar" variant="cancel" onClick={onCancel} />
+          <>
+            {initialData?.podeRetirar && podeRetirar && onRetirar && (
+              <Button
+                label="Retirar itens"
+                variant="primary"
+                onClick={() => onRetirar(initialData)}
+              />
+            )}
+            <Button label="Fechar" variant="cancel" onClick={onCancel} />
+          </>
         ) : (
           <>
             <Button label="Cancelar" variant="cancel" onClick={onCancel} />

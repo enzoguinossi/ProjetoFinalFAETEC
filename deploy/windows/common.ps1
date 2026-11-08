@@ -250,6 +250,139 @@ function Test-Health {
     return $result
 }
 
+function Test-AgentHealth {
+    <#
+    .SYNOPSIS
+        Consulta /v1/health do NexusAgent com o segredo (Bearer).
+
+    .DESCRIPTION
+        Devolve Ok somente quando o HTTP responde 200 e o JSON traz status=ok.
+        O segredo nunca compõe mensagem de erro, saída ou log.
+
+    .PARAMETER Secret
+        Conteúdo de C:\ProgramData\Nexus\config\agent.secret.
+
+    .PARAMETER Url
+        URL do health do agente (padrão: http://127.0.0.1:3215/v1/health).
+
+    .OUTPUTS
+        Objeto com Ok, HttpStatus, AgentStatus, Version, Mysql e Error.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Secret,
+        [string]$Url = "http://127.0.0.1:3215/v1/health",
+        [int]$TimeoutSeconds = 10
+    )
+
+    $result = [pscustomobject]@{
+        Ok          = $false
+        HttpStatus  = 0
+        AgentStatus = $null
+        Version     = $null
+        Mysql       = $null
+        Error       = $null
+    }
+
+    $oldProgress = $ProgressPreference
+    $ProgressPreference = "SilentlyContinue"
+    try {
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSeconds `
+            -Headers @{ Authorization = ("Bearer {0}" -f $Secret) }
+        $result.HttpStatus = [int]$response.StatusCode
+        $text = ([string]$response.Content).TrimStart()
+        if ($text.StartsWith("{")) {
+            try {
+                $json = $text | ConvertFrom-Json
+                if ($json.PSObject.Properties.Name -contains "status") {
+                    $result.AgentStatus = [string]$json.status
+                }
+                if ($json.PSObject.Properties.Name -contains "version") {
+                    $result.Version = [string]$json.version
+                }
+                if ($json.PSObject.Properties.Name -contains "mysql") {
+                    $result.Mysql = [string]$json.mysql
+                }
+            }
+            catch {
+                # JSON inválido: o status HTTP continua valendo para o diagnóstico.
+            }
+        }
+        $result.Ok = ($result.HttpStatus -eq 200 -and $result.AgentStatus -eq "ok")
+    }
+    catch {
+        $response = $_.Exception.Response
+        if ($response) {
+            try { $result.HttpStatus = [int]$response.StatusCode } catch { }
+        }
+        else {
+            $result.Error = "sem resposta"
+        }
+        $result.Ok = $false
+    }
+    finally {
+        $ProgressPreference = $oldProgress
+    }
+
+    return $result
+}
+
+function Test-AgentJobActive {
+    <#
+    .SYNOPSIS
+        Consulta /v1/status e diz se há um job QUEUED/RUNNING no NexusAgent.
+
+    .DESCRIPTION
+        Usado antes de parar o serviço do agente (bootstrap/desinstalação): parar
+        no meio de um backup/restauração deixaria o banco pela metade. Nunca
+        compõe mensagem com o segredo.
+
+    .PARAMETER Secret
+        Conteúdo de C:\ProgramData\Nexus\config\agent.secret.
+
+    .PARAMETER Url
+        URL do status do agente (padrão: http://127.0.0.1:3215/v1/status).
+
+    .OUTPUTS
+        Objeto com Ok, Active, JobId e Error.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Secret,
+        [string]$Url = "http://127.0.0.1:3215/v1/status",
+        [int]$TimeoutSeconds = 5
+    )
+
+    $result = [pscustomobject]@{
+        Ok     = $false
+        Active = $false
+        JobId  = $null
+        Error  = $null
+    }
+
+    $oldProgress = $ProgressPreference
+    $ProgressPreference = "SilentlyContinue"
+    try {
+        $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSeconds `
+            -Headers @{ Authorization = ("Bearer {0}" -f $Secret) }
+        $json = ([string]$response.Content).TrimStart() | ConvertFrom-Json
+        if ($null -ne $json.current) {
+            $status = [string]$json.current.status
+            if ($status -eq "QUEUED" -or $status -eq "RUNNING") {
+                $result.Active = $true
+                $result.JobId = [string]$json.current.id
+            }
+        }
+        $result.Ok = $true
+    }
+    catch {
+        $result.Error = "sem resposta do agente"
+    }
+    finally {
+        $ProgressPreference = $oldProgress
+    }
+
+    return $result
+}
+
 function Stop-NexusAppProcess {
     <#
     .SYNOPSIS

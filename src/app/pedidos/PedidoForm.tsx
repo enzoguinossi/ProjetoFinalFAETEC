@@ -272,8 +272,8 @@ export default function PedidoForm({
             <span className="font-sans text-xs text-[#697077]">Unidade de saída</span>
             <input
               readOnly
-              value={detalhe?.unidade_saida ?? "—"}
-              placeholder="—"
+              value={detalhe?.unidade_saida ?? ""}
+              placeholder=""
               className={INPUT_CLASS}
             />
           </div>
@@ -282,7 +282,7 @@ export default function PedidoForm({
             <span className="font-sans text-xs text-[#697077]">Fator</span>
             <input
               readOnly
-              value={detalhe ? formatarQuantidade(detalhe.fator) : "—"}
+              value={detalhe ? formatarQuantidade(detalhe.fator) : ""}
               className={INPUT_CLASS}
             />
           </div>

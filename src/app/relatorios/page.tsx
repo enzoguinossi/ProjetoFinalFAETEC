@@ -39,7 +39,7 @@ const relatorios: CartaoRelatorio[] = [
   {
     titulo: "Entregas por Instituição",
     descricao:
-      "Notas de saída por destinatário no período, com itens esperados, entregues e pendentes.",
+      "Notas de saída por destinatário no período, com itens solicitados, entregues e pendentes.",
     href: "/relatorios/entregas",
   },
   {

@@ -4,7 +4,10 @@ import { conversaoUnidadeDAO } from "@/dao/conversao-unidade";
 import { destinatarioDAO } from "@/dao/destinatario";
 import { fornecedorDAO } from "@/dao/fornecedor";
 import { notaEntradaDAO } from "@/dao/nota-entrada";
-import { notaSaidaDAO } from "@/dao/nota-saida";
+import {
+  notaSaidaDAO,
+  STATUS_NOTA_SAIDA_RETIRAVEL,
+} from "@/dao/nota-saida";
 import { produtoDAO } from "@/dao/produto";
 import { mensagemDeErro } from "@/dao/_errors";
 import { requireUser } from "@/lib/auth";
@@ -20,10 +23,12 @@ import {
   buildPagination,
   resultadoVazio,
   STATUS_NOTA_SAIDA,
+  TIPO_NOTA_ENTRADA,
   TIPO_NOTA_SAIDA,
   type PaginationParams,
   type PaginatedResult,
   type StatusNotaSaida,
+  type TipoNotaEntrada,
   type TipoNotaSaida,
 } from "@/types";
 import type {
@@ -34,6 +39,7 @@ import type {
   FornecedorSelecaoRow,
   NotaEntradaFormData,
   NotaEntradaListRow,
+  NotaSaidaExpedicao,
   NotaSaidaFormData,
   NotaSaidaListRow,
   NovaEntradaPayload,
@@ -83,6 +89,8 @@ export type NotaEntradaFiltrosPayload = {
   de?: string;
   ate?: string;
   id_fornecedor?: number[];
+  /** `ENTRADA`/`DESMONTAGEM`; ausente = os dois (lista de Entrada). */
+  tipos?: string[];
   search?: string;
 };
 
@@ -120,6 +128,11 @@ function formatarData(data: Date | null, utc = false): string {
   return `${dia}/${mes}/${data.getUTCFullYear()}`;
 }
 
+const ROTULOS_TIPO_NOTA_ENTRADA: Record<string, string> = {
+  ENTRADA: "Entrada",
+  DESMONTAGEM: "Desmontagem",
+};
+
 export async function listarNotasEntrada(
   params: PaginationParams & NotaEntradaFiltrosPayload = {},
 ): Promise<PaginatedResult<NotaEntradaListRow>> {
@@ -132,6 +145,7 @@ export async function listarNotasEntrada(
     de: dataFiltro(params.de),
     ate: dataFiltro(params.ate),
     id_fornecedor: idsFiltro(params.id_fornecedor),
+    tipos: enumFiltro<TipoNotaEntrada>(params.tipos, TIPO_NOTA_ENTRADA),
     search: textoFiltro(params.search),
   });
   return {
@@ -142,6 +156,8 @@ export async function listarNotasEntrada(
         nota.data_recebimento ?? nota.data_criacao,
         nota.data_recebimento !== null,
       ),
+      tipo: nota.tipo,
+      tipoLabel: ROTULOS_TIPO_NOTA_ENTRADA[nota.tipo] ?? nota.tipo,
       fornecedor: nota.fornecedor?.pessoaJuridica.razao_social ?? "Sem fornecedor",
       itens: nota.itens.length,
       chave_acesso: nota.chave_acesso,
@@ -303,9 +319,12 @@ export async function obterNotaEntrada(
 
   const nota = await notaEntradaDAO.getById(id);
   if (!nota) return null;
+  // A desmontagem é histórico: só visualiza, nunca edita (RN004).
+  if (modo === "edit" && nota.tipo !== "ENTRADA") return null;
 
   return {
     id_nota_entrada: nota.id_nota_entrada,
+    tipo: nota.tipo,
     id_fornecedor: nota.fornecedor?.id_fornecedor ?? null,
     fornecedor: nota.fornecedor?.pessoaJuridica.razao_social ?? null,
     cnpj: nota.fornecedor?.pessoaJuridica.cnpj ?? null,
@@ -356,6 +375,35 @@ const ROTULOS_TIPO_NOTA_SAIDA: Record<string, string> = {
   CONSUMO_INTERNO: "Consumo interno",
 };
 
+const ROTULOS_STATUS_EXPEDICAO: Record<string, string> = {
+  PLANEJADA: "Planejada",
+  EM_PERCURSO: "Em percurso",
+  CONCLUIDA: "Concluída",
+};
+
+/** Expedição vinculada à nota, com o rótulo de status da tela. */
+function expedicoesDaNota(
+  vinculos: { expedicao: { id_expedicao: number; status: string } }[],
+): NotaSaidaExpedicao[] {
+  return vinculos.map((vinculo) => ({
+    id_expedicao: vinculo.expedicao.id_expedicao,
+    status: vinculo.expedicao.status,
+    statusLabel:
+      ROTULOS_STATUS_EXPEDICAO[vinculo.expedicao.status] ??
+      vinculo.expedicao.status,
+  }));
+}
+
+/** Retirada direta: remessa ativa/pendente/parcial (nunca finalizada). */
+function podeRetirarNota(nota: { tipo: string; status: string }) {
+  return (
+    nota.tipo === "SAIDA" &&
+    STATUS_NOTA_SAIDA_RETIRAVEL.includes(
+      nota.status as (typeof STATUS_NOTA_SAIDA_RETIRAVEL)[number],
+    )
+  );
+}
+
 /** Item da nota com a quantidade de saída e a base lado a lado. */
 
 const STATUS_NOTA_SAIDA_CANCELAVEL = ["ABERTA"];
@@ -396,8 +444,11 @@ export async function listarNotasSaida(
         quantidade: itens.reduce((acc, item) => acc + item.quantidade_solicitada, 0),
         status: nota.status,
         statusLabel: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
+        urgente: nota.urgente,
         podeCancelar: STATUS_NOTA_SAIDA_CANCELAVEL.includes(nota.status),
         podeEditar: STATUS_NOTA_SAIDA_EDITAVEL.includes(nota.status),
+        podeRetirar: podeRetirarNota(nota),
+        expedicoes: expedicoesDaNota(nota.expedicoes),
       };
     }),
   };
@@ -429,7 +480,7 @@ export async function listarDestinatariosSelecao(
     data: resultado.data.map((d) => ({
       id_destinatario: d.id_destinatario,
       razao_social: d.pessoaJuridica.razao_social,
-      tipo: d.tipo_destinatario,
+      tipo_nome: d.tipoDestinatario?.nome ?? null,
     })),
   };
 }
@@ -458,8 +509,11 @@ export async function obterNotaSaida(
     status: nota.status,
     statusLabel: ROTULOS_STATUS_NOTA_SAIDA[nota.status] ?? nota.status,
     podeEditar: STATUS_NOTA_SAIDA_EDITAVEL.includes(nota.status),
+    podeRetirar: podeRetirarNota(nota),
+    expedicoes: expedicoesDaNota(nota.expedicoes),
     id_destinatario: nota.id_destinatario,
     destinatario: nota.destinatario?.pessoaJuridica.razao_social ?? null,
+    tipo_nome: nota.destinatario?.tipoDestinatario?.nome ?? null,
     urgente: nota.urgente,
     observacao: nota.observacao,
     itens: nota.itens.map(itemSaidaDetalhe),
@@ -612,6 +666,43 @@ export async function cancelarNotaSaida(id: number) {
       const resultado = await notaSaidaService.cancelar(id, user.id_usuario);
       if ("error" in resultado) return resultado;
       return { success: true, id_nota_saida: resultado.id_nota_saida };
+    } catch (e) {
+      return { error: mensagemDeErro(e) };
+    }
+  });
+}
+
+/**
+ * Retirada direta de itens da nota de saída (RF021): baixa o retirado do
+ * saldo/reserva e o conta como entregue. Exige `expedicao.alterar` — a mesma
+ * permissão de `registrarEntregaNota` — e não grava tentativa/fotos.
+ */
+export async function retirarItensNotaSaida(id: number, itens: unknown) {
+  return comPermissao("expedicao.alterar", async (user) => {
+    try {
+      // Sanitiza o payload: só os dois campos usados chegam ao serviço.
+      const lista = Array.isArray(itens)
+        ? itens.map((item) => {
+            const registro = (item ?? {}) as Record<string, unknown>;
+            return {
+              id_item_nota_saida: Number(registro.id_item_nota_saida),
+              quantidade: Number(registro.quantidade),
+            };
+          })
+        : itens;
+
+      const resultado = await notaSaidaService.retirar(
+        id,
+        lista,
+        user.id_usuario,
+      );
+      if ("error" in resultado) return resultado;
+      return {
+        success: true,
+        id_nota_saida: resultado.id_nota_saida,
+        status: resultado.status,
+        itens: resultado.itens,
+      };
     } catch (e) {
       return { error: mensagemDeErro(e) };
     }

@@ -38,6 +38,39 @@ if (-not $Dotnet -or -not (Test-Path -LiteralPath $Dotnet)) {
     throw "SDK do .NET não encontrado. Informe -Dotnet com o caminho do dotnet.exe."
 }
 
+# Ícone do arquivo: o atalho Bandeja do Nexus usa wscript.exe, então o símbolo
+# do Nexus precisa estar embutido no NexusTray.exe (<ApplicationIcon>).
+$icon = Join-Path $PSScriptRoot "NexusTray.ico"
+$iconGenerator = Join-Path $PSScriptRoot "..\..\..\scripts\gerar-icone-tray.mjs"
+$iconProblem = $null
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+if (-not (Test-Path -LiteralPath $iconGenerator -PathType Leaf)) {
+    $iconProblem = "gerador não encontrado em $iconGenerator"
+}
+elseif (-not $nodeCommand) {
+    $iconProblem = "node não encontrado no PATH"
+}
+else {
+    Write-Host "Gerando NexusTray.ico a partir de public\logo.svg" -ForegroundColor Cyan
+    & $nodeCommand.Source $iconGenerator
+    if ($LASTEXITCODE -ne 0) {
+        $iconProblem = "scripts\gerar-icone-tray.mjs falhou (código $LASTEXITCODE)"
+    }
+}
+
+if ($iconProblem) {
+    if (Test-Path -LiteralPath $icon -PathType Leaf) {
+        Write-Warning "Ícone: $iconProblem. Usando o NexusTray.ico existente."
+    }
+    else {
+        throw ("O ícone da bandeja não pôde ser gerado ($iconProblem) e não existe em $icon. " +
+            "Rode 'node scripts\gerar-icone-tray.mjs' antes de publicar.")
+    }
+}
+elseif (-not (Test-Path -LiteralPath $icon -PathType Leaf)) {
+    throw "O gerador terminou sem criar $icon. O .exe ficaria sem o ícone do Nexus."
+}
+
 if (Test-Path -LiteralPath $outDir) {
     Remove-Item -LiteralPath $outDir -Recurse -Force
 }

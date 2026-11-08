@@ -214,6 +214,12 @@ export class NotaEntradaService {
 
     const existente = await notaEntradaDAO.getById(idNota);
     if (!existente) return { error: "Nota de entrada não encontrada." };
+    if (existente.tipo !== "ENTRADA") {
+      return {
+        error:
+          "Notas de desmontagem são histórico e não podem ser editadas (RN004).",
+      };
+    }
 
     const itensExistentes = new Map(
       existente.itens.map((item) => [item.id_item_nota_entrada, item]),

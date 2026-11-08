@@ -1,7 +1,8 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvPedidos, pedidoService } from "@/services/pedido";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import { gerarCsvPedidos, pedidoService, tabelaPedidos } from "@/services/pedido";
 import type { StatusPedido } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,17 @@ export async function GET(request: Request) {
     ),
     com_nota: notas.length === 1 ? notas[0] === "com" : null,
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `pedidos-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaPedidos(linhas), {
+        nome: "Pedidos",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvPedidos(linhas), {
     headers: {

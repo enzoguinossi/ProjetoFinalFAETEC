@@ -145,7 +145,7 @@ export default function EnderecoFields({
 
   const text = (key: keyof EnderecoValue, requiredField = false) =>
     disabled ? (
-      <p className={roClass}>{value[key] || "—"}</p>
+      <p className={roClass}>{value[key] || ""}</p>
     ) : (
       <input
         name={key}
@@ -161,7 +161,7 @@ export default function EnderecoFields({
       <div className="flex gap-4">
         <Campo label="CEP" className={`${colClass} flex-[2]`}>
           {disabled ? (
-            <p className={roClass}>{value.cep || "—"}</p>
+            <p className={roClass}>{value.cep || ""}</p>
           ) : (
             <div className="flex gap-2">
               <input
@@ -204,7 +204,7 @@ export default function EnderecoFields({
         </Campo>
         <Campo label="UF" className={`${colClass} flex-1`}>
           {disabled ? (
-            <p className={roClass}>{value.uf || "—"}</p>
+            <p className={roClass}>{value.uf || ""}</p>
           ) : (
             <select
               name="uf"

@@ -14,6 +14,46 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 ## [Unreleased]
 
 ### Added
+- **Exportação XLSX dos relatórios (KAN-170, RF024/RNF008/RF023):** todos os relatórios
+  (`/relatorios/*/export` e o inventário fechado/cancelado) aceitam `?formato=xlsx` na mesma
+  rota, gerando a planilha com `exceljs` 4.4.0 por `src/lib/planilha.ts` (`criarXlsx`/
+  `respostaXlsx`): cabeçalho em negrito, linha congelada com autofiltro, larguras calculadas e
+  números nativos (`#,##0.###`). As tabelas dos relatórios foram centralizadas nos serviços
+  (`tabelaProdutos`, `tabelaMovimentacoes`, `tabelaPedidos`, `tabelaInventario` etc.) e o CSV
+  continua idêntico. Botão **Exportar XLSX** ao lado do CSV nas telas. Testes em
+  `tests/lib/planilha.test.ts` e nos serviços.
+- **Retirada direta de itens da nota de saída (KAN-170, RF021):** ação **Retirar itens** no
+  detalhe e na lista da Saída, com permissão `expedicao.alterar`. O modal item a item vem com
+  “retirar agora” igual ao pendente; o servidor trava a nota (`FOR UPDATE`), valida o delta,
+  soma `qtd_entregue` e dá baixa em `produto.saldo`/`saldo_reservado` via `saldoDAO.baixar`,
+  com movimentação negativa e auditoria dos saldos. A nota vira `BAIXA_PARCIAL` ou
+  `BAIXA_TOTAL`; o já retirado conta como entregue, `despachar` não sobrescreve a baixa parcial
+  e a expedição passa a oferecer apenas o pendente. Testes em `tests/services/nota-saida.test.ts`,
+  `tests/services/expedicao.test.ts` e `tests/app/mov-estoque-saida-actions.test.ts`.
+- **Desmembramento de produtos compostos (KAN-170):** botão **Desmembrar** na visualização do
+  produto e ação condicional (só compostos) na listagem. Exige `estoque.entrada` **e**
+  `estoque.saida` e grava, na mesma transação, uma `nota_saida` `DESMONTAGEM` (`BAIXA_TOTAL`,
+  baixa do pai) e uma `nota_entrada` `DESMONTAGEM` (entrada dos insumos ativos, repetidos
+  somados), com movimentações e auditoria das duas notas. O `saldo_reservado` não muda; RN001
+  apenas avisa (o saldo pode ficar negativo) e o inventário bloqueia o pai e os filhos. As
+  notas `DESMONTAGEM` aparecem na lista de Entrada com coluna e filtro **Tipo**, em modo
+  somente leitura. Nenhuma permissão nova.
+- **Deploy em um comando (KAN-170):** `npm run deploy:windows` compila e empacota tudo
+  (`prisma generate`, SQL de produção, lint, app standalone/`app.zip`, `NexusTray`,
+  `NexusAgent`, payload e setup Inno), copia o setup para o caminho informado e grava o
+  `.sha256`. Opções `-SkipSql`, `-SkipLint`, `-SkipApp`, `-SkipTray`, `-SkipAgent`,
+  `-WithTests` e `-Force`; script em `scripts/deploy-windows.ps1`.
+- **Tipo de destinatário como cadastro (KAN-170):** o enum `TipoDestinatario` virou a tabela
+  editável `tipo_destinatario` (`codigo` imutável, `nome` único e `padrao` único). O modal
+  **Tipos de escola** fica no formulário de Destinatário, cria/edita e exclui fisicamente
+  (a FK `ON DELETE SET NULL` deixa os destinatários sem tipo) e registra auditoria — na
+  exclusão, com o tipo e os destinatários afetados. O tipo é opcional no destinatário; no
+  máximo um é padrão e já vem selecionado no novo cadastro, podendo ser trocado por
+  **Sem tipo**. Novas permissões `tipo_destinatario.criar/.alterar/.excluir` (86 → **89**).
+  Migração `002-tipos-destinatario.sql` (idempotente) e `aplicar-sql.ps1` passam a executar
+  todas as migrações de `migracoes\*.sql`; o seed cria Escola/Creche/CMEI/CMEIA apenas com a
+  tabela vazia (Escola padrão). Listagens, filtros, percursos, saída, pedidos e o relatório de
+  destinatários usam o nome do cadastro e ficam vazios quando não há tipo.
 - **Bandeja .NET 10 (KAN-170):** `NexusTray` em `net10.0-windows`, self-contained/single-file,
   com status de `NexusMySQL84`/`NexusApp`/`NexusCaddy`, `Iniciar Nexus`, `Fechar bandeja`
   (confirmação e encerramento Caddy→App→MySQL), ícone cinza quando parado intencionalmente e
@@ -47,8 +87,37 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   (`data_recebimento`, ou `data_criacao` quando nulo, no dia local) e fornecedor (multi). Em
   **Saída** há período, tipo (4), status (7), destinatário (multi) e urgente. Todos filtram no
   servidor, combinados com a busca, e sem filtro o resultado é o mesmo de antes.
+- **NexusAgent — backup e restauração (KAN-170):** serviço Windows **.NET 10** self-contained
+  (`deploy/windows/NexusAgent/`) em `LocalSystem`, automático, com API local em
+  `127.0.0.1:3215` (bearer `agent.secret`), um job por vez, histórico de 100 jobs e agenda
+  própria (02:00, 30 dias, uploads). O agente executa `backup.ps1` com `-AgentProgress`/
+  `-RequireMysql`, faz backup+restauração do banco e dos uploads, gera backup de segurança
+  antes de restaurar e mantém o Caddy no ar para a página de progresso.
+- **Backup pela UI (KAN-170):** `/administracao/backup`, aberta pela **engrenagem da topbar**
+  (visível com `backup.listar`), lista o estado, o histórico e os
+  arquivos do manifesto, executa backup, edita a agenda e restaura (confirmação `RESTAURAR` +
+  senha), com auditoria (`SOLICITAR_BACKUP`, `ALTERAR_AGENDA`, `RESTAURAR`). A página lê o
+  agente no servidor por `src/lib/agent.ts`; agente fora do ar não derruba a tela.
+- **Progresso visual do backup (KAN-170):** `/progresso/` (página estática servida pelo Caddy)
+  acompanha passos e percentual por `status.json` e volta para `/administracao/backup` ao
+  concluir.
+- **Permissões de backup (KAN-170):** `backup.listar`, `backup.executar`, `backup.agendar` e
+  `backup.restaurar` entram no seed Prisma e no SQL de produção — o catálogo passa a **86
+  permissões**.
 
 ### Changed
+- **Terminologia de quantidades (KAN-170):** “Esperado/Esperada” passa a “Solicitado/Solicitada”
+  nas telas, impressão/PDF e exportações CSV/XLSX; os campos internos `qtd_esperada`/`esperado`
+  não mudam.
+- **Setup instala o NexusAgent (KAN-170):** a fase 6 do `bootstrap.ps1` copia o
+  `NexusAgent.exe`, gera/preserva `config\agent.secret` (48 bytes), grava
+  `AGENT_SECRET`/`AGENT_URL` no `.env`, publica `caddy\progresso\index.html`, cria/atualiza o
+  serviço `NexusAgent` (`LocalSystem`, automático, sem dependência do MySQL), bloqueia a porta
+  **3215** na LAN, **remove a tarefa `NexusBackup`** e exige `/v1/health` `status=ok` antes de
+  concluir. O `smoke.ps1` valida o agente e a ausência da tarefa; o `desinstalar.ps1` remove o
+  serviço e a pasta do agente preservando `ProgramData\Nexus\agent`, o `agent.secret` e os
+  backups. O instalador passa a embutir `NexusAgent.exe` e `progresso\index.html` (setup
+  ~488 MB) e o `build-instalador.ps1` falha com mensagem clara se faltar o agente.
 - **Barra de filtros compartilhada (KAN-170):** `BarraFiltrosBase` concentra a barra controlada
   de chips (adicionáveis/removíveis, com **Aplicar filtros** e **Limpar**) e `BarraFiltros` fica
   como o wrapper de URL dos relatórios; as listagens usam a mesma base e, nas paginadas no
@@ -88,6 +157,30 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `%TEMP%\Setup Log*.txt`.
 
 ### Fixed
+- **Ícone da bandeja no atalho (KAN-170):** `scripts/gerar-icone-tray.mjs` gera
+  `deploy/windows/NexusTray/NexusTray.ico` a partir de `public/logo.svg` (16, 24, 32, 48, 64,
+  128 e 256, entradas PNG) e o `.ico` é versionado; o `NexusTray.csproj` embute o ícone no
+  arquivo (`<ApplicationIcon>`), o `build.ps1` regenera antes do publish (avisa e segue se o
+  `.ico` já existir) e o setup exige o arquivo. O atalho **Bandeja do Nexus** continua com
+  `wscript.exe` (elevação sem UAC) e agora usa `IconFilename: {app}\NexusTray.ico`, exibindo
+  o símbolo do Nexus em vez do ícone do script.
+- **Backup/instalação — achados residuais do QA (KAN-170):** o `NexusAgent` é criado com
+  `New-Service` e o binPath chega ao SCM **entre aspas** (o upgrade usa `sc.exe config` com as
+  aspas literais e confere por `sc.exe qc`); `-SkipTray` deixa de pular a fase 6 e só ignora a
+  bandeja; o `backup.ps1` grava `<dump>.incomplete` e o marcador só sai no sucesso, então um dump
+  parcial não aparece em `/v1/backups` nem pode ser restaurado; a retenção poda snapshots de
+  uploads órfãos (e não poda dump sem snapshot, que é válido com `-SkipUploads`); o restore só
+  religa o `NexusCaddy` se ele já estava em execução; backup/agenda auditam somente depois do
+  aceite do agente.
+- **Backup/restauração — correções da revisão do NexusAgent (KAN-170):** `/progresso/` passa a
+  ser publicado em `C:\ProgramData\Nexus\caddy\progresso` (onde o Caddy serve) e `/progresso`
+  redireciona para `/progresso/`; o `NexusCaddy` deixa de depender do `NexusApp` (parar ou
+  reiniciar o app não derruba o HTTPS nem a página de progresso) e o restore garante o Caddy em
+  execução no fim; os uploads viram **snapshot por backup** (`backups\uploads\<timestamp>`), com
+  `hasUploads` no manifesto e restauração de uploads recusada (400) sem o snapshot; o backup de
+  segurança roda com `-NoRetention` e a restauração usa uma cópia em `agent\tmp`; job
+  interrompido pelo reinício vira `FAILED` e o polling da UI para após 10 ciclos; o dump é
+  validado antes de parar o app e o backup de segurança faz rollback se o `mysql` falhar.
 - **Busca não-string nas listagens (KAN-170):** as actions de listagem de Expedições (e
   percursos), Inventário, Produtos, Destinatários, Fornecedores, Funcionários, Veículos e
   Usuários passam `search` por `textoFiltro` (helper em `src/lib/filtros.ts`): número, objeto

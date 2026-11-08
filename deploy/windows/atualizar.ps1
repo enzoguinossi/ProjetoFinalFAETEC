@@ -11,11 +11,16 @@
     falha, a pasta anterior volta a ser usada; o banco NÃO é restaurado
     automaticamente.
 
+    O pacote só troca a aplicação e o SQL: runtimes, scripts, bandeja e o
+    serviço NexusAgent (backup) são atualizados pelo setup/bootstrap, nunca por
+    -Package.
+
     Layout do pacote (-Package):
         <pacote>\app\app.zip    (ou <pacote>\app.zip)
         <pacote>\sql\schema.sql
         <pacote>\sql\seed.sql
         <pacote>\sql\migracoes\001-unidades-pct10-cx50.sql
+        <pacote>\sql\migracoes\002-tipos-destinatario.sql
 
 .PARAMETER Package
     Diretório do pacote de atualização (app\ + sql\).

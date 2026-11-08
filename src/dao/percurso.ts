@@ -19,7 +19,11 @@ export type PercursoDados = {
 const includeDestinatarios = {
   destinatarios: {
     orderBy: { ordem_visita: "asc" as const },
-    include: { destinatario: { include: { pessoaJuridica: true } } },
+    include: {
+      destinatario: {
+        include: { pessoaJuridica: true, tipoDestinatario: true },
+      },
+    },
   },
 } satisfies Prisma.PercursoInclude;
 
@@ -225,7 +229,7 @@ export class PercursoDAO {
         skip,
         take,
         where,
-        include: { pessoaJuridica: true },
+        include: { pessoaJuridica: true, tipoDestinatario: true },
         orderBy: { pessoaJuridica: { razao_social: "asc" } },
       }),
       prisma.destinatario.count({ where }),

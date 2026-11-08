@@ -2,6 +2,12 @@
 NexusTray/bin/
 NexusTray/obj/
 NexusTray/dist/
+
+# Artefatos do serviço NexusAgent
+NexusAgent/bin/
+NexusAgent/obj/
+NexusAgent/dist/
+
 *.user
 
 # Instalador gerado por build-instalador.ps1

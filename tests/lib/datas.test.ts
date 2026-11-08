@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { limitesDoDiaSaoPaulo } from "@/lib/datas";
+import { diaUtcSaoPaulo, limitesDoDiaSaoPaulo } from "@/lib/datas";
+
+describe("diaUtcSaoPaulo", () => {
+  it("devolve a meia-noite UTC do dia civil, mesmo depois das 21h em São Paulo", () => {
+    // 01:30 UTC do dia 9 ainda é 22:30 do dia 8 em São Paulo (UTC-3).
+    expect(diaUtcSaoPaulo(new Date("2026-11-09T01:30:00.000Z")).toISOString()).toBe(
+      "2026-11-08T00:00:00.000Z",
+    );
+  });
+});
 
 describe("limitesDoDiaSaoPaulo", () => {
   it("devolve início e fim inclusivos do dia civil", () => {

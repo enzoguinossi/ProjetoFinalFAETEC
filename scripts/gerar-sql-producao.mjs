@@ -46,6 +46,14 @@ const TIPOS_CODIGO = [
   ["MATRICULA", "Matrícula funcional do funcionário"],
 ];
 
+// Tipos de escola de referência; só são inseridos quando a tabela está vazia.
+const TIPOS_DESTINATARIO = [
+  ["ESCOLA", "Escola", true],
+  ["CRECHE", "Creche", false],
+  ["CMEI", "CMEI", false],
+  ["CMEIA", "CMEIA", false],
+];
+
 function listaPermissoes() {
   const entidadesCadastro = [
     "usuario",
@@ -73,6 +81,9 @@ function listaPermissoes() {
     "unidade_conversao.alterar",
     "unidade_conversao.consultar",
     "unidade_conversao.excluir",
+    "tipo_destinatario.criar",
+    "tipo_destinatario.alterar",
+    "tipo_destinatario.excluir",
     "estoque.entrada",
     "estoque.saida",
     "estoque.ver_saldo",
@@ -108,6 +119,10 @@ function listaPermissoes() {
     "mural.criar",
     "mural.alterar",
     "mural.excluir",
+    "backup.listar",
+    "backup.executar",
+    "backup.agendar",
+    "backup.restaurar",
   ];
 }
 
@@ -231,6 +246,17 @@ function gerarSeed() {
     TIPOS_CODIGO.map(([nome, descricao]) => `  (${q(nome)}, ${q(descricao)}, TRUE)`).join(",\n"),
     "AS new",
     "ON DUPLICATE KEY UPDATE `descricao` = new.`descricao`, `ativo` = new.`ativo`;",
+    "",
+    "-- ── Tipos de destinatário (só quando o cadastro está vazio) ────────────────",
+    "SET @qtd_tipo_destinatario = (SELECT COUNT(*) FROM `tipo_destinatario`);",
+    "INSERT INTO `tipo_destinatario` (`codigo`, `nome`, `padrao`)",
+    "SELECT `codigo`, `nome`, `padrao` FROM (",
+    TIPOS_DESTINATARIO.map(
+      ([codigo, nome, padrao]) =>
+        `  SELECT ${q(codigo)} AS \`codigo\`, ${q(nome)} AS \`nome\`, ${padrao ? "TRUE" : "FALSE"} AS \`padrao\``,
+    ).join(" UNION ALL\n"),
+    ") AS novos",
+    "WHERE @qtd_tipo_destinatario = 0;",
     "",
     "-- ── Permissões (entidade.acao) ─────────────────────────────────────────────",
     "INSERT INTO `permissao` (`nome`, `ativo`) VALUES",
@@ -398,6 +424,7 @@ function validar() {
         "SELECT GROUP_CONCAT(CONCAT(`nome`, ':', `fator`, ':', `padrao`) ORDER BY `fator` SEPARATOR ',') FROM `conversao_unidade`",
       ),
       tipos: consultar("SELECT COUNT(*) FROM `tipo_codigo`"),
+      tiposDestinatario: consultar("SELECT COUNT(*) FROM `tipo_destinatario`"),
     });
 
     aplicar(SEED_FILE);
@@ -409,18 +436,21 @@ function validar() {
     console.log(`  seed.sql reaplicado: ${JSON.stringify(segunda)}`);
 
     const erros = [];
-    if (primeira.permissoes !== "82") erros.push(`permissões: ${primeira.permissoes} (esperado 82)`);
+    if (primeira.permissoes !== "89") erros.push(`permissões: ${primeira.permissoes} (esperado 89)`);
     if (primeira.perfis !== "2") erros.push(`perfis: ${primeira.perfis} (esperado 2)`);
     if (primeira.conversoes !== "UNIDADE:1:1,PCT10:10:0,CX50:50:0") {
       erros.push(`conversões: ${primeira.conversoes}`);
     }
     if (primeira.tipos !== "6") erros.push(`tipos de código: ${primeira.tipos} (esperado 6)`);
+    if (primeira.tiposDestinatario !== "4") {
+      erros.push(`tipos de escola: ${primeira.tiposDestinatario} (esperado 4)`);
+    }
     if (JSON.stringify(primeira) !== JSON.stringify(segunda)) {
       erros.push("o seed duplicou dados na segunda aplicação");
     }
     if (erros.length > 0) throw new Error(`Validação falhou:\n  - ${erros.join("\n  - ")}`);
 
-    console.log("  OK: 82 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), seed idempotente");
+    console.log("  OK: 89 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), 4 tipos de escola, seed idempotente");
   } finally {
     if (keep) {
       console.log(`  banco mantido: ${checkDb}`);

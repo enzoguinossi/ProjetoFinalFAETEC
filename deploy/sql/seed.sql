@@ -15,6 +15,17 @@ INSERT INTO `tipo_codigo` (`nome`, `descricao`, `ativo`) VALUES
 AS new
 ON DUPLICATE KEY UPDATE `descricao` = new.`descricao`, `ativo` = new.`ativo`;
 
+-- ── Tipos de destinatário (só quando o cadastro está vazio) ────────────────
+SET @qtd_tipo_destinatario = (SELECT COUNT(*) FROM `tipo_destinatario`);
+INSERT INTO `tipo_destinatario` (`codigo`, `nome`, `padrao`)
+SELECT `codigo`, `nome`, `padrao` FROM (
+  SELECT 'ESCOLA' AS `codigo`, 'Escola' AS `nome`, TRUE AS `padrao` UNION ALL
+  SELECT 'CRECHE' AS `codigo`, 'Creche' AS `nome`, FALSE AS `padrao` UNION ALL
+  SELECT 'CMEI' AS `codigo`, 'CMEI' AS `nome`, FALSE AS `padrao` UNION ALL
+  SELECT 'CMEIA' AS `codigo`, 'CMEIA' AS `nome`, FALSE AS `padrao`
+) AS novos
+WHERE @qtd_tipo_destinatario = 0;
+
 -- ── Permissões (entidade.acao) ─────────────────────────────────────────────
 INSERT INTO `permissao` (`nome`, `ativo`) VALUES
   ('usuario.listar', TRUE),
@@ -64,6 +75,9 @@ INSERT INTO `permissao` (`nome`, `ativo`) VALUES
   ('unidade_conversao.alterar', TRUE),
   ('unidade_conversao.consultar', TRUE),
   ('unidade_conversao.excluir', TRUE),
+  ('tipo_destinatario.criar', TRUE),
+  ('tipo_destinatario.alterar', TRUE),
+  ('tipo_destinatario.excluir', TRUE),
   ('estoque.entrada', TRUE),
   ('estoque.saida', TRUE),
   ('estoque.ver_saldo', TRUE),
@@ -98,7 +112,11 @@ INSERT INTO `permissao` (`nome`, `ativo`) VALUES
   ('relatorio.gerar', TRUE),
   ('mural.criar', TRUE),
   ('mural.alterar', TRUE),
-  ('mural.excluir', TRUE)
+  ('mural.excluir', TRUE),
+  ('backup.listar', TRUE),
+  ('backup.executar', TRUE),
+  ('backup.agendar', TRUE),
+  ('backup.restaurar', TRUE)
 AS new
 ON DUPLICATE KEY UPDATE `ativo` = new.`ativo`;
 

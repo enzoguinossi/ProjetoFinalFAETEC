@@ -93,7 +93,8 @@ $requiredPayload = @(
     @{ Path = (Join-Path $payloadRoot "nssm\nssm.exe"); Label = "NSSM" },
     @{ Path = (Join-Path $payloadRoot "app\app.zip"); Label = "app.zip" },
     @{ Path = (Join-Path $payloadRoot "sql\schema.sql"); Label = "schema.sql" },
-    @{ Path = (Join-Path $payloadRoot "sql\seed.sql"); Label = "seed.sql" }
+    @{ Path = (Join-Path $payloadRoot "sql\seed.sql"); Label = "seed.sql" },
+    @{ Path = (Join-Path $payloadRoot "sql\migracoes\002-tipos-destinatario.sql"); Label = "migração 002" }
 )
 foreach ($item in $requiredPayload) {
     if (-not (Test-Path -LiteralPath $item.Path -PathType Leaf)) {
@@ -120,6 +121,32 @@ if (-not (Test-Path -LiteralPath $trayExe -PathType Leaf)) {
         Fail "NexusTray.exe não foi gerado em $trayExe. Rode NexusTray\build.ps1 e tente novamente."
     }
 }
+
+# O atalho Bandeja do Nexus usa wscript.exe (elevação sem UAC); o ícone do
+# atalho vem deste .ico, que também é embutido no NexusTray.exe.
+$trayIcon = Join-Path $ScriptRoot "NexusTray\NexusTray.ico"
+if (-not (Test-Path -LiteralPath $trayIcon -PathType Leaf)) {
+    Fail ("NexusTray.ico não encontrado em $trayIcon. " +
+        "Gere com 'node scripts\gerar-icone-tray.mjs' antes de compilar o setup; " +
+        "sem ele o atalho Bandeja do Nexus fica sem o ícone do Nexus.")
+}
+Write-Ok "NexusTray.ico"
+
+# --- Agente ------------------------------------------------------------------
+# Não publica automaticamente: o serviço é um projeto .NET separado e o setup
+# precisa do exe já gerado (NexusAgent\build.ps1).
+$agentExe = Join-Path $ScriptRoot "NexusAgent\dist\NexusAgent.exe"
+if (-not (Test-Path -LiteralPath $agentExe -PathType Leaf)) {
+    Fail ("NexusAgent.exe não encontrado em $agentExe. " +
+        "Publique o agente com deploy\windows\NexusAgent\build.ps1 antes de gerar o setup.")
+}
+Write-Ok "NexusAgent.exe"
+
+$progressPage = Join-Path $ScriptRoot "progresso\index.html"
+if (-not (Test-Path -LiteralPath $progressPage -PathType Leaf)) {
+    Fail "progresso\index.html não encontrado em $progressPage; a página /progresso/ ficaria indisponível."
+}
+Write-Ok "progresso\index.html"
 
 # --- ISCC --------------------------------------------------------------------
 function Test-Iscc {

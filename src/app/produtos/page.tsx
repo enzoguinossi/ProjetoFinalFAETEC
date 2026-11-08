@@ -14,12 +14,16 @@ export default async function ProdutosPage() {
   const perms = await resolverPermissoesPara(user, "produto");
   if (!perms.canList) redirect("/dashboard");
 
-  const [inicial, conversoes, tiposCodigo, podeVerInativos] = await Promise.all([
-    listarProdutos({ page: 1, limit: 20 }),
-    conversaoUnidadeDAO.list(),
-    tipoCodigoDAO.listParaEntidade("PRODUTO"),
-    usuarioPode(user, "produto.ver_inativos"),
-  ]);
+  const [inicial, conversoes, tiposCodigo, podeVerInativos, podeEntrada, podeSaida] =
+    await Promise.all([
+      listarProdutos({ page: 1, limit: 20 }),
+      conversaoUnidadeDAO.list(),
+      tipoCodigoDAO.listParaEntidade("PRODUTO"),
+      usuarioPode(user, "produto.ver_inativos"),
+      usuarioPode(user, "estoque.entrada"),
+      usuarioPode(user, "estoque.saida"),
+    ]);
+  const podeDesmembrar = podeEntrada && podeSaida;
 
   return (
     <>
@@ -30,6 +34,7 @@ export default async function ProdutosPage() {
         tiposCodigo={tiposCodigo}
         perms={perms}
         podeVerInativos={podeVerInativos}
+        podeDesmembrar={podeDesmembrar}
       />
     </>
   );

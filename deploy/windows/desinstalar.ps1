@@ -4,15 +4,16 @@
     Desinstala os serviços, tarefas e arquivos do Nexus no Windows.
 
 .DESCRIPTION
-    Para e remove os serviços NexusApp, NexusCaddy e NexusMySQL84, remove as
-    tarefas NexusTray e NexusBackup, encerra a bandeja e apaga o runtime
-    embutido: C:\Program Files\Nexus\app, node, mysql, caddy, tools, scripts,
-    payload, sql, NexusTray e as versões antigas app.prev-*/app.failed-*.
-    Também remove as regras de firewall do Nexus.
+    Para e remove os serviços NexusApp, NexusCaddy, NexusAgent e NexusMySQL84,
+    remove as tarefas NexusTray e NexusBackup, encerra a bandeja e apaga o
+    runtime embutido: C:\Program Files\Nexus\app, node, mysql, caddy, tools,
+    scripts, payload, sql, NexusTray, NexusAgent e as versões antigas
+    app.prev-*/app.failed-*. Também remove as regras de firewall do Nexus.
 
     C:\ProgramData\Nexus é PRESERVADO (mysql\data, uploads, configuração,
-    backups e logs). O MySQL antigo em C:\ProgramData\MySQL não é removido:
-    os dados precisam de confirmação explícita do operador.
+    backups, agent, agent.secret e logs). O MySQL antigo em
+    C:\ProgramData\MySQL não é removido: os dados precisam de confirmação
+    explícita do operador.
 #>
 [CmdletBinding()]
 param()
@@ -24,9 +25,10 @@ $DataRoot = "C:\ProgramData\Nexus"
 $LogsDir = Join-Path $DataRoot "logs"
 $CaddyData = "C:\ProgramData\Caddy"
 $MySqlService = "NexusMySQL84"
+$AgentService = "NexusAgent"
 $MySqlDir = Join-Path $ProgramRoot "mysql"
 $LegacyMySqlRoot = "C:\ProgramData\MySQL\MySQL Server 8.4"
-$FirewallRuleNames = @("Nexus HTTP", "Nexus HTTPS", "Nexus MySQL (LAN)", "Nexus Next (LAN)")
+$FirewallRuleNames = @("Nexus HTTP", "Nexus HTTPS", "Nexus MySQL (LAN)", "Nexus Next (LAN)", "Nexus Agent (LAN)")
 $NssmExe = Join-Path $ProgramRoot "tools\nssm\nssm.exe"
 $ScExe = Join-Path $env:SystemRoot "System32\sc.exe"
 $SchtasksExe = Join-Path $env:SystemRoot "System32\schtasks.exe"
@@ -116,6 +118,72 @@ function Remove-NexusService {
     }
     if ($code -ne 0) {
         Write-Log "[AVISO] Não foi possível remover o serviço $Name (código $code)."
+        $script:Failures++
+    }
+}
+
+function Test-AgentJobActive {
+    # Consulta /v1/status antes de parar o agente: um job em andamento não pode
+    # ser interrompido pela desinstalação.
+    $secretPath = Join-Path $DataRoot "config\agent.secret"
+    if (-not (Test-Path -LiteralPath $secretPath -PathType Leaf)) { return $false }
+    try {
+        $secret = ([System.IO.File]::ReadAllText($secretPath)).Trim()
+    }
+    catch {
+        return $false
+    }
+    if (-not $secret) { return $false }
+
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:3215/v1/status" -UseBasicParsing `
+            -TimeoutSec 5 -Headers @{ Authorization = ("Bearer {0}" -f $secret) }
+        $json = ([string]$response.Content).TrimStart() | ConvertFrom-Json
+        if ($null -eq $json.current) { return $false }
+        $status = [string]$json.current.status
+        return ($status -eq "QUEUED" -or $status -eq "RUNNING")
+    }
+    catch {
+        return $false
+    }
+}
+
+function Stop-AgentService {
+    # O NexusAgent é criado pelo sc.exe (não pelo NSSM): usa o SCM direto.
+    $service = Get-Service -Name $AgentService -ErrorAction SilentlyContinue
+    if (-not $service) {
+        Write-Log "Serviço $AgentService não existe."
+        return
+    }
+    if ($service.Status -eq "Stopped") {
+        Write-Log "Serviço $AgentService já está parado."
+        return
+    }
+
+    Write-Log "Parando serviço $AgentService..."
+    Invoke-Native -Exe $ScExe -Arguments @("stop", $AgentService) | Out-Null
+
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+        $current = Get-Service -Name $AgentService -ErrorAction SilentlyContinue
+        if (-not $current -or $current.Status -eq "Stopped") { return }
+        Start-Sleep -Seconds 1
+    }
+    Write-Log "[AVISO] O serviço $AgentService não parou em 60 segundos."
+    $script:Failures++
+}
+
+function Remove-AgentService {
+    $service = Get-Service -Name $AgentService -ErrorAction SilentlyContinue
+    if (-not $service) {
+        Write-Log "Serviço $AgentService já removido."
+        return
+    }
+
+    Write-Log "Removendo serviço $AgentService..."
+    $code = Invoke-Native -Exe $ScExe -Arguments @("delete", $AgentService)
+    if ($code -ne 0) {
+        Write-Log "[AVISO] Não foi possível remover o serviço $AgentService (código $code)."
         $script:Failures++
     }
 }
@@ -252,9 +320,16 @@ catch {
 Write-Log "Desinstalação do Nexus iniciada."
 
 try {
-    # A bandeja depende do NexusApp; o Caddy depende do NexusApp.
+    if (Test-AgentJobActive) {
+        Write-Log "[ERRO] Há uma operação de backup/restauração em andamento no NexusAgent (job ativo)."
+        Write-Log "Nada foi parado nem removido. Aguarde o job terminar e rode a desinstalação novamente."
+        exit 1
+    }
+
+    # O Caddy não depende mais do app (só o app depende do MySQL).
     Stop-NexusService -Name "NexusCaddy"
     Stop-NexusService -Name "NexusApp"
+    Stop-AgentService
     Stop-MySqlService
 
     $trayProcesses = Get-Process -Name "NexusTray" -ErrorAction SilentlyContinue
@@ -275,10 +350,11 @@ try {
 
     Remove-NexusService -Name "NexusCaddy"
     Remove-NexusService -Name "NexusApp"
+    Remove-AgentService
     Remove-MySqlService
 
     if ($script:Failures -gt 0) {
-        Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray, versões antigas e binários do MySQL serão preservados."
+        Write-Log "[ERRO] Serviços ou tarefas não foram removidos; app, NexusTray, NexusAgent, versões antigas e binários do MySQL serão preservados."
         Write-Log "C:\ProgramData\Nexus preservado."
         exit 1
     }
@@ -297,10 +373,11 @@ try {
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "node") -Label "Node.js portátil"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "app") -Label "Aplicação"
     Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusTray") -Label "Bandeja"
+    Remove-NexusDirectory -Path (Join-Path $ProgramRoot "NexusAgent") -Label "Agente de backup"
     Remove-NexusDirectory -Path $CaddyData -Label "Dados legados do Caddy"
     Remove-NexusFirewallRules
 
-    Write-Log "C:\ProgramData\Nexus preservado: mysql\data, uploads, configuração, backups e logs."
+    Write-Log "C:\ProgramData\Nexus preservado: mysql\data, uploads, configuração, backups, agent, agent.secret e logs."
     if (Test-Path -LiteralPath $LegacyMySqlRoot) {
         Write-Log "C:\ProgramData\MySQL\MySQL Server 8.4 preservado (dados do MySQL antigo; remova manualmente se não precisar)."
     }

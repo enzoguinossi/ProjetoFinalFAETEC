@@ -1,13 +1,18 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvMovimentacoes, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvMovimentacoes,
+  relatorioService,
+  tabelaMovimentacoes,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV do Extrato de Produto(s). Sem produto selecionado, exporta
- * todas as movimentações do período (o mesmo que a tela mostra).
+ * Exportação CSV/XLSX do Extrato de Produto(s). Sem produto selecionado,
+ * exporta todas as movimentações do período (o mesmo que a tela mostra).
  */
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -21,6 +26,17 @@ export async function GET(request: Request) {
     ate: url.searchParams.get("ate"),
     produto: url.searchParams.getAll("produto"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `extrato-produtos-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaMovimentacoes(data), {
+        nome: "Extrato",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvMovimentacoes(data), {
     headers: {

@@ -33,7 +33,7 @@ interface Props {
 }
 
 function formatarData(valor: string | null): string {
-  if (!valor) return "—";
+  if (!valor) return "";
   const [ano, mes, dia] = valor.split("-");
   return ano && mes && dia ? `${dia}/${mes}/${ano}` : valor;
 }
@@ -125,7 +125,7 @@ function EntregaForm({
             style={{ gridTemplateColumns: "2fr 0.8fr 0.8fr 0.8fr 1fr" }}
           >
             <div>Item</div>
-            <div className="text-center">Esperada</div>
+            <div className="text-center">Solicitada</div>
             <div className="text-center">Já entregue</div>
             <div className="text-center">Pendente</div>
             <div className="text-center">Entregar agora</div>
@@ -575,7 +575,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                 Veículo
               </span>
               <span className="font-sans text-base text-ink-strong">
-                {detalhe.veiculo ?? "—"}
+                {detalhe.veiculo ?? ""}
               </span>
             </div>
             <div className="flex flex-col gap-1">
@@ -583,7 +583,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                 Condutor
               </span>
               <span className="font-sans text-base text-ink-strong">
-                {detalhe.condutor ?? "—"}
+                {detalhe.condutor ?? ""}
               </span>
             </div>
           </div>
@@ -648,7 +648,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
                 {nota.codigo}
               </div>
               <div className="overflow-hidden text-ellipsis whitespace-nowrap px-[0.6875rem] py-2">
-                {nota.destinatario ?? "—"}
+                {nota.destinatario ?? ""}
               </div>
               <div className="px-[0.6875rem] py-2 text-center text-sm">
                 {nota.statusLabel}
@@ -692,7 +692,8 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
               )}
               {podeExecutar && (
                 <div className="flex flex-wrap items-center justify-center gap-1 px-[0.6875rem] py-1">
-                  {nota.status === "EM_PERCURSO" ? (
+                  {nota.status === "EM_PERCURSO" ||
+                  nota.status === "BAIXA_PARCIAL" ? (
                     <>
                       <button
                         type="button"

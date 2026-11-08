@@ -10,11 +10,8 @@ import EnderecoFields, { type EnderecoInitial } from "@/components/EnderecoField
 import { normalizaTelefones } from "@/lib/contatos";
 import { formatarCnpj, validarCnpj } from "@/lib/cnpj";
 import { formatarCodigo } from "@/lib/formatar";
-import {
-  ROTULOS_TIPO_DESTINATARIO,
-  TIPO_DESTINATARIO,
-  type TipoDestinatario,
-} from "@/types";
+import type { PermissoesEntidade, TipoDestinatarioItem } from "@/types";
+import TiposDestinatarioModal from "@/components/TiposDestinatarioModal";
 import Button from "@/components/Button";
 import { useAviso } from "@/components/AvisoProvider";
 import FormShell from "@/components/form/FormShell";
@@ -29,7 +26,9 @@ export type EmpresaFichaData = {
   nome_fantasia: string | null;
   cnpj: string | null;
   ativo: boolean;
-  tipo_destinatario?: TipoDestinatario;
+  /** Tipo de escola do cadastro; `null` = sem tipo. */
+  id_tipo_destinatario?: number | null;
+  tipo_nome?: string | null;
   endereco: {
     logradouro: string;
     numero: string | null;
@@ -51,6 +50,10 @@ interface Props {
   tipo: "destinatario" | "fornecedor";
   initialData?: EmpresaFichaData;
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
+  /** Tipos de escola do cadastro editável (só o destinatário usa). */
+  tiposDestinatario?: TipoDestinatarioItem[];
+  onTiposDestinatarioChange?: (tipos: TipoDestinatarioItem[]) => void;
+  permsTipo?: Pick<PermissoesEntidade, "canCreate" | "canEdit" | "canDelete">;
   canDeactivate?: boolean;
   criar: (formData: FormData) => Promise<ResultadoSalvar>;
   atualizar: (formData: FormData) => Promise<ResultadoSalvar>;
@@ -82,7 +85,7 @@ function iniciaisDaRazao(razao: string): string {
         !SUFIXOS_SOCIETARIOS.has(normalizada) && !CONECTORES.has(normalizada)
       );
     });
-  if (significativas.length === 0) return "—";
+  if (significativas.length === 0) return "";
   if (significativas.length === 1) return significativas[0]!.slice(0, 2).toUpperCase();
   return (
     significativas[0]![0]! + significativas[significativas.length - 1]![0]!
@@ -94,7 +97,7 @@ function ValorLeitura({ label, value }: { label: string; value: React.ReactNode 
     <div className="flex flex-col gap-1">
       <span className="font-sans text-xs leading-4 text-[#697077]">{label}</span>
       <span className="font-sans text-sm leading-5 text-ink-strong">
-        {value ?? "—"}
+        {value ?? ""}
       </span>
     </div>
   );
@@ -112,6 +115,9 @@ export default function EmpresaFicha({
   tipo,
   initialData,
   tiposCodigo,
+  tiposDestinatario = [],
+  onTiposDestinatarioChange,
+  permsTipo,
   canDeactivate = true,
   criar,
   atualizar,
@@ -127,9 +133,18 @@ export default function EmpresaFicha({
   const [razaoSocial, setRazaoSocial] = useState(initialData?.razao_social ?? "");
   const [nomeFantasia, setNomeFantasia] = useState(initialData?.nome_fantasia ?? "");
   const [cnpj, setCnpj] = useState(formatarCnpj(initialData?.cnpj ?? ""));
-  const [tipoDestinatario, setTipoDestinatario] = useState<TipoDestinatario>(
-    initialData?.tipo_destinatario ?? "ESCOLA",
-  );
+  const [tipos, setTipos] = useState<TipoDestinatarioItem[]>(tiposDestinatario);
+  // "" = sem tipo; no create o padrão do cadastro já vem selecionado.
+  const [idTipoDestinatario, setIdTipoDestinatario] = useState<string>(() => {
+    if (initialData) {
+      return initialData.id_tipo_destinatario
+        ? String(initialData.id_tipo_destinatario)
+        : "";
+    }
+    const padrao = tiposDestinatario.find((t) => t.padrao);
+    return padrao ? String(padrao.id_tipo_destinatario) : "";
+  });
+  const [tiposModalOpen, setTiposModalOpen] = useState(false);
   const [consultando, setConsultando] = useState(false);
   const [preenchidoPelaReceita, setPreenchidoPelaReceita] = useState(false);
   const [sugestaoEndereco, setSugestaoEndereco] = useState<EnderecoInitial | null>(null);
@@ -143,7 +158,7 @@ export default function EmpresaFicha({
 
   const tituloCriacao = tipo === "destinatario" ? "Novo destinatário" : "Novo fornecedor";
   const tituloEdicao = tipo === "destinatario" ? "Editar destinatário" : "Editar fornecedor";
-  const titulo = isView ? razaoSocial || "—" : isEdit ? tituloEdicao : tituloCriacao;
+  const titulo = isView ? razaoSocial : isEdit ? tituloEdicao : tituloCriacao;
   const meta = isView
     ? cnpj
       ? `CNPJ ${formatarCnpj(cnpj)}`
@@ -151,10 +166,32 @@ export default function EmpresaFicha({
     : initialData
       ? `Código ${formatarCodigo(initialData.id)}`
       : "Código gerado ao salvar";
+  const tipoSelecionado = tipos.find(
+    (t) => String(t.id_tipo_destinatario) === idTipoDestinatario,
+  );
+  const tipoNome = isView
+    ? initialData?.tipo_nome ?? ""
+    : tipoSelecionado?.nome ?? "";
+  /** O "+" só aparece para quem pode criar, alterar ou excluir tipos. */
+  const podeGerenciarTipos = Boolean(
+    permsTipo?.canCreate || permsTipo?.canEdit || permsTipo?.canDelete,
+  );
   const chipTipo =
-    tipo === "fornecedor"
-      ? "Fornecedor"
-      : ROTULOS_TIPO_DESTINATARIO[tipoDestinatario];
+    tipo === "fornecedor" ? "Fornecedor" : tipoNome || "Destinatário";
+
+  function aoMudarTipos(lista: TipoDestinatarioItem[]) {
+    setTipos(lista);
+    onTiposDestinatarioChange?.(lista);
+    setIdTipoDestinatario((atual) => {
+      if (!atual) return atual;
+      if (lista.some((t) => String(t.id_tipo_destinatario) === atual)) {
+        return atual;
+      }
+      // O tipo selecionado foi excluído: volta para "Sem tipo" em vez de
+      // trocar silenciosamente pelo padrão.
+      return "";
+    });
+  }
 
   async function consultarDadosCnpj() {
     const validacao = validarCnpj(cnpj);
@@ -213,7 +250,7 @@ export default function EmpresaFicha({
       form.set("codigos", JSON.stringify(codigos));
       form.set("contatos", JSON.stringify({ emails, telefones }));
       if (tipo === "destinatario") {
-        form.set("tipo_destinatario", tipoDestinatario);
+        form.set("id_tipo_destinatario", idTipoDestinatario);
       }
       const result = initialData ? await atualizar(form) : await criar(form);
       if (result.error) {
@@ -304,12 +341,9 @@ export default function EmpresaFicha({
       <FormSection title="Identificação">
         {isView ? (
           <FormGrid columns={tipo === "destinatario" ? 2 : 1}>
-            <ValorLeitura label="Nome fantasia" value={nomeFantasia || "—"} />
+            <ValorLeitura label="Nome fantasia" value={nomeFantasia} />
             {tipo === "destinatario" && (
-              <ValorLeitura
-                label="Tipo"
-                value={ROTULOS_TIPO_DESTINATARIO[tipoDestinatario]}
-              />
+              <ValorLeitura label="Tipo" value={tipoNome} />
             )}
           </FormGrid>
         ) : (
@@ -349,21 +383,43 @@ export default function EmpresaFicha({
               />
               {tipo === "destinatario" && (
                 <FormField label="Tipo" htmlFor="empresa-tipo">
-                  <select
-                    id="empresa-tipo"
-                    name="tipo_destinatario"
-                    value={tipoDestinatario}
-                    onChange={(e) =>
-                      setTipoDestinatario(e.target.value as TipoDestinatario)
-                    }
-                    className={`${INPUT_CLASS} cursor-pointer`}
-                  >
-                    {TIPO_DESTINATARIO.map((valor) => (
-                      <option key={valor} value={valor}>
-                        {ROTULOS_TIPO_DESTINATARIO[valor]}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      id="empresa-tipo"
+                      name="id_tipo_destinatario"
+                      value={idTipoDestinatario}
+                      onChange={(e) => setIdTipoDestinatario(e.target.value)}
+                      className={`${INPUT_CLASS} cursor-pointer`}
+                    >
+                      <option value="">Sem tipo</option>
+                      {tipos.map((item) => (
+                        <option
+                          key={item.id_tipo_destinatario}
+                          value={String(item.id_tipo_destinatario)}
+                        >
+                          {item.nome}
+                        </option>
+                      ))}
+                    </select>
+                    {!isView && podeGerenciarTipos && (
+                      <button
+                        type="button"
+                        title="Gerenciar tipos"
+                        aria-label="Gerenciar tipos"
+                        onClick={() => setTiposModalOpen(true)}
+                        className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border-input bg-white text-brand transition-colors hover:bg-[rgba(27,153,86,0.06)]"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                          <path
+                            d="M10 4V16M4 10H16"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </FormField>
               )}
             </FormGrid>
@@ -405,6 +461,16 @@ export default function EmpresaFicha({
           disabled={isView}
         />
       </FormSection>
+
+      {tipo === "destinatario" && (
+        <TiposDestinatarioModal
+          open={tiposModalOpen}
+          onClose={() => setTiposModalOpen(false)}
+          initial={tipos}
+          perms={permsTipo}
+          onChanged={aoMudarTipos}
+        />
+      )}
     </FormShell>
   );
 }

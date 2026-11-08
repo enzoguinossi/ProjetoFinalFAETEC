@@ -5,6 +5,12 @@
 __HOSTNAME__ {
 	tls internal
 	encode zstd gzip
+	# Sem a barra final o /progresso/* não casa e cairia no app (404).
+	redir /progresso /progresso/ 308
+	handle_path /progresso/* {
+		root * C:\ProgramData\Nexus\caddy\progresso
+		file_server
+	}
 	reverse_proxy 127.0.0.1:3000
 	log {
 		output file C:\ProgramData\Nexus\caddy\logs\access.log {

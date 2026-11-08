@@ -1,6 +1,6 @@
 /** Tipos compartilhados entre a página, o cliente e as Server Actions de movimentação. */
 
-import type { TipoDestinatario } from "@/types";
+import type { TipoNotaEntrada } from "@/types";
 
 export type ConversaoUnidadeItem = {
   id_conversao: number;
@@ -43,6 +43,8 @@ export type ProdutoEntradaDetalhe = {
 export type NotaEntradaListRow = {
   id_nota_entrada: number;
   data: string;
+  tipo: TipoNotaEntrada;
+  tipoLabel: string;
   fornecedor: string;
   itens: number;
   chave_acesso: string | null;
@@ -84,6 +86,7 @@ export type NotaEntradaItemDetalhe = {
 /** Nota de entrada carregada para os modos `view` e `edit`. */
 export type NotaEntradaFormData = {
   id_nota_entrada: number;
+  tipo: TipoNotaEntrada;
   id_fornecedor: number | null;
   fornecedor: string | null;
   cnpj: string | null;
@@ -99,7 +102,7 @@ export type NotaEntradaFormData = {
 export type DestinatarioSelecaoRow = {
   id_destinatario: number;
   razao_social: string;
-  tipo: TipoDestinatario;
+  tipo_nome: string | null;
 };
 
 export type ItemSaidaPayload = {
@@ -167,6 +170,13 @@ export type NotaSaidaItemDetalhe = {
   observacao: string | null;
 };
 
+/** Expedição em que a nota está vinculada (histórico, mesmo concluída). */
+export type NotaSaidaExpedicao = {
+  id_expedicao: number;
+  status: string;
+  statusLabel: string;
+};
+
 export type NotaSaidaListRow = {
   id_nota_saida: number;
   data: string;
@@ -178,9 +188,14 @@ export type NotaSaidaListRow = {
   quantidade: number;
   status: string;
   statusLabel: string;
+  urgente: boolean;
   podeCancelar: boolean;
   /** Só notas `ABERTA` (Remessa) podem ser editadas. */
   podeEditar: boolean;
+  /** Remessa em status que ainda aceita retirada direta de itens. */
+  podeRetirar: boolean;
+  /** Expedições vinculadas, na ordem de adição. */
+  expedicoes: NotaSaidaExpedicao[];
 };
 
 /** Tentativa de entrega registrada para a nota (somente leitura). */
@@ -203,8 +218,13 @@ export type NotaSaidaFormData = {
   statusLabel: string;
   /** Só notas abertas são editáveis. */
   podeEditar: boolean;
+  /** Remessa em status que ainda aceita retirada direta de itens. */
+  podeRetirar: boolean;
+  /** Expedições vinculadas, na ordem de adição. */
+  expedicoes: NotaSaidaExpedicao[];
   id_destinatario: number | null;
   destinatario: string | null;
+  tipo_nome: string | null;
   urgente: boolean;
   observacao: string | null;
   itens: NotaSaidaItemDetalhe[];

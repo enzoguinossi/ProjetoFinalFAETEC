@@ -1,13 +1,14 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode, usuarioPodeAlguma } from "@/lib/permissoes";
 import { inventarioDAO } from "@/dao/inventario";
-import { gerarCsvInventario } from "@/services/inventario";
+import { gerarCsvInventario, tabelaInventario } from "@/services/inventario";
 import { hojeISO } from "@/lib/formatar";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await requireUser();
@@ -33,7 +34,22 @@ export async function GET(
     return new Response("Inventário fechado não encontrado.", { status: 404 });
   }
 
-  return new Response(gerarCsvInventario(inventario, { incluirSistema: inventario.contagem_cega ? await usuarioPode(user, "estoque.ver_saldo") : true }), {
+  const incluirSistema = inventario.contagem_cega
+    ? await usuarioPode(user, "estoque.ver_saldo")
+    : true;
+
+  if (new URL(request.url).searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `inventario-${id}-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaInventario(inventario, { incluirSistema }), {
+        nome: "Inventário",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
+
+  return new Response(gerarCsvInventario(inventario, { incluirSistema }), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="inventario-${id}-${hojeISO()}.csv"`,

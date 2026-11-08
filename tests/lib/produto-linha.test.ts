@@ -9,6 +9,7 @@ describe("lib/produto-linha", () => {
       saldo: 15,
       saldo_reservado: 5,
       ativo: true,
+      composto: false,
     });
 
     expect(linha).toEqual({
@@ -18,6 +19,7 @@ describe("lib/produto-linha", () => {
       qtd: "15",
       livre: "10",
       ativo: true,
+      composto: false,
     });
     expect(linha).not.toHaveProperty("unidade");
   });
@@ -29,11 +31,13 @@ describe("lib/produto-linha", () => {
       saldo: 1,
       saldo_reservado: 4,
       ativo: false,
+      composto: true,
     });
 
     expect(linha.qtd).toBe("1");
     expect(linha.livre).toBe("-3");
     expect(linha.ativo).toBe(false);
+    expect(linha.composto).toBe(true);
   });
 
   it("zera quantidade quando o produto não possui saldo", () => {
@@ -43,9 +47,11 @@ describe("lib/produto-linha", () => {
       saldo: 0,
       saldo_reservado: 0,
       ativo: true,
+      composto: false,
     });
 
     expect(linha.qtd).toBe("0");
     expect(linha.livre).toBe("0");
+    expect(linha.composto).toBe(false);
   });
 });

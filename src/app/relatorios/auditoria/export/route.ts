@@ -1,14 +1,19 @@
 import { requireUser } from "@/lib/auth";
 import { usuarioPode } from "@/lib/permissoes";
 import { hojeISO } from "@/lib/formatar";
-import { gerarCsvAuditoria, relatorioService } from "@/services/relatorio";
+import { criarXlsx, respostaXlsx } from "@/lib/planilha";
+import {
+  gerarCsvAuditoria,
+  relatorioService,
+  tabelaAuditoria,
+} from "@/services/relatorio";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Exportação CSV da Auditoria (RF023/RF024). Route Handler é a exceção prevista
- * no AGENTS §15: o navegador baixa um arquivo, o que uma Server Action não
- * entrega com `Content-Disposition`.
+ * Exportação CSV/XLSX da Auditoria (RF023/RF024). Route Handler é a exceção
+ * prevista no AGENTS §15: o navegador baixa um arquivo, o que uma Server Action
+ * não entrega com `Content-Disposition`.
  */
 export async function GET(request: Request) {
   const user = await requireUser();
@@ -24,6 +29,17 @@ export async function GET(request: Request) {
     entidade: url.searchParams.getAll("entidade"),
     acao: url.searchParams.getAll("acao"),
   });
+
+  if (url.searchParams.get("formato") === "xlsx") {
+    const nomeArquivo = `auditoria-${hojeISO()}.xlsx`;
+    return respostaXlsx(
+      await criarXlsx(tabelaAuditoria(data, referencias), {
+        nome: "Auditoria",
+        nomeArquivo,
+      }),
+      nomeArquivo,
+    );
+  }
 
   return new Response(gerarCsvAuditoria(data, referencias), {
     headers: {

@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Nexus — Sistema Logístico",
   description: "Controle de Estoque e Logística de Entregas",
+  icons: {
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+    shortcut: "/logo.svg",
+  },
 };
 
 export default function RootLayout({

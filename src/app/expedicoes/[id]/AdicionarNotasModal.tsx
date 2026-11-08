@@ -295,7 +295,7 @@ export default function AdicionarNotasModal({
                         {nota.codigo}
                       </div>
                       <div className="overflow-hidden text-ellipsis whitespace-nowrap font-sans text-xs text-[#697077]">
-                        {nota.destinatario ?? "—"}
+                        {nota.destinatario ?? ""}
                       </div>
                     </div>
                   </div>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>Nexus · Progresso</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --fundo: #eef2f7;
+            --cartao: #ffffff;
+            --texto: #1f2937;
+            --suave: #64748b;
+            --borda: #dbe3ec;
+            --primaria: #2563eb;
+            --ok: #16a34a;
+            --erro: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--fundo);
+            color: var(--texto);
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        }
+
+        main {
+            width: min(680px, calc(100% - 48px));
+            background: var(--cartao);
+            border: 1px solid var(--borda);
+            border-radius: 14px;
+            padding: 32px 36px 28px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 4px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .subtitulo {
+            margin: 0 0 24px;
+            color: var(--suave);
+            font-size: 14px;
+        }
+
+        .barra {
+            height: 14px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .barra > div {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            border-radius: 999px;
+            transition: width 0.35s ease;
+        }
+
+        .linha {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 16px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .percentual {
+            font-variant-numeric: tabular-nums;
+            font-weight: 600;
+        }
+
+        .etapa {
+            color: var(--suave);
+            text-align: right;
+        }
+
+        .mensagem {
+            margin: 18px 0 0;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid var(--borda);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #334155;
+            min-height: 44px;
+        }
+
+        ul.passos {
+            list-style: none;
+            margin: 26px 0 0;
+            padding: 0;
+            border-top: 1px solid var(--borda);
+        }
+
+        ul.passos li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--borda);
+            font-size: 14px;
+            color: var(--suave);
+        }
+
+        ul.passos li .marca {
+            width: 20px;
+            height: 20px;
+            flex: none;
+            border-radius: 50%;
+            border: 2px solid #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: transparent;
+        }
+
+        ul.passos li[data-status="running"] {
+            color: var(--texto);
+            font-weight: 600;
+        }
+
+        ul.passos li[data-status="running"] .marca {
+            border-color: var(--primaria);
+            border-right-color: transparent;
+            animation: giro 0.9s linear infinite;
+        }
+
+        ul.passos li[data-status="done"] .marca {
+            background: var(--ok);
+            border-color: var(--ok);
+            color: #fff;
+        }
+
+        ul.passos li[data-status="error"] .marca {
+            background: var(--erro);
+            border-color: var(--erro);
+            color: #fff;
+        }
+
+        ul.passos li[data-status="done"] {
+            color: #475569;
+        }
+
+        .erro {
+            margin: 22px 0 0;
+            padding: 14px 16px;
+            border: 1px solid #fecaca;
+            background: #fef2f2;
+            color: #991b1b;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .acoes {
+            margin-top: 22px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        a.botao {
+            display: inline-block;
+            padding: 9px 18px;
+            border-radius: 8px;
+            background: var(--primaria);
+            color: #fff;
+            font-size: 14px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        a.botao:hover {
+            background: #1d4ed8;
+        }
+
+        @keyframes giro {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1 id="titulo">Nexus · Operação</h1>
+    <p class="subtitulo" id="subtitulo">Aguardando acompanhamento de uma operação.</p>
+
+    <div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="barra">
+        <div id="preenchimento"></div>
+    </div>
+    <div class="linha">
+        <span class="percentual" id="percentual">0%</span>
+        <span class="etapa" id="etapa">Preparando…</span>
+    </div>
+
+    <p class="mensagem" id="mensagem">Aguardando o início da operação.</p>
+
+    <ul class="passos" id="passos"></ul>
+
+    <div class="erro" id="erro"></div>
+
+    <div class="acoes" id="acoes" style="display:none">
+        <a class="botao" href="/administracao/backup">Voltar para Backup</a>
+    </div>
+</main>
+
+<script>
+    (function () {
+        // Caminho absoluto: o Caddy remove o prefixo /progresso antes de servir
+        // o diretório, então a página funciona com ou sem a barra final.
+        var statusUrl = "/progresso/status.json";
+        var titulo = document.getElementById("titulo");
+        var subtitulo = document.getElementById("subtitulo");
+        var barra = document.getElementById("barra");
+        var preenchimento = document.getElementById("preenchimento");
+        var percentual = document.getElementById("percentual");
+        var etapa = document.getElementById("etapa");
+        var mensagem = document.getElementById("mensagem");
+        var passos = document.getElementById("passos");
+        var erro = document.getElementById("erro");
+        var acoes = document.getElementById("acoes");
+        var timer = null;
+        var falhas = 0;
+        var concluido = false;
+
+        var rotulos = {
+            BACKUP: { titulo: "Nexus · Backup em andamento", subtitulo: "Acompanhe o backup do sistema." },
+            RESTORE: { titulo: "Nexus · Restauração em andamento", subtitulo: "Não feche esta página durante a restauração." }
+        };
+
+        function renderPassos(lista) {
+            if (!Array.isArray(lista)) {
+                return;
+            }
+            var html = "";
+            lista.forEach(function (passo) {
+                var status = passo.status || "pending";
+                var marca = status === "done" ? "✓" : (status === "error" ? "✕" : "");
+                html += '<li data-status="' + status + '"><span class="marca">' + marca +
+                    "</span><span>" + escapar(passo.name || "") + "</span></li>";
+            });
+            passos.innerHTML = html;
+        }
+
+        function escapar(texto) {
+            return String(texto)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
+
+        function aplicar(estado) {
+            var tipo = estado.type === "RESTORE" ? "RESTORE" : "BACKUP";
+            var rotulo = rotulos[tipo];
+            titulo.textContent = rotulo.titulo;
+            subtitulo.textContent = rotulo.subtitulo;
+
+            var valor = Math.max(0, Math.min(100, Number(estado.percent) || 0));
+            preenchimento.style.width = valor + "%";
+            barra.setAttribute("aria-valuenow", String(valor));
+            percentual.textContent = valor + "%";
+            etapa.textContent = estado.step || "";
+            if (estado.message) {
+                mensagem.textContent = estado.message;
+            }
+            renderPassos(estado.steps);
+
+            if (estado.done) {
+                concluido = true;
+                parar();
+                if (estado.ok) {
+                    preenchimento.style.background = "linear-gradient(90deg, #22c55e, #16a34a)";
+                    mensagem.textContent = "Operação concluída. Redirecionando para a administração…";
+                    setTimeout(function () {
+                        window.location.href = "/administracao/backup";
+                    }, 2500);
+                } else {
+                    erro.style.display = "block";
+                    erro.textContent = (tipo === "RESTORE" ? "A restauração falhou. " : "O backup falhou. ") +
+                        (estado.message || "")
+                        + " Verifique os logs em C:\\ProgramData\\Nexus\\logs.";
+                    acoes.style.display = "flex";
+                }
+            }
+        }
+
+        function parar() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        function consultar() {
+            if (concluido) {
+                return;
+            }
+            var url = statusUrl + "?t=" + Date.now();
+            fetch(url, { cache: "no-store" })
+                .then(function (resposta) {
+                    if (!resposta.ok) {
+                        throw new Error("sem status");
+                    }
+                    return resposta.json();
+                })
+                .then(function (estado) {
+                    falhas = 0;
+                    aplicar(estado);
+                })
+                .catch(function () {
+                    falhas += 1;
+                    if (falhas >= 10) {
+                        etapa.textContent = "Nenhuma operação em andamento";
+                        mensagem.textContent =
+                            "O status ainda não está disponível. Se você abriu esta página sem uma operação ativa, volte para a administração.";
+                    }
+                });
+        }
+
+        consultar();
+        timer = setInterval(consultar, 1000);
+    })();
+</script>
+</body>
+</html>

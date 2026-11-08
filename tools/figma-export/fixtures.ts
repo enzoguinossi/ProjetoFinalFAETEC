@@ -117,6 +117,22 @@ async function tiposCodigo() {
   return mapa;
 }
 
+async function tiposDestinatario() {
+  const codigos = ["ESCOLA", "CRECHE", "CMEI", "CMEIA"];
+  const encontrados = await prisma.tipoDestinatario.findMany({
+    where: { codigo: { in: codigos } },
+  });
+  const mapa: Record<string, number> = {};
+  for (const t of encontrados) mapa[t.codigo] = t.id_tipo_destinatario;
+  const faltando = codigos.filter((codigo) => !mapa[codigo]);
+  if (faltando.length > 0) {
+    throw new Error(
+      `Tipos de destinatário ausentes (${faltando.join(", ")}). Rode o seed da aplicação: npm run db:seed.`,
+    );
+  }
+  return mapa;
+}
+
 async function criarPessoaFisica(nome: string, cpf: string) {
   return prisma.pessoaFisica.create({ data: { nome, cpf } });
 }
@@ -148,6 +164,7 @@ async function main() {
   }
 
   const tipos = await tiposCodigo();
+  const tiposDest = await tiposDestinatario();
   const senhaHash = await bcrypt.hash(SENHA_PADRAO, 10);
 
   /* ── Super Admin (mesmo fluxo da aplicação, com auditoria) ── */
@@ -261,7 +278,7 @@ async function main() {
       data: {
         id_pessoa_juridica: pj.id_pessoa_juridica,
         id_endereco: endereco.id_endereco,
-        tipo_destinatario: d.tipo,
+        id_tipo_destinatario: tiposDest[d.tipo],
       },
     });
     await prisma.destinatarioEmail.create({

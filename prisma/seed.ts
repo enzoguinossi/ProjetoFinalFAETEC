@@ -36,6 +36,20 @@ async function main() {
   }
   console.log("  ✅ Tipos de código");
 
+  // ── Tipos de destinatário ───────────────────────────────────────
+  // Só cria os 4 tipos de referência quando o cadastro está vazio; nomes e
+  // padrão já editados pelo usuário não são sobrescritos.
+  const tiposDestinatario = [
+    { codigo: "ESCOLA", nome: "Escola", padrao: true },
+    { codigo: "CRECHE", nome: "Creche", padrao: false },
+    { codigo: "CMEI", nome: "CMEI", padrao: false },
+    { codigo: "CMEIA", nome: "CMEIA", padrao: false },
+  ];
+  if ((await prisma.tipoDestinatario.count()) === 0) {
+    await prisma.tipoDestinatario.createMany({ data: tiposDestinatario });
+  }
+  console.log("  ✅ Tipos de destinatário");
+
   // ── Permissões ──────────────────────────────────────────────────
   const entidadesCadastro = ["usuario", "funcionario", "destinatario", "fornecedor", "veiculo", "produto"];
 
@@ -51,6 +65,7 @@ async function main() {
     "produto.ver_inativos",
     "unidade_conversao.listar", "unidade_conversao.criar", "unidade_conversao.alterar",
     "unidade_conversao.consultar", "unidade_conversao.excluir",
+    "tipo_destinatario.criar", "tipo_destinatario.alterar", "tipo_destinatario.excluir",
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",
@@ -61,6 +76,7 @@ async function main() {
     "pedido.listar", "pedido.criar", "pedido.alterar", "pedido.consultar", "pedido.aprovar",
     "relatorio.gerar",
     "mural.criar", "mural.alterar", "mural.excluir",
+    "backup.listar", "backup.executar", "backup.agendar", "backup.restaurar",
   ];
 
   for (const nome of permissoes) {
