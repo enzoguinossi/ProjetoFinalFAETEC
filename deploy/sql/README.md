@@ -38,7 +38,7 @@ node scripts/gerar-sql-producao.mjs --all    # regenera e valida
 ```
 
 A validação usa as credenciais de `DATABASE_URL`, cria um banco temporário
-(`nexus_sql_test` por padrão), aplica schema+seed, confere 81 permissões,
+(`nexus_sql_test` por padrão), aplica schema+seed, confere 82 permissões,
 2 perfis e as 3 conversões (`UNIDADE`/`PCT10`/`CX50`), reaplica o seed para
 provar a idempotência e remove o banco no fim. O banco de `DATABASE_URL` nunca
 é o destino e nomes com `prod` são recusados. `--check-db <nome>` troca o banco

@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { conversaoUnidadeDAO } from "./conversao-unidade";
-import { buildPagination, type ListParams } from "@/types";
+import { buildPagination, LIMITE_OPCOES_MAX, type ListParams } from "@/types";
 
 type Db = Prisma.TransactionClient;
 
@@ -42,6 +42,20 @@ export class ProdutoDAO {
       prisma.produto.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };
+  }
+
+  /**
+   * Opções de produto para seletores/chips (somente ativos). Usa o teto de
+   * opções (`LIMITE_OPCOES_MAX`, 500) em vez do teto da paginação normal (100);
+   * acima dele o seletor não lista todos os produtos.
+   */
+  async listOpcoes(limit: number = LIMITE_OPCOES_MAX) {
+    const { take } = buildPagination({ page: 1, limit }, LIMITE_OPCOES_MAX);
+    return prisma.produto.findMany({
+      where: { ativo: true },
+      take,
+      orderBy: { descricao: "asc" },
+    });
   }
 
   /**

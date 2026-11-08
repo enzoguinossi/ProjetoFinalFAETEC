@@ -136,7 +136,13 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
         onLimpar={limparFiltrosTela}
       />
 
-      <DataTable columns={columns} data={rows} idField="id_perfil" actions={actions} />
+      <DataTable
+        key={`${termo}-${JSON.stringify(valoresFiltros)}`}
+        columns={columns}
+        data={rows}
+        idField="id_perfil"
+        actions={actions}
+      />
 
       <Modal open={modalMode === "create"} onClose={closeModal} width="min(860px, calc(100vw - 32px))" title="Novo Perfil">
         <PerfilForm grupos={grupos} mode="create" onSuccess={handleSuccess} onCancel={closeModal} />

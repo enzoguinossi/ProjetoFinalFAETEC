@@ -230,3 +230,32 @@ describe("actions de pedidos — permissões", () => {
     expect(pedido.status).toBe("CONFIRMADO");
   });
 });
+
+describe("listarPedidos — sanitização dos filtros", () => {
+  it("ignora datas inválidas e search não-string sem lançar", async () => {
+    const { usuario, destinatario, produto } = await preparar(["pedido.listar"]);
+    const criado = await pedidoService.criar(
+      {
+        id_destinatario: destinatario.id_destinatario,
+        itens: [{ id_produto: produto.id_produto, quantidade: 1 }],
+      },
+      usuario.id_usuario,
+    );
+    if ("error" in criado) throw new Error(criado.error);
+
+    // `2026-02-31` não existe e `x` não é data: nenhuma das duas filtra.
+    const invalidas = await listarPedidos({ de: "2026-02-31", ate: "x" } as never);
+    expect(invalidas.total).toBe(1);
+
+    // `search` não-string não pode estourar `.trim()`.
+    const buscaInvalida = await listarPedidos({ search: 42 } as never);
+    expect(buscaInvalida.total).toBe(1);
+
+    // O período válido continua inclusivo no dia civil de São Paulo.
+    const foraDoPeriodo = await listarPedidos({
+      de: "2020-01-01",
+      ate: "2020-01-02",
+    });
+    expect(foraDoPeriodo.total).toBe(0);
+  });
+});

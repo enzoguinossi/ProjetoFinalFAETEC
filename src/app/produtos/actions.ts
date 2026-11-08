@@ -141,6 +141,8 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
 
   const p = await produtoDAO.getById(id);
   if (!p) return null;
+  // Produto inativo só é acessível por quem pode vê-los na listagem.
+  if (!p.ativo && !(await usuarioPode(user, "produto.ver_inativos"))) return null;
 
   return {
     id_produto: p.id_produto,
@@ -245,6 +247,14 @@ export async function updateProduto(formData: FormData) {
   return comPermissao("produto.alterar", async (user) => {
     const id = Number(formData.get("id_produto"));
     if (!id) return { error: "ID inválido" };
+
+    // Editar um produto inativo exige enxergá-lo (`produto.ver_inativos`);
+    // `produto.alterar` sozinho não pode alcançar registro fora da listagem.
+    const atual = await produtoDAO.getById(id);
+    if (!atual) return { error: "Produto não encontrado." };
+    if (!atual.ativo && !(await usuarioPode(user, "produto.ver_inativos"))) {
+      return { error: "Sem permissão." };
+    }
 
     const descricao = formData.get("descricao") as string;
     if (!descricao?.trim()) return { error: "Descrição é obrigatória" };

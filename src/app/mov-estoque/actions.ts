@@ -96,6 +96,11 @@ export type NotaSaidaFiltrosPayload = {
   search?: string;
 };
 
+/** Texto de busca: apenas `string` vira filtro (payload pode chegar cru). */
+function textoFiltro(valor: unknown): string | undefined {
+  return typeof valor === "string" ? valor.trim() || undefined : undefined;
+}
+
 /** Normaliza os parâmetros de uma listagem de seletor (página, limite e filtro). */
 function parametrosSelecao(params: SelecaoParams): {
   page: number;
@@ -106,7 +111,7 @@ function parametrosSelecao(params: SelecaoParams): {
   return {
     page: Math.max(1, params.page ?? 1),
     limit: take,
-    search: params.search?.trim() || undefined,
+    search: textoFiltro(params.search),
   };
 }
 
@@ -131,7 +136,7 @@ export async function listarNotasEntrada(
     de: dataFiltro(params.de),
     ate: dataFiltro(params.ate),
     id_fornecedor: idsFiltro(params.id_fornecedor),
-    search: params.search?.trim() || undefined,
+    search: textoFiltro(params.search),
   });
   return {
     ...resultado,
@@ -220,12 +225,24 @@ export async function getProdutoSaida(id: number): Promise<ProdutoSaidaDetalhe |
   };
 }
 
-/** Fornecedores para o seletor da entrada. Permissão da tela: `estoque.entrada`. */
+/**
+ * Fornecedores para o seletor da entrada. Permissão da tela: `estoque.entrada`
+ * ou as permissões de leitura que exibem a lista (`estoque.ver_saldo`/
+ * `nota_entrada.consultar`) — consulta de opções, sem ampliar mutação.
+ */
 export async function listarFornecedoresSelecao(
   params: SelecaoParams = {},
 ): Promise<PaginatedResult<FornecedorSelecaoRow>> {
   const user = await requireUser();
-  if (!(await usuarioPode(user, "estoque.entrada"))) return resultadoVazio(params);
+  if (
+    !(await usuarioPodeAlguma(user, [
+      "estoque.entrada",
+      "estoque.ver_saldo",
+      "nota_entrada.consultar",
+    ]))
+  ) {
+    return resultadoVazio(params);
+  }
 
   const { page, limit, search } = parametrosSelecao(params);
   const resultado = await fornecedorDAO.list({ page, limit, search });
@@ -366,7 +383,7 @@ export async function listarNotasSaida(
     status,
     id_destinatario: idsFiltro(params.id_destinatario),
     urgente: params.urgente === true ? true : undefined,
-    search: params.search?.trim() || undefined,
+    search: textoFiltro(params.search),
   });
   return {
     ...resultado,
@@ -390,12 +407,24 @@ export async function listarNotasSaida(
   };
 }
 
-/** Destinatários para o seletor da saída. Permissão da tela: `estoque.saida`. */
+/**
+ * Destinatários para o seletor da saída. Permissão da tela: `estoque.saida` ou
+ * as permissões de leitura que exibem a lista (`estoque.ver_saldo`/
+ * `nota_saida.consultar`) — consulta de opções, sem ampliar mutação.
+ */
 export async function listarDestinatariosSelecao(
   params: SelecaoParams = {},
 ): Promise<PaginatedResult<DestinatarioSelecaoRow>> {
   const user = await requireUser();
-  if (!(await usuarioPode(user, "estoque.saida"))) return resultadoVazio(params);
+  if (
+    !(await usuarioPodeAlguma(user, [
+      "estoque.saida",
+      "estoque.ver_saldo",
+      "nota_saida.consultar",
+    ]))
+  ) {
+    return resultadoVazio(params);
+  }
 
   const { page, limit, search } = parametrosSelecao(params);
   const resultado = await destinatarioDAO.list({ page, limit, search });

@@ -74,12 +74,24 @@ export type PaginatedResult<T> = {
   totalPages: number;
 };
 
-export function buildPagination(params: PaginationParams): {
+/** Teto de itens por página nas listagens paginadas da UI. */
+export const LIMITE_PAGINA_MAX = 100;
+/**
+ * Teto das listas de opções (chips/seletores). É maior que o da paginação
+ * normal; acima dele a opção não é listada — a busca livre do seletor cobre o
+ * restante (combobox com busca fica para um próximo run).
+ */
+export const LIMITE_OPCOES_MAX = 500;
+
+export function buildPagination(
+  params: PaginationParams,
+  maxLimit: number = LIMITE_PAGINA_MAX,
+): {
   skip: number;
   take: number;
 } {
   const page = Math.max(1, params.page ?? 1);
-  const take = Math.min(100, Math.max(1, params.limit ?? 20));
+  const take = Math.min(Math.max(1, maxLimit), Math.max(1, params.limit ?? 20));
   const skip = (page - 1) * take;
   return { skip, take };
 }

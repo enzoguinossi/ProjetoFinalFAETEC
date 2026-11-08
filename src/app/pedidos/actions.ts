@@ -4,6 +4,7 @@ import { destinatarioDAO } from "@/dao/destinatario";
 import type { PedidoFiltros } from "@/dao/pedido";
 import { produtoDAO } from "@/dao/produto";
 import { requireUser } from "@/lib/auth";
+import { limitesDoDiaSaoPaulo } from "@/lib/datas";
 import { comPermissao, usuarioPodeAlguma } from "@/lib/permissoes";
 import { mensagemDeErro } from "@/dao/_errors";
 import { formatarCodigo } from "@/lib/formatar";
@@ -111,15 +112,28 @@ function statusDoPayload(valor: unknown): PedidoFiltros["status"] {
   return aceitos.length > 0 ? [...new Set(aceitos)] : [];
 }
 
+/** Texto de busca: apenas `string` vira filtro (payload pode chegar cru). */
+function textoFiltro(valor: unknown): string | undefined {
+  return typeof valor === "string" ? valor.trim() || undefined : undefined;
+}
+
+/** Data `YYYY-MM-DD` válida no dia civil de São Paulo; inválida não filtra. */
+function dataFiltro(valor: unknown): string | undefined {
+  if (typeof valor !== "string") return undefined;
+  const texto = valor.trim();
+  if (!texto) return undefined;
+  return limitesDoDiaSaoPaulo(texto, null).inicio ? texto : undefined;
+}
+
 function filtrosDoPayload(params: PedidoFiltrosPayload = {}): PedidoFiltros {
   return {
     page: params.page,
     limit: params.limit ?? params.pageSize,
-    search: params.search?.trim() || undefined,
+    search: textoFiltro(params.search),
     destinatarios: params.id_destinatario ? idsPositivos(params.id_destinatario) : [],
     status: statusDoPayload(params.status),
-    de: params.de || undefined,
-    ate: params.ate || undefined,
+    de: dataFiltro(params.de),
+    ate: dataFiltro(params.ate),
     produtos: params.id_produto ? idsPositivos(params.id_produto) : [],
     com_nota:
       params.com_nota === "com" ? true : params.com_nota === "sem" ? false : null,
@@ -262,8 +276,10 @@ export async function listarProdutosPedido(): Promise<
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, [...PERMISSOES_VER, "pedido.criar"]))) return [];
 
-  const resultado = await produtoDAO.list({ page: 1, limit: 200 });
-  return resultado.data.map((produto) => ({
+  // Teto próprio de opções (500), não o da paginação normal (100); acima dele
+  // o seletor não lista todos os produtos.
+  const produtos = await produtoDAO.listOpcoes();
+  return produtos.map((produto) => ({
     id_produto: produto.id_produto,
     codigo: formatarCodigo(produto.id_produto),
     descricao: produto.descricao,

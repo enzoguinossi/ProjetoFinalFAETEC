@@ -65,17 +65,17 @@ export class FuncionarioDAO {
     });
   }
 
-  /** Cargos distintos já cadastrados (não nulos), ordenados — opções do filtro. */
+  /** Cargos distintos de funcionários ativos, sem nulos/vazios — opções do filtro. */
   async listCargos(): Promise<string[]> {
     const linhas = await prisma.funcionario.findMany({
-      where: { cargo: { not: null } },
+      where: { ativo: true, cargo: { not: null } },
       distinct: ["cargo"],
       select: { cargo: true },
       orderBy: { cargo: "asc" },
     });
     return linhas
-      .map((linha) => linha.cargo)
-      .filter((cargo): cargo is string => cargo !== null);
+      .map((linha) => linha.cargo?.trim())
+      .filter((cargo): cargo is string => !!cargo);
   }
 
   async create(

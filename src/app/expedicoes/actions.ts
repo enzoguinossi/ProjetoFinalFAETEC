@@ -319,10 +319,14 @@ export async function listarVeiculosParaExpedicao(
   params: ListParams = {},
 ): Promise<PaginatedResult<VeiculoExpedicaoRow>> {
   const user = await requireUser();
+  // Opção de filtro da listagem: quem só lê (`listar`/`consultar`) também
+  // precisa das opções; isto não concede nenhuma mutação.
   if (
     !(await usuarioPodeAlguma(user, [
       "expedicao.criar",
       "expedicao.alterar",
+      "expedicao.listar",
+      "expedicao.consultar",
     ]))
   ) {
     return resultadoVazio(params);
@@ -344,10 +348,14 @@ export async function listarCondutoresParaExpedicao(
   params: ListParams = {},
 ): Promise<PaginatedResult<CondutorExpedicaoRow>> {
   const user = await requireUser();
+  // Opção de filtro da listagem: quem só lê (`listar`/`consultar`) também
+  // precisa das opções; isto não concede nenhuma mutação.
   if (
     !(await usuarioPodeAlguma(user, [
       "expedicao.criar",
       "expedicao.alterar",
+      "expedicao.listar",
+      "expedicao.consultar",
     ]))
   ) {
     return resultadoVazio(params);

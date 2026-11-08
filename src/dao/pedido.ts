@@ -1,5 +1,6 @@
 import type { Prisma, StatusPedido } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { limitesDoDiaSaoPaulo } from "@/lib/datas";
 import { buildPagination } from "@/types";
 import { registrarAuditoria } from "./_audit";
 
@@ -34,17 +35,15 @@ export type PedidoFiltros = {
 
 const AUDIT_ENTIDADE = "PedidoEscola";
 
-/** Limites do dia em São Paulo, convertidos para o instante do servidor. */
+/** Limites do dia em São Paulo para `data_criacao` (inclusivo); inválidos viram `null`. */
 function intervaloPeriodo(de?: string, ate?: string) {
-  const OFFSET = "-03:00";
-  const inicio = de ? new Date(`${de}T00:00:00.000${OFFSET}`) : null;
-  const fim = ate ? new Date(`${ate}T23:59:59.999${OFFSET}`) : null;
-  return { inicio, fim };
+  return limitesDoDiaSaoPaulo(de, ate);
 }
 
 function whereDe(filtros: PedidoFiltros): Prisma.PedidoEscolaWhereInput {
   const { inicio, fim } = intervaloPeriodo(filtros.de, filtros.ate);
-  const busca = filtros.search?.trim();
+  const busca =
+    typeof filtros.search === "string" ? filtros.search.trim() || undefined : undefined;
 
   return {
     ...(filtros.destinatarios?.length

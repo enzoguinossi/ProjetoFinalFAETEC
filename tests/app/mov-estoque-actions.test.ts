@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { criarProduto, criarUsuario } from "../helpers/factories";
+import {
+  criarDestinatario,
+  criarFornecedor,
+  criarProduto,
+  criarUsuario,
+} from "../helpers/factories";
 import { notaEntradaService } from "@/services/nota-entrada";
 import { prismaTeste } from "../helpers/prisma";
 
@@ -24,7 +29,12 @@ vi.mock("@/services/permissao", () => ({
   },
 }));
 
-import { obterNotaEntrada, salvarNotaEntrada } from "@/app/mov-estoque/actions";
+import {
+  listarDestinatariosSelecao,
+  listarFornecedoresSelecao,
+  obterNotaEntrada,
+  salvarNotaEntrada,
+} from "@/app/mov-estoque/actions";
 
 describe("actions da nota de entrada", () => {
   async function prepararNota(nomes: string[]) {
@@ -114,5 +124,39 @@ describe("actions da nota de entrada", () => {
     const detalhe = await obterNotaEntrada(nota.id_nota_entrada, "view");
     expect(detalhe?.id_nota_entrada).toBe(nota.id_nota_entrada);
     expect(detalhe?.itens).toHaveLength(1);
+  });
+});
+
+describe("opções dos filtros de entrada/saída", () => {
+  async function preparar(nomes: string[]) {
+    const { usuario } = await criarUsuario();
+    sessao.id_usuario = usuario.id_usuario;
+    permissoes.nomes = nomes;
+  }
+
+  it("lista fornecedores com permissão somente de leitura", async () => {
+    await preparar(["estoque.ver_saldo"]);
+    const { fornecedor } = await criarFornecedor({ razaoSocial: "Fornecedor Chip" });
+
+    const lista = await listarFornecedoresSelecao({ search: "Chip" });
+    expect(lista.data.map((linha) => linha.id_fornecedor)).toEqual([
+      fornecedor.id_fornecedor,
+    ]);
+
+    permissoes.nomes = [];
+    expect((await listarFornecedoresSelecao()).total).toBe(0);
+  });
+
+  it("lista destinatários com permissão somente de leitura da saída", async () => {
+    await preparar(["nota_saida.consultar"]);
+    const { destinatario } = await criarDestinatario({ razaoSocial: "Escola Chip" });
+
+    const lista = await listarDestinatariosSelecao({ search: "Chip" });
+    expect(lista.data.map((linha) => linha.id_destinatario)).toEqual([
+      destinatario.id_destinatario,
+    ]);
+
+    permissoes.nomes = [];
+    expect((await listarDestinatariosSelecao()).total).toBe(0);
   });
 });

@@ -74,11 +74,15 @@ describe("funcionarioDAO", () => {
   });
 
   describe("listCargos", () => {
-    it("devolve cargos distintos e não nulos em ordem alfabética", async () => {
+    it("devolve cargos de ativos, distintos, não vazios e em ordem alfabética", async () => {
       await criarFuncionario({ cargo: "Separador" });
       await criarFuncionario({ cargo: "Motorista" });
       await criarFuncionario({ cargo: "Separador" });
       await criarFuncionario();
+      // Inativo e cargo vazio/em branco não viram opção do filtro.
+      await criarFuncionario({ cargo: "Zelador", ativo: false });
+      await criarFuncionario({ cargo: "" });
+      await criarFuncionario({ cargo: "   " });
 
       const cargos = await funcionarioDAO.listCargos();
 

@@ -1050,7 +1050,7 @@ permissao
 └── ativo                  BOOLEAN DEFAULT TRUE
 ```
 
-Permissões criadas por `prisma/seed.ts` (**81** no total):
+Permissões criadas por `prisma/seed.ts` (**82** no total):
 
 | Entidade | Ações |
 |----------|-------|
@@ -1059,7 +1059,7 @@ Permissões criadas por `prisma/seed.ts` (**81** no total):
 | `destinatario` | listar, criar, alterar, consultar, desativar, excluir |
 | `fornecedor` | listar, criar, alterar, consultar, desativar, excluir |
 | `veiculo` | listar, criar, alterar, consultar, desativar, excluir |
-| `produto` | listar, criar, alterar, consultar, desativar, excluir |
+| `produto` | listar, criar, alterar, consultar, desativar, excluir, ver_inativos |
 | `perfil` | listar, criar, alterar, consultar, excluir |
 | `estoque` | entrada, saida, ver_saldo |
 | `nota_entrada` | criar, alterar, consultar, cancelar |

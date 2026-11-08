@@ -97,11 +97,22 @@ export function limitesDoDiaSaoPaulo(
     if (!valor) return null;
     const texto = valor.trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+    const [ano, mes, dia] = texto.split("-").map(Number) as [number, number, number];
+    const calendario = new Date(Date.UTC(ano, mes - 1, dia));
+    // Rejeita datas normalizadas pelo JS (ex.: 2026-02-31 → 03/03). A validação
+    // é feita no calendário puro: em datas com horário de verão (histórico) o
+    // fim do dia em São Paulo cai no dia seguinte, e comparar o instante final
+    // recusaria um dia válido.
+    if (
+      calendario.getUTCFullYear() !== ano ||
+      calendario.getUTCMonth() !== mes - 1 ||
+      calendario.getUTCDate() !== dia
+    ) {
+      return null;
+    }
     const hora = fimDoDia ? "23:59:59.999" : "00:00:00.000";
     const data = new Date(`${texto}T${hora}-03:00`);
-    if (Number.isNaN(data.getTime())) return null;
-    // Rejeita datas normalizadas pelo JS (ex.: 2026-02-31 → 03/03).
-    return diaISOSaoPaulo(data) === texto ? data : null;
+    return Number.isNaN(data.getTime()) ? null : data;
   };
   return { inicio: converter(de, false), fim: converter(ate, true) };
 }

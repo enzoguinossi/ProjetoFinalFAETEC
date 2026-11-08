@@ -73,6 +73,16 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `%TEMP%\Setup Log*.txt`.
 
 ### Fixed
+- **Filtros preservados após salvar/excluir (KAN-170):** a lista paginada deixa de
+  descartar busca e filtros quando a página é revalidada (`router.refresh()`): com recorte
+  ativo ela reconsulta os parâmetros atuais, e só usa o resultado do servidor quando não há
+  busca nem filtro. Também corrige as opções vazias de chips para perfis somente leitura
+  (veículos/condutores de Expedições, fornecedores da Entrada e destinatários da Saída), o
+  teto de 100 opções nos seletores (Pedidos passa a listar até 500 produtos), datas
+  inválidas nos filtros de Pedidos (ignoradas, sem exceção), `search` não-string em
+  Pedidos/Estoque, cargos de funcionários inativos ou vazios no filtro de Funcionários, a
+  página de Perfis voltando ao início ao buscar/filtrar e o acesso por ID a produto inativo
+  sem `produto.ver_inativos` (detalhe e edição).
 - **sharp/libvips e NexusApp travada (KAN-170):** o pacote standalone passa a incluir
   `sharp`/`@img` completos (DLLs do libvips), corrigindo o `ERR_DLOPEN_FAILED`; o serviço é
   reiniciado sem deixar node órfão na porta 3000, evitando `NexusApp: Paused`.
