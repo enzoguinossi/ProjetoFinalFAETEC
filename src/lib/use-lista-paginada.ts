@@ -12,15 +12,21 @@ export type FiltrosLista = Record<
   string | string[] | number | number[] | boolean | null | undefined
 >;
 
-/** Um valor de filtro só conta quando não é vazio/nulo. */
+/**
+ * Um valor de filtro conta como "aplicado" quando é **explícito**. `null` é um
+ * recorte escolhido (ex.: Situação "Ativos + Inativos"), não ausência de
+ * filtro: só `undefined`, string vazia/em branco e array vazio significam
+ * "sem filtro".
+ */
 export function filtroAtivo(valor: FiltrosLista[string]): boolean {
-  if (valor === null || valor === undefined) return false;
+  if (valor === undefined) return false;
+  if (valor === null) return true;
   if (typeof valor === "string") return valor.trim().length > 0;
   if (Array.isArray(valor)) return valor.length > 0;
   return true;
 }
 
-/** Há ao menos um filtro aplicado (valor não vazio). */
+/** Há ao menos um filtro aplicado (valor explícito, inclusive `null`). */
 export function temFiltrosAtivos(filtros: FiltrosLista): boolean {
   return Object.values(filtros).some(filtroAtivo);
 }

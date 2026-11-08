@@ -85,6 +85,9 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   `%TEMP%\Setup Log*.txt`.
 
 ### Fixed
+- **Filtro Situação “Ativos + Inativos” após refresh (KAN-170):** `filtroAtivo(null)` passa a
+  contar como recorte explícito, então salvar/excluir não devolve mais a lista ao default (só
+  ativos) enquanto o chip Situação continua mostrando os dois valores.
 - **Filtros preservados após salvar/excluir (KAN-170):** a lista paginada deixa de
   descartar busca e filtros quando a página é revalidada (`router.refresh()`): com recorte
   ativo ela reconsulta os parâmetros atuais, e só usa o resultado do servidor quando não há

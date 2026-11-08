@@ -29,14 +29,22 @@ describe("useListaPaginada — decisão do refresh", () => {
     expect(deveUsarInicial("", { status: ["PENDENTE"] })).toBe(false);
     expect(deveUsarInicial("", { id_destinatario: [3] })).toBe(false);
     expect(deveUsarInicial("", { ativo: false })).toBe(false);
-    expect(deveUsarInicial("", { ativo: null })).toBe(true);
+    expect(deveUsarInicial("", { ativo: null })).toBe(false);
     expect(deveUsarInicial("", { perecivel: true })).toBe(false);
     expect(deveUsarInicial("", { de: "2026-11-01" })).toBe(false);
   });
 
-  it("classifica valores vazios como inativos e não vazios como ativos", () => {
+  it("mantém o recorte de Situação “Ativos + Inativos” (null) após o refresh", () => {
+    // `null` é o recorte explícito "todos", diferente do default (só ativos):
+    // `router.refresh()` não pode trocar a lista pelo inicial nesse caso.
+    const filtros = { ativo: null };
+    expect(temFiltrosAtivos(filtros)).toBe(true);
+    expect(deveUsarInicial("", filtros)).toBe(false);
+  });
+
+  it("classifica valores explícitos como ativos e os vazios como inativos", () => {
     expect(filtroAtivo(undefined)).toBe(false);
-    expect(filtroAtivo(null)).toBe(false);
+    expect(filtroAtivo(null)).toBe(true);
     expect(filtroAtivo("")).toBe(false);
     expect(filtroAtivo("   ")).toBe(false);
     expect(filtroAtivo([])).toBe(false);
@@ -47,6 +55,7 @@ describe("useListaPaginada — decisão do refresh", () => {
 
   it("temFiltrosAtivos combina as chaves", () => {
     expect(temFiltrosAtivos({ a: undefined, b: [], c: "" })).toBe(false);
+    expect(temFiltrosAtivos({ a: undefined, b: null })).toBe(true);
     expect(temFiltrosAtivos({ a: undefined, b: ["x"] })).toBe(true);
   });
 });
