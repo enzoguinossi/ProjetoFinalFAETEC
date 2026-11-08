@@ -16,7 +16,11 @@ serviram de base para o layout e continuam como referência visual.
   Vencimento, Pedidos, Expedições, Entregas e Extrato: `RelatorioCadastro` (ações,
   filtros, folha, totais e rodapé); Movimentação e Auditoria montam a folha diretamente.
 - Componentes de folha: `FichaRelatorio` (cadastros), `CartaoRegistro`
-  (expedições/entregas), `BadgeStatus`, `BarraFiltros` e `ImprimirButton`.
+  (expedições/entregas), `BadgeStatus`, `BarraFiltros` e `ImprimirButton`. A base
+  `BarraFiltrosBase` é controlada e também é usada pelas listagens do sistema, com
+  chips adicionáveis/removíveis; `BarraFiltros` é apenas o wrapper de URL dos relatórios.
+- Os chips listam até **500 opções** (`LIMITE_OPCOES_MAX`); acima disso nem todas
+  aparecem e não há busca dentro do seletor.
 - O sistema é desktop (mínimo 1360×768); não há layout mobile.
 
 ---

@@ -27,6 +27,12 @@ domínio, a especificação e o processo — quando um deles divergir do código
 | `diagramas/` | [`classes.puml`](diagramas/classes.puml) | diagrama de classes conceitual (48 classes) |
 | `diagramas/` | [`DER.puml`](diagramas/DER.puml) | diagrama entidade-relacionamento (48 entidades) |
 | `diagramas/` | [`fluxo_atual.puml`](diagramas/fluxo_atual.puml) e [`fluxosAtuais/`](diagramas/fluxosAtuais/) | o fluxo **AS-IS manual** (papel, Trello, Excel) — **não** é o fluxo alvo do sistema |
+| `relatorios/` | [`relatorios/README.md`](relatorios/README.md) | modelo A4 dos relatórios impressos e componentes de filtro compartilhados |
+
+Os componentes de UI compartilhados ficam em `src/components/`. A barra de filtros em chips
+(`BarraFiltrosBase`, controlada) atende tanto os relatórios — via o wrapper de URL
+`BarraFiltros` — quanto as listagens do sistema; os chips são adicionáveis/removíveis e não
+há filtro fixo nas telas (só os checkboxes de apresentação dos relatórios).
 
 As convenções de desenvolvimento (arquitetura, regras críticas e o que nunca fazer) estão em
 [`../AGENTS.md`](../AGENTS.md); o histórico de mudanças, em [`../CHANGELOG.md`](../CHANGELOG.md).

@@ -26,11 +26,15 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   visualizar produtos inativos em `/produtos`, com filtro **Situação** e coluna própria. A
   listagem ganhou filtros em chips de **Perecível**, **Composto** e **Tipo de código**. Sem a
   permissão, a tela continua só com ativos, e os seletores operacionais não mudam.
-- **Filtros em chips nos cadastros (KAN-170):** as listagens de **Destinatários** (Tipo e UF),
-  **Fornecedores** (UF), **Funcionários** (Cargo e Condutor), **Veículos** (Status),
-  **Usuários** (Somente super admin) e **Perfis** (Grupo de permissões) usam a barra de
-  filtros em chips, combinada com a busca livre. Em Perfis, a busca passa a filtrar por nome
-  ou descrição no cliente. As listagens continuam ocultando registros inativos.
+- **Filtros em chips nos cadastros (KAN-170):** as listagens usam a barra de filtros em chips,
+  combinada com a busca livre: **Destinatários** (Situação, Tipo e UF), **Fornecedores**
+  (Situação e UF), **Funcionários** (Situação, Cargo e Condutor), **Veículos** (Situação e
+  Status), **Usuários** (Situação e Somente super admin) e **Perfis** (Grupo de permissões,
+  com busca por nome ou descrição no cliente). A coluna **Situação** exibe o badge Ativo/Inativo;
+  nas telas com Situação, sem seleção a lista continua só com ativos, só Inativos mostra os
+  inativos e ambos mostram todos. Não há permissão nova (a `produto.ver_inativos` continua só em
+  Produtos) e os seletores operacionais seguem apenas com ativos. **Expedições** ganha o filtro
+  **Destinatário** (multi), aplicado pelas notas de saída vinculadas.
 - **Filtros de Expedições e Inventário (KAN-170):** as duas listagens ganham filtros em
   chips no servidor. Em **Expedições**: período de data prevista, status, veículo e condutor.
   Em **Inventário**: período de data de início, status (lista) e contagem cega. Os filtros
@@ -42,15 +46,13 @@ rastreabilidade versão ↔ issues ↔ commit — está em
   (`data_recebimento`, ou `data_criacao` quando nulo, no dia local) e fornecedor (multi). Em
   **Saída** há período, tipo (4), status (7), destinatário (multi) e urgente. Todos filtram no
   servidor, combinados com a busca, e sem filtro o resultado é o mesmo de antes.
-- **Situação nos cadastros e destinatário em Expedições (KAN-170):** **Destinatários**,
-  **Fornecedores**, **Funcionários**, **Veículos** e **Usuários** ganham o filtro **Situação**
-  (Ativos/Inativos, no servidor) e a coluna **Situação** com badge Ativo/Inativo. Sem seleção
-  a lista continua só com ativos; só Inativos mostra os inativos e ambos mostram todos. Não há
-  permissão nova (a `produto.ver_inativos` continua só em Produtos) e os seletores operacionais
-  seguem apenas com ativos. **Expedições** ganha o filtro **Destinatário** (multi), aplicado
-  pelas notas de saída vinculadas.
 
 ### Changed
+- **Barra de filtros compartilhada (KAN-170):** `BarraFiltrosBase` concentra a barra controlada
+  de chips (adicionáveis/removíveis, com **Aplicar filtros** e **Limpar**) e `BarraFiltros` fica
+  como o wrapper de URL dos relatórios; as listagens usam a mesma base e, nas paginadas no
+  servidor (`useListaPaginada`/`useCrudLista`), aplicar volta à página 1 e o recorte é preservado
+  depois de `router.refresh()`.
 - **Nenhum filtro sempre visível (KAN-170):** na barra de filtros, os checkboxes de filtro
   (Condutor, Somente super admin, Perecível, Composto, Contagem cega, Urgente) passam a ser
   chips adicionáveis/removíveis, como os demais. Só os checkboxes de apresentação dos

@@ -301,7 +301,9 @@ produto
 
 O **produto é dono do saldo**: não existe tabela/linha de estoque nem lote. Todo produto tem
 `saldo`/`saldo_reservado` desde a criação (zero) e `saldo_disponivel = saldo − saldo_reservado`
-(vide §3.7).
+(vide §3.7). O campo `ativo` é o que a listagem filtra por padrão (só ativos); a permissão
+`produto.ver_inativos` libera a visão de inativos apenas na listagem/busca e no detalhe/edição
+por ID (§3.15.1).
 
 **Flags removidas:** fracionado, porGrade, localizacao_fisica, gtin (gtin agora é código personalizado)
 
@@ -734,7 +736,8 @@ Regras:
 - Nenhuma nota (entrada ou saída) aceita produto duplicado: `item_nota_entrada` e
   `item_nota_saida` têm `UNIQUE(ID_nota, ID_produto)` e o serviço também recusa
 - Pedido RECUSADO não gera nota. Não há desativação/exclusão de pedido (sem `ativo`)
-- Lista e relatório têm busca/filtros por **escola, status, período, produto e com/sem nota**;
+- Lista e relatório têm busca e filtros em chips por **escola, status, período, produto e
+  com/sem nota**;
   o filtro **Nota** aceita com/sem/todas (vazio ou ambos = todos). O relatório “Pedidos por
   escola” usa A4 retrato e CSV, como os demais relatórios
 - `/pedidos` é acessível por **qualquer** permissão do módulo (`listar`, `consultar`, `criar`,
@@ -1078,6 +1081,24 @@ Permissões criadas por `prisma/seed.ts` (**82** no total):
 > permissão obsoleta `percurso.desativar` caso ela exista no banco.
 > A permissão obsoleta `inventario.ver_contagem_cega` não faz parte do seed nem da UI; em
 > banco antigo ela pode continuar existindo e deve ser removida manualmente.
+
+A permissão **`produto.ver_inativos`** (a 82ª) é a única que expõe registros inativos: libera
+o chip e a coluna **Situação** em `/produtos`, a busca por produtos inativos e o detalhe/edição
+por ID. Ela **não** libera seletores operacionais (movimentação, pedidos, inventário e insumos),
+que continuam apenas com produtos ativos; as notas históricas seguem exibindo os produtos
+inativos que já têm item.
+
+**Padrão das listagens.** As listagens de cadastro e operação (Produtos, Destinatários,
+Fornecedores, Funcionários, Veículos, Usuários, Perfis, Expedições, Inventário, Pedidos, Entrada
+e Saída) usam a mesma barra de filtros em **chips**: o campo só aparece depois de **Adicionar
+filtro**, pode ser removido individualmente e não há filtro fixo — só os checkboxes de
+apresentação dos relatórios (`fixo`) ficam sempre visíveis. Nas listagens paginadas no servidor,
+aplicar volta à página 1, combina os filtros com a busca/paginação e mantém o recorte depois de
+salvar/excluir (`router.refresh()`); em Perfis, a busca e o Grupo de permissões filtram no
+cliente. Sem filtro, as listagens que têm `ativo` mostram **apenas ativos** (Perfis não tem
+`ativo`). Os chips listam até **500 opções** (`LIMITE_OPCOES_MAX`); acima disso não há busca
+dentro do seletor e nem todas as opções aparecem — o combobox com busca é evolução futura, não
+implementada.
 
 #### 3.15.2 Perfil (Template)
 
