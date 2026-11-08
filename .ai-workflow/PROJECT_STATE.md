@@ -8,8 +8,8 @@
 ## Estado corrente — release 1.08.11.2026 (2026-11-08)
 
 - **Versão/tag:** `1.08.11.2026` / `v1.08.11.2026` (DateVer, primeira release do dia 08.11).
-- **Publicação:** `main` no commit `5733d16` e tag `v1.08.11.2026` publicadas em `origin`
-  (GitHub `enzoguinossi/ProjetoFinalFAETEC`).
+- **Publicação:** release no commit `5733d16`; `main` publicada com este estado e tag
+  `v1.08.11.2026` em `origin` (GitHub `enzoguinossi/ProjetoFinalFAETEC`).
 - **Instalador:** `deploy/windows/out/NexusSetup-1.08.11.2026.exe`, **439.748.699 bytes
   (419,4 MB)**, SHA-256 `5C976B33DC3E64805384FD0B42276C339C73B79371437E02454A4448DFE7194F`.
   Build por `npm run deploy:windows` (prisma generate, SQL, lint, Next standalone/app.zip,
