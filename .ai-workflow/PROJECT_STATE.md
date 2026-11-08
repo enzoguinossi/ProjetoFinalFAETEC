@@ -1,9 +1,9 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-07 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
+> Última consolidação: 2026-11-08 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
 > autocontido com Node/MySQL/Caddy/NSSM/app embutidos; wizard de senhas/progresso, ACL,
-> bandeja .NET 10 e app standalone com `sharp`/libvips em `[Unreleased]`).
+> bandeja .NET 10, app standalone com `sharp`/libvips e filtros em chips em `[Unreleased]`).
 
 ## Objetivo atual
 
@@ -155,6 +155,39 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    `1.07.11.2026`; HTTPS 200; `SMOKE: OK`; bandeja Running (PID 18872); `app.err.log` sem
    escrita nova desde 17:43:19 (só histórico). Versão anterior preservada em
    `app.prev-manual-20261107-174210`.
+
+## Filtros em chips e permissão de inativos (pós-1.07, `[Unreleased]`)
+
+1. **Componente:** `BarraFiltrosBase` (controlado) concentra os chips adicionáveis/removíveis;
+   `BarraFiltros` virou wrapper fino de URL dos relatórios. **Nenhum filtro fica fixo** nas
+   telas operacionais: checkbox (condutor, super admin, perecível, composto, contagem cega,
+   urgente) só aparece após **Adicionar filtro** ou quando tem valor. `fixo: true` ficou
+   exclusivo dos checkboxes de apresentação dos relatórios (“Listar fotos/códigos/contatos”).
+2. **Estado/persistência:** `useListaPaginada`/`useCrudLista` aceitam filtros de domínio,
+   aplicam na página 1 e **preservam o recorte após `router.refresh()`** (salvar/excluir),
+   inclusive Situação “Ativos + Inativos” (`ativo: null` explícito).
+3. **Filtros por tela:** Produtos (Situação/Perecível/Composto/Tipo de código), Destinatários
+   (Situação/Tipo/UF), Fornecedores (Situação/UF), Funcionários (Situação/Cargo/Condutor),
+   Veículos (Situação/Status), Usuários (Situação/Super admin), Perfis (busca + Grupo de
+   permissões), Expedições (Período/Status/Veículo/Condutor/Destinatário), Inventário
+   (Período/Status/Contagem cega), Pedidos (Período/Escola/Status/Produto/Nota, substituindo o
+   formulário antigo), Entrada (Período/Fornecedor) e Saída
+   (Período/Tipo/Status/Destinatário/Urgente). Todas mantêm a busca livre; default continua
+   **só ativos**.
+4. **Permissão `produto.ver_inativos` (82ª):** única que expõe inativos — libera o chip e a
+   coluna Situação em `/produtos`, a busca priorizada e o detalhe/edição por ID; **não** libera
+   seletores operacionais (movimentação, pedidos, inventário, insumos). Notas históricas
+   continuam exibindo o produto inativo. Seeds TS/SQL e `aplicar-sql.ps1`/gerador em **82**.
+5. **Robustez:** datas inválidas e `search` não-string são descartados nas actions
+   (`src/lib/filtros.ts`); filtros inválidos são ignorados; filtros no servidor com enums/ids
+   sanitizados.
+6. **Validação:** `npm run lint`, `npx tsc --noEmit`, `npm run build`, `git diff --check` OK;
+   **603 testes / 60 arquivos** verdes; QA independente atendeu todos os critérios.
+7. **Limitação conhecida:** chips de opções listam até **500** registros
+   (`LIMITE_OPCOES_MAX`); acima disso não há busca dentro do seletor — combobox com busca é
+   evolução futura.
+8. **Commits (`main`):** `e1d4956`, `1e23cbe`, `205c0f0`, `b641969`, `568393c`, `9005fe2`,
+   `1a8e693`, `cecb426`, `ad58d89`, `0cbf8a9`, `74cb9bc`. Sem push/tag.
 
 ## Produção Windows — legado (até 11.02)
 
@@ -364,15 +397,16 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    UAC, decidir em um próximo run.
 5. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
-6. **Docs:** o runbook foi atualizado para wizard/ACL/bandeja; revisar `IMPLEMENTACAO.md` se
-   necessário.
+6. **Docs:** runbook, `IMPLEMENTACAO.md`, `ENTENDIMENTO.md` e `README`s atualizados para
+   wizard/ACL/bandeja/sharp/filtros; manter ao incluir novas telas.
 7. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar wizard/ACL/tray
-   .NET 10/sharp; o `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
+   .NET 10/sharp/filtros + seed com 82 permissões; o `CHANGELOG` está em `[Unreleased]` e o
+   setup em `out` é build local, sem tag.
 8. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
-9. **NexusAgent/painel/filtros:** os planos de `NexusAgent` .NET 10 + Task Scheduler, painel
-   `/administracao` de backup e filtros nas listas **não foram implementados**; retomar após
-   fechar a bandeja.
+9. **NexusAgent/painel:** os planos de `NexusAgent` .NET 10 + Task Scheduler e painel
+   `/administracao` de backup **não foram implementados**; os filtros das listas foram
+   concluídos (seção própria acima).
 10. **Bandeja e usuário padrão:** a tarefa roda no logon de quem instalou, com
     `RunLevel Highest`; conta padrão exige um tray `asInvoker` + tarefa elevada de restart.
 11. **Produção:** executar o `NexusSetup` no galpão, concluir o primeiro acesso (Super Admin),
