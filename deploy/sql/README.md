@@ -7,7 +7,7 @@ executa Prisma**. O DDL é o mesmo do `prisma db push`, gerado a partir de
 | Arquivo | Conteúdo |
 | --- | --- |
 | `schema.sql` | DDL completo (MySQL 8.4, `utf8mb4`), sem `CREATE DATABASE` |
-| `seed.sql` | Dados de referência idempotentes: `tipo_codigo`, `permissao`, `perfil`, `perfil_permissao`, `conversao_unidade` |
+| `seed.sql` | Dados de referência idempotentes: `tipo_codigo`, `tipo_destinatario`, `permissao`, `perfil`, `perfil_permissao`, `conversao_unidade` |
 | `migracoes/001-unidades-pct10-cx50.sql` | renomeia `PACOTE`→`PCT10` e `CAIXA`→`CX50` em bancos antigos, preservando IDs |
 | `migracoes/002-tipos-destinatario.sql` | cria o cadastro `tipo_destinatario`, mapeia o enum antigo e remove a coluna enum |
 

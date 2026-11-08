@@ -41,9 +41,17 @@ npm run dev
 | `npm run db:reset` | **Apaga todos os dados** (`--force-reset`) e re-seeda |
 | `npm run db:studio` | Abre o Prisma Studio |
 
-O seed popula apenas dados de referência (tipos de código, permissões, perfis-template e
-unidades de conversão); nenhum cadastro é criado — o Super Admin nasce no fluxo de primeiro
-acesso do sistema.
+O seed popula apenas dados de referência (tipos de código, tipos de destinatário,
+permissões, perfis-template e unidades de conversão); nenhum cadastro é criado — o Super Admin
+nasce no fluxo de primeiro acesso do sistema.
+
+## Produção
+
+O servidor Windows usa o instalador autocontido da versão atual (`1.08.11.2026`): Next
+standalone, MySQL embutido, Caddy, bandeja .NET 10 e `NexusAgent` para backup/restauração.
+O runbook (instalação, upgrade, backup e checklist de release) está em
+[`docs/processo/PRODUCAO.md`](docs/processo/PRODUCAO.md); o setup e o payload não são
+versionados.
 
 ## Documentação
 

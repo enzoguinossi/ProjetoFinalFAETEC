@@ -67,7 +67,7 @@ projetofinalfaetec/
 │   ├── types/             # Interfaces e tipos TypeScript
 │   └── proxy.ts           # Proteção das rotas privadas (sessão)
 ├── prisma/
-│   ├── schema.prisma      # Modelo de dados (51 entidades)
+│   ├── schema.prisma      # Modelo de dados (49 entidades)
 │   └── seed.ts            # Seed de referência
 ├── prisma.config.ts       # Configuração do Prisma 7
 ├── docs/                  # Documentação (ver docs/README.md)
@@ -629,7 +629,7 @@ ABERTO → EM_CONTAGEM → AGUARDANDO_APROVACAO → FINALIZADO
 | **Ajuste** | Só é criado quando `quantidade_final` difere do snapshot | Aprovado: `produto.saldo` muda pelo delta e cria `movimentacao_estoque` com `ID_ajuste_inventario` (`saldo_anterior`/`saldo_posterior`); rejeitado: saldo e reserva não mudam. Valor igual ao sistema: decisão sem ajuste, mas o item fica decidido |
 | **Finalização** | Todos os itens precisam estar decididos | Exige `quantidade_final` em todos os itens e ajuste para cada diferença; status = FINALIZADO, `data_fim` e aprovador; libera o bloqueio. `FINALIZADO` não volta |
 | **Cancelamento** | Permitido em ABERTO/EM_CONTAGEM/AGUARDANDO_APROVACAO enquanto não houver ajuste aprovado/movimento | status = CANCELADO e `data_fim` gravada; itens/contagens/ajustes preservados; libera o bloqueio |
-| **Lista/relatório** | Lista de contagem impressa e relatório CSV/PDF do fechado/cancelado | Exigem `relatorio.gerar`; na cega, sem `estoque.ver_saldo` não revelam sistema, saldos, `quantidade_final` nem “sem ajuste/igual”: tela, lista e CSV mascaram/omitem esses valores (a lista/CSV seguem com/sem sistema conforme a permissão) |
+| **Lista/relatório** | Lista de contagem impressa e relatório CSV/XLSX/PDF do fechado/cancelado | Exigem `relatorio.gerar`; na cega, sem `estoque.ver_saldo` não revelam sistema, saldos, `quantidade_final` nem “sem ajuste/igual”: tela, lista e exportações CSV/XLSX mascaram/omitem esses valores (a lista/exportações seguem com/sem sistema conforme a permissão) |
 
 **Lista de contagem:** todos os produtos do inventário, com campos em branco para preencher à
 mão; o cabeçalho mostra o nome (`observacao`), a data, o emitente e a data/hora de geração —
@@ -705,7 +705,7 @@ Regras:
 
 ---
 
-### 3.11 Bloco: Pedido, Nota Saída e Coleta
+### 3.11 Bloco: Pedido, Nota Saída e Retirada
 
 #### 3.11.0 Pedido da Escola (Solicitação)
 
@@ -760,7 +760,7 @@ Regras:
 - Lista e relatório têm busca e filtros em chips por **escola, status, período, produto e
   com/sem nota**;
   o filtro **Nota** aceita com/sem/todas (vazio ou ambos = todos). O relatório “Pedidos por
-  escola” usa A4 retrato e CSV, como os demais relatórios
+  escola” usa A4 retrato e CSV/XLSX, como os demais relatórios
 - `/pedidos` é acessível por **qualquer** permissão do módulo (`listar`, `consultar`, `criar`,
   `alterar`, `aprovar`); cada ação (criar/editar/aprovar/recusar) é exibida e autorizada
   conforme a permissão correspondente, e a importação na Saída exige `nota_saida.criar`
@@ -844,7 +844,9 @@ Regras:
 - Cancelar só é permitido em `SAIDA` `ABERTA`: libera `saldo_reservado -= qtd_esperada` em cada item e
   muda para `CANCELADA`; a segunda tentativa é recusada sem debitar de novo. Avaria/Consumo Interno
   não são canceláveis — a correção é uma nota nova
-- A nota pode entrar em **várias expedições** (`expedicao_nota`) e/ou gerar **coletas**
+- A nota pode entrar em **várias expedições** (`expedicao_nota`); as tabelas `coleta`/`item_coleta`
+  continuam modeladas, mas não há fluxo/tela/serviço/DAO de coleta; elas só aparecem na
+  proteção de exclusão de produto/destinatário e na auditoria (ver §3.11.3)
 - Status: `ABERTA` (criada, aguardando expedição), `EM_PERCURSO` (saiu para entrega),
   `PENDENTE` (não entregue, reserva mantida), `BAIXA_TOTAL` (tudo entregue),
   `BAIXA_PARCIAL` (parte entregue, o restante continua reservado), `BAIXA_COM_CORTE` (parte
@@ -881,28 +883,31 @@ numa nota já finalizada é recusada sem debitar de novo. Ao **concluir** a expe
 em percurso passam a `PENDENTE`, a expedição vai para `CONCLUIDA` e o veículo volta a `DISPONIVEL`
 quando não está em outra expedição em percurso.
 
-#### 3.11.3 Coleta (Retirada Direta na Escola)
+#### 3.11.3 Retirada Direta na Escola (urgência)
 
-Representa retirada presencial por urgência — sem expedição, sem condutor, sem veículo.
-
-```
-coleta
-├── ID_coleta               INT PK auto_increment
-├── ID_nota_saida           INT FK NOT NULL
-├── ID_destinatario         INT FK NOT NULL
-├── data_criacao            TIMESTAMP NOT NULL
-└── observacao              TEXT
-
-item_coleta
-├── ID_item_coleta          INT PK auto_increment
-├── ID_coleta               INT FK NOT NULL
-├── ID_produto              INT FK NOT NULL
-├── quantidade              FLOAT NOT NULL
-```
+Representa a retirada presencial por urgência — sem expedição, sem condutor e sem veículo —
+registrada **na própria nota de saída**, não em uma tabela `coleta`.
 
 Regras:
-- Chegou e pegou — sem agendamento, sem status
-- Ao registrar, a quantidade entregue é atualizada no acompanhamento correspondente e o saldo do produto dá baixa
+- Ação **Retirar itens** no detalhe e na lista da Saída (`src/app/mov-estoque/RetiradaModal.tsx`),
+  visível e autorizada por `expedicao.alterar`
+- Só para nota de Remessa (`tipo = SAIDA`) em `ABERTA`, `EM_PERCURSO`, `PENDENTE` ou
+  `BAIXA_PARCIAL`; `BAIXA_TOTAL`, `BAIXA_COM_CORTE`, `CANCELADA` e Avaria/Consumo Interno
+  são histórico e não aceitam retirada
+- O operador informa o delta por item, no máximo o pendente (`qtd_esperada − qtd_entregue`);
+  o servidor trava a nota (`FOR UPDATE`), soma `qtd_entregue += delta`, dá baixa em
+  `produto.saldo` e `produto.saldo_reservado` (`saldoDAO.baixar`, com movimentação negativa e
+  `ID_nota_saida`) e grava auditoria com os saldos antes/depois
+- A nota fica `BAIXA_PARCIAL` ou `BAIXA_TOTAL`; o já retirado conta como entregue e a
+  expedição passa a listar só o pendente
+- **Não é tentativa de entrega:** não grava `justificativa`, `data_tentativa`,
+  `ID_usuario_tentativa` nem fotos
+- Respeita o bloqueio por inventário ativo (`assertProdutoSemInventario`) e nunca deixa
+  `saldo_reservado` negativo
+- **Tabelas `coleta`/`item_coleta`:** continuam no `schema.prisma` (com FKs e proteção de
+  exclusão), mas **nenhum fluxo, tela, serviço ou DAO de coleta as cria ou usa**; a retirada
+  direta é na própria nota e as tabelas só aparecem na proteção de exclusão de
+  produto/destinatário e na auditoria. Não há UI de coleta.
 
 #### 3.11.4 Expedição × Nota (N:N com ordem)
 
@@ -961,7 +966,9 @@ há remoção nem troca das fotos e um novo registro só é possível em outra e
 ```
 
 Esse ciclo é o da **Remessa** (`SAIDA`). **Avaria** e **Consumo Interno** não entram nele: nascem
-`BAIXA_TOTAL`, já com a baixa física registrada na criação, e permanecem no histórico.
+`BAIXA_TOTAL`, já com a baixa física registrada na criação, e permanecem no histórico. A
+**retirada direta** (§3.11.3) é o atalho fora da expedição: baixa o pendente na própria nota e
+a leva a `BAIXA_PARCIAL`/`BAIXA_TOTAL`, contando o retirado como entregue.
 
 ---
 
@@ -1282,14 +1289,19 @@ Não é uma tabela — é funcionalidade de consulta e exportação.
 | Movimentação de Estoque | Período, produto, tipo de movimentação | PDF, CSV/XLSX |
 | Expedições por Período | Data, expedição, destinatário, condutor | PDF, CSV/XLSX |
 | Entregas por Instituição | Destinatário, período, status | PDF, CSV/XLSX |
-| Produtos Próximos ao Vencimento | Dias para vencer | PDF |
+| Produtos Próximos ao Vencimento | Dias para vencer | PDF, CSV/XLSX |
 | **Listagem Simplificada de Produtos** | — | PDF, CSV/XLSX |
 | Auditoria | Usuário, período, entidade, ação | CSV/XLSX |
 | Consolidado Semestral | Movimentações agregadas (6 em 6 meses) | PDF, CSV/XLSX |
 
+As rotas `.../export` de cada relatório entregam **CSV** por padrão e **XLSX** com
+`?formato=xlsx`; o **PDF** é a impressão A4 do navegador (`window.print()`). O **Consolidado
+Semestral** não é um relatório separado: é o recorte de período (atalho **Semestre atual**) da
+Movimentação/Extrato.
+
 **Fotos nos relatórios:** Produtos, Funcionários, Entregas e Expedições têm o checkbox opcional
 **“Listar fotos”** (`?fotos=1`). Ele adiciona a coluna de miniaturas na tela/PDF (as imagens
-abrem em nova aba; acima de 3–4 fotos a linha mostra `+N`) e a coluna de URL no CSV. Em
+abrem em nova aba; acima de 3–4 fotos a linha mostra `+N`) e a coluna de URL no CSV/XLSX. Em
 **Entregas** acrescenta também a **justificativa** da última não entrega. Todos os relatórios
 usam A4 retrato. O relatório de Produtos mostra **a foto atual** (anexo ativo mais recente).
 

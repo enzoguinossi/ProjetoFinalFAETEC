@@ -13,6 +13,12 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [1.08.11.2026] - 2026-11-08
+
+Esta seção consolida os tipos de destinatário como cadastro, o desmembramento de compostos,
+o NexusAgent com backup/restauração, a bandeja .NET 10, a retirada direta de itens e a
+exportação XLSX, além dos filtros em chips e da revisão de terminologia (“Solicitado”).
+
 ### Added
 - **Exportação XLSX dos relatórios (KAN-170, RF024/RNF008/RF023):** todos os relatórios
   (`/relatorios/*/export` e o inventário fechado/cancelado) aceitam `?formato=xlsx` na mesma

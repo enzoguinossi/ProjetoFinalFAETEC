@@ -69,7 +69,7 @@ src/
 └── proxy.ts        # proteção das rotas privadas (sessão)
 
 prisma/
-├── schema.prisma   # modelo físico (48 entidades)
+├── schema.prisma   # modelo físico (49 entidades)
 └── seed.ts         # seed de referência
 
 docs/
@@ -523,6 +523,11 @@ Uma nota pendente pode ser adicionada posteriormente a outra expedição.
 
 Entrega parcial deve preservar a rastreabilidade da quantidade entregue e da quantidade restante;
 a pendência é a própria nota em `BAIXA_PARCIAL` (sem split e sem remessa).
+A **retirada direta** (RF021) é registrada na própria nota, não em `coleta`: a ação
+**Retirar itens** no detalhe/lista da Saída (permissão `expedicao.alterar`) aceita nota de
+Remessa em `ABERTA`/`EM_PERCURSO`/`PENDENTE`/`BAIXA_PARCIAL`, soma `qtd_entregue`, baixa
+`produto.saldo`/`saldo_reservado` e a leva a `BAIXA_PARCIAL`/`BAIXA_TOTAL`. Não é tentativa
+de entrega (não grava justificativa/fotos) e respeita o bloqueio por inventário.
 
 A Remessa usa a **Unidade Padrão de Saída** apenas como auxílio no item novo; a nota guarda
 só `qtd_esperada` e `qtd_entregue` (totais). A expedição, a baixa e a pendência trabalham com
@@ -540,7 +545,7 @@ Não implemente um novo fluxo de entrega sem verificar:
 * `expedicao`;
 * `expedicao_nota` (tentativa: `justificativa`, `data_tentativa`, `ID_usuario_tentativa`);
 * `anexo` com `ID_expedicao_nota` (fotos da tentativa);
-* `coleta` (`item_coleta` por `ID_produto`).
+* `coleta` (`item_coleta` por `ID_produto`) — tabela modelada, sem UI/fluxo; a retirada direta usa a própria nota.
 
 ## 14.1 Pedidos (RF025)
 

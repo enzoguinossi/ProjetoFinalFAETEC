@@ -3,7 +3,7 @@
 **Semântica das quantidades (transversal às RNs):** a conversão de unidade é **apenas auxílio
 de lançamento** — multiplica a quantidade digitada para calcular o total na hora, sem ser
 copiada para a nota. O saldo do produto, a reserva, a baixa e a movimentação ficam em **base**
-(`UNIDADE`, fator 1), e dashboard, relatórios e CSV exibem a quantidade base sem unidade.
+(`UNIDADE`, fator 1), e dashboard, relatórios e exportações CSV/XLSX exibem a quantidade base sem unidade.
 `item_nota_entrada.quantidade` é o total que entra no saldo; `item_nota_saida` guarda só
 `qtd_esperada` (total solicitado) e `qtd_entregue` (total entregue). A **Unidade Padrão de
 Saída** do produto só auxilia o lançamento de notas de Remessa (`SAIDA`) — ver
@@ -70,6 +70,22 @@ O servidor recusa item sem pendência, redução do já entregue e entrega com t
 corte e sem justificativa. **Não entregue** exige justificativa (1..1000), mantém a nota em
 `PENDENTE` e a reserva intacta, e grava a tentativa (`data_tentativa`, usuário e 0..5 fotos)
 no vínculo `expedicao_nota`.
+
+### Retirada direta de itens (RF021 — não é uma nova RN)
+
+A ação **Retirar itens** no detalhe/lista da Saída atende à retirada presencial de urgência
+sem expedição, condutor ou veículo, e é registrada **na própria nota de saída**. Exige
+`expedicao.alterar` e só vale para Remessa (`SAIDA`) em `ABERTA`, `EM_PERCURSO`, `PENDENTE` ou
+`BAIXA_PARCIAL`. O servidor trava a nota, aceita o delta por item até o pendente
+(`qtd_esperada − qtd_entregue`), soma `qtd_entregue += delta`, dá baixa em `produto.saldo` e
+`produto.saldo_reservado` na mesma transação (movimentação negativa com `ID_nota_saida`) e
+grava auditoria com os saldos antes/depois. A nota vira `BAIXA_PARCIAL` ou `BAIXA_TOTAL`.
+
+Não é tentativa de entrega: não grava `justificativa`, `data_tentativa`,
+`ID_usuario_tentativa` nem fotos. Respeita o bloqueio por inventário ativo e nunca deixa
+`saldo_reservado` negativo; `BAIXA_TOTAL`, `BAIXA_COM_CORTE`, `CANCELADA` e Avaria/Consumo
+Interno já baixados são histórico. O já retirado conta como entregue, e a expedição passa a
+oferecer apenas o pendente.
 
 ## RN004 — Imutabilidade de Histórico
 **Prioridade:** Essencial

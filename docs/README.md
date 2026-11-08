@@ -29,6 +29,9 @@ domínio, a especificação e o processo — quando um deles divergir do código
 | `diagramas/` | [`fluxo_atual.puml`](diagramas/fluxo_atual.puml) e [`fluxosAtuais/`](diagramas/fluxosAtuais/) | o fluxo **AS-IS manual** (papel, Trello, Excel) — **não** é o fluxo alvo do sistema |
 | `relatorios/` | [`relatorios/README.md`](relatorios/README.md) | modelo A4 dos relatórios impressos e componentes de filtro compartilhados |
 
+O modelo físico tem **49 entidades**; o seed de referência cria **89 permissões**, **2 perfis** e
+**3 conversões**. A versão atual é **1.08.11.2026** (ver [`../CHANGELOG.md`](../CHANGELOG.md)).
+
 Os componentes de UI compartilhados ficam em `src/components/`. A barra de filtros em chips
 (`BarraFiltrosBase`, controlada) atende tanto os relatórios — via o wrapper de URL
 `BarraFiltros` — quanto as listagens do sistema; os chips são adicionáveis/removíveis e não

@@ -27,7 +27,7 @@ serviram de base para o layout e continuam como referência visual.
 
 ## Relatórios implementados
 
-| Relatório | Rota | Folha | CSV |
+| Relatório | Rota | Folha | Exportação |
 | :--- | :--- | :--- | :--- |
 | Lista de Produtos | `/relatorios/produtos` | fichas | `/relatorios/produtos/export` |
 | Movimentação de Estoque | `/relatorios/movimentacao` | faixas por documento | `/relatorios/movimentacao/export` |
@@ -42,6 +42,8 @@ serviram de base para o layout e continuam como referência visual.
 | Auditoria | `/relatorios/auditoria` | eventos + diff legível | `/relatorios/auditoria/export` |
 | Inventário (fechado/cancelado) | `/inventario/[id]/relatorio` | tabela | `/inventario/[id]/relatorio/export` |
 
+As rotas de exportação entregam **CSV** por padrão e **XLSX** com `?formato=xlsx`.
+
 > O **Extrato de Produto** é um relatório próprio em `/relatorios/extrato`, com filtro de
 > período e de produtos (opcional). Sem produto selecionado, ele mostra todos os produtos
 > que tiveram movimentação no período, agrupados por produto; com produtos selecionados,
@@ -53,7 +55,7 @@ serviram de base para o layout e continuam como referência visual.
 - **Pedidos** usa A4 retrato: faixa por escola, sub-faixa por pedido (código,
   data, status e nota) e itens em linhas.
 - **Expedições e Entregas** aceitam `?fotos=1`: até 4 miniaturas (+N) na folha e
-  a URL no CSV; em Entregas, a justificativa também entra no CSV.
+  a URL na exportação; em Entregas, a justificativa também entra no CSV/XLSX.
 - **Auditoria** mostra o diff em `antes → depois`, com coleções por item e
   `[oculto]` para campos sensíveis; sem JSON bruto e sem diff em eventos de login.
 
@@ -74,5 +76,6 @@ conforme a tabela acima.
 
 1. Abra o relatório em `/relatorios` e aplique os filtros.
 2. **CSV**: use o botão **Exportar CSV** da tela (mesmos filtros da URL).
-3. **PDF**: use **Imprimir** e escolha "Salvar como PDF" nas configurações de
+3. **XLSX**: use o botão **Exportar XLSX**; a mesma rota recebe `?formato=xlsx`.
+4. **PDF**: use **Imprimir** e escolha "Salvar como PDF" nas configurações de
    impressão, mantendo o papel A4 retrato e os gráficos de segundo plano.

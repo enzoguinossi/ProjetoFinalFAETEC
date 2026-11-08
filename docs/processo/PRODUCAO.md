@@ -1,7 +1,7 @@
-# Produção — instalador autocontido 1.07 (Windows)
+# Produção — instalador autocontido 1.08 (Windows)
 
 Runbook da instalação do **Nexus** em um servidor Windows usando o pacote
-**`NexusSetup-1.07.11.2026.exe`**. O instalador é **autocontido**: Node.js portátil, MySQL
+**`NexusSetup-1.08.11.2026.exe`**. O instalador é **autocontido**: Node.js portátil, MySQL
 8.4.13, Caddy, VC++, NSSM, a aplicação Next **standalone** e o SQL de produção entram no
 payload. **Nada é baixado na máquina de destino** e não há Git, npm, `next build`, `db push`
 nem Prisma CLI no servidor.
@@ -37,7 +37,7 @@ estações da rede
 
 | Peça | Papel |
 | --- | --- |
-| `NexusSetup-1.07.11.2026.exe` | instalador **Inno Setup 7** autocontido (~488 MB, com o agente); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
+| `NexusSetup-1.08.11.2026.exe` | instalador **Inno Setup 7** autocontido (419,4 MB / 439.748.699 bytes, com o agente); embute o payload, pede as senhas do MySQL no wizard e executa o bootstrap com janela de progresso |
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
 | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
@@ -56,7 +56,7 @@ estações da rede
 
 | Componente | Versão/origem | Onde está definido |
 | --- | --- | --- |
-| App Next | **standalone**, `server.js` + `.next/static` + `public` + client Prisma; versão `1.07.11.2026` | `next.config.ts`, `package.json`, `app.zip` |
+| App Next | **standalone**, `server.js` + `.next/static` + `public` + client Prisma; versão `1.08.11.2026` | `next.config.ts`, `package.json`, `app.zip` |
 | Node.js | **24.19.0** portátil, ZIP `node-v24.19.0-win-x64.zip` | `manifesto.json` / payload |
 | MySQL | **8.4.13 LTS**, ZIP `mysql-8.4.13-winx64.zip` (MD5) | `manifesto.json` / payload |
 | Serviço MySQL | **`NexusMySQL84`**, porta **3214**, bind `127.0.0.1` | `instalar-mysql.ps1` |
@@ -66,10 +66,10 @@ estações da rede
 | Bandeja | **.NET 10**, `win-x64`, self-contained, single-file | `NexusTray/NexusTray.csproj` |
 | Agente | **.NET 10**, `win-x64`, self-contained, single-file (`NexusAgent.exe` ~99 MB) | `NexusAgent/NexusAgent.csproj` |
 | Instalador | **Inno Setup 7**; `ISCC.exe` local ou NuGet **7.1.0** no build | `build-instalador.ps1` |
-| Setup | **388,7 MB** (`NexusSetup-1.07.11.2026.exe`) + ~99 MB do agente (≈ 488 MB); payload ~408 MB + agente | `deploy/windows/out/` |
+| Setup | **419,4 MB** (`NexusSetup-1.08.11.2026.exe`, 439.748.699 bytes, já com o agente) | `deploy/windows/out/` |
 
-> O tamanho do setup cresce com o `NexusAgent.exe` (~99 MB). Confirme o valor real após
-> `build-instalador.ps1` — o número acima é a estimativa do build com o agente embutido.
+> O tamanho do setup cresce com o `NexusAgent.exe` (~99 MB). O valor acima é o build real
+> com o agente embutido.
 
 > O destino **não usa** Git, npm, `next build`, `db push` ou Prisma CLI. O cliente Prisma já
 > vem no `app.zip`; o schema é aplicado por SQL com `mysql.exe`.
@@ -127,7 +127,7 @@ estações da rede
 | `C:\ProgramData\MySQL\MySQL Server 8.4\Data` | dados do MySQL da instalação anterior (10.02); o `instalar-mysql.ps1` copia para `C:\ProgramData\Nexus\mysql\data` e **preserva o original** |
 | `C:\Program Files\MySQL\MySQL Server 8.4` | se existir, é uma instalação MySQL independente (por exemplo, 3306); o Nexus **não a instala, para nem altera** |
 
-> `C:\ProgramData\MySQL\MySQL Server 8.4` **não é caminho ativo** do Nexus 1.07: serve apenas
+> `C:\ProgramData\MySQL\MySQL Server 8.4` **não é caminho ativo** do Nexus 1.08: serve apenas
 > de origem para a migração do `Data`. O caminho ativo é `C:\ProgramData\Nexus\mysql\data`.
 
 ---
@@ -224,7 +224,7 @@ a 3000 e a 3215 ficam bloqueadas para a sub-rede. Se as estações estiverem for
 
 ---
 
-## 5. Instalação pelo instalador (`NexusSetup-1.07.11.2026.exe`)
+## 5. Instalação pelo instalador (`NexusSetup-1.08.11.2026.exe`)
 
 ### 5.1 O que o wizard pergunta
 
@@ -401,7 +401,7 @@ O bootstrap executa o smoke com a versão do `package.json` do app:
 & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
   -NoProfile -ExecutionPolicy Bypass `
   -File "C:\Program Files\Nexus\Instalador\smoke.ps1" `
-  -Hostname nexus.galpao.local -ExpectedVersion 1.07.11.2026
+  -Hostname nexus.galpao.local -ExpectedVersion 1.08.11.2026
 ```
 
 O smoke confere:
@@ -926,7 +926,7 @@ Se faltar ou estiver inválido, a bandeja usa os padrões do código (já aponta
 Rota pública (`src/proxy.ts`), `force-dynamic`, runtime Node:
 
 ```json
-{ "status": "ok", "db": true, "versao": "1.07.11.2026" }
+{ "status": "ok", "db": true, "versao": "1.08.11.2026" }
 ```
 
 - HTTP **200** quando `SELECT 1` responde;
@@ -939,7 +939,7 @@ Rota pública (`src/proxy.ts`), `force-dynamic`, runtime Node:
 ```powershell
 # PowerShell elevado; exemplo de versão
 cd "C:\Program Files\Nexus\Instalador"
-.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 1.07.11.2026
+.\smoke.ps1 -Hostname nexus.galpao.local -ExpectedVersion 1.08.11.2026
 ```
 
 Confere Node portátil, `mysqld.exe`, os quatro serviços (`NexusMySQL84`, `NexusApp`,
@@ -1147,7 +1147,7 @@ Para remoção total, depois de copiar o que precisa:
 
 ---
 
-## 14. Checklist de release do instalador 1.07
+## 14. Checklist de release do instalador 1.08
 
 > **Build em um comando (Windows):** `npm run deploy:windows` executa, em ordem:
 > `prisma generate` → geração de `deploy/sql` → lint → build/empacotamento do app →
@@ -1170,7 +1170,7 @@ Para remoção total, depois de copiar o que precisa:
 - [ ] `npm run build:standalone` (Next com `output: "standalone"`).
 - [ ] `npm run package:standalone` → `out/standalone/app.zip`; confira `server.js` na raiz,
       `.next/static` e ausência de `.env`/`uploads`.
-- [ ] A versão do `package.json` é `1.07.11.2026` (ou a versão da release) e aparece no
+- [ ] A versão do `package.json` é `1.08.11.2026` (ou a versão da release) e aparece no
       `app.zip`.
 
 ### 14.2 Payload e setup
@@ -1183,8 +1183,8 @@ Para remoção total, depois de copiar o que precisa:
       8.4.13, Caddy 2.11.9, VC++, NSSM, `app\app.zip`, `sql\{schema,seed}` e toda a pasta
       `sql\migracoes`; os hashes definidos no manifesto são verificados.
 - [ ] `deploy/windows/build-instalador.ps1` (chama `preparar-payload`) gera
-      `deploy/windows/out/NexusSetup-1.07.11.2026.exe`; confira o tamanho (~488 MB, já com o
-      agente).
+      `deploy/windows/out/NexusSetup-1.08.11.2026.exe`; confira o tamanho (419,4 MB /
+      439.748.699 bytes, já com o agente).
 - [ ] O setup contém `payload\`, `sql\`, `NexusAgent.exe` e `progresso\index.html`; nenhum
       download/Git/npm/Prisma é necessário no destino.
 
@@ -1277,7 +1277,8 @@ Para remoção total, depois de copiar o que precisa:
     remoção total, apague `C:\ProgramData\Nexus` e exclua a CA em `certlm.msc`.
 
 12. **O setup é grande e o payload não é versionado.**
-    O `NexusSetup-1.07.11.2026.exe` fica em ~488 MB com o `NexusAgent.exe` (~99 MB);
+    O `NexusSetup-1.08.11.2026.exe` fica em 419,4 MB (439.748.699 bytes) com o
+    `NexusAgent.exe` (~99 MB);
     `deploy/windows/payload` é ignorado pelo Git e precisa ser montado no build. O destino é
     offline, mas o build exige internet e os arquivos de origem (app.zip, NSSM, SQL, agente).
 

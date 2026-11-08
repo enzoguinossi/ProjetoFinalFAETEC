@@ -1,9 +1,31 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-08 (release `1.07.11.2026`, tag `v1.07.11.2026`; instalador
-> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; wizard de senhas/progresso, ACL,
-> bandeja .NET 10, app standalone com `sharp`/libvips e filtros em chips em `[Unreleased]`).
+> Última consolidação: 2026-11-08 (release `1.08.11.2026`, tag `v1.08.11.2026`; instalador
+> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; tipos de destinatário, desmembramento,
+> NexusAgent/backup, bandeja .NET 10, retirada direta e XLSX).
+
+## Estado corrente — release 1.08.11.2026 (2026-11-08)
+
+- **Versão/tag:** `1.08.11.2026` / `v1.08.11.2026` (DateVer, primeira release do dia 08.11).
+- **Instalador:** `deploy/windows/out/NexusSetup-1.08.11.2026.exe`, **439.748.699 bytes
+  (419,4 MB)**, SHA-256 `5C976B33DC3E64805384FD0B42276C339C73B79371437E02454A4448DFE7194F`.
+  Build por `npm run deploy:windows` (prisma generate, SQL, lint, Next standalone/app.zip,
+  NexusTray, NexusAgent, payload e Inno Setup) — 6,4 min.
+- **Entregas do release:** tipos de destinatário como cadastro (`tipo_destinatario`),
+  desmembramento de compostos, NexusAgent com backup/restauração e painel
+  `/administracao/backup`, bandeja .NET 10, filtros em chips, retirada direta de itens
+  (RF021), exportação XLSX (RF023/RF024/RNF008) e terminologia “Solicitado”.
+- **Validação:** suíte completa **702 testes / 67 arquivos** (config temporária sem
+  `globalSetup`, pois o Prisma bloqueia `db push --accept-data-loss` para agentes);
+  `npm run lint`, `tsc` e `npm run build` OK; build do instalador OK.
+- **Documentação:** `IMPLEMENTACAO.md`, `ENTENDIMENTO.md`, `REGRAS_NEGOCIO.md`,
+  `REQUISITOS_FUNCIONAIS.md`, `PRODUCAO.md`, `README`s, `AGENTS.md` e diagramas revisados para
+  49 entidades, 89 permissões, 2 perfis, 3 conversões e o fluxo de retirada sem `coleta`.
+- **Matriz atual:** somente `RF011` (leitor/tela dedicada) e `RNF002` (medição < 2 s)
+  permanecem parciais; `RF018`, `RF026` e `RNF009` seguem fora do escopo.
+- **Pendências reais:** instalar o setup em máquina limpa/colega, testar restauração **com
+  uploads**, testar a retirada e o XLSX em desktop e publicar a tag (push main + tag neste run).
 
 ## Objetivo atual
 
@@ -399,10 +421,10 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
 5. **Testar `atualizar.ps1 -Package`:** a máquina atual foi atualizada pelo bootstrap; o
    caminho de pacote + SQL do atualizador ainda não foi exercitado.
 6. **Docs:** runbook, `IMPLEMENTACAO.md`, `ENTENDIMENTO.md` e `README`s atualizados para
-   wizard/ACL/bandeja/sharp/filtros; manter ao incluir novas telas.
-7. **Release:** definir a próxima versão DateVer (`2.07.11.2026`) e publicar wizard/ACL/tray
-   .NET 10/sharp/filtros/tipos de escola/desmembramento/backup + seed com **89 permissões**; o
-   `CHANGELOG` está em `[Unreleased]` e o setup em `out` é build local, sem tag.
+   wizard/ACL/bandeja/sharp/filtros/tipos de destinatário/desmembramento/backup/retirada/XLSX;
+   manter ao incluir novas telas.
+7. **Release 1.08.11.2026:** versão/tag definidas, `CHANGELOG` fechado, instalador compilado
+   e documentação revisada; falta publicar `main` + tag e instalar/testar o setup.
 8. **Ferramentas:** `tools/figma-export/fixtures.ts` ainda usa `PACOTE`/`CAIXA`; alinhar a
    `PCT10`/`CX50`.
 9. **NexusAgent/backup:** implementados (serviço, agendamento, restauração e painel
@@ -414,17 +436,6 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
     criar o usuário do representante e validar impressão/backup.
 12. **Limitações conhecidas:** backup sem `caddy\data`; retenção de `backups\uploads`;
     CA permanece no trust store; hashes de Node/VC++/Caddy/MySQL a preencher; DNS dos clientes.
-13. **RFs restantes:** RF011 (leitor/tela dedicada), RF021 (retirada direta de urgência) e
-    RF023/RF024/RNF008 (XLSX); RF012 e RF019 concluídos (transferências = entregas às escolas;
-    assistente de saída = aviso RN001); RF018/RF026/RNF009 fora do escopo.
-14. **Retiradas diretas de urgência (RF021):** dar baixa parcial na própria nota de saída
-    (`urgente`), item a item, baixando `produto.saldo` e liberando o `saldo_reservado`, com
-    `BAIXA_PARCIAL`/`BAIXA_TOTAL`, movimentação e auditoria. Deve funcionar também quando a
-    nota já está planejada em uma expedição: o já retirado conta como entregue e a expedição
-    oferece só o pendente (ou a nota sai da lista se estiver completa). Definir: permissão
-    (`nota_saida.alterar`/`estoque.saida`), local da ação (detalhe/lista da Saída), se permite
-    retirar antes do despacho e como a expedição é atualizada/avisada.
-15. **Exportação XLSX (RF024/RNF008; fecha o pendente do RF023):** rota/arquivo `.xlsx` para
-    cada relatório, repetindo os filtros e dados do CSV, com cabeçalho, larguras e
-    números/datas formatados, botão ao lado de CSV e testes. Avaliar biblioteca (ex.:
-    `exceljs`/`xlsx`) e impacto no bundle; manter CSV e PDF.
+13. **RFs restantes:** apenas `RF011` (leitor/tela dedicada) e `RNF002` (medição < 2 s);
+    `RF021`, `RF023`, `RF024` e `RNF008` concluídos no release `1.08.11.2026`;
+    `RF018`/`RF026`/`RNF009` fora do escopo.
