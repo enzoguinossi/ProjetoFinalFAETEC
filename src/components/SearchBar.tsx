@@ -4,6 +4,11 @@ import Button from "@/components/Button";
 
 interface SearchBarProps {
   placeholder?: string;
+  /**
+   * Valor exibido no campo (controlado). Sem a prop, o campo segue não
+   * controlado como antes.
+   */
+  value?: string;
   onSearch?: (value: string) => void;
   onNew?: () => void;
   novoHref?: string;
@@ -13,6 +18,7 @@ interface SearchBarProps {
 
 export default function SearchBar({
   placeholder = "Pesquisar...",
+  value,
   onSearch,
   onNew,
   novoHref,
@@ -52,6 +58,7 @@ export default function SearchBar({
           className="flex-1 border-none outline-none bg-transparent font-sans text-sm text-ink h-full min-w-0 placeholder:text-[#8a8f9a]"
           type="text"
           placeholder={placeholder}
+          value={value}
           onChange={(e) => onSearch?.(e.target.value)}
         />
         <img

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import DataTable, { type Column } from "@/components/DataTable";
+import SearchBar from "@/components/SearchBar";
 import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
@@ -44,9 +45,6 @@ interface Props {
   podeAprovar: boolean;
   podeConsultar: boolean;
 }
-
-const CLASSE_CAMPO =
-  "h-10 rounded-lg border border-border-input bg-white px-3 font-sans text-sm text-ink outline-none focus:border-brand";
 
 const STATUS_FILTRO: { valor: string; rotulo: string }[] = [
   { valor: "PENDENTE", rotulo: "Pendente" },
@@ -108,6 +106,15 @@ export default function PedidosClient({
   const [valoresFiltros, setValoresFiltros] = useState<Valores>(valoresIniciais);
   const [chaveFiltros, setChaveFiltros] = useState(0);
   const filtrosAtuais = useRef<Valores>(valoresIniciais);
+  const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Mesmo debounce da lista paginada: o timer é limpo ao desmontar.
+  useEffect(
+    () => () => {
+      if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    },
+    [],
+  );
 
   const camposFiltro: CampoFiltro[] = [
     { id: "periodo", rotulo: "Período", tipo: "periodo" },
@@ -173,6 +180,22 @@ export default function PedidosClient({
     }
   }
 
+  /**
+   * Busca com o mesmo debounce (300 ms) e mínimo de 2 caracteres da lista
+   * paginada; abaixo disso a lista volta sem o termo.
+   */
+  function buscarComDebounce(termo: string) {
+    setBusca(termo);
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
+    if (termo.trim().length < 2) {
+      void carregar(1, resultado.limit, filtrosAtuais.current, "");
+      return;
+    }
+    buscaTimer.current = setTimeout(() => {
+      void carregar(1, resultado.limit, filtrosAtuais.current, termo);
+    }, 300);
+  }
+
   function aplicarFiltrosTela(novos: Valores) {
     filtrosAtuais.current = novos;
     setValoresFiltros(novos);
@@ -181,6 +204,7 @@ export default function PedidosClient({
   }
 
   function limparFiltros() {
+    if (buscaTimer.current) clearTimeout(buscaTimer.current);
     setBusca("");
     filtrosAtuais.current = {};
     setValoresFiltros({});
@@ -304,23 +328,14 @@ export default function PedidosClient({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-border bg-white p-3">
-        <label className="flex min-w-[14rem] flex-1 flex-col gap-1 font-sans text-xs text-[#697077]">
-          Buscar
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void carregar(1);
-              }
-            }}
-            placeholder="Escola, produto ou observação"
-            className={CLASSE_CAMPO}
-          />
-        </label>
-      </div>
+      <SearchBar
+        placeholder="Pesquisar pedidos..."
+        value={busca}
+        onSearch={buscarComDebounce}
+        novoHref="/pedidos/novo"
+        novoLabel="Novo pedido"
+        showNew={podeCriar}
+      />
 
       <BarraFiltrosBase
         key={chaveFiltros}
@@ -328,9 +343,6 @@ export default function PedidosClient({
         valores={valoresFiltros}
         onAplicar={aplicarFiltrosTela}
         onLimpar={limparFiltros}
-        acoes={
-          podeCriar ? <Button label="Novo pedido" href="/pedidos/novo" /> : undefined
-        }
       />
 
       <DataTable
