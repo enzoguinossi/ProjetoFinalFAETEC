@@ -173,7 +173,8 @@ app Next standalone; schema/seed SQL sem Prisma; banco em `C:\ProgramData\Nexus\
    (Período/Status/Contagem cega), Pedidos (Período/Escola/Status/Produto/Nota, substituindo o
    formulário antigo), Entrada (Período/Fornecedor) e Saída
    (Período/Tipo/Status/Destinatário/Urgente). Todas mantêm a busca livre; default continua
-   **só ativos**.
+   **só ativos**. Pedidos passou a usar o `SearchBar` compartilhado (lupa, botão “Novo pedido”,
+   debounce de 300 ms e mínimo de 2 caracteres), como as demais telas.
 4. **Permissão `produto.ver_inativos` (82ª):** única que expõe inativos — libera o chip e a
    coluna Situação em `/produtos`, a busca priorizada e o detalhe/edição por ID; **não** libera
    seletores operacionais (movimentação, pedidos, inventário, insumos). Notas históricas
