@@ -7,10 +7,11 @@
 
 ## Estado corrente — sessão de apresentação 2026-11-14 (pós-1.08.11.2026)
 
-- **Working tree:** `main` no commit `ecc7bb1` (versão `1.14.11.2026`), **publicado em
-  `origin/main`**; tag `v1.14.11.2026` **não** criada. Árvore limpa, exceto `.openchamber/`
-  local (screenshots antigos não versionados). O release `1.08.11.2026` continua sendo o
-  último instalador distribuído; o 1.14 está gerado e ainda não instalado.
+- **Working tree:** `main` publicado em `origin/main`; o release `1.14.11.2026` está no
+  commit `ecc7bb1`, com a tag anotada **`v1.14.11.2026` criada e publicada**. O estado
+  corrente é este commit de registro. Árvore limpa, exceto `.openchamber/` local (screenshots
+  antigos não versionados). O release `1.08.11.2026` continua sendo o último instalador
+  distribuído; o 1.14 está gerado e ainda não instalado.
 - **Funcionário condutor:** `cnh`, `categoria_cnh`, `validade_cnh` (DATE) e `tipo_sanguineo`
   em `funcionario`, sempre opcionais; aba **Condutor** no formulário (`FormTabs`) aparece
   somente quando o checkbox **É condutor** está marcado (em `view`, somente se o registro for
@@ -69,14 +70,15 @@
   arquivos** passando (config temporária sem `globalSetup`, com `nexus_test` em sync);
   screenshots do login em 1360×768 e 1920×1080; `figma:check` passou depois da mudança do
   cabeçalho da tabela. Migração 003 testada sobre schema 1.08 (50 tabelas, 92/2/3).
-- **Release 1.14.11.2026:** commit `ecc7bb1` em `origin/main`; instalador
+- **Release 1.14.11.2026:** commit `ecc7bb1` em `origin/main`, com a tag anotada
+  **`v1.14.11.2026` criada e publicada**; instalador
   `deploy/windows/out/NexusSetup-1.14.11.2026.exe` (440.095.033 bytes; SHA-256
   `FA8BED8C17B2471C1CA538C6AB08E1DD214F668896AE9B846327FE8BFD2710A0`), build de 6,8 min,
   com as migrações 001–003 no payload. **Não instalado/atualizado** na máquina de produção;
-  tag `v1.14.11.2026` e GitHub release não criados.
+  GitHub release não criado.
 - **Pendências reais:** instalar/atualizar o app de produção com o setup 1.14 (o código novo
-  ainda não está no build instalado; o schema/dados já estão prontos), criar a tag/GitHub
-  release se aprovado e fazer a validação visual autenticada das telas novas e das listagens
+  ainda não está no build instalado; o schema/dados já estão prontos), criar o GitHub release
+  se desejado e fazer a validação visual autenticada das telas novas e das listagens
   (scroll, sticky, ordenação e colunas visíveis), que não foi possível por falta de credencial
   de login; a suíte, o lint, o build e o `figma:check` cobrem o código.
 - **Serviços:** `NexusMySQL84` Running; `NexusApp` e `NexusCaddy` Stopped (como estavam).
