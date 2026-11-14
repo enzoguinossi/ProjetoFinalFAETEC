@@ -13,6 +13,35 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [2.14.11.2026] - 2026-11-14
+
+Correção do instalador: a atualização não pode ser bloqueada por contagens de cadastros
+editáveis, e o Update deixa de recriar dados que o usuário apagou.
+
+### Fixed
+- **Instalador — contagens não bloqueiam (KAN-22):** o `aplicar-sql.ps1` não valida mais
+  permissões, perfis, conversões nem a renomeação PCT10/CX50. As contagens são apenas
+  registradas no log. Perfis, tipos e conversões de unidade são cadastros editáveis e o
+  usuário pode apagar todos; nenhuma contagem é pré-requisito para instalar ou atualizar.
+  O update da produção parava com
+  `Contagem de referência divergente em profiles: esperado 2, obtido '3'` por causa de um
+  perfil personalizado criado no sistema.
+
+### Changed
+- **Seed de atualização:** o caminho **Update** aplica as migrações e o novo
+  `deploy/sql/seed-update.sql`, com apenas o catálogo de permissões e a limpeza das
+  permissões obsoletas. Perfis, tipos de código, tipos de destinatário e conversões de
+  unidade ficam como o usuário deixou, e nenhum vínculo perfil↔permissão é refeito. Novas
+  permissões entram no catálogo sem concessão automática aos perfis existentes (o Super
+  Admin tem todas; as demais são concedidas na tela de Perfis). O `seed.sql` completo
+  continua sendo aplicado somente em banco novo.
+- **Migração 002:** os 4 tipos de destinatário de referência só são inseridos enquanto a
+  coluna enum antiga existe (primeira migração de banco legado); depois disso o cadastro é
+  do usuário e não é recriado.
+- **Validação do gerador:** `gerar-sql-producao.mjs --check` continua conferindo o banco
+  novo (92 permissões, 2 perfis, 3 conversões) e agora prova que o `seed-update.sql`, sobre
+  um banco com os cadastros apagados, mantém as permissões e não recria nada.
+
 ## [1.14.11.2026] - 2026-11-14
 
 Esta seção consolida os ajustes de apresentação e a evolução das listagens.

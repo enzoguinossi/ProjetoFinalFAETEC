@@ -199,8 +199,10 @@ function Assert-Payload {
         @{ Path = "app\app.zip"; Label = "aplicação standalone (app.zip)" },
         @{ Path = "sql\schema.sql"; Label = "schema.sql" },
         @{ Path = "sql\seed.sql"; Label = "seed.sql" },
+        @{ Path = "sql\seed-update.sql"; Label = "seed-update.sql" },
         @{ Path = "sql\migracoes\001-unidades-pct10-cx50.sql"; Label = "migração 001" },
-        @{ Path = "sql\migracoes\002-tipos-destinatario.sql"; Label = "migração 002" }
+        @{ Path = "sql\migracoes\002-tipos-destinatario.sql"; Label = "migração 002" },
+        @{ Path = "sql\migracoes\003-condutor-tipos-produto-auxiliar.sql"; Label = "migração 003" }
     )
     foreach ($item in $required) {
         $path = Join-Path $PayloadDir $item.Path

@@ -94,7 +94,9 @@ $requiredPayload = @(
     @{ Path = (Join-Path $payloadRoot "app\app.zip"); Label = "app.zip" },
     @{ Path = (Join-Path $payloadRoot "sql\schema.sql"); Label = "schema.sql" },
     @{ Path = (Join-Path $payloadRoot "sql\seed.sql"); Label = "seed.sql" },
-    @{ Path = (Join-Path $payloadRoot "sql\migracoes\002-tipos-destinatario.sql"); Label = "migração 002" }
+    @{ Path = (Join-Path $payloadRoot "sql\seed-update.sql"); Label = "seed-update.sql" },
+    @{ Path = (Join-Path $payloadRoot "sql\migracoes\002-tipos-destinatario.sql"); Label = "migração 002" },
+    @{ Path = (Join-Path $payloadRoot "sql\migracoes\003-condutor-tipos-produto-auxiliar.sql"); Label = "migração 003" }
 )
 foreach ($item in $requiredPayload) {
     if (-not (Test-Path -LiteralPath $item.Path -PathType Leaf)) {

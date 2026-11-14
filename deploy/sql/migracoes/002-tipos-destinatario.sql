@@ -4,7 +4,9 @@
 -- o schema.sql já nasce com a tabela, a coluna, o índice e a FK; esta migração
 -- apenas confirma que tudo existe (é idempotente).
 --
--- 1. cria `tipo_destinatario` e insere os 4 tipos de referência só se vazia;
+-- 1. cria `tipo_destinatario` e insere os 4 tipos de referência apenas na primeira
+--    migração de um banco legado (quando a coluna enum ainda existe); depois disso
+--    o cadastro é do usuário e não é recriado;
 -- 2. adiciona `destinatario.ID_tipo_destinatario` quando ainda não existe;
 -- 3. mapeia o enum antigo (`tipo_destinatario`) pelo `codigo`;
 -- 4. cria índice e FK `ON DELETE SET NULL`;
@@ -25,7 +27,16 @@ CREATE TABLE IF NOT EXISTS `tipo_destinatario` (
     PRIMARY KEY (`ID_tipo_destinatario`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-SET @qtd_tipo_destinatario := (SELECT COUNT(*) FROM `tipo_destinatario`);
+-- 1b. Tipos de referência: só na conversão do enum antigo para o cadastro. Se a
+-- coluna enum já não existe, o cadastro é do usuário — apagar os tipos é uma
+-- decisão dele e a atualização não os traz de volta.
+SET @migrar_tipos_destinatario := (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'destinatario'
+      AND COLUMN_NAME = 'tipo_destinatario'
+);
+
 INSERT INTO `tipo_destinatario` (`codigo`, `nome`, `padrao`)
 SELECT `codigo`, `nome`, `padrao` FROM (
     SELECT 'ESCOLA' AS `codigo`, 'Escola' AS `nome`, TRUE AS `padrao`
@@ -33,7 +44,10 @@ SELECT `codigo`, `nome`, `padrao` FROM (
     UNION ALL SELECT 'CMEI', 'CMEI', FALSE
     UNION ALL SELECT 'CMEIA', 'CMEIA', FALSE
 ) AS novos
-WHERE @qtd_tipo_destinatario = 0;
+WHERE @migrar_tipos_destinatario = 1
+  AND NOT EXISTS (
+      SELECT 1 FROM `tipo_destinatario` t WHERE t.`codigo` = novos.`codigo`
+  );
 
 -- 2. Coluna de vínculo (opcional) no destinatário.
 SET @sql := (

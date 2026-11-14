@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     O pacote contém a aplicação standalone (app.zip) e o SQL de produção
-    (schema.sql/seed.sql/migracoes). O atualizador faz backup, para o
+    (schema.sql/seed.sql/seed-update.sql/migracoes). O atualizador faz backup, para o
     NexusCaddy/NexusApp, troca a pasta da aplicação, preserva o .env, aplica o
     SQL com mysql.exe, sobe os serviços e valida com smoke test. Em caso de
     falha, a pasta anterior volta a ser usada; o banco NÃO é restaurado
@@ -19,8 +19,10 @@
         <pacote>\app\app.zip    (ou <pacote>\app.zip)
         <pacote>\sql\schema.sql
         <pacote>\sql\seed.sql
+        <pacote>\sql\seed-update.sql
         <pacote>\sql\migracoes\001-unidades-pct10-cx50.sql
         <pacote>\sql\migracoes\002-tipos-destinatario.sql
+        <pacote>\sql\migracoes\003-condutor-tipos-produto-auxiliar.sql
 
 .PARAMETER Package
     Diretório do pacote de atualização (app\ + sql\).
@@ -146,7 +148,7 @@ function Resolve-SqlDir {
             return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
-    throw "SQL de produção não encontrado. Informe -Sql com a pasta que contém schema.sql/seed.sql."
+    throw "SQL de produção não encontrado. Informe -Sql com a pasta que contém schema.sql/seed.sql/seed-update.sql."
 }
 
 function Start-NexusCaddy {

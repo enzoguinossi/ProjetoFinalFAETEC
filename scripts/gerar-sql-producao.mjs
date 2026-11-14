@@ -2,21 +2,25 @@
 /**
  * Gera o SQL de produção do Nexus (sem Prisma no destino).
  *
- *   node scripts/gerar-sql-producao.mjs          # regenera schema.sql e seed.sql
+ *   node scripts/gerar-sql-producao.mjs          # regenera schema.sql, seed.sql e seed-update.sql
  *   node scripts/gerar-sql-producao.mjs --check  # valida os arquivos num banco temporário
  *   node scripts/gerar-sql-producao.mjs --all    # regenera e valida
  *
  * `schema.sql` vem de `prisma migrate diff --from-empty --to-schema` (mesmo DDL
- * do `prisma db push`), sem `CREATE DATABASE`. `seed.sql` é gerado a partir da
- * lista de referência abaixo — a mesma do `prisma/seed.ts` — e é idempotente:
- * `INSERT ... ON DUPLICATE KEY UPDATE` para cadastros e `INSERT IGNORE` para os
- * vínculos perfil↔permissão.
+ * do `prisma db push`), sem `CREATE DATABASE`. Há dois seeds:
  *
- * A validação (`--check`) cria um banco temporário (padrão `nexus_sql_test`) com
- * as credenciais de `DATABASE_URL`, aplica schema+seed, confere as contagens,
- * reaplica o seed e confere que nada duplicou. O banco de `DATABASE_URL` nunca é
- * usado como destino e `nexus_prod` é recusado. A senha nunca é impressa: vai
- * ao cliente MySQL por `MYSQL_PWD`.
+ *   - `seed.sql` (Fresh): todos os dados de referência — tipos de código, tipos de
+ *     destinatário, permissões, perfis-template, vínculos e conversões de unidade;
+ *   - `seed-update.sql` (Update): só o catálogo de permissões e a limpeza das
+ *     permissões obsoletas. Perfis, tipos e conversões são cadastros editáveis que
+ *     o usuário pode apagar; a atualização não os recria nem refaz vínculos.
+ *
+ * Ambos são idempotentes. A validação (`--check`) cria um banco temporário (padrão
+ * `nexus_sql_test`) com as credenciais de `DATABASE_URL`, aplica schema+seed,
+ * confere as contagens, reaplica o seed, e depois apaga os cadastros editáveis e
+ * confere que `seed-update.sql` não os traz de volta. O banco de `DATABASE_URL`
+ * nunca é usado como destino e `nexus_prod` é recusado. A senha nunca é impressa:
+ * vai ao cliente MySQL por `MYSQL_PWD`.
  *
  * O destino (instalador) NÃO executa Prisma: usa apenas `mysql.exe` com os
  * arquivos de `deploy/sql/`.
@@ -33,6 +37,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SQL_DIR = path.join(ROOT, "deploy", "sql");
 const SCHEMA_FILE = path.join(SQL_DIR, "schema.sql");
 const SEED_FILE = path.join(SQL_DIR, "seed.sql");
+const SEED_UPDATE_FILE = path.join(SQL_DIR, "seed-update.sql");
 const SCHEMA_MODEL = "prisma/schema.prisma";
 
 // ── Dados de referência (espelham prisma/seed.ts) ───────────────────────────
@@ -235,8 +240,24 @@ function gerarSchema() {
   return `${header}${ddl.trimEnd()}\n`;
 }
 
-function gerarSeed() {
+function linhasPermissoes() {
   const permissoes = listaPermissoes();
+  return [
+    "-- ── Permissões (entidade.acao) ─────────────────────────────────────────────",
+    "INSERT INTO `permissao` (`nome`, `ativo`) VALUES",
+    permissoes.map((nome) => `  (${q(nome)}, TRUE)`).join(",\n"),
+    "AS new",
+    "ON DUPLICATE KEY UPDATE `ativo` = new.`ativo`;",
+    "",
+    "-- ── Limpeza de permissões obsoletas (modelos antigos remessa/rota) ─────────",
+    `DELETE FROM \`usuario_permissao\` WHERE \`ID_permissao\` IN (SELECT \`ID_permissao\` FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)}));`,
+    `DELETE FROM \`perfil_permissao\` WHERE \`ID_permissao\` IN (SELECT \`ID_permissao\` FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)}));`,
+    `DELETE FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)});`,
+    "",
+  ];
+}
+
+function gerarSeed() {
   const linhas = [
     "-- Nexus — seed de referência (sem usuários, produtos ou dados operacionais).",
     "-- Gerado por scripts/gerar-sql-producao.mjs a partir da lista de referência do",
@@ -261,17 +282,7 @@ function gerarSeed() {
     ") AS novos",
     "WHERE @qtd_tipo_destinatario = 0;",
     "",
-    "-- ── Permissões (entidade.acao) ─────────────────────────────────────────────",
-    "INSERT INTO `permissao` (`nome`, `ativo`) VALUES",
-    permissoes.map((nome) => `  (${q(nome)}, TRUE)`).join(",\n"),
-    "AS new",
-    "ON DUPLICATE KEY UPDATE `ativo` = new.`ativo`;",
-    "",
-    "-- ── Limpeza de permissões obsoletas (modelos antigos remessa/rota) ─────────",
-    `DELETE FROM \`usuario_permissao\` WHERE \`ID_permissao\` IN (SELECT \`ID_permissao\` FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)}));`,
-    `DELETE FROM \`perfil_permissao\` WHERE \`ID_permissao\` IN (SELECT \`ID_permissao\` FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)}));`,
-    `DELETE FROM \`permissao\` WHERE \`nome\` IN (${inList(PERMISSOES_OBSOLETAS)});`,
-    "",
+    ...linhasPermissoes(),
     "-- ── Perfis-template ────────────────────────────────────────────────────────",
     "INSERT INTO `perfil` (`nome`, `descricao`) VALUES",
     PERFIS.map((p) => `  (${q(p.nome)}, ${q(p.descricao)})`).join(",\n"),
@@ -311,6 +322,22 @@ function gerarSeed() {
   return linhas.join("\n");
 }
 
+function gerarSeedUpdate() {
+  return [
+    "-- Nexus — seed de atualização (modo Update): somente o catálogo de permissões.",
+    "-- Gerado por scripts/gerar-sql-producao.mjs.",
+    "--",
+    "-- Perfis, tipos de código, tipos de destinatário e conversões de unidade são",
+    "-- cadastros editáveis: o usuário pode apagá-los. Por isso o Update NÃO os",
+    "-- recria, nem refaz vínculos perfil↔permissão — a atualização preserva o que",
+    "-- estiver no banco. O seed completo (seed.sql) roda apenas em banco novo.",
+    "",
+    "SET NAMES utf8mb4;",
+    "",
+    ...linhasPermissoes(),
+  ].join("\n");
+}
+
 function gerarArquivos() {
   fs.mkdirSync(SQL_DIR, { recursive: true });
   fs.mkdirSync(path.join(SQL_DIR, "migracoes"), { recursive: true });
@@ -322,6 +349,12 @@ function gerarArquivos() {
   const seed = gerarSeed();
   fs.writeFileSync(SEED_FILE, seed, "utf8");
   console.log(`seed.sql:   ${path.relative(ROOT, SEED_FILE)} (${seed.length} bytes)`);
+
+  const seedUpdate = gerarSeedUpdate();
+  fs.writeFileSync(SEED_UPDATE_FILE, seedUpdate, "utf8");
+  console.log(
+    `seed-update.sql: ${path.relative(ROOT, SEED_UPDATE_FILE)} (${seedUpdate.length} bytes)`,
+  );
 }
 
 // ── Validação em banco temporário ──────────────────────────────────────────
@@ -367,7 +400,7 @@ function validar() {
   if (/prod/i.test(checkDb)) {
     throw new Error("O banco de validação não pode conter 'prod' no nome.");
   }
-  for (const file of [SCHEMA_FILE, SEED_FILE]) {
+  for (const file of [SCHEMA_FILE, SEED_FILE, SEED_UPDATE_FILE]) {
     if (!fs.existsSync(file)) {
       throw new Error(`Arquivo ausente: ${path.relative(ROOT, file)}. Rode a geração primeiro.`);
     }
@@ -454,6 +487,39 @@ function validar() {
     if (erros.length > 0) throw new Error(`Validação falhou:\n  - ${erros.join("\n  - ")}`);
 
     console.log("  OK: 92 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), 4 tipos de escola, seed idempotente");
+
+    // O Update não pode ressuscitar cadastros editáveis apagados pelo usuário.
+    consultar(
+      "DELETE FROM `perfil_permissao`; DELETE FROM `perfil`; DELETE FROM `conversao_unidade`; " +
+        "DELETE FROM `tipo_destinatario`; DELETE FROM `tipo_codigo`;",
+    );
+    aplicar(SEED_UPDATE_FILE);
+    aplicar(SEED_UPDATE_FILE);
+
+    const aposUpdate = {
+      permissoes: consultar("SELECT COUNT(*) FROM `permissao`"),
+      perfis: consultar("SELECT COUNT(*) FROM `perfil`"),
+      vinculos: consultar("SELECT COUNT(*) FROM `perfil_permissao`"),
+      conversoes: consultar("SELECT COUNT(*) FROM `conversao_unidade`"),
+      tipos: consultar("SELECT COUNT(*) FROM `tipo_codigo`"),
+      tiposDestinatario: consultar("SELECT COUNT(*) FROM `tipo_destinatario`"),
+    };
+    console.log(`  seed-update.sql sobre cadastros apagados: ${JSON.stringify(aposUpdate)}`);
+
+    const errosUpdate = [];
+    if (aposUpdate.permissoes !== "92") {
+      errosUpdate.push(`permissões: ${aposUpdate.permissoes} (esperado 92)`);
+    }
+    for (const chave of ["perfis", "vinculos", "conversoes", "tipos", "tiposDestinatario"]) {
+      if (aposUpdate[chave] !== "0") {
+        errosUpdate.push(`${chave} recriados: ${aposUpdate[chave]} (esperado 0)`);
+      }
+    }
+    if (errosUpdate.length > 0) {
+      throw new Error(`Validação do Update falhou:\n  - ${errosUpdate.join("\n  - ")}`);
+    }
+
+    console.log("  OK: seed-update mantém 92 permissões e não recria perfis/tipos/conversões apagados");
   } finally {
     if (keep) {
       console.log(`  banco mantido: ${checkDb}`);

@@ -9,9 +9,9 @@
 
 - **Working tree:** `main` publicado em `origin/main`; o release `1.14.11.2026` está no
   commit `ecc7bb1`, com a tag anotada **`v1.14.11.2026` criada e publicada**. O estado
-  corrente é este commit de registro. Árvore limpa, exceto `.openchamber/` local (screenshots
-  antigos não versionados). O release `1.08.11.2026` continua sendo o último instalador
-  distribuído; o 1.14 está gerado e ainda não instalado.
+  corrente é este commit de registro da `2.14.11.2026`. Árvore limpa, exceto
+  `.openchamber/` local (screenshots antigos não versionados). A produção está **instalada e
+  no ar com `1.14.11.2026`**.
 - **Funcionário condutor:** `cnh`, `categoria_cnh`, `validade_cnh` (DATE) e `tipo_sanguineo`
   em `funcionario`, sempre opcionais; aba **Condutor** no formulário (`FormTabs`) aparece
   somente quando o checkbox **É condutor** está marcado (em `view`, somente se o registro for
@@ -63,9 +63,9 @@
   (1 Merenda/2, 2 Papelaria/5, 3 Kits/2, 4 Mobiliário/1) e vinculados os 10 produtos, sem
   tipo restante. As permissões `tipo_produto.criar/alterar/excluir` existem. O script
   temporário `scripts/carregar-tipos-produto.ts` foi removido após o uso. O instalador ganhou
-  a migração `003-condutor-tipos-produto-auxiliar.sql` para o caminho Update, o SQL de
-  referência em **92 permissões** e o `aplicar-sql.ps1` valida essa contagem; a migração foi
-  testada sobre um schema 1.08 (50 tabelas, 92/2/3).
+  a migração `003-condutor-tipos-produto-auxiliar.sql` para o caminho Update e o SQL de
+  referência em **92 permissões**; a migração foi testada sobre um schema 1.08 (50 tabelas,
+  92/2/3).
 - **Validação:** `tsc`, `eslint`, `npm run lint` e `npm run build` OK; suíte **716 testes / 68
   arquivos** passando (config temporária sem `globalSetup`, com `nexus_test` em sync);
   screenshots do login em 1360×768 e 1920×1080; `figma:check` passou depois da mudança do
@@ -74,14 +74,30 @@
   **`v1.14.11.2026` criada e publicada**; instalador
   `deploy/windows/out/NexusSetup-1.14.11.2026.exe` (440.095.033 bytes; SHA-256
   `FA8BED8C17B2471C1CA538C6AB08E1DD214F668896AE9B846327FE8BFD2710A0`), build de 6,8 min,
-  com as migrações 001–003 no payload. **Não instalado/atualizado** na máquina de produção;
-  GitHub release não criado.
-- **Pendências reais:** instalar/atualizar o app de produção com o setup 1.14 (o código novo
-  ainda não está no build instalado; o schema/dados já estão prontos), criar o GitHub release
-  se desejado e fazer a validação visual autenticada das telas novas e das listagens
-  (scroll, sticky, ordenação e colunas visíveis), que não foi possível por falta de credencial
-  de login; a suíte, o lint, o build e o `figma:check` cobrem o código.
-- **Serviços:** `NexusMySQL84` Running; `NexusApp` e `NexusCaddy` Stopped (como estavam).
+  com as migrações 001–003 no payload. **Instalado em produção** em 14/11/2026.
+- **Incidente do update 1.14:** o bootstrap parou na validação de contagens do
+  `aplicar-sql.ps1` (`Contagem de referência divergente em profiles: esperado 2, obtido
+  '3'`), porque `nexus_prod` tem o perfil personalizado **Administrador** (ID 20) além de
+  Operador/Auxiliar. Migrações, seed e app já haviam sido aplicados; `NexusApp`/`NexusCaddy`
+  ficaram parados. A instalação foi retomada com o script ajustado e concluída:
+  smoke **OK**, health 200 `db=true`, versão 1.14.11.2026, quatro serviços `Running`.
+- **Correção 2.14.11.2026:** o `aplicar-sql.ps1` **não valida mais contagem nenhuma**
+  (permissões, perfis, conversões, renamed) — só registra no log; perfis, tipos e conversões
+  são cadastros editáveis e podem ser apagados. O Update passou a aplicar as migrações +
+  `deploy/sql/seed-update.sql` (só catálogo de permissões + limpeza de obsoletas), então
+  nada apagado volta e nenhum vínculo perfil↔permissão é refeito. A migração 002 só insere
+  os 4 tipos de referência enquanto a coluna enum antiga existe.
+- **Validação da correção:** `gerar-sql-producao.mjs --check` OK (banco novo 92/2/3 e,
+  após apagar perfis/tipos/conversões, `seed-update.sql` mantém 92 permissões e recria 0);
+  caminho Update testado em banco novo (50 tabelas) e em banco legado sintético com enum
+  (4 tipos criados, 2 destinatários mapeados, coluna enum removida; segunda passada não
+  recria nada); parse do PowerShell OK nos quatro scripts alterados.
+- **Pendências reais:** gerar o instalador `2.14.11.2026` e publicar tag/GitHub release;
+  rodar o setup na produção para atualizar o `Instalador\aplicar-sql.ps1` instalado; fazer a
+  validação visual autenticada das telas novas e das listagens (scroll, sticky, ordenação e
+  colunas visíveis), que não foi possível por falta de credencial de login; a suíte, o lint,
+  o build e o `figma:check` cobrem o código.
+- **Serviços:** `NexusMySQL84`, `NexusApp`, `NexusCaddy` e `NexusAgent` Running.
 
 ## Estado corrente — release 1.08.11.2026 (2026-11-08)
 

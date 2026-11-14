@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Instala o esquema e o seed de referência em um banco novo (Fresh) ou aplica
-    todas as migrações de migracoes\*.sql, em ordem, + seed em um banco
+    todas as migrações de migracoes\*.sql, em ordem, + seed-update.sql em um banco
     existente (Update). O modo Auto detecta pelo information_schema: banco sem
     tabelas → Fresh; com tabelas → Update.
 
@@ -13,8 +13,10 @@
     restrita (--defaults-extra-file). A senha nunca vai para -p, log ou
     argumento de linha de comando.
 
-    Ao final valida as contagens de referência: 92 permissões, 2 perfis e as
-    3 conversões UNIDADE/PCT10/CX50 (PCT10 fator 10, CX50 fator 50).
+    Ao final apenas registra no log as contagens de permissões, perfis e
+    conversões. Elas NÃO são validadas: perfis, tipos e conversões de unidade são
+    cadastros editáveis e o usuário pode apagá-los, então nenhuma contagem é
+    pré-requisito para instalar ou atualizar.
 
 .PARAMETER MysqlExe
     Caminho do mysql.exe (C:\Program Files\Nexus\mysql\bin\mysql.exe).
@@ -29,11 +31,11 @@
     Banco de destino. Padrão: nexus_prod.
 
 .PARAMETER Mode
-    Auto (padrão), Fresh (schema + seed) ou Update (migrações + seed).
+    Auto (padrão), Fresh (schema + seed) ou Update (migrações + seed-update).
 
 .PARAMETER SqlDir
-    Diretório com schema.sql, seed.sql e migracoes\. Padrão: .\sql ao lado
-    deste script (o instalador copia para {app}\sql), com fallback para
+    Diretório com schema.sql, seed.sql, seed-update.sql e migracoes\. Padrão: .\sql
+    ao lado deste script (o instalador copia para {app}\sql), com fallback para
     .\payload\sql.
 #>
 [CmdletBinding()]
@@ -89,6 +91,7 @@ function Resolve-SqlDir {
 $SqlDir = Resolve-SqlDir -Explicit $SqlDir
 $schemaFile = Join-Path $SqlDir "schema.sql"
 $seedFile = Join-Path $SqlDir "seed.sql"
+$seedUpdateFile = Join-Path $SqlDir "seed-update.sql"
 $migrationsDir = Join-Path $SqlDir "migracoes"
 
 $tempRoot = Join-Path $env:TEMP ("nexus-sql-" + [guid]::NewGuid().ToString("N"))
@@ -232,8 +235,8 @@ try {
         Invoke-Mysql -InputFile $seedFile -Label "seed.sql" | Out-Null
     }
     else {
-        if (-not (Test-Path -LiteralPath $seedFile -PathType Leaf)) {
-            Fail "seed.sql não encontrado em $SqlDir."
+        if (-not (Test-Path -LiteralPath $seedUpdateFile -PathType Leaf)) {
+            Fail "seed-update.sql não encontrado em $SqlDir."
         }
         if (-not (Test-Path -LiteralPath $migrationsDir -PathType Container)) {
             Fail "Pasta de migrações não encontrada em $migrationsDir."
@@ -242,27 +245,20 @@ try {
         if ($migrations.Count -eq 0) {
             Fail "Nenhuma migração *.sql encontrada em $migrationsDir."
         }
-        Write-Ok ("Banco com {0} tabela(s): aplicando {1} migração(ões) e seed.sql." -f $tableCount, $migrations.Count)
+        Write-Ok ("Banco com {0} tabela(s): aplicando {1} migração(ões) e seed-update.sql." -f $tableCount, $migrations.Count)
         foreach ($migration in $migrations) {
             Invoke-Mysql -InputFile $migration.FullName -Label ("migração " + $migration.BaseName) | Out-Null
         }
-        Invoke-Mysql -InputFile $seedFile -Label "seed.sql" | Out-Null
+        Invoke-Mysql -InputFile $seedUpdateFile -Label "seed-update.sql" | Out-Null
     }
 
+    # Diagnóstico, não validação: as contagens vão para o log e nunca bloqueiam.
+    # Perfis, tipos e conversões de unidade são cadastros editáveis — o usuário pode
+    # apagar todos, então nenhuma contagem é pré-requisito de instalação.
     $permissions = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM permissao;" -Label "contagem de permissões"
     $profiles = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM perfil;" -Label "contagem de perfis"
-    $conversions = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE nome IN ('UNIDADE','PCT10','CX50');" -Label "contagem de conversões"
-    $renamed = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade WHERE (nome = 'PCT10' AND fator = 10) OR (nome = 'CX50' AND fator = 50);" -Label "conferência de PCT10/CX50"
-
-    $expected = @{ permissions = 92; profiles = 2; conversions = 3; renamed = 2 }
-    $actual = @{ permissions = $permissions; profiles = $profiles; conversions = $conversions; renamed = $renamed }
-    foreach ($key in @("permissions", "profiles", "conversions", "renamed")) {
-        if ([string]($actual[$key]) -ne [string]$expected[$key]) {
-            Fail ("Contagem de referência divergente em ${key}: esperado $($expected[$key]), " +
-                "obtido '$($actual[$key])'.")
-        }
-    }
-    Write-Ok "Referência validada: 92 permissões, 2 perfis, 3 conversões (PCT10/CX50)."
+    $conversions = Invoke-SqlQuery -Query "SELECT COUNT(*) FROM conversao_unidade;" -Label "contagem de conversões"
+    Write-Ok ("Contagens (apenas log): {0} permissões, {1} perfis, {2} conversões." -f $permissions, $profiles, $conversions)
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

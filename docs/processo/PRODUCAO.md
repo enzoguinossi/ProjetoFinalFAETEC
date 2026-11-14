@@ -41,7 +41,7 @@ estações da rede
 | [`bootstrap.ps1`](../../deploy/windows/bootstrap.ps1) | instalação em **8 fases (0–7)**, idempotente e retomável; estado em `C:\ProgramData\Nexus\bootstrap.state.json` |
 | [`instalar-mysql.ps1`](../../deploy/windows/instalar-mysql.ps1) | instala o MySQL 8.4.13 embutido, migra o `Data` legado e cria o serviço `NexusMySQL84` na 3214 |
 | [`pos-instalacao-mysql.ps1`](../../deploy/windows/pos-instalacao-mysql.ps1) | ajusta o `my.ini`, cria `nexus_prod` e o usuário `nexus_app` |
-| [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) | aplica `schema.sql`/`seed.sql` (Fresh) ou todas as migrações de `migracoes\*.sql` em ordem + seed (Update), sem Prisma |
+| [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) | aplica `schema.sql`/`seed.sql` (Fresh) ou todas as migrações de `migracoes\*.sql` em ordem + `seed-update.sql` (Update), sem Prisma |
 | [`atualizar.ps1`](../../deploy/windows/atualizar.ps1) | atualização por **pacote** (`app\app.zip` + `sql\`), com backup e rollback |
 | [`backup.ps1`](../../deploy/windows/backup.ps1) | backup do banco, uploads, `.env` e `Caddyfile`; aceita `-AgentProgress`/`-RequireMysql` quando chamado pelo agente |
 | `NexusAgent` | serviço **.NET 10** self-contained (`LocalSystem`, automático) com a API local de backup/restauração; agenda substitui a tarefa `NexusBackup` |
@@ -91,7 +91,7 @@ estações da rede
 | `NexusTray\` | `NexusTray.exe` e `tray.json` |
 | `NexusAgent\` | `NexusAgent.exe` (serviço de backup/restauração), copiado pelo bootstrap |
 | `Instalador\` | scripts do instalador e `payload\` (Node, MySQL, Caddy, VC++, NSSM, `app\app.zip`, `sql`) |
-| `Instalador\sql\` | cópia de `schema.sql`, `seed.sql` e de toda a pasta `migracoes\` (001, 002, ...) |
+| `Instalador\sql\` | cópia de `schema.sql`, `seed.sql`, `seed-update.sql` e de toda a pasta `migracoes\` (001, 002, ...) |
 | `app.prev-<versão>\` | versão anterior mantida pelo `atualizar.ps1` (até duas) |
 | `app.prev-manual-<timestamp>\` | aplicação anterior movida pelo bootstrap/instalação |
 | `app.failed-<versão>\` | versão que falhou na atualização, para diagnóstico |
@@ -321,24 +321,33 @@ o banco existente é reutilizado. O `bootstrap` chama o
 [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) com `-Mode Auto`:
 
 - **Fresh** (banco sem tabelas): aplica `schema.sql` (DDL completo, 50 tabelas) e
-  `seed.sql`;
+  `seed.sql` (todos os cadastros de referência);
 - **Update** (banco com tabelas, como no 10.02): aplica todas as migrações de
-  `migracoes\*.sql` em ordem (001, 002, 003, ...) e depois `seed.sql`.
+  `migracoes\*.sql` em ordem (001, 002, 003, ...) e depois `seed-update.sql`, que
+  contém **apenas o catálogo de permissões**.
 
-O SQL usa `mysql.exe` com `--defaults-extra-file` (senha nunca em `-p`). Ao final valida:
+O SQL usa `mysql.exe` com `--defaults-extra-file` (senha nunca em `-p`). Ao final apenas
+**registra no log** as contagens de permissões, perfis e conversões — nada é validado:
 
-- **92 permissões**;
-- **2 perfis** (`Operador` e `Auxiliar`);
-- **3 conversões** `UNIDADE` (fator 1, padrão), `PCT10` (10) e `CX50` (50).
+- 92 permissões no banco novo (referência do seed);
+- 2 perfis (`Operador` e `Auxiliar`) no banco novo;
+- 3 conversões `UNIDADE` (fator 1, padrão), `PCT10` (10) e `CX50` (50) no banco novo.
+
+**Contagem não é pré-requisito.** Perfis, tipos de código, tipos de destinatário e
+conversões de unidade são cadastros editáveis: o usuário pode apagar todos. Por isso o
+Update não os recria nem refaz vínculos perfil↔permissão — o que foi apagado continua
+apagado, e novas permissões entram no catálogo sem serem concedidas automaticamente aos
+perfis existentes (o Super Admin tem todas; as demais são concedidas na tela de Perfis).
 
 A migração 001 renomeia `PACOTE`→`PCT10` e `CAIXA`→`CX50`, preservando `ID_conversao` e os
 vínculos de produto. A migração 002 cria o cadastro `tipo_destinatario`, adiciona
 `destinatario.ID_tipo_destinatario` (opcional), mapeia o enum antigo pelo código, cria a FK
-`ON DELETE SET NULL` e remove a coluna enum. A migração 003 cria `tipo_produto`, os campos
-de condutor em `funcionario` (`cnh`, `categoria_cnh`, `validade_cnh`, `tipo_sanguineo`) e
-`expedicao.ID_funcionario_auxiliar`, com índices e FKs `ON DELETE SET NULL`. Todas são
-idempotentes e rodam antes do seed. O seed é idempotente e não cria usuários, produtos,
-pedidos nem dados operacionais.
+`ON DELETE SET NULL` e remove a coluna enum; os 4 tipos de referência só são inseridos
+enquanto a coluna enum existe (primeira migração de banco legado). A migração 003 cria
+`tipo_produto`, os campos de condutor em `funcionario` (`cnh`, `categoria_cnh`,
+`validade_cnh`, `tipo_sanguineo`) e `expedicao.ID_funcionario_auxiliar`, com índices e FKs
+`ON DELETE SET NULL`. Todas são idempotentes e rodam antes do seed. Os seeds são
+idempotentes e não criam usuários, produtos, pedidos nem dados operacionais.
 
 > ⚠️ **A migração 002 é irreversível.** Ela remove a coluna enum `destinatario.tipo_destinatario`;
 > depois disso, o rollback do `atualizar.ps1` (que restaura **somente o app**) não devolve o
@@ -493,6 +502,7 @@ Para uma instalação já em 1.07, use o `atualizar.ps1` com um pacote (sem Git)
 └── sql\
     ├── schema.sql
     ├── seed.sql
+    ├── seed-update.sql
     └── migracoes\
         ├── 001-unidades-pct10-cx50.sql
         ├── 002-tipos-destinatario.sql
@@ -983,8 +993,8 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | `app.zip` inválido/`server.js` ausente | pacote standalone não foi gerado | rode `npm run build:standalone` e `npm run package:standalone`; o `empacotar-standalone.mjs` precisa de `.next/standalone`, `.next/static` e `server.js` |
 | MySQL `NexusMySQL84` não inicia / 3214 fechada | `my.ini`, `Data` ou serviço | confira `C:\ProgramData\Nexus\mysql\my.ini`, o erro em `...\mysql\data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214`; restaure `my.ini-*.bak` |
 | migração do Data não aconteceu | `C:\ProgramData\Nexus\mysql\data` já tinha conteúdo | o `instalar-mysql.ps1` só copia para destino vazio; faça backup e esvazie/renomeie o destino se for migrar |
-| SQL falha em Fresh | banco já tem tabelas | use `-Mode Update` (migrações + seed) ou um banco vazio; confira `aplicar-sql.ps1` |
-| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 92 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
+| SQL falha em Fresh | banco já tem tabelas | use `-Mode Update` (migrações + seed-update) ou um banco vazio; confira `aplicar-sql.ps1` |
+| log mostra contagem "diferente" de perfis/tipos/conversões | cadastros editáveis: o usuário criou ou apagou registros | nada a fazer — as contagens são só diagnóstico e nunca bloqueiam a instalação |
 | `NexusApp` não sobe | Node/`server.js`/`.env`/dependência MySQL | confira `C:\Program Files\Nexus\node\node.exe`, `app\server.js`, `app\.env` e `DATABASE_URL` na 3214; veja `app.err.log` |
 | health 503 (`db=false`) | `NexusMySQL84` parado, senha/banco ausente | `Get-Service NexusMySQL84`; teste com `C:\Program Files\Nexus\mysql\bin\mysql.exe --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3214 -D nexus_prod -e "SELECT 1"` |
 | HTTPS falha/CA não confiada | Caddy/CA/ACL/hostname | veja `C:\ProgramData\Nexus\caddy\logs\caddy.err.log`; confira `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` e o `hosts`/DNS |
