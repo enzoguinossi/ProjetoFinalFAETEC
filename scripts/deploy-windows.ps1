@@ -5,7 +5,7 @@
 .DESCRIPTION
     Executa, em ordem:
       1. prisma generate (client do schema atual);
-      2. geração do SQL de produção (schema.sql/seed.sql);
+      2. geração do SQL de produção (schema.sql/seed.sql/seed-update.sql);
       3. lint;
       4. build do app Next standalone + app.zip;
       5. publish da bandeja (NexusTray) e do serviço (NexusAgent);
@@ -20,7 +20,7 @@
     deploy\windows\out. Relativo ao diretório atual.
 
 .PARAMETER SkipSql
-    Não regenera deploy\sql\schema.sql e seed.sql (use o que está no disco).
+    Não regenera deploy\sql\schema.sql, seed.sql e seed-update.sql (use o que está no disco).
 
 .PARAMETER SkipLint
     Não executa `npm run lint`.

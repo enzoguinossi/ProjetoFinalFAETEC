@@ -13,7 +13,7 @@
         ├── vcredist\vc_redist.x64.exe
         ├── app\app.zip              (copiado de out\standalone\app.zip)
         ├── nssm\nssm.exe            (copiado de deploy\windows\tools\nssm\nssm.exe)
-        └── sql\{schema.sql,seed.sql,migracoes\...}
+        └── sql\{schema.sql,seed.sql,seed-update.sql,migracoes\...}
 
     O payload é ignorado pelo Git (deploy\windows\payload\) e entra no setup do
     Inno. Nada é baixado na máquina de destino.
@@ -309,7 +309,8 @@ $sqlTarget = Join-Path $PayloadDir "sql"
 $sqlMigrationsSource = Join-Path $SqlSource "migracoes"
 $sqlFiles = @(
     @{ Source = (Join-Path $SqlSource "schema.sql"); Destination = (Join-Path $sqlTarget "schema.sql") },
-    @{ Source = (Join-Path $SqlSource "seed.sql"); Destination = (Join-Path $sqlTarget "seed.sql") }
+    @{ Source = (Join-Path $SqlSource "seed.sql"); Destination = (Join-Path $sqlTarget "seed.sql") },
+    @{ Source = (Join-Path $SqlSource "seed-update.sql"); Destination = (Join-Path $sqlTarget "seed-update.sql") }
 )
 if (-not (Test-Path -LiteralPath $sqlMigrationsSource -PathType Container)) {
     Fail "Pasta de migrações não encontrada: $sqlMigrationsSource"
@@ -327,13 +328,14 @@ foreach ($migration in $sqlMigrations) {
 foreach ($sqlFile in $sqlFiles) {
     Copy-PayloadFile -Source $sqlFile.Source -Destination $sqlFile.Destination -Label (Split-Path -Leaf $sqlFile.Source)
 }
-Write-Ok ("SQL copiado (schema, seed e {0} migração(ões))." -f $sqlMigrations.Count)
+Write-Ok ("SQL copiado (schema, seed, seed-update e {0} migração(ões))." -f $sqlMigrations.Count)
 
 # --- Resumo -----------------------------------------------------------------
 Write-Step "Resumo do payload"
 $files = @(
     $nodeZip, $mysqlZip, $caddyZip, $vcRedist, $nssmTarget, $appZip,
-    (Join-Path $sqlTarget "schema.sql"), (Join-Path $sqlTarget "seed.sql")
+    (Join-Path $sqlTarget "schema.sql"), (Join-Path $sqlTarget "seed.sql"),
+    (Join-Path $sqlTarget "seed-update.sql")
 )
 foreach ($migration in $sqlMigrations) {
     $files += (Join-Path (Join-Path $sqlTarget "migracoes") $migration.Name)
