@@ -328,7 +328,7 @@ describe("destinatarioDAO", () => {
       expect(texto).toContain("pedido(s)");
       expect(texto).toContain("nota(s) de saída");
       expect(texto).toContain("coleta(s)");
-      expect(texto).toContain("percurso(s)");
+      expect(texto).toContain("rota(s)");
     });
   });
 

@@ -4,6 +4,7 @@ import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { conversaoUnidadeDAO } from "./conversao-unidade";
 import { buildPagination, LIMITE_OPCOES_MAX, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 
 type Db = Prisma.TransactionClient;
 
@@ -14,6 +15,20 @@ export type ProdutoListFiltros = {
   perecivel?: boolean;
   composto?: boolean;
   id_tipo_codigo?: number[];
+  /** IDs dos tipos de produto (lista vazia = todos). */
+  id_tipo_produto?: number[];
+};
+
+/**
+ * Campos ordenáveis da listagem de produtos (whitelist). `codigo` e `livre` não
+ * entram: são derivados da linha, não colunas do produto.
+ */
+const ORDEM_PRODUTO: Record<string, Prisma.ProdutoOrderByWithRelationInput> = {
+  codigo: { id_produto: "asc" },
+  descricao: { descricao: "asc" },
+  tipo: { tipoProduto: { nome: "asc" } },
+  qtd: { saldo: "asc" },
+  ativo: { ativo: "asc" },
 };
 
 export class ProdutoDAO {
@@ -26,6 +41,9 @@ export class ProdutoDAO {
     if (filtros.id_tipo_codigo && filtros.id_tipo_codigo.length > 0) {
       where.produtoCodigos = { some: { id_tipo_codigo: { in: filtros.id_tipo_codigo } } };
     }
+    if (filtros.id_tipo_produto && filtros.id_tipo_produto.length > 0) {
+      where.id_tipo_produto = { in: filtros.id_tipo_produto };
+    }
     return where;
   }
 
@@ -37,7 +55,11 @@ export class ProdutoDAO {
     const [data, total] = await Promise.all([
       prisma.produto.findMany({
         skip, take, where,
-        orderBy: { descricao: "asc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_PRODUTO, { descricao: "asc" }),
+          { id_produto: "asc" },
+        ],
+        include: { tipoProduto: true },
       }),
       prisma.produto.count({ where }),
     ]);
@@ -162,6 +184,7 @@ export class ProdutoDAO {
             saldo_reservado: true,
             ativo: true,
             composto: true,
+            tipoProduto: { select: { nome: true } },
           },
           take,
           orderBy: { descricao: "asc" },
@@ -176,6 +199,7 @@ export class ProdutoDAO {
       include: {
         conversaoPadrao: true,
         conversaoSaida: true,
+        tipoProduto: true,
         produtoCodigos: { include: { tipoCodigo: true } },
         insumosPai: { include: { produtoFilho: true } },
         anexos: {
@@ -190,6 +214,7 @@ export class ProdutoDAO {
     data: {
       descricao: string; perecivel?: boolean; composto?: boolean;
       data_validade?: string; id_conversao_padrao?: number; id_conversao_saida?: number;
+      id_tipo_produto?: number | null;
       codigos?: { id_tipo_codigo: number; codigo: string }[];
       insumos?: { id_produto_filho: number; quantidade: number }[];
     },
@@ -217,6 +242,7 @@ export class ProdutoDAO {
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
           id_conversao_padrao: idConversaoPadrao,
           id_conversao_saida: idConversaoSaida,
+          id_tipo_produto: data.id_tipo_produto ?? null,
         },
       });
 
@@ -227,6 +253,7 @@ export class ProdutoDAO {
           descricao: data.descricao,
           id_conversao_padrao: idConversaoPadrao,
           id_conversao_saida: idConversaoSaida,
+          id_tipo_produto: p.id_tipo_produto,
           codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
         },
         tx,
@@ -255,6 +282,7 @@ export class ProdutoDAO {
         include: {
           conversaoPadrao: true,
           conversaoSaida: true,
+          tipoProduto: true,
           produtoCodigos: { include: { tipoCodigo: true } },
           insumosPai: { include: { produtoFilho: true } },
           anexos: {
@@ -271,6 +299,7 @@ export class ProdutoDAO {
     data: {
       descricao?: string; perecivel?: boolean; composto?: boolean;
       data_validade?: string; id_conversao_padrao?: number; id_conversao_saida?: number;
+      id_tipo_produto?: number | null;
       ativo?: boolean;
       codigos?: { id_tipo_codigo: number; codigo: string }[];
       insumos?: { id_produto_filho: number; quantidade: number }[];
@@ -294,6 +323,7 @@ export class ProdutoDAO {
           data_validade: data.data_validade ? new Date(data.data_validade) : undefined,
           id_conversao_padrao: data.id_conversao_padrao,
           id_conversao_saida: data.id_conversao_saida,
+          id_tipo_produto: data.id_tipo_produto,
           ativo: data.ativo ?? true,
         },
       });
@@ -309,6 +339,7 @@ export class ProdutoDAO {
           ativo: antes.ativo,
           id_conversao_padrao: antes.id_conversao_padrao,
           id_conversao_saida: antes.id_conversao_saida,
+          id_tipo_produto: antes.id_tipo_produto,
           codigos: antes.produtoCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
         },
         {
@@ -318,6 +349,7 @@ export class ProdutoDAO {
           ativo: depois.ativo,
           id_conversao_padrao: depois.id_conversao_padrao,
           id_conversao_saida: depois.id_conversao_saida,
+          id_tipo_produto: depois.id_tipo_produto,
           codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })),
         },
         tx,
@@ -348,6 +380,7 @@ export class ProdutoDAO {
         include: {
           conversaoPadrao: true,
           conversaoSaida: true,
+          tipoProduto: true,
           produtoCodigos: { include: { tipoCodigo: true } },
           insumosPai: { include: { produtoFilho: true } },
           anexos: {

@@ -12,7 +12,7 @@ import ProdutoForm from "./novo/ProdutoForm";
 import ProdutoView from "./novo/ProdutoView";
 import DesmembrarProdutoModal from "./novo/DesmembrarProdutoModal";
 import type { Action, Column } from "@/components/DataTable";
-import type { PaginatedResult, PermissoesEntidade } from "@/types";
+import type { PaginatedResult, PermissoesEntidade, TipoProdutoItem } from "@/types";
 import { useCrudLista } from "@/lib/use-crud-lista";
 import {
   listarProdutos,
@@ -26,7 +26,9 @@ interface Props {
   inicial: PaginatedResult<ProdutoListRow>;
   conversoes: { id_conversao: number; nome: string; fator: number; descricao: string | null; padrao: boolean }[];
   tiposCodigo: { id_tipo_codigo: number; nome: string }[];
+  tiposProduto: TipoProdutoItem[];
   perms: PermissoesEntidade;
+  permsTipo: PermissoesEntidade;
   /** `produto.ver_inativos`: habilita o filtro de situação e a coluna Situação. */
   podeVerInativos: boolean;
   /** `estoque.entrada` + `estoque.saida`: habilita a ação Desmembrar. */
@@ -34,9 +36,16 @@ interface Props {
 }
 
 const columnsBase: Column<ProdutoListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
-  { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center", sortable: true, fixed: true },
+  {
+    key: "descricao",
+    label: "Descrição",
+    width: "2fr",
+    align: "left",
+    sortable: true,
+  },
+  { key: "tipo", label: "Tipo", width: "1.5fr", align: "left", sortable: true },
+  { key: "qtd", label: "Quantidade", width: "1fr", align: "right", sortable: true },
   { key: "livre", label: "Qtd. Livre", width: "1fr", align: "right" },
 ];
 
@@ -45,6 +54,8 @@ const colunaSituacao: Column<ProdutoListRow> = {
   label: "Situação",
   width: "1fr",
   align: "center",
+  sortable: true,
+  sortKey: "ativo",
   render: (_valor, row) => (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 font-sans text-xs leading-4 ${
@@ -62,7 +73,9 @@ export default function ProdutosClient({
   inicial,
   conversoes,
   tiposCodigo,
+  tiposProduto,
   perms,
+  permsTipo,
   podeVerInativos,
   podeDesmembrar,
 }: Props) {
@@ -72,6 +85,8 @@ export default function ProdutosClient({
     carregando,
     buscarPorTermo,
     aplicarFiltros,
+    ordenacao,
+    ordenar,
     paginacaoServidor,
     actions: acoesCrud,
     modalMode,
@@ -95,6 +110,7 @@ export default function ProdutosClient({
 
   const [chaveFiltros, setChaveFiltros] = useState(0);
   const [valoresFiltros, setValoresFiltros] = useState<Valores>({});
+  const [tipos, setTipos] = useState<TipoProdutoItem[]>(tiposProduto);
   const [desmembrarId, setDesmembrarId] = useState<number | null>(null);
 
   const actions: Action<ProdutoListRow>[] = [
@@ -132,11 +148,20 @@ export default function ProdutosClient({
         rotulo: tipo.nome,
       })),
     },
+    {
+      id: "tipo_produto",
+      rotulo: "Tipo de produto",
+      tipo: "multi",
+      opcoes: tipos.map((tipo) => ({
+        valor: String(tipo.id_tipo_produto),
+        rotulo: tipo.nome,
+      })),
+    },
   ];
 
   const columns = podeVerInativos ? [...columnsBase, colunaSituacao] : columnsBase;
 
-  function aplicarFiltrosTela(novos: Valores) {
+  function montarFiltros(novos: Valores) {
     const situacao = novos.situacao;
     let ativo: boolean | null | undefined;
     if (Array.isArray(situacao) && situacao.length > 0) {
@@ -156,14 +181,47 @@ export default function ProdutosClient({
         ? tipos.map((id) => Number(id)).filter((id) => Number.isInteger(id))
         : undefined;
 
-    setValoresFiltros(novos);
-    aplicarFiltros({
+    const tiposProduto = novos.tipo_produto;
+    const idTipoProduto =
+      Array.isArray(tiposProduto) && tiposProduto.length > 0
+        ? tiposProduto
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id))
+        : undefined;
+
+    return {
       incluirInativos: podeVerInativos,
       ativo,
       perecivel: marcado("perecivel"),
       composto: marcado("composto"),
       id_tipo_codigo: idTipoCodigo,
-    });
+      id_tipo_produto: idTipoProduto,
+    };
+  }
+
+  function aplicarFiltrosTela(novos: Valores) {
+    setValoresFiltros(novos);
+    aplicarFiltros(montarFiltros(novos));
+  }
+
+  function aoMudarTipos(lista: TipoProdutoItem[]) {
+    setTipos(lista);
+
+    // Um tipo selecionado no filtro pode ter sido excluído no cadastro: remove
+    // os ids inválidos e reaplica o recorte para a lista não ficar vazia à toa.
+    const selecionados = valoresFiltros.tipo_produto;
+    if (Array.isArray(selecionados)) {
+      const validos = new Set(lista.map((tipo) => String(tipo.id_tipo_produto)));
+      const restantes = selecionados.filter((id) => validos.has(String(id)));
+      if (restantes.length !== selecionados.length) {
+        const novos = { ...valoresFiltros, tipo_produto: restantes };
+        setValoresFiltros(novos);
+        aplicarFiltros(montarFiltros(novos));
+      }
+    }
+
+    setChaveFiltros((chave) => chave + 1);
+    router.refresh();
   }
 
   function limparFiltrosTela() {
@@ -191,15 +249,21 @@ export default function ProdutosClient({
         columns={columns}
         data={resultado.data}
         idField="codigo"
+        idTabela="produtos"
         actions={actions}
         paginacaoServidor={paginacaoServidor}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={ordenar}
       />
 
       <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">
         <ProdutoForm
           conversoes={conversoes}
           tiposCodigo={tiposCodigo}
+          tiposProduto={tipos}
+          permsTipo={permsTipo}
+          onTiposProdutoChange={aoMudarTipos}
           onSuccess={aoSalvar}
           onCancel={fecharModal}
         />
@@ -210,6 +274,9 @@ export default function ProdutosClient({
           <ProdutoForm
             conversoes={conversoes}
             tiposCodigo={tiposCodigo}
+            tiposProduto={tipos}
+            permsTipo={permsTipo}
+            onTiposProdutoChange={aoMudarTipos}
             initialData={formData}
             canDeactivate={perms.canDeactivate}
             onSuccess={aoSalvar}

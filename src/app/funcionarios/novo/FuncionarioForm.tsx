@@ -14,8 +14,15 @@ import { useAviso } from "@/components/AvisoProvider";
 import FormShell from "@/components/form/FormShell";
 import FormSection from "@/components/form/FormSection";
 import FormField, { FormGrid } from "@/components/form/FormField";
+import FormTabs from "@/components/form/FormTabs";
 import IdentityBand from "@/components/form/IdentityBand";
 import StatusSwitch from "@/components/form/StatusSwitch";
+import {
+  CATEGORIAS_CNH,
+  TIPOS_SANGUINEOS,
+  cnhVencida,
+  formatarDataCnh,
+} from "@/lib/cnh";
 
 interface Props {
   mode?: "create" | "edit" | "view";
@@ -71,6 +78,10 @@ export default function FuncionarioForm({
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
   const [emails, setEmails] = useState<EmailEntry[]>(initialData?.emails ?? []);
   const [telefones, setTelefones] = useState<TelefoneEntry[]>(normalizaTelefones(initialData?.telefones));
+  const [cnh, setCnh] = useState(initialData?.cnh ?? "");
+  const [categoriaCnh, setCategoriaCnh] = useState(initialData?.categoria_cnh ?? "");
+  const [validadeCnh, setValidadeCnh] = useState(initialData?.validade_cnh ?? "");
+  const [tipoSanguineo, setTipoSanguineo] = useState(initialData?.tipo_sanguineo ?? "");
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -150,7 +161,12 @@ export default function FuncionarioForm({
                 : "Novo funcionário"
           }
           meta={codigo ? `Código ${codigo}` : "Código gerado ao salvar"}
-          chips={condutor ? [{ label: "Condutor", tone: "brand" }] : []}
+          chips={[
+            ...(condutor ? [{ label: "Condutor", tone: "brand" as const }] : []),
+            ...(cnhVencida(validadeCnh)
+              ? [{ label: "CNH vencida", tone: "warning" as const }]
+              : []),
+          ]}
           aside={
             isEdit ? (
               <StatusSwitch
@@ -183,93 +199,214 @@ export default function FuncionarioForm({
         )
       }
     >
-      <FormSection title="Identificação">
-        {!isView && (
-          <FormField label="Nome" htmlFor="funcionario-nome" required>
-            <input
-              id="funcionario-nome"
-              className={INPUT_CLASS}
-              name="nome"
-              required
-              value={isEdit ? nome : undefined}
-              onChange={isEdit ? (e) => setNome(e.target.value) : undefined}
-            />
-          </FormField>
-        )}
+      <FormTabs
+        items={[
+          {
+            id: "dados-gerais",
+            label: "Dados gerais",
+            content: (
+              <>
+                <FormSection title="Identificação">
+                  {!isView && (
+                    <FormField label="Nome" htmlFor="funcionario-nome" required>
+                      <input
+                        id="funcionario-nome"
+                        className={INPUT_CLASS}
+                        name="nome"
+                        required
+                        value={isEdit ? nome : undefined}
+                        onChange={isEdit ? (e) => setNome(e.target.value) : undefined}
+                      />
+                    </FormField>
+                  )}
 
-        <FormGrid columns={3}>
-          {isView ? (
-            <ValorLeitura label="CPF" value={cpf} />
-          ) : (
-            <FormField label="CPF" htmlFor="funcionario-cpf">
-              <input
-                id="funcionario-cpf"
-                name="cpf"
-                value={cpf}
-                onChange={(e) => setCpf(formatarCpf(e.target.value))}
-                inputMode="numeric"
-                maxLength={CPF_MAX_CARACTERES}
-                placeholder="000.000.000-00"
-                className={INPUT_CLASS}
-              />
-            </FormField>
-          )}
+                  <FormGrid columns={3}>
+                    {isView ? (
+                      <ValorLeitura label="CPF" value={cpf} />
+                    ) : (
+                      <FormField label="CPF" htmlFor="funcionario-cpf">
+                        <input
+                          id="funcionario-cpf"
+                          name="cpf"
+                          value={cpf}
+                          onChange={(e) => setCpf(formatarCpf(e.target.value))}
+                          inputMode="numeric"
+                          maxLength={CPF_MAX_CARACTERES}
+                          placeholder="000.000.000-00"
+                          className={INPUT_CLASS}
+                        />
+                      </FormField>
+                    )}
 
-          {isView ? (
-            <ValorLeitura label="Cargo" value={cargo} />
-          ) : (
-            <FormField label="Cargo" htmlFor="funcionario-cargo">
-              <input
-                id="funcionario-cargo"
-                name="cargo"
-                className={INPUT_CLASS}
-                value={isEdit ? cargo : undefined}
-                onChange={isEdit ? (e) => setCargo(e.target.value) : undefined}
-              />
-            </FormField>
-          )}
+                    {isView ? (
+                      <ValorLeitura label="Cargo" value={cargo} />
+                    ) : (
+                      <FormField label="Cargo" htmlFor="funcionario-cargo">
+                        <input
+                          id="funcionario-cargo"
+                          name="cargo"
+                          className={INPUT_CLASS}
+                          value={isEdit ? cargo : undefined}
+                          onChange={isEdit ? (e) => setCargo(e.target.value) : undefined}
+                        />
+                      </FormField>
+                    )}
 
-          {isView ? (
-            <ValorLeitura label="Condutor" value={condutor ? "Sim" : "Não"} />
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              <span className="font-sans text-sm font-medium leading-5 text-ink-strong">
-                Condutor
-              </span>
-              <label className={CHECKBOX_LABEL_CLASS}>
-                <input
-                  type="checkbox"
-                  name="condutor"
-                  checked={condutor}
-                  onChange={(e) => setCondutor(e.target.checked)}
-                />
-                É condutor
-              </label>
-            </div>
-          )}
-        </FormGrid>
-      </FormSection>
+                    {isView ? (
+                      <ValorLeitura label="Condutor" value={condutor ? "Sim" : "Não"} />
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="font-sans text-sm font-medium leading-5 text-ink-strong">
+                          Condutor
+                        </span>
+                        <label className={CHECKBOX_LABEL_CLASS}>
+                          <input
+                            type="checkbox"
+                            name="condutor"
+                            checked={condutor}
+                            onChange={(e) => setCondutor(e.target.checked)}
+                          />
+                          É condutor
+                        </label>
+                      </div>
+                    )}
+                  </FormGrid>
+                </FormSection>
 
-      <FormSection title="Contato">
-        <ContatosSection
-          variant="compact"
-          emails={emails}
-          telefones={telefones}
-          onEmailsChange={setEmails}
-          onTelefonesChange={setTelefones}
-          disabled={isView}
-        />
-      </FormSection>
+                <FormSection title="Contato">
+                  <ContatosSection
+                    variant="compact"
+                    emails={emails}
+                    telefones={telefones}
+                    onEmailsChange={setEmails}
+                    onTelefonesChange={setTelefones}
+                    disabled={isView}
+                  />
+                </FormSection>
 
-      <FormSection title="Códigos">
-        <CodigosSection
-          variant="compact"
-          tiposCodigo={tiposCodigo}
-          value={codigos}
-          onChange={setCodigos}
-          disabled={isView}
-        />
-      </FormSection>
+                <FormSection title="Códigos">
+                  <CodigosSection
+                    variant="compact"
+                    tiposCodigo={tiposCodigo}
+                    value={codigos}
+                    onChange={setCodigos}
+                    disabled={isView}
+                  />
+                </FormSection>
+              </>
+            ),
+          },
+          ...(condutor
+            ? [
+                {
+                  id: "condutor",
+                  label: "Condutor",
+                  content: (
+                    <>
+                      {!isView && (
+                        <p className="m-0 font-sans text-sm leading-5 text-[#697077]">
+                          Preencha apenas quando o funcionário atuar como condutor. Todos os campos são opcionais e podem ficar em branco.
+                        </p>
+                      )}
+
+                      <FormSection title="Habilitação" note="Opcional">
+                        <FormGrid columns={3}>
+                          {isView ? (
+                            <ValorLeitura label="Número da CNH" value={cnh || "—"} />
+                          ) : (
+                            <FormField
+                              label="Número da CNH"
+                              htmlFor="funcionario-cnh"
+                              hint="Somente números."
+                            >
+                              <input
+                                id="funcionario-cnh"
+                                name="cnh"
+                                className={INPUT_CLASS}
+                                inputMode="numeric"
+                                maxLength={11}
+                                value={cnh}
+                                onChange={(e) => setCnh(e.target.value)}
+                              />
+                            </FormField>
+                          )}
+
+                          {isView ? (
+                            <ValorLeitura label="Categoria da CNH" value={categoriaCnh || "—"} />
+                          ) : (
+                            <FormField label="Categoria da CNH" htmlFor="funcionario-categoria-cnh">
+                              <select
+                                id="funcionario-categoria-cnh"
+                                name="categoria_cnh"
+                                className={INPUT_CLASS}
+                                value={categoriaCnh}
+                                onChange={(e) => setCategoriaCnh(e.target.value)}
+                              >
+                                <option value="">Selecione</option>
+                                {CATEGORIAS_CNH.map((categoria) => (
+                                  <option key={categoria} value={categoria}>
+                                    {categoria}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormField>
+                          )}
+
+                          {isView ? (
+                            <ValorLeitura
+                              label="Validade da CNH"
+                              value={formatarDataCnh(validadeCnh)}
+                            />
+                          ) : (
+                            <FormField
+                              label="Validade da CNH"
+                              htmlFor="funcionario-validade-cnh"
+                              hint="Data impressa no documento."
+                            >
+                              <input
+                                id="funcionario-validade-cnh"
+                                name="validade_cnh"
+                                type="date"
+                                className={INPUT_CLASS}
+                                value={validadeCnh}
+                                onChange={(e) => setValidadeCnh(e.target.value)}
+                              />
+                            </FormField>
+                          )}
+                        </FormGrid>
+                      </FormSection>
+
+                      <FormSection title="Dados de saúde" note="Opcional">
+                        <FormGrid columns={2}>
+                          {isView ? (
+                            <ValorLeitura label="Tipo sanguíneo" value={tipoSanguineo || "—"} />
+                          ) : (
+                            <FormField label="Tipo sanguíneo" htmlFor="funcionario-tipo-sanguineo">
+                              <select
+                                id="funcionario-tipo-sanguineo"
+                                name="tipo_sanguineo"
+                                className={INPUT_CLASS}
+                                value={tipoSanguineo}
+                                onChange={(e) => setTipoSanguineo(e.target.value)}
+                              >
+                                <option value="">Selecione</option>
+                                {TIPOS_SANGUINEOS.map((tipo) => (
+                                  <option key={tipo} value={tipo}>
+                                    {tipo}
+                                  </option>
+                                ))}
+                              </select>
+                            </FormField>
+                          )}
+                        </FormGrid>
+                      </FormSection>
+                    </>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
     </FormShell>
   );
 }

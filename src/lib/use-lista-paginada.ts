@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ListParams, PaginatedResult } from "@/types";
+import type {
+  DirecaoOrdenacao,
+  ListParams,
+  OrdenacaoTabela,
+  PaginatedResult,
+} from "@/types";
+import { paramsDeOrdenacao } from "./ordenacao-tabela";
 
 const DEBOUNCE_MS = 300;
 const MIN_BUSCA = 2;
@@ -51,10 +57,12 @@ export function useListaPaginada<T>(
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [filtros, setFiltros] = useState<FiltrosLista>(() => ({ ...filtrosIniciais }));
+  const [ordenacao, setOrdenacao] = useState<OrdenacaoTabela | null>(null);
   const requisicao = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const termoAtual = useRef("");
   const filtrosAtuais = useRef<FiltrosLista>({ ...filtrosIniciais });
+  const ordenacaoRef = useRef<OrdenacaoTabela | null>(null);
 
   // Refs para manter `carregar` estável: o efeito de revalidação não pode
   // depender de `buscar`/`inicial` (identidades novas a cada render do servidor)
@@ -80,12 +88,13 @@ export function useListaPaginada<T>(
         const res = await buscarRef.current(params);
         if (id === requisicao.current) setResultado(res);
       } catch {
-        // Em erro, só volta ao inicial quando a lista não está recortada: com
-        // busca/filtro ativo é melhor manter o último resultado do que exibir
-        // tudo como se o recorte tivesse sido aplicado.
+        // Em erro, só volta ao inicial quando a lista não está recortada nem
+        // ordenada: com busca/filtro/ordenação ativa é melhor manter o último
+        // resultado do que exibir tudo como se o recorte não existisse.
         if (
           id === requisicao.current &&
-          deveUsarInicial(termoAtual.current, filtrosAtuais.current)
+          deveUsarInicial(termoAtual.current, filtrosAtuais.current) &&
+          !ordenacaoRef.current
         ) {
           setResultado(inicialRef.current);
         }
@@ -101,7 +110,13 @@ export function useListaPaginada<T>(
       const search = termoAtual.current.length >= MIN_BUSCA ? termoAtual.current : undefined;
       // `page`/`limit` são numéricos e o índice de `FiltrosLista` também admite
       // números; a asserção mantém o tipo de interseção esperado pelos chamadores.
-      return { page, limit, search, ...filtrosAtuais.current } as ListParams & FiltrosLista;
+      return {
+        page,
+        limit,
+        search,
+        ...filtrosAtuais.current,
+        ...paramsDeOrdenacao(ordenacaoRef.current),
+      } as ListParams & FiltrosLista;
     },
     [],
   );
@@ -115,13 +130,16 @@ export function useListaPaginada<T>(
       return;
     }
 
-    if (deveUsarInicial(termoAtual.current, filtrosAtuais.current)) {
+    if (
+      deveUsarInicial(termoAtual.current, filtrosAtuais.current) &&
+      !ordenacaoRef.current
+    ) {
       setResultado(inicial);
       return;
     }
 
-    // Reconsulta na primeira página com o recorte atual: salvar/excluir pode
-    // esvaziar a página em que o usuário estava.
+    // Reconsulta na primeira página com o recorte/ordenação atual: salvar/excluir
+    // pode esvaziar a página em que o usuário estava.
     void carregar(paramsAtuais(1, resultadoRef.current.limit));
   }, [inicial, carregar, paramsAtuais]);
 
@@ -170,6 +188,22 @@ export function useListaPaginada<T>(
     [carregar, paramsAtuais, resultado.limit],
   );
 
+  /**
+   * Ordenação server-side: grava campo/direção (ref síncrono usado por
+   * `paramsAtuais`), volta à primeira página e recarrega. `null` nos dois
+   * parâmetros limpa a ordenação e devolve o padrão do servidor.
+   */
+  const ordenar = useCallback(
+    (campo: string | null, direcao: DirecaoOrdenacao | null) => {
+      const nova =
+        campo !== null && direcao !== null ? { campo, direcao } : null;
+      ordenacaoRef.current = nova;
+      setOrdenacao(nova);
+      void carregar(paramsAtuais(1, resultadoRef.current.limit));
+    },
+    [carregar, paramsAtuais],
+  );
+
   return {
     resultado,
     carregando,
@@ -178,5 +212,7 @@ export function useListaPaginada<T>(
     mudarTamanho,
     aplicarFiltros,
     filtros,
+    ordenacao,
+    ordenar,
   };
 }

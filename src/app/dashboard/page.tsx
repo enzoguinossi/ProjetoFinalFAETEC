@@ -132,7 +132,7 @@ export default async function DashboardPage() {
           valor={podeVerExpedicoes ? numero.format(resumo.expedicoesAtivas) : "—"}
           detalhe={
             podeVerExpedicoes
-              ? "expedições em percurso"
+              ? "expedições em rota"
               : "sem permissão para ver expedições"
           }
         />

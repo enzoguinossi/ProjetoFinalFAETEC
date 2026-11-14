@@ -184,6 +184,7 @@ export default function ProdutoView({
       >
         <FormSection title="Dados do produto">
           <FormGrid columns={3}>
+            <ViewField label="Tipo" value={produto.tipo_nome} />
             <ViewField label="Conversão Padrão de Entrada" value={unidadeEntrada} />
             <ViewField label="Unidade Padrão de Saída" value={unidadeSaida} />
             <ViewField label="Perecível" value={produto.perecivel ? "Sim" : "Não"} />

@@ -9,7 +9,8 @@ import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
-import type { PaginatedResult } from "@/types";
+import { useOrdenacao } from "@/lib/use-ordenacao";
+import type { DirecaoOrdenacao, PaginatedResult } from "@/types";
 import {
   aprovarPedido,
   listarPedidos,
@@ -89,6 +90,7 @@ export default function PedidosClient({
   podeConsultar,
 }: Props) {
   const mostrarAviso = useAviso();
+  const { ordenacao, ordenar, params: paramsOrdenacao } = useOrdenacao();
 
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
@@ -163,7 +165,14 @@ export default function PedidosClient({
         nota.length === 1 && (nota[0] === "com" || nota[0] === "sem")
           ? nota[0]
           : "todos",
+      ...paramsOrdenacao(),
     };
+  }
+
+  /** Ordenação server-side: grava campo/direção e recarrega a primeira página. */
+  function aoOrdenar(campo: string | null, direcao: DirecaoOrdenacao | null) {
+    ordenar(campo, direcao);
+    void carregar(1, resultado.limit);
   }
 
   async function carregar(
@@ -250,10 +259,20 @@ export default function PedidosClient({
       label: "Código",
       width: "0.8fr",
       align: "center",
+      sortable: true,
+      fixed: true,
+      sortKey: "id_pedido_escola",
       render: (value) => formatarCodigo(Number(value)),
     },
-    { key: "data", label: "Data", width: "0.9fr", align: "center" },
-    { key: "escola", label: "Escola", width: "2.6fr" },
+    {
+      key: "data",
+      label: "Data",
+      width: "0.9fr",
+      align: "center",
+      sortable: true,
+      sortKey: "data_criacao",
+    },
+    { key: "escola", label: "Escola", width: "2.6fr", sortable: true },
     {
       key: "total",
       label: "Itens",
@@ -267,6 +286,8 @@ export default function PedidosClient({
       label: "Status",
       width: "1fr",
       align: "center",
+      sortable: true,
+      sortKey: "status",
       render: (value, row) => (
         <span
           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -349,6 +370,7 @@ export default function PedidosClient({
         columns={columns}
         data={resultado.data}
         idField="id_pedido_escola"
+        idTabela="pedidos"
         rowExpansivel={(row) => row.itens.length > 0}
         renderExpandido={(row) => (
           <div className="flex flex-col gap-1">
@@ -368,6 +390,8 @@ export default function PedidosClient({
           onPageSizeChange: (limit) => void carregar(1, limit),
         }}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={aoOrdenar}
       />
 
       <ConfirmDialog

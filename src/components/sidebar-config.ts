@@ -62,7 +62,7 @@ export const movEstoqueItems: SidebarNavItemWithPermission[] = [
 
 export const expedicaoItems: SidebarNavItemWithPermission[] = [
   { label: "Expedições", path: "/expedicoes", icon: MapPinned, permissao: "expedicao.listar" },
-  { label: "Percursos", path: "/expedicoes/percursos", icon: Route, permissao: "percurso.listar" },
+  { label: "Rotas", path: "/expedicoes/rotas", icon: Route, permissao: "percurso.listar" },
 ];
 
 // Ordem do menu: Dashboard · Mov. Estoque · Expedições · Cadastros · Pedidos · Relatórios.

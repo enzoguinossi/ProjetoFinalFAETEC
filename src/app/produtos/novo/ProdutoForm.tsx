@@ -8,6 +8,7 @@ import { COLUNAS_PRODUTO, type ProdutoListRow } from "@/lib/produto-linha";
 import { formatarCodigo } from "@/lib/formatar";
 import CodigosSection, { type CodigoEntry } from "@/components/CodigosSection";
 import UnidadesModal from "@/components/UnidadesModal";
+import TiposProdutoModal from "@/components/TiposProdutoModal";
 import Modal from "@/components/Modal";
 import ProdutoView from "./ProdutoView";
 import FotosField from "@/components/FotosField";
@@ -20,6 +21,7 @@ import IdentityBand from "@/components/form/IdentityBand";
 import SaldoReadout from "@/components/form/SaldoReadout";
 import StatusSwitch from "@/components/form/StatusSwitch";
 import CompactList from "@/components/form/CompactList";
+import type { PermissoesEntidade, TipoProdutoItem } from "@/types";
 
 interface Conversao {
   id_conversao: number;
@@ -42,6 +44,11 @@ export interface ProdutoItem {
 interface Props {
   conversoes: Conversao[];
   tiposCodigo: TipoCodigo[];
+  /** Tipos de produto para o seletor (cadastro editável). */
+  tiposProduto?: TipoProdutoItem[];
+  /** Ações do cadastro de tipos (o servidor valida de novo). */
+  permsTipo?: Pick<PermissoesEntidade, "canCreate" | "canEdit" | "canDelete">;
+  onTiposProdutoChange?: (tipos: TipoProdutoItem[]) => void;
   initialData?: ProdutoFormData;
   canDeactivate?: boolean;
   onSuccess?: () => void;
@@ -56,8 +63,8 @@ const CHECKBOX_LABEL_CLASS =
   "flex items-center gap-2 font-sans text-sm font-normal text-ink-strong leading-[1.4] cursor-pointer [&_input[type=checkbox]]:size-[1.125rem] [&_input[type=checkbox]]:accent-brand [&_input[type=checkbox]]:cursor-pointer";
 
 export default function ProdutoForm({
-  conversoes, tiposCodigo, initialData, canDeactivate = true,
-  onSuccess, onCancel,
+  conversoes, tiposCodigo, tiposProduto = [], permsTipo, onTiposProdutoChange,
+  initialData, canDeactivate = true, onSuccess, onCancel,
 }: Props) {
   const isEdit = initialData !== undefined;
 
@@ -79,6 +86,21 @@ export default function ProdutoForm({
   );
   const [conversoesAtuais, setConversoesAtuais] = useState<Conversao[]>(conversoes);
   const [unidadesModalOpen, setUnidadesModalOpen] = useState(false);
+
+  // "" = sem tipo; no cadastro novo o tipo padrão já vem selecionado.
+  const [tipos, setTipos] = useState<TipoProdutoItem[]>(tiposProduto);
+  const [idTipoProduto, setIdTipoProduto] = useState<string>(() => {
+    if (initialData) {
+      return initialData.id_tipo_produto ? String(initialData.id_tipo_produto) : "";
+    }
+    const padrao = tiposProduto.find((tipo) => tipo.padrao);
+    return padrao ? String(padrao.id_tipo_produto) : "";
+  });
+  const [tiposModalOpen, setTiposModalOpen] = useState(false);
+  /** O gerenciador só aparece para quem pode criar, alterar ou excluir tipos. */
+  const podeGerenciarTipos = Boolean(
+    permsTipo?.canCreate || permsTipo?.canEdit || permsTipo?.canDelete,
+  );
 
   const [codigos, setCodigos] = useState<CodigoEntry[]>(initialData?.codigos ?? []);
 
@@ -117,6 +139,18 @@ export default function ProdutoForm({
     if (produto) setInsumoViewData(produto);
   }
 
+  function aoMudarTipos(lista: TipoProdutoItem[]) {
+    setTipos(lista);
+    onTiposProdutoChange?.(lista);
+    setIdTipoProduto((atual) => {
+      if (!atual) return atual;
+      if (lista.some((tipo) => String(tipo.id_tipo_produto) === atual)) return atual;
+      // O tipo selecionado foi excluído: volta para "Sem tipo" em vez de
+      // trocar silenciosamente pelo padrão.
+      return "";
+    });
+  }
+
   // ── Submit ──
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -130,7 +164,7 @@ export default function ProdutoForm({
       const result = initialData
         ? await updateProduto(form)
         : await createProduto(form);
-      if (result.error) { mostrarAviso(result.error, "erro"); return; }
+      if ("error" in result) { mostrarAviso(result.error, "erro"); return; }
       mostrarAviso(initialData ? "Alterações salvas com sucesso." : "Cadastro concluído com sucesso.", "sucesso");
       onSuccess?.();
     } catch {
@@ -225,6 +259,40 @@ export default function ProdutoForm({
               onChange={(e) => setDescricao(e.target.value)}
             />
           </FormField>
+
+          <div className="flex max-w-xs flex-col gap-1.5">
+            <div className="flex items-center gap-3">
+              <label
+                htmlFor="produto-tipo"
+                className="font-sans text-sm font-medium leading-5 text-ink-strong"
+              >
+                Tipo
+              </label>
+              {podeGerenciarTipos && (
+                <button
+                  type="button"
+                  onClick={() => setTiposModalOpen(true)}
+                  className="cursor-pointer border-none bg-transparent p-0 font-sans text-xs font-semibold text-brand underline-offset-2 hover:underline"
+                >
+                  Gerenciar tipos
+                </button>
+              )}
+            </div>
+            <select
+              id="produto-tipo"
+              name="id_tipo_produto"
+              value={idTipoProduto}
+              onChange={(e) => setIdTipoProduto(e.target.value)}
+              className={`${INPUT_CLASS} cursor-pointer`}
+            >
+              <option value="">Sem tipo</option>
+              {tipos.map((tipo) => (
+                <option key={tipo.id_tipo_produto} value={String(tipo.id_tipo_produto)}>
+                  {tipo.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <FormGrid>
             <FormField
@@ -386,6 +454,14 @@ export default function ProdutoForm({
             setIdConversaoSaida(mapeadas.find((c) => c.padrao)?.id_conversao ?? null);
           }
         }}
+      />
+
+      <TiposProdutoModal
+        open={tiposModalOpen}
+        onClose={() => setTiposModalOpen(false)}
+        initial={tipos}
+        perms={permsTipo}
+        onChanged={aoMudarTipos}
       />
 
       <Modal

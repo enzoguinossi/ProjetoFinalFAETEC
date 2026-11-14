@@ -15,7 +15,7 @@ import {
   ROTULOS_STATUS_PEDIDO,
   type PedidoInput,
 } from "@/services/pedido";
-import { resultadoVazio, type PaginatedResult } from "@/types";
+import { resultadoVazio, type DirecaoOrdenacao, type PaginatedResult } from "@/types";
 
 export type PedidoItemRow = {
   id_produto: number;
@@ -67,6 +67,9 @@ export type PedidoFiltrosPayload = {
   com_nota?: "todos" | "com" | "sem";
   /** Paginação da lista usa o mesmo formato dos demais módulos. */
   pageSize?: number;
+  /** Ordenação server-side (campo da whitelist + direção). */
+  sort?: string;
+  dir?: DirecaoOrdenacao;
 };
 
 export type ProdutoPedidoDetalhe = {
@@ -133,6 +136,8 @@ function filtrosDoPayload(params: PedidoFiltrosPayload = {}): PedidoFiltros {
     produtos: params.id_produto ? idsPositivos(params.id_produto) : [],
     com_nota:
       params.com_nota === "com" ? true : params.com_nota === "sem" ? false : null,
+    sort: params.sort,
+    dir: params.dir,
   };
 }
 

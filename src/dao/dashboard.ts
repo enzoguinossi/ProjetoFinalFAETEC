@@ -14,7 +14,7 @@ function arredondar(valor: number): number {
 
 export const ROTULOS_STATUS_NOTA: Record<string, string> = {
   ABERTA: "Aberta",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   PENDENTE: "Pendente",
   BAIXA_TOTAL: "Baixa total",
   BAIXA_PARCIAL: "Baixa parcial",

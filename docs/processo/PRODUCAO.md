@@ -320,22 +320,25 @@ Em uma instalação nova, o banco é criado vazio pelo `pos-instalacao-mysql.ps1
 o banco existente é reutilizado. O `bootstrap` chama o
 [`aplicar-sql.ps1`](../../deploy/windows/aplicar-sql.ps1) com `-Mode Auto`:
 
-- **Fresh** (banco sem tabelas): aplica `schema.sql` (DDL completo, 49 tabelas) e
+- **Fresh** (banco sem tabelas): aplica `schema.sql` (DDL completo, 50 tabelas) e
   `seed.sql`;
 - **Update** (banco com tabelas, como no 10.02): aplica todas as migrações de
-  `migracoes\*.sql` em ordem (001, 002, ...) e depois `seed.sql`.
+  `migracoes\*.sql` em ordem (001, 002, 003, ...) e depois `seed.sql`.
 
 O SQL usa `mysql.exe` com `--defaults-extra-file` (senha nunca em `-p`). Ao final valida:
 
-- **89 permissões**;
+- **92 permissões**;
 - **2 perfis** (`Operador` e `Auxiliar`);
 - **3 conversões** `UNIDADE` (fator 1, padrão), `PCT10` (10) e `CX50` (50).
 
 A migração 001 renomeia `PACOTE`→`PCT10` e `CAIXA`→`CX50`, preservando `ID_conversao` e os
 vínculos de produto. A migração 002 cria o cadastro `tipo_destinatario`, adiciona
 `destinatario.ID_tipo_destinatario` (opcional), mapeia o enum antigo pelo código, cria a FK
-`ON DELETE SET NULL` e remove a coluna enum. Ambas são idempotentes e rodam antes do seed. O
-seed é idempotente e não cria usuários, produtos, pedidos nem dados operacionais.
+`ON DELETE SET NULL` e remove a coluna enum. A migração 003 cria `tipo_produto`, os campos
+de condutor em `funcionario` (`cnh`, `categoria_cnh`, `validade_cnh`, `tipo_sanguineo`) e
+`expedicao.ID_funcionario_auxiliar`, com índices e FKs `ON DELETE SET NULL`. Todas são
+idempotentes e rodam antes do seed. O seed é idempotente e não cria usuários, produtos,
+pedidos nem dados operacionais.
 
 > ⚠️ **A migração 002 é irreversível.** Ela remove a coluna enum `destinatario.tipo_destinatario`;
 > depois disso, o rollback do `atualizar.ps1` (que restaura **somente o app**) não devolve o
@@ -492,7 +495,8 @@ Para uma instalação já em 1.07, use o `atualizar.ps1` com um pacote (sem Git)
     ├── seed.sql
     └── migracoes\
         ├── 001-unidades-pct10-cx50.sql
-        └── 002-tipos-destinatario.sql
+        ├── 002-tipos-destinatario.sql
+        └── 003-condutor-tipos-produto-auxiliar.sql
 ```
 
 ```powershell
@@ -980,7 +984,7 @@ Get-NetFirewallRule -DisplayName "Nexus *" | Select-Object DisplayName, Enabled,
 | MySQL `NexusMySQL84` não inicia / 3214 fechada | `my.ini`, `Data` ou serviço | confira `C:\ProgramData\Nexus\mysql\my.ini`, o erro em `...\mysql\data\*.err`, `Get-Service NexusMySQL84` e `Test-NetConnection 127.0.0.1 -Port 3214`; restaure `my.ini-*.bak` |
 | migração do Data não aconteceu | `C:\ProgramData\Nexus\mysql\data` já tinha conteúdo | o `instalar-mysql.ps1` só copia para destino vazio; faça backup e esvazie/renomeie o destino se for migrar |
 | SQL falha em Fresh | banco já tem tabelas | use `-Mode Update` (migrações + seed) ou um banco vazio; confira `aplicar-sql.ps1` |
-| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 89 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
+| SQL falha nas contagens | seed/migração incompletos ou banco divergente | rode `aplicar-sql.ps1` manualmente e confira 92 permissões, 2 perfis, 3 conversões (`PCT10`/`CX50`); veja o log |
 | `NexusApp` não sobe | Node/`server.js`/`.env`/dependência MySQL | confira `C:\Program Files\Nexus\node\node.exe`, `app\server.js`, `app\.env` e `DATABASE_URL` na 3214; veja `app.err.log` |
 | health 503 (`db=false`) | `NexusMySQL84` parado, senha/banco ausente | `Get-Service NexusMySQL84`; teste com `C:\Program Files\Nexus\mysql\bin\mysql.exe --defaults-extra-file="C:\ProgramData\Nexus\config\backup.cnf" -h 127.0.0.1 -P 3214 -D nexus_prod -e "SELECT 1"` |
 | HTTPS falha/CA não confiada | Caddy/CA/ACL/hostname | veja `C:\ProgramData\Nexus\caddy\logs\caddy.err.log`; confira `certutil -addstore -f Root "C:\ProgramData\Nexus\caddy\data\caddy\pki\authorities\local\root.crt"` e o `hosts`/DNS |
@@ -1259,7 +1263,7 @@ Para remoção total, depois de copiar o que precisa:
    setup/bootstrap.
 
 8. **Atualização de schema aplica todas as migrações da pasta.**
-   O caminho Update aplica `migracoes\*.sql` em ordem (001, 002, ...) + seed. Mudanças de
+   O caminho Update aplica `migracoes\*.sql` em ordem (001, 002, 003, ...) + seed. Mudanças de
    schema em releases futuras exigem uma nova migração em `deploy/sql/migracoes`; não use
    `db push` nem Prisma no destino.
 

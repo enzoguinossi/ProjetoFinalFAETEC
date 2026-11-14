@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+<defs>
+<linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#0b274a"/>
+<stop offset=".15" stop-color="#092749"/>
+<stop offset=".30" stop-color="#0f3151"/>
+<stop offset=".45" stop-color="#1a4b61"/>
+<stop offset=".60" stop-color="#256c75"/>
+<stop offset=".75" stop-color="#2f8789"/>
+<stop offset=".90" stop-color="#35a29c"/>
+<stop offset="1" stop-color="#3bafa6"/>
+</linearGradient>
+<radialGradient id="brilho" cx=".5" cy=".78" r=".72">
+<stop offset="0" stop-color="#7fe3d4" stop-opacity=".18"/>
+<stop offset=".55" stop-color="#7fe3d4" stop-opacity=".05"/>
+<stop offset="1" stop-color="#7fe3d4" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<rect width="1920" height="1080" fill="url(#ceu)"/>
+<rect width="1920" height="1080" fill="url(#brilho)"/>
+</svg>

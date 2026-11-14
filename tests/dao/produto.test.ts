@@ -68,6 +68,24 @@ describe("produtoDAO", () => {
       ]);
     });
 
+    it("ordena por campo permitido na direção pedida", async () => {
+      await criarProduto({ descricao: "Alfa" });
+      await criarProduto({ descricao: "Zebra" });
+
+      const resultado = await produtoDAO.list({ sort: "descricao", dir: "desc" });
+
+      expect(resultado.data.map((p) => p.descricao)).toEqual(["Zebra", "Alfa"]);
+    });
+
+    it("volta à ordenação padrão quando o campo não está na whitelist", async () => {
+      await criarProduto({ descricao: "Zebra" });
+      await criarProduto({ descricao: "Alfa" });
+
+      const resultado = await produtoDAO.list({ sort: "campo_invalido", dir: "desc" });
+
+      expect(resultado.data.map((p) => p.descricao)).toEqual(["Alfa", "Zebra"]);
+    });
+
     it("filtra por perecível, composto e tipo de código", async () => {
       const tipo = await criarTipoCodigo("DIGITACAO");
       const perecivel = await criarProduto({ descricao: "Perecível", perecivel: true });

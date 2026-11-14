@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { buildPagination, type ListParams } from "@/types";
 import { limitesDoDiaUtc } from "@/lib/datas";
+import { ordenarPor } from "@/lib/ordenacao";
 import { registrarAuditoria } from "./_audit";
 
 /** Status em que o produto fica bloqueado para movimentações de saldo. */
@@ -18,6 +19,16 @@ export const STATUS_INVENTARIO_BLOQUEADO: StatusInventario[] = [
 
 const EPS = 0.000001;
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist); `responsavel` vem do usuário de abertura. */
+const ORDEM_INVENTARIO: Record<string, Prisma.InventarioOrderByWithRelationInput> = {
+  observacao: { observacao: "asc" },
+  data_inicio: { data_inicio: "asc" },
+  status: { status: "asc" },
+  responsavel: {
+    usuarioAbertura: { funcionario: { pessoaFisica: { nome: "asc" } } },
+  },
+};
 
 export type InventarioListParams = ListParams & {
   status?: StatusInventario[];
@@ -171,7 +182,10 @@ export class InventarioDAO {
         skip,
         take,
         where,
-        orderBy: { id_inventario: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_INVENTARIO, { id_inventario: "desc" }),
+          { id_inventario: "desc" },
+        ],
         include: {
           usuarioAbertura: {
             select: {

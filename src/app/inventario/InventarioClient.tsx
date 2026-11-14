@@ -52,6 +52,7 @@ const columns: Column<InventarioListRow>[] = [
     label: "Observação",
     width: "3fr",
     align: "left",
+    sortable: true,
     render: (value) => String(value ?? ""),
   },
   {
@@ -59,6 +60,7 @@ const columns: Column<InventarioListRow>[] = [
     label: "Data",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (value) => formatarData(String(value ?? "")),
   },
   {
@@ -66,6 +68,8 @@ const columns: Column<InventarioListRow>[] = [
     label: "Status",
     width: "1.25fr",
     align: "center",
+    sortable: true,
+    sortKey: "status",
     render: (_value, row) => (
       <span
         className={`inline-flex rounded-full px-3 py-1 font-sans text-xs font-semibold ${
@@ -226,6 +230,7 @@ export default function InventarioClient({ inicial, podeAbrir }: Props) {
         columns={columns}
         data={lista.resultado.data}
         idField="id_inventario"
+        idTabela="inventario"
         actions={actions}
         paginacaoServidor={{
           total: lista.resultado.total,
@@ -235,6 +240,8 @@ export default function InventarioClient({ inicial, podeAbrir }: Props) {
           onPageSizeChange: lista.mudarTamanho,
         }}
         carregando={lista.carregando}
+        ordenacao={lista.ordenacao}
+        onOrdenar={lista.ordenar}
       />
 
       <Modal

@@ -3,9 +3,18 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type ListParams, type StatusVeiculo } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 import type { CodigoInput } from "@/lib/codigo";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist). */
+const ORDEM_VEICULO: Record<string, Prisma.VeiculoOrderByWithRelationInput> = {
+  codigo: { id_veiculo: "asc" },
+  placa: { placa: "asc" },
+  modelo: { modelo: "asc" },
+  ativo: { ativo: "asc" },
+};
 
 /** Filtros da listagem de veículos (status único ou múltiplo). */
 export type VeiculoListFiltros = {
@@ -31,7 +40,12 @@ export class VeiculoDAO {
       ];
     }
     const [data, total] = await Promise.all([
-      prisma.veiculo.findMany({ skip, take, where, orderBy: { placa: "asc" } }),
+      prisma.veiculo.findMany({
+        skip,
+        take,
+        where,
+        orderBy: [ordenarPor(params, ORDEM_VEICULO, { placa: "asc" }), { id_veiculo: "asc" }],
+      }),
       prisma.veiculo.count({ where }),
     ]);
     return { data, total, page: params.page ?? 1, limit: take, totalPages: Math.ceil(total / take) };

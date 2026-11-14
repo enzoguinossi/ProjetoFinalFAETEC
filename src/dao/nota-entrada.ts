@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import { limitesDoDiaSaoPaulo, limitesDoDiaUtc } from "@/lib/datas";
+import { ordenarPor } from "@/lib/ordenacao";
 import type { Prisma, TipoNotaEntrada } from "@prisma/client";
 import { saldoDAO } from "./estoque";
 
@@ -38,6 +39,14 @@ export type NotaEntradaAtualizacao = {
 };
 
 const AUDIT_ENTIDADE = "NotaEntrada";
+
+/** Campos ordenáveis da listagem (whitelist). `itens` é contagem/lista calculada. */
+const ORDEM_NOTA_ENTRADA: Record<string, Prisma.NotaEntradaOrderByWithRelationInput> = {
+  data_criacao: { data_criacao: "asc" },
+  fornecedor: { fornecedor: { pessoaJuridica: { razao_social: "asc" } } },
+  tipo: { tipo: "asc" },
+  chave_acesso: { chave_acesso: "asc" },
+};
 
 /** Filtros de domínio da listagem de notas de entrada. */
 export type NotaEntradaListFiltros = {
@@ -150,7 +159,7 @@ export class NotaEntradaDAO {
    * Notas de entrada (`ENTRADA`) e de desmembramento (`DESMONTAGEM`), da mais
    * recente para a mais antiga. Editar continua restrito a `ENTRADA`.
    */
-  async list(params: PaginationParams & NotaEntradaListFiltros = {}) {
+  async list(params: ListParams & NotaEntradaListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where = whereDe(params);
 
@@ -165,7 +174,10 @@ export class NotaEntradaDAO {
           },
           itens: { select: { id_item_nota_entrada: true } },
         },
-        orderBy: { data_criacao: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_NOTA_ENTRADA, { data_criacao: "desc" }),
+          { id_nota_entrada: "desc" },
+        ],
       }),
       prisma.notaEntrada.count({ where }),
     ]);

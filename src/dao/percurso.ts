@@ -2,8 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist), inclusive a contagem de destinatários. */
+const ORDEM_PERCURSO: Record<string, Prisma.PercursoOrderByWithRelationInput> = {
+  nome: { nome: "asc" },
+  total_destinatarios: { destinatarios: { _count: "asc" } },
+};
 
 export type PercursoDestinatarioDados = {
   id_destinatario: number;
@@ -54,7 +61,7 @@ async function garantirNomeUnico(
     },
     select: { id_percurso: true },
   });
-  if (existente) throw new Error("Já existe um percurso com este nome.");
+  if (existente) throw new Error("Já existe uma rota com este nome.");
 }
 
 export class PercursoDAO {
@@ -69,7 +76,7 @@ export class PercursoDAO {
         skip,
         take,
         where,
-        orderBy: { nome: "asc" },
+        orderBy: [ordenarPor(params, ORDEM_PERCURSO, { nome: "asc" }), { id_percurso: "asc" }],
         include: { _count: { select: { destinatarios: true } } },
       }),
       prisma.percurso.count({ where }),

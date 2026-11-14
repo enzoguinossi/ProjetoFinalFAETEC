@@ -36,13 +36,22 @@ interface Props {
 }
 
 const columns: Column<DestinatarioListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "razao", label: "Razão Social", width: "4fr", align: "left" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center", sortable: true, fixed: true },
+  { key: "razao", label: "Razão Social", width: "4fr", align: "left", sortable: true },
+  {
+    key: "nome_fantasia",
+    label: "Nome Fantasia",
+    width: "3fr",
+    align: "left",
+    sortable: true,
+    defaultHidden: true,
+  },
   {
     key: "tipo_nome",
     label: "Tipo",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (value) => (value ? String(value) : ""),
   },
   {
@@ -50,6 +59,7 @@ const columns: Column<DestinatarioListRow>[] = [
     label: "Situação",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
   },
 ];
@@ -69,6 +79,8 @@ export default function DestinatariosClient({
     carregando,
     buscarPorTermo,
     aplicarFiltros,
+    ordenacao,
+    ordenar,
     paginacaoServidor,
     actions,
     modalMode,
@@ -160,9 +172,12 @@ export default function DestinatariosClient({
         columns={columns}
         data={resultado.data}
         idField="codigo"
+        idTabela="destinatarios"
         actions={actions}
         paginacaoServidor={paginacaoServidor}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={ordenar}
       />
 
       <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">

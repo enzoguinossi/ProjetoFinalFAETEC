@@ -13,6 +13,47 @@ rastreabilidade versão ↔ issues ↔ commit — está em
 
 ## [Unreleased]
 
+## [1.14.11.2026] - 2026-11-14
+
+Esta seção consolida os ajustes de apresentação e a evolução das listagens.
+
+### Added
+- **Funcionário condutor (KAN-155):** CNH, categoria, validade e tipo sanguíneo opcionais
+  em `funcionario`, com a aba **Condutor** no formulário (visível somente com o checkbox
+  “É condutor” marcado, inclusive na visualização), chip de CNH vencida sem bloqueio e
+  auditoria no DAO/actions. Regra de validação em `src/lib/cnh.ts`.
+- **Tipos de produto (KAN-139):** cadastro `tipo_produto` sem tipo padrão, com CRUD,
+  permissões `tipo_produto.criar/.alterar/.excluir`, seletor no produto e filtro em
+  “Adicionar filtros”; a criação/edição de tipos fica somente no cadastro do produto.
+- **Auxiliar na expedição (KAN-142):** `id_funcionario_auxiliar` anulável, FK
+  `ON DELETE SET NULL` e índice; auxiliar opcional, funcionário ativo, diferente do
+  condutor; nome no detalhe e na auditoria.
+- **Login (KAN-18):** selos ODS 4/8/9/12/16 e selo institucional **Inovação, Ciência e
+  Tecnologia**; fundo modular em `Cena.tsx`/`cena.json`, com oito SVGs independentes em
+  `public/brand/cena/` e 16 camadas `<img>`, prontas para a reconstrução do cursor-craft.
+- **Tabelas (KAN-18):** scroll horizontal com coluna Ações sticky somente no overflow,
+  ordenação server-side de uma coluna (com Código ordenado pelo ID), coluna Código e Ações
+  fixas, seletor de colunas acima da tabela e preferência no IndexedDB
+  (`nexus-preferencias`), por navegador. **Nome Fantasia** em Destinatários e Fornecedores
+  é coluna opcional, oculta por padrão e ordenável (KAN-138/KAN-154).
+
+### Changed
+- **Percurso → Rota (KAN-142):** a interface e a URL passam a usar `/expedicoes/rotas` e o
+  rótulo “Rota”; o modelo continua `percurso`. A URL antiga redireciona.
+- **Filtros de Produtos (KAN-139):** o tipo de produto saiu da barra fixa e virou campo
+  multi dentro de “Adicionar filtros”; o botão “Gerenciar tipos” e o modal da listagem
+  foram removidos.
+- **Banco de produção:** aplicados `ID_funcionario_auxiliar` + FK/índice em `nexus_prod`
+  (backup `pre-auxiliar-2026-11-14.sql`) e carregados quatro tipos de produto, vinculados
+  aos dez produtos existentes. A migração `003-condutor-tipos-produto-auxiliar.sql` cobre o
+  caminho **Update** do instalador (tipo de produto, condutor e auxiliar) e o seed passa a
+  validar **92 permissões**.
+
+### Fixed
+- **Filtro de período (KAN-18):** `BarraFiltrosBase` inicializa `{ de, ate }` ao adicionar
+  um campo de período e o `PeriodoPainel` lê `valor?.de`/`valor?.ate`, eliminando o
+  `TypeError` em `/mov-estoque/saida`.
+
 ## [1.08.11.2026] - 2026-11-08
 
 Esta seção consolida os tipos de destinatário como cadastro, o desmembramento de compostos,

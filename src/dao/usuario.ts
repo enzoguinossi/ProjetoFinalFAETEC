@@ -3,10 +3,19 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 
 const AUDIT_ENTIDADE = "Usuario";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist): colunas reais, diretas ou por relação. */
+const ORDEM_USUARIO: Record<string, Prisma.UsuarioOrderByWithRelationInput> = {
+  codigo: { id_usuario: "asc" },
+  nome: { funcionario: { pessoaFisica: { nome: "asc" } } },
+  login: { login: "asc" },
+  ativo: { ativo: "asc" },
+};
 
 /** Filtros da listagem de usuários. */
 export type UsuarioListFiltros = {
@@ -57,7 +66,7 @@ export class UsuarioDAO {
         skip, take,
         where,
         include: { funcionario: { include: { pessoaFisica: true } } },
-        orderBy: { id_usuario: "asc" },
+        orderBy: [ordenarPor(params, ORDEM_USUARIO, { id_usuario: "asc" }), { id_usuario: "asc" }],
       }),
       prisma.usuario.count({ where }),
     ]);

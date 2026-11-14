@@ -6,6 +6,8 @@ export type ProdutoListRow = {
   id_produto: number;
   codigo: string;
   descricao: string;
+  /** Nome do tipo de produto (vazio quando sem tipo). */
+  tipo: string;
   qtd: string;
   livre: string;
   ativo: boolean;
@@ -13,10 +15,11 @@ export type ProdutoListRow = {
   composto: boolean;
 };
 
-/** Colunas da listagem/seletor de produto (Código → Descrição → Quantidade → Qtd. Livre). */
+/** Colunas da listagem/seletor de produto (Código → Descrição → Tipo → Quantidade → Qtd. Livre). */
 export const COLUNAS_PRODUTO: Column<ProdutoListRow>[] = [
   { key: "codigo", label: "Código", width: "1fr", align: "center" },
   { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
+  { key: "tipo", label: "Tipo", width: "1.5fr", align: "left" },
   { key: "qtd", label: "Quantidade", width: "1fr", align: "right" },
   { key: "livre", label: "Qtd. Livre", width: "1fr", align: "right" },
 ];
@@ -28,6 +31,7 @@ type ProdutoComSaldo = {
   saldo_reservado: number;
   ativo: boolean;
   composto: boolean;
+  tipoProduto?: { nome: string } | null;
 };
 
 /**
@@ -42,6 +46,7 @@ export function produtoParaLinha(p: ProdutoComSaldo): ProdutoListRow {
     id_produto: p.id_produto,
     codigo: formatarCodigo(p.id_produto),
     descricao: p.descricao,
+    tipo: p.tipoProduto?.nome ?? "",
     qtd: String(saldo),
     livre: String(saldo - reservado),
     ativo: p.ativo,

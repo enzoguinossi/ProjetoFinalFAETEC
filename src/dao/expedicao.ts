@@ -9,6 +9,7 @@ import { anexoDAO, type AnexoInput } from "./anexo";
 import { saldoDAO } from "./estoque";
 import { limitesDoDiaUtc } from "@/lib/datas";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 
 type Db = Prisma.TransactionClient;
 
@@ -39,6 +40,17 @@ export type ResultadoEntrega = {
 
 const AUDIT_ENTIDADE = "Expedicao";
 
+/**
+ * Campos ordenáveis da listagem (whitelist). `destinatarios` fica de fora: é uma
+ * concatenação calculada na linha, sem coluna/relação única correspondente.
+ */
+const ORDEM_EXPEDICAO: Record<string, Prisma.ExpedicaoOrderByWithRelationInput> = {
+  data_prevista: { data_prevista: "asc" },
+  status: { status: "asc" },
+  total_notas: { notas: { _count: "asc" } },
+  veiculo: { veiculo: { placa: "asc" } },
+};
+
 /** Status em que a nota ainda pode entrar numa expedição. */
 const STATUS_NOTA_ELEGIVEL: StatusNotaSaida[] = [
   "ABERTA",
@@ -57,6 +69,7 @@ export type ExpedicaoDados = {
   observacao: string | null;
   id_veiculo: number;
   id_funcionario_condutor: number;
+  id_funcionario_auxiliar: number | null;
   /** Consumido na criação; não é gravado na expedição. */
   id_percurso: number | null;
 };
@@ -97,6 +110,9 @@ const includeNotas = {
 const includeDetalhe = {
   veiculo: true,
   condutor: { include: { pessoaFisica: true } },
+  auxiliar: {
+    select: { id_funcionario: true, pessoaFisica: { select: { nome: true } } },
+  },
   ...includeNotas,
 } satisfies Prisma.ExpedicaoInclude;
 
@@ -135,6 +151,7 @@ function snapshot(expedicao: ExpedicaoComNotas) {
     id_expedicao: expedicao.id_expedicao,
     id_veiculo: expedicao.id_veiculo,
     id_funcionario_condutor: expedicao.id_funcionario_condutor,
+    id_funcionario_auxiliar: expedicao.id_funcionario_auxiliar,
     data_criacao: expedicao.data_criacao.toISOString(),
     data_prevista: expedicao.data_prevista.toISOString().slice(0, 10),
     observacao: expedicao.observacao,
@@ -148,7 +165,7 @@ function snapshot(expedicao: ExpedicaoComNotas) {
   };
 }
 
-/** Confere se o veículo e o condutor informados existem e estão ativos. */
+/** Confere se o veículo, o condutor e o auxiliar informados existem e estão ativos. */
 async function validarVinculos(client: Db, data: ExpedicaoAtualizacao) {
   const veiculo = await client.veiculo.findFirst({
     where: { id_veiculo: data.id_veiculo, ativo: true },
@@ -166,6 +183,21 @@ async function validarVinculos(client: Db, data: ExpedicaoAtualizacao) {
   });
   if (!condutor) {
     throw new Error("Condutor não encontrado, inativo ou não habilitado.");
+  }
+
+  // O auxiliar é opcional e não precisa ser condutor habilitado, mas precisa
+  // ser um funcionário ativo e não pode acumular a função do condutor.
+  if (data.id_funcionario_auxiliar !== null) {
+    if (data.id_funcionario_auxiliar === data.id_funcionario_condutor) {
+      throw new Error(
+        "O auxiliar não pode ser o mesmo funcionário do condutor.",
+      );
+    }
+    const auxiliar = await client.funcionario.findFirst({
+      where: { id_funcionario: data.id_funcionario_auxiliar, ativo: true },
+      select: { id_funcionario: true },
+    });
+    if (!auxiliar) throw new Error("Auxiliar não encontrado ou inativo.");
   }
 }
 
@@ -233,7 +265,7 @@ async function finalizarNota(
   });
   if (!expedicao) throw new Error("Expedição não encontrada.");
   if (expedicao.status !== "EM_PERCURSO") {
-    throw new Error("Só expedições em percurso registram entrega.");
+    throw new Error("Só expedições em rota registram entrega.");
   }
 
   const justificativa = tentativa.justificativa?.trim() || null;
@@ -267,7 +299,7 @@ async function finalizarNota(
   if (!vinculo) throw new Error("Esta nota não pertence à expedição.");
   if (nota.status !== "EM_PERCURSO" && nota.status !== "BAIXA_PARCIAL") {
     throw new Error(
-      "Esta nota não está em percurso: a entrega já foi registrada ou a nota não saiu.",
+      "Esta nota não está em rota: a entrega já foi registrada ou a nota não saiu.",
     );
   }
 
@@ -622,7 +654,10 @@ export class ExpedicaoDAO {
         take,
         where,
         include: includeResumo,
-        orderBy: [{ data_prevista: "desc" }, { id_expedicao: "desc" }],
+        orderBy: [
+          ordenarPor(params, ORDEM_EXPEDICAO, { data_prevista: "desc" }),
+          { id_expedicao: "desc" },
+        ],
       }),
       prisma.expedicao.count({ where }),
     ]);
@@ -695,6 +730,34 @@ export class ExpedicaoDAO {
   async listCondutores(params: ListParams = {}) {
     const { skip, take } = buildPagination(params);
     const where: Prisma.FuncionarioWhereInput = { ativo: true, condutor: true };
+    if (params.search) {
+      where.pessoaFisica = { nome: { contains: params.search } };
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.funcionario.findMany({
+        skip,
+        take,
+        where,
+        include: { pessoaFisica: true },
+        orderBy: { pessoaFisica: { nome: "asc" } },
+      }),
+      prisma.funcionario.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page: params.page ?? 1,
+      limit: take,
+      totalPages: Math.ceil(total / take),
+    };
+  }
+
+  /** Funcionários ativos (qualquer cargo) para o seletor de auxiliar. */
+  async listFuncionarios(params: ListParams = {}) {
+    const { skip, take } = buildPagination(params);
+    const where: Prisma.FuncionarioWhereInput = { ativo: true };
     if (params.search) {
       where.pessoaFisica = { nome: { contains: params.search } };
     }
@@ -822,6 +885,7 @@ export class ExpedicaoDAO {
         data: {
           id_veiculo: data.id_veiculo,
           id_funcionario_condutor: data.id_funcionario_condutor,
+          id_funcionario_auxiliar: data.id_funcionario_auxiliar,
           data_criacao: new Date(),
           data_prevista: data.data_prevista,
           observacao: data.observacao,
@@ -836,7 +900,7 @@ export class ExpedicaoDAO {
             destinatarios: { orderBy: { ordem_visita: "asc" } },
           },
         });
-        if (!percurso) throw new Error("Percurso não encontrado.");
+        if (!percurso) throw new Error("Rota não encontrada.");
 
         const idsDestinatarios = percurso.destinatarios.map(
           (item) => item.id_destinatario,
@@ -935,6 +999,7 @@ export class ExpedicaoDAO {
           observacao: data.observacao,
           id_veiculo: data.id_veiculo,
           id_funcionario_condutor: data.id_funcionario_condutor,
+          id_funcionario_auxiliar: data.id_funcionario_auxiliar,
         },
       });
 
@@ -1174,7 +1239,7 @@ export class ExpedicaoDAO {
         select: { id_expedicao: true },
       });
       if (veiculoEmOutraExpedicao) {
-        throw new Error("Veículo já está em outra expedição em percurso.");
+        throw new Error("Veículo já está em outra expedição em rota.");
       }
 
       await tx.expedicao.update({
@@ -1291,7 +1356,7 @@ export class ExpedicaoDAO {
 
         if (!antes.ativo) throw new Error("Expedição desativada.");
         if (antes.status !== "EM_PERCURSO") {
-          throw new Error("Só expedições em percurso podem ser concluídas.");
+          throw new Error("Só expedições em rota podem ser concluídas.");
         }
 
         const transicao = await tx.expedicao.updateMany({

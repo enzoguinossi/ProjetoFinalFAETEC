@@ -132,14 +132,14 @@ export type StatusNotaRelatorio = (typeof STATUS_NOTA_RELATORIO)[number];
 /** Rótulos de status usados na tela e no CSV (mesmos da listagem de expedições). */
 export const ROTULOS_STATUS_EXPEDICAO = {
   PLANEJADA: "Planejada",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   CONCLUIDA: "Concluída",
 } as const;
 
 /** Rótulos de status da nota de saída (mesmos da listagem de expedições). */
 export const ROTULOS_STATUS_NOTA = {
   ABERTA: "Aberta",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   PENDENTE: "Pendente",
   BAIXA_TOTAL: "Baixa total",
   BAIXA_PARCIAL: "Baixa parcial",

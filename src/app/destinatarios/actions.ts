@@ -20,6 +20,8 @@ export type DestinatarioListRow = {
   id_destinatario: number;
   codigo: string;
   razao: string;
+  /** Nome fantasia da pessoa jurídica; `null` = não informado. */
+  nome_fantasia: string | null;
   /** Nome do tipo vindo do cadastro; `null` = sem tipo. */
   tipo_nome: string | null;
   ativo: boolean;
@@ -128,6 +130,7 @@ export async function listarDestinatarios(
       id_destinatario: d.id_destinatario,
       codigo: formatarCodigo(d.id_destinatario),
       razao: d.pessoaJuridica.razao_social,
+      nome_fantasia: d.pessoaJuridica.nome_fantasia,
       tipo_nome: d.tipoDestinatario?.nome ?? null,
       ativo: d.ativo,
     })),

@@ -16,6 +16,7 @@ describe("lib/produto-linha", () => {
       id_produto: 42,
       codigo: "000042",
       descricao: "Arroz",
+      tipo: "",
       qtd: "15",
       livre: "10",
       ativo: true,

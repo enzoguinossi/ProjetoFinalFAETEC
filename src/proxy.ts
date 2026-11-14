@@ -14,6 +14,8 @@ const publicRoutes = [
   "/_next/image/",
   "/favicon",
   "/icons/",
+  "/ods/",
+  "/brand/",
   "/logo.svg",
 ];
 

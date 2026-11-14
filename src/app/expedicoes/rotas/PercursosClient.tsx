@@ -22,12 +22,13 @@ interface Props {
 }
 
 const columns: Column<PercursoListRow>[] = [
-  { key: "nome", label: "Nome", width: "4fr", align: "left" },
+  { key: "nome", label: "Nome", width: "4fr", align: "left", sortable: true },
   {
     key: "total_destinatarios",
     label: "Destinatários",
     width: "1.2fr",
     align: "right",
+    sortable: true,
     render: (value) => String(value ?? 0),
   },
 ];
@@ -37,6 +38,8 @@ export default function PercursosClient({ inicial, perms }: Props) {
     resultado,
     carregando,
     buscarPorTermo,
+    ordenacao,
+    ordenar,
     paginacaoServidor,
     actions,
     modalMode,
@@ -55,13 +58,13 @@ export default function PercursosClient({ inicial, perms }: Props) {
     excluir: excluirPercurso,
     idDe: (row) => row.id_percurso,
     perms,
-    mensagemExcluido: "Percurso excluído com sucesso.",
+    mensagemExcluido: "Rota excluída com sucesso.",
   });
 
   return (
     <>
       <SearchBar
-        placeholder="Pesquisar percursos..."
+        placeholder="Pesquisar rotas..."
         onNew={abrirNovo}
         onSearch={buscarPorTermo}
         showNew={perms.canCreate}
@@ -70,16 +73,19 @@ export default function PercursosClient({ inicial, perms }: Props) {
         columns={columns}
         data={resultado.data}
         idField="id_percurso"
+        idTabela="rotas"
         actions={actions}
         paginacaoServidor={paginacaoServidor}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={ordenar}
       />
 
-      <Modal open={modalMode === "create"} onClose={fecharModal} width="900px">
+      <Modal open={modalMode === "create"} onClose={fecharModal} title="Nova rota" width="900px">
         <PercursoForm mode="create" onSuccess={aoSalvar} onCancel={fecharModal} />
       </Modal>
 
-      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} width="900px">
+      <Modal open={modalMode === "edit" && formData !== null} onClose={fecharModal} title="Editar rota" width="900px">
         {formData && (
           <PercursoForm
             mode="edit"
@@ -90,7 +96,7 @@ export default function PercursosClient({ inicial, perms }: Props) {
         )}
       </Modal>
 
-      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} width="900px">
+      <Modal open={modalMode === "view" && formData !== null} onClose={fecharModal} title="Rota" width="900px">
         {formData && (
           <PercursoForm
             mode="view"
@@ -104,8 +110,8 @@ export default function PercursosClient({ inicial, perms }: Props) {
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmarExclusao}
-        title="Excluir percurso"
-        message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"? Esta ação é permanente: o percurso e a ordem das visitas serão apagados.`}
+        title="Excluir rota"
+        message={`Tem certeza que deseja excluir "${deleteTarget?.nome}"? Esta ação é permanente: a rota e a ordem das visitas serão apagadas.`}
         confirmLabel="Excluir"
         loading={excluindo}
       />

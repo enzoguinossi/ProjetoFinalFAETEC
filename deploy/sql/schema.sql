@@ -111,6 +111,10 @@ CREATE TABLE `funcionario` (
     `cargo` VARCHAR(191) NULL,
     `ativo` BOOLEAN NOT NULL DEFAULT true,
     `condutor` BOOLEAN NOT NULL DEFAULT false,
+    `cnh` VARCHAR(11) NULL,
+    `categoria_cnh` VARCHAR(5) NULL,
+    `validade_cnh` DATE NULL,
+    `tipo_sanguineo` VARCHAR(3) NULL,
 
     UNIQUE INDEX `funcionario_ID_pessoa_fisica_key`(`ID_pessoa_fisica`),
     PRIMARY KEY (`ID_funcionario`)
@@ -276,12 +280,25 @@ CREATE TABLE `conversao_unidade` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `tipo_produto` (
+    `ID_tipo_produto` INTEGER NOT NULL AUTO_INCREMENT,
+    `codigo` VARCHAR(191) NOT NULL,
+    `nome` VARCHAR(191) NOT NULL,
+    `padrao` BOOLEAN NOT NULL DEFAULT false,
+
+    UNIQUE INDEX `tipo_produto_codigo_key`(`codigo`),
+    UNIQUE INDEX `tipo_produto_nome_key`(`nome`),
+    PRIMARY KEY (`ID_tipo_produto`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `produto` (
     `ID_produto` INTEGER NOT NULL AUTO_INCREMENT,
     `descricao` VARCHAR(191) NOT NULL,
     `perecivel` BOOLEAN NOT NULL DEFAULT false,
     `composto` BOOLEAN NOT NULL DEFAULT false,
     `data_validade` DATE NULL,
+    `ID_tipo_produto` INTEGER NULL,
     `ID_conversao_padrao` INTEGER NOT NULL DEFAULT 1,
     `ID_conversao_saida` INTEGER NOT NULL DEFAULT 1,
     `saldo` DOUBLE NOT NULL DEFAULT 0,
@@ -290,6 +307,7 @@ CREATE TABLE `produto` (
 
     INDEX `produto_ID_conversao_padrao_fkey`(`ID_conversao_padrao`),
     INDEX `produto_ID_conversao_saida_fkey`(`ID_conversao_saida`),
+    INDEX `produto_ID_tipo_produto_fkey`(`ID_tipo_produto`),
     PRIMARY KEY (`ID_produto`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -523,6 +541,7 @@ CREATE TABLE `expedicao` (
     `ID_expedicao` INTEGER NOT NULL AUTO_INCREMENT,
     `ID_veiculo` INTEGER NOT NULL,
     `ID_funcionario_condutor` INTEGER NOT NULL,
+    `ID_funcionario_auxiliar` INTEGER NULL,
     `data_criacao` TIMESTAMP(0) NOT NULL,
     `data_prevista` DATE NOT NULL,
     `observacao` TEXT NULL,
@@ -530,6 +549,7 @@ CREATE TABLE `expedicao` (
     `ativo` BOOLEAN NOT NULL DEFAULT true,
 
     INDEX `expedicao_ID_funcionario_condutor_fkey`(`ID_funcionario_condutor`),
+    INDEX `expedicao_ID_funcionario_auxiliar_fkey`(`ID_funcionario_auxiliar`),
     INDEX `expedicao_ID_veiculo_fkey`(`ID_veiculo`),
     PRIMARY KEY (`ID_expedicao`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -760,6 +780,9 @@ ALTER TABLE `produto` ADD CONSTRAINT `produto_ID_conversao_padrao_fkey` FOREIGN 
 ALTER TABLE `produto` ADD CONSTRAINT `produto_ID_conversao_saida_fkey` FOREIGN KEY (`ID_conversao_saida`) REFERENCES `conversao_unidade`(`ID_conversao`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `produto` ADD CONSTRAINT `produto_ID_tipo_produto_fkey` FOREIGN KEY (`ID_tipo_produto`) REFERENCES `tipo_produto`(`ID_tipo_produto`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `produto_insumo` ADD CONSTRAINT `produto_insumo_ID_produto_filho_fkey` FOREIGN KEY (`ID_produto_filho`) REFERENCES `produto`(`ID_produto`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -866,6 +889,9 @@ ALTER TABLE `percurso_destinatario` ADD CONSTRAINT `percurso_destinatario_ID_per
 
 -- AddForeignKey
 ALTER TABLE `expedicao` ADD CONSTRAINT `expedicao_ID_funcionario_condutor_fkey` FOREIGN KEY (`ID_funcionario_condutor`) REFERENCES `funcionario`(`ID_funcionario`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `expedicao` ADD CONSTRAINT `expedicao_ID_funcionario_auxiliar_fkey` FOREIGN KEY (`ID_funcionario_auxiliar`) REFERENCES `funcionario`(`ID_funcionario`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `expedicao` ADD CONSTRAINT `expedicao_ID_veiculo_fkey` FOREIGN KEY (`ID_veiculo`) REFERENCES `veiculo`(`ID_veiculo`) ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -3,10 +3,22 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist): colunas reais, diretas ou por relação. */
+const ORDEM_FORNECEDOR: Record<string, Prisma.FornecedorOrderByWithRelationInput> = {
+  codigo: { id_fornecedor: "asc" },
+  razao: { pessoaJuridica: { razao_social: "asc" } },
+  nome_fantasia: { pessoaJuridica: { nome_fantasia: "asc" } },
+  cnpj: { pessoaJuridica: { cnpj: "asc" } },
+  cidade: { endereco: { cidade: "asc" } },
+  uf: { endereco: { uf: "asc" } },
+  ativo: { ativo: "asc" },
+};
 
 /** Filtros da listagem de fornecedores. */
 export type FornecedorListFiltros = {
@@ -29,7 +41,10 @@ export class FornecedorDAO {
         skip, take,
         where,
         include: { pessoaJuridica: true, endereco: true },
-        orderBy: { id_fornecedor: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_FORNECEDOR, { id_fornecedor: "desc" }),
+          { id_fornecedor: "desc" },
+        ],
       }),
       prisma.fornecedor.count({ where }),
     ]);

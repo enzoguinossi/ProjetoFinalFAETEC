@@ -156,6 +156,7 @@ const ROTULOS_CAMPO: Record<string, string> = {
   id_usuario_aprovacao: "Usuário da aprovação",
   id_usuario_decisao: "Usuário da decisão",
   id_funcionario_condutor: "Condutor",
+  id_funcionario_auxiliar: "Auxiliar",
   id_item_nota_saida: "Item da nota de saída",
   id_movimentacao: "Movimento",
   id_conversao_padrao: "Unidade de entrada",
@@ -165,7 +166,7 @@ const ROTULOS_CAMPO: Record<string, string> = {
 
 const ROTULOS_VALOR: Record<string, string> = {
   ABERTA: "Aberta",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   PENDENTE: "Pendente",
   BAIXA_TOTAL: "Baixa total",
   BAIXA_PARCIAL: "Baixa parcial",

@@ -423,7 +423,7 @@ describe("serviço de relatórios", () => {
       expect(formatarDataRelatorio(new Date("2026-10-24T15:30:00.000Z"))).toBe(
         "24/10/2026",
       );
-      expect(rotuloStatusExpedicao("EM_PERCURSO")).toBe("Em percurso");
+      expect(rotuloStatusExpedicao("EM_PERCURSO")).toBe("Em rota");
       expect(rotuloStatusNota("BAIXA_COM_CORTE")).toBe("Baixa com corte");
     });
 

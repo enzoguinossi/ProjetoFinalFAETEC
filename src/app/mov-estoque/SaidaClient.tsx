@@ -10,7 +10,8 @@ import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosB
 import type { Column } from "@/components/DataTable";
 import { useAviso } from "@/components/AvisoProvider";
 import { formatarCodigo } from "@/lib/formatar";
-import type { PaginatedResult } from "@/types";
+import { useOrdenacao } from "@/lib/use-ordenacao";
+import type { DirecaoOrdenacao, PaginatedResult } from "@/types";
 import RetiradaModal, { type NotaRetirada } from "./RetiradaModal";
 import SaidaForm from "./SaidaForm";
 import {
@@ -51,7 +52,7 @@ const TIPOS_FILTRO: { valor: string; rotulo: string }[] = [
 
 const STATUS_FILTRO: { valor: string; rotulo: string }[] = [
   { valor: "ABERTA", rotulo: "Aberta" },
-  { valor: "EM_PERCURSO", rotulo: "Em percurso" },
+  { valor: "EM_PERCURSO", rotulo: "Em rota" },
   { valor: "PENDENTE", rotulo: "Pendente" },
   { valor: "BAIXA_TOTAL", rotulo: "Baixa total" },
   { valor: "BAIXA_PARCIAL", rotulo: "Baixa parcial" },
@@ -84,6 +85,7 @@ export default function SaidaClient({
   podeRetirarNota,
 }: Props) {
   const mostrarAviso = useAviso();
+  const { ordenacao, ordenar, params: paramsOrdenacao } = useOrdenacao();
 
   const [resultadoSaida, setResultadoSaida] = useState(inicialSaida);
   const [carregandoSaida, setCarregandoSaida] = useState(false);
@@ -124,11 +126,18 @@ export default function SaidaClient({
         page,
         limit,
         ...filtrosAtuais.current,
+        ...paramsOrdenacao(),
       });
       setResultadoSaida(atualizado);
     } finally {
       setCarregandoSaida(false);
     }
+  }
+
+  /** Ordenação server-side: grava campo/direção e recarrega a primeira página. */
+  function aoOrdenar(campo: string | null, direcao: DirecaoOrdenacao | null) {
+    ordenar(campo, direcao);
+    void carregarSaida(1);
   }
 
   function aplicarFiltrosTela(novos: Valores) {
@@ -202,10 +211,19 @@ export default function SaidaClient({
       label: "Código",
       width: "0.9fr",
       align: "center",
+      sortable: true,
+      fixed: true,
       render: (value) => formatarCodigo(Number(value)),
     },
-    { key: "tipoLabel", label: "Tipo", width: "1.2fr", align: "center" },
-    { key: "destinatario", label: "Destinatário", width: "3fr", align: "left" },
+    {
+      key: "tipoLabel",
+      label: "Tipo",
+      width: "1.2fr",
+      align: "center",
+      sortable: true,
+      sortKey: "tipo",
+    },
+    { key: "destinatario", label: "Destinatário", width: "3fr", align: "left", sortable: true },
     {
       key: "itens",
       label: "Itens",
@@ -213,7 +231,14 @@ export default function SaidaClient({
       align: "right",
       render: (_value, row) => formatarNumero(row.quantidade),
     },
-    { key: "statusLabel", label: "Status", width: "1.2fr", align: "center" },
+    {
+      key: "statusLabel",
+      label: "Status",
+      width: "1.2fr",
+      align: "center",
+      sortable: true,
+      sortKey: "status",
+    },
     ...(podeConsultarNota || podeAlterarNota
       ? [
           {
@@ -376,6 +401,7 @@ export default function SaidaClient({
         columns={columnsSaida}
         data={resultadoSaida.data}
         idField="id_nota_saida"
+        idTabela="saidas"
         rowExpansivel={() => true}
         renderExpandido={renderItens}
         paginacaoServidor={{
@@ -386,6 +412,8 @@ export default function SaidaClient({
           onPageSizeChange: (limit) => void carregarSaida(1, limit),
         }}
         carregando={carregandoSaida || carregandoDetalhe}
+        ordenacao={ordenacao}
+        onOrdenar={aoOrdenar}
       />
 
       <Modal open={modalSaidaAberto} onClose={() => setModalSaidaAberto(false)} title="Nova saída" width="960px">

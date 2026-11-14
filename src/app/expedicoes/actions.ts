@@ -23,13 +23,13 @@ import {
 
 const ROTULOS_STATUS_EXPEDICAO: Record<string, string> = {
   PLANEJADA: "Planejada",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   CONCLUIDA: "Concluída",
 };
 
 const ROTULOS_STATUS_NOTA: Record<string, string> = {
   ABERTA: "Aberta",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   PENDENTE: "Pendente",
   BAIXA_TOTAL: "Baixa total",
   BAIXA_PARCIAL: "Baixa parcial",
@@ -93,8 +93,10 @@ export type ExpedicaoFormData = {
   observacao: string | null;
   id_veiculo: number;
   id_funcionario_condutor: number;
+  id_funcionario_auxiliar: number | null;
   veiculo: string;
   condutor: string;
+  auxiliar: string | null;
   status: string;
   statusLabel: string;
   ativo: boolean;
@@ -119,6 +121,11 @@ export type VeiculoExpedicaoRow = {
 };
 
 export type CondutorExpedicaoRow = {
+  id_funcionario: number;
+  nome: string;
+};
+
+export type FuncionarioExpedicaoRow = {
   id_funcionario: number;
   nome: string;
 };
@@ -154,10 +161,15 @@ type ExpedicaoDetalhe = {
   observacao: string | null;
   id_veiculo: number;
   id_funcionario_condutor: number;
+  id_funcionario_auxiliar: number | null;
   status: string;
   ativo: boolean;
   veiculo: { placa: string };
   condutor: { pessoaFisica: { nome: string } };
+  auxiliar: {
+    id_funcionario: number;
+    pessoaFisica: { nome: string };
+  } | null;
   notas: {
     id_nota_saida: number;
     ordem_visita: number;
@@ -214,8 +226,10 @@ function mapaDetalhe(expedicao: ExpedicaoDetalhe): ExpedicaoFormData {
     observacao: expedicao.observacao,
     id_veiculo: expedicao.id_veiculo,
     id_funcionario_condutor: expedicao.id_funcionario_condutor,
+    id_funcionario_auxiliar: expedicao.id_funcionario_auxiliar,
     veiculo: expedicao.veiculo.placa,
     condutor: expedicao.condutor.pessoaFisica.nome,
+    auxiliar: expedicao.auxiliar?.pessoaFisica.nome ?? null,
     status: expedicao.status,
     statusLabel:
       ROTULOS_STATUS_EXPEDICAO[expedicao.status] ?? expedicao.status,
@@ -388,6 +402,36 @@ export async function listarCondutoresParaExpedicao(
   };
 }
 
+export async function listarFuncionariosParaExpedicao(
+  params: ListParams = {},
+): Promise<PaginatedResult<FuncionarioExpedicaoRow>> {
+  const user = await requireUser();
+  // Mesmo conjunto de permissões do seletor de condutores: é opção de
+  // formulário/filtro, não concede nenhuma mutação.
+  if (
+    !(await usuarioPodeAlguma(user, [
+      "expedicao.criar",
+      "expedicao.alterar",
+      "expedicao.listar",
+      "expedicao.consultar",
+    ]))
+  ) {
+    return resultadoVazio(params);
+  }
+
+  const resultado = await expedicaoDAO.listFuncionarios({
+    ...params,
+    search: textoFiltro(params.search),
+  });
+  return {
+    ...resultado,
+    data: resultado.data.map((funcionario) => ({
+      id_funcionario: funcionario.id_funcionario,
+      nome: funcionario.pessoaFisica.nome,
+    })),
+  };
+}
+
 /**
  * Destinatários ativos que aparecem em notas de expedições ativas — opções do
  * filtro da listagem. Somente leitura: `listar`/`consultar` também precisam.
@@ -464,6 +508,7 @@ export async function salvarExpedicao(
     observacao: formData.get("observacao"),
     id_veiculo: formData.get("id_veiculo"),
     id_funcionario_condutor: formData.get("id_funcionario_condutor"),
+    id_funcionario_auxiliar: formData.get("id_funcionario_auxiliar"),
     id_percurso: formData.get("id_percurso"),
   };
 

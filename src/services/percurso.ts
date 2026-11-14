@@ -33,9 +33,9 @@ export class PercursoService {
     const ids = new Set<number>();
     for (const item of input.destinatarios) {
       const id = idPositivo(item.id_destinatario);
-      if (!id) return { error: "Destinatário inválido no percurso." };
+      if (!id) return { error: "Destinatário inválido na rota." };
       if (ids.has(id)) {
-        return { error: "O mesmo destinatário não pode aparecer mais de uma vez no percurso." };
+        return { error: "O mesmo destinatário não pode aparecer mais de uma vez na rota." };
       }
       if (!Number.isInteger(item.ordem_visita)) {
         return { error: "A ordem das visitas deve ser um número inteiro." };
@@ -72,7 +72,7 @@ export class PercursoService {
     if ("error" in validado) return validado;
 
     if (await percursoDAO.nomeEmUso(validado.dados.nome)) {
-      return { error: "Já existe um percurso com este nome." };
+      return { error: "Já existe uma rota com este nome." };
     }
 
     return { percurso: await percursoDAO.create(validado.dados, id_usuario) };
@@ -80,17 +80,17 @@ export class PercursoService {
 
   async alterar(id: number, input: PercursoInput, id_usuario: number) {
     const idPercurso = idPositivo(id);
-    if (!idPercurso) return { error: "Percurso inválido." };
+    if (!idPercurso) return { error: "Rota inválida." };
 
     const validado = this.validar(input);
     if ("error" in validado) return validado;
 
     if (await percursoDAO.nomeEmUso(validado.dados.nome, idPercurso)) {
-      return { error: "Já existe um percurso com este nome." };
+      return { error: "Já existe uma rota com este nome." };
     }
 
     const existente = await percursoDAO.getById(idPercurso);
-    if (!existente) return { error: "Percurso não encontrado." };
+    if (!existente) return { error: "Rota não encontrada." };
 
     return {
       percurso: await percursoDAO.update(idPercurso, validado.dados, id_usuario),
@@ -99,10 +99,10 @@ export class PercursoService {
 
   async excluir(id: number, id_usuario: number) {
     const idPercurso = idPositivo(id);
-    if (!idPercurso) return { error: "Percurso inválido." };
+    if (!idPercurso) return { error: "Rota inválida." };
 
     const existente = await percursoDAO.getById(idPercurso);
-    if (!existente) return { error: "Percurso não encontrado." };
+    if (!existente) return { error: "Rota não encontrada." };
 
     return { percurso: await percursoDAO.excluir(idPercurso, id_usuario) };
   }

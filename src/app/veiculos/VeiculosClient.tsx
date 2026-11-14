@@ -28,15 +28,23 @@ interface Props {
 }
 
 const columns: Column<VeiculoListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "descricao", label: "Descrição", width: "2fr", align: "left" },
-  { key: "placa", label: "Placa", width: "1.5fr", align: "center" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center", sortable: true, fixed: true },
+  {
+    key: "descricao",
+    label: "Descrição",
+    width: "2fr",
+    align: "left",
+    sortable: true,
+    sortKey: "modelo",
+  },
+  { key: "placa", label: "Placa", width: "1.5fr", align: "center", sortable: true },
   { key: "status", label: "Status", width: "1fr", align: "center" },
   {
     key: "ativo",
     label: "Situação",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
   },
 ];
@@ -53,6 +61,8 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
     carregando,
     buscarPorTermo,
     aplicarFiltros,
+    ordenacao,
+    ordenar,
     paginacaoServidor,
     actions,
     modalMode,
@@ -130,9 +140,12 @@ export default function VeiculosClient({ inicial, tiposCodigo, perms }: Props) {
         columns={columns}
         data={resultado.data}
         idField="codigo"
+        idTabela="veiculos"
         actions={actions}
         paginacaoServidor={paginacaoServidor}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={ordenar}
       />
 
       <Modal open={modalMode === "create"} onClose={fecharModal} width="520px">

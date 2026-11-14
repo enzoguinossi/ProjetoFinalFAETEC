@@ -1,9 +1,81 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-08 (release `1.08.11.2026`, tag `v1.08.11.2026`; instalador
-> autocontido com Node/MySQL/Caddy/NSSM/app embutidos; tipos de destinatário, desmembramento,
-> NexusAgent/backup, bandeja .NET 10, retirada direta e XLSX).
+> Última consolidação: 2026-11-14 (sessão de apresentação: condutor, tipos de produto,
+> Percurso→Rota, auxiliar na expedição, login ODS + selo + cena modular; schema e dados
+> aplicados em `nexus_prod`).
+
+## Estado corrente — sessão de apresentação 2026-11-14 (pós-1.08.11.2026)
+
+- **Working tree:** `main` com o commit local da versão `1.14.11.2026` (DateVer; **sem
+  tag/push**); a árvore está limpa, exceto `.openchamber/` local (screenshots antigos não
+  versionados). O release `1.08.11.2026` continua sendo o último publicado.
+- **Funcionário condutor:** `cnh`, `categoria_cnh`, `validade_cnh` (DATE) e `tipo_sanguineo`
+  em `funcionario`, sempre opcionais; aba **Condutor** no formulário (`FormTabs`) aparece
+  somente quando o checkbox **É condutor** está marcado (em `view`, somente se o registro for
+  condutor), chip de CNH vencida sem bloqueio, DAO/actions com auditoria. Regra em
+  `src/lib/cnh.ts`.
+- **Tipos de produto:** `TipoProduto` (`tipo_produto`) sem tipo padrão, CRUD com
+  `tipo_produto.criar/alterar/excluir`, modal compartilhado (`TiposCadastroModal` /
+  `TiposProdutoModal`), seletor/coluna/filtro no produto. Permissões no seed.
+- **Percurso → Rota:** pasta em `src/app/expedicoes/rotas`, redirect da URL antiga, sidebar,
+  títulos, status e textos; o modelo continua `percurso`.
+- **Auxiliar na expedição:** `id_funcionario_auxiliar` anulável, FK `ON DELETE SET NULL`,
+  índice; auxiliar opcional, funcionário ativo, não pode ser o mesmo do condutor; nome no
+  detalhe e no snapshot de auditoria; campo no formulário de criação e edição.
+- **Login:** selos ODS 4/8/9/12/16 e selo institucional **Inovação, Ciência e Tecnologia**;
+  fundo modular em `src/components/cena/Cena.tsx` + `cena.json`, com 8 SVGs independentes em
+  `public/brand/cena/` e 16 camadas `<img>` (céu, mapa, grade, nós, 5 caminhões, rastro e 6
+  pinos em terra). O `README` do kit documenta âncoras e como acrescentar peças. O asset
+  monolítico `public/brand/fundo-mapa.svg` foi removido.
+- **Listagens e tabela compartilhada:** `DataTable` com scroll horizontal (largura mínima por
+  coluna + `ResizeObserver`), coluna **Ações sticky somente quando a tabela não couber**,
+  cabeçalhos truncáveis e ordenação **server-side de uma coluna** com whitelist por DAO
+  (`src/lib/ordenacao.ts`). `useListaPaginada`/`useCrudLista`/`useOrdenacao` carregam
+  `sort`/`dir` e voltam à página 1; refresh preserva a ordenação ativa. Código ordenado pelo
+  ID da entidade em Produtos, Destinatários, Fornecedores, Funcionários, Usuários e Veículos
+  (Pedidos/Saída já tinham a chave); a busca priorizada de Produtos também aceita a ordenação
+  por código. Colunas calculadas/contagens não suportadas continuam fora.
+- **Colunas visíveis:** botão **Colunas** acima da tabela (14 listas + Backup), no padrão
+  `DataTableViewOptions` do shadcn-table, com checkboxes, contador e “Restaurar padrão”.
+  **Código e Ações são fixos e não podem ser desabilitados** (Ações nem entra na lista;
+  Código aparece marcado/desabilitado, inclusive quando uma preferência antiga o escondia).
+  Pelo menos uma coluna de dados permanece visível, esconder a coluna ordenada limpa a
+  ordenação e a largura mínima/sticky são recalculados. A preferência é salva no
+  **IndexedDB** (`nexus-preferencias`, store `colunas`, chave `idTabela`, conjunto **oculto**
+  + `conhecidas`), por navegador, com fallback em memória; `SeletorColunas`,
+  `useColunasVisiveis` e `preferencias-tabela` implementam. **Nome Fantasia** (PJ) é coluna
+  opcional, oculta por padrão e ordenável, em Destinatários e Fornecedores; colunas novas de
+  versões futuras usam o próprio `defaultHidden` sem apagar as escolhas antigas. O seletor
+  fica fora do `data-figma="DataTable"`, preservando o componente promovido no Figma.
+- **Filtros de Produtos:** o tipo de produto saiu da barra fixa e virou campo multi em
+  “Adicionar filtros”; o botão **Gerenciar tipos** e o modal da listagem foram removidos. A
+  criação/edição de tipos fica **somente dentro do cadastro do produto** (`ProdutoForm`), com
+  `permsTipo`; `tipos`/`aoMudarTipos` continuam atualizando as opções do filtro.
+- **Filtros — período:** `BarraFiltrosBase` inicializa `{ de, ate }` ao adicionar um campo de
+  período e o `PeriodoPainel` lê `valor?.de`/`valor?.ate`; corrige o `TypeError` que ocorria
+  em `/mov-estoque/saida` ao clicar em “Adicionar filtro → período”.
+- **Produção (`nexus_prod`):** `NexusMySQL84` iniciado; backup
+  `C:\ProgramData\Nexus\backups\db\pre-auxiliar-2026-11-14.sql` (372.832 bytes) antes do
+  `db push`. Aplicados `ID_funcionario_auxiliar` + FK/index. Carregados 4 tipos de produto
+  (1 Merenda/2, 2 Papelaria/5, 3 Kits/2, 4 Mobiliário/1) e vinculados os 10 produtos, sem
+  tipo restante. As permissões `tipo_produto.criar/alterar/excluir` existem. O script
+  temporário `scripts/carregar-tipos-produto.ts` foi removido após o uso. O instalador ganhou
+  a migração `003-condutor-tipos-produto-auxiliar.sql` para o caminho Update, o SQL de
+  referência em **92 permissões** e o `aplicar-sql.ps1` valida essa contagem; a migração foi
+  testada sobre um schema 1.08 (50 tabelas, 92/2/3).
+- **Validação:** `tsc`, `eslint`, `npm run lint` e `npm run build` OK; suíte **716 testes / 68
+  arquivos** passando (config temporária sem `globalSetup`, com `nexus_test` em sync);
+  screenshots do login em 1360×768 e 1920×1080; `figma:check` passou depois da mudança do
+  cabeçalho da tabela.
+- **Pendências reais:** o app de produção **não foi reimplantado** — o código novo (auxiliar,
+  tipos, rota, cena e ordenação das listagens) ainda não está no build instalado; o
+  schema/dados já estão prontos para o próximo release. Validação visual autenticada das telas
+  novas e das listagens (scroll, sticky, ordenação e colunas visíveis) não foi feita por falta
+  de credencial de login; a suíte, o lint, o build e o `figma:check` cobrem o código. O
+  commit local foi criado; tag `v1.14.11.2026` e push não foram executados (dependem de
+  aprovação).
+- **Serviços:** `NexusMySQL84` Running; `NexusApp` e `NexusCaddy` Stopped (como estavam).
 
 ## Estado corrente — release 1.08.11.2026 (2026-11-08)
 

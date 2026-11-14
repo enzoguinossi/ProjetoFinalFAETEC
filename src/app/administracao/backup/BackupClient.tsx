@@ -415,19 +415,20 @@ export default function BackupClient({
 
   const colunas = useMemo<Column<LinhaJob>[]>(
     () => [
-      { key: "tipo", label: "Tipo", width: "12%" },
+      { key: "tipo", label: "Tipo", width: "12%", sortable: true },
       {
         key: "status",
         label: "Status",
         width: "13%",
         align: "center",
+        sortable: true,
         render: (valor) => <StatusBadge status={valor as AgentJobStatus} />,
       },
-      { key: "origem", label: "Origem", width: "12%" },
-      { key: "inicio", label: "Início", width: "15%" },
+      { key: "origem", label: "Origem", width: "12%", sortable: true },
+      { key: "inicio", label: "Início", width: "15%", sortable: true },
       { key: "duracao", label: "Duração", width: "10%" },
-      { key: "arquivo", label: "Arquivo", width: "18%" },
-      { key: "mensagem", label: "Mensagem" },
+      { key: "arquivo", label: "Arquivo", width: "18%", sortable: true },
+      { key: "mensagem", label: "Mensagem", sortable: true },
     ],
     [],
   );
@@ -640,7 +641,7 @@ export default function BackupClient({
             Nenhum backup ou restauração registrados.
           </p>
         ) : (
-          <DataTable columns={colunas} data={linhas} idField="id" pageSize={10} />
+          <DataTable columns={colunas} data={linhas} idField="id" idTabela="backup" pageSize={10} />
         )}
       </section>
 

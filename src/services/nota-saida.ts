@@ -54,7 +54,7 @@ export type ResultadoNotaSaida = { nota: { id_nota_saida: number } } | { error: 
 
 const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
   ABERTA: "aberta",
-  EM_PERCURSO: "em percurso",
+  EM_PERCURSO: "em rota",
   PENDENTE: "pendente",
   BAIXA_TOTAL: "com baixa total",
   BAIXA_PARCIAL: "com baixa parcial",

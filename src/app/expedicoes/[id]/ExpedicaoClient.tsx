@@ -14,6 +14,7 @@ import {
   concluirExpedicao,
   despacharExpedicao,
   listarCondutoresParaExpedicao,
+  listarFuncionariosParaExpedicao,
   listarVeiculosParaExpedicao,
   marcarNotaNaoEntregue,
   moverNotasExpedicao,
@@ -24,6 +25,7 @@ import {
   type CondutorExpedicaoRow,
   type ExpedicaoFormData,
   type ExpedicaoNotaRow,
+  type FuncionarioExpedicaoRow,
   type VeiculoExpedicaoRow,
 } from "../actions";
 
@@ -240,21 +242,32 @@ function ExpedicaoEdicaoForm({
       ? String(inicial.id_funcionario_condutor)
       : "",
   );
+  const [idAuxiliar, setIdAuxiliar] = useState(
+    inicial.id_funcionario_auxiliar
+      ? String(inicial.id_funcionario_auxiliar)
+      : "",
+  );
   const [veiculos, setVeiculos] = useState<VeiculoExpedicaoRow[]>([]);
   const [condutores, setCondutores] = useState<CondutorExpedicaoRow[]>([]);
+  const [funcionarios, setFuncionarios] = useState<FuncionarioExpedicaoRow[]>(
+    [],
+  );
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     let ativo = true;
 
     void (async () => {
-      const [listaVeiculos, listaCondutores] = await Promise.all([
-        listarVeiculosParaExpedicao({ page: 1, limit: 100 }),
-        listarCondutoresParaExpedicao({ page: 1, limit: 100 }),
-      ]);
+      const [listaVeiculos, listaCondutores, listaFuncionarios] =
+        await Promise.all([
+          listarVeiculosParaExpedicao({ page: 1, limit: 100 }),
+          listarCondutoresParaExpedicao({ page: 1, limit: 100 }),
+          listarFuncionariosParaExpedicao({ page: 1, limit: 100 }),
+        ]);
       if (!ativo) return;
       setVeiculos(listaVeiculos.data);
       setCondutores(listaCondutores.data);
+      setFuncionarios(listaFuncionarios.data);
     })();
 
     return () => {
@@ -280,6 +293,7 @@ function ExpedicaoEdicaoForm({
       form.set("observacao", observacao);
       form.set("id_veiculo", idVeiculo);
       form.set("id_funcionario_condutor", idCondutor);
+      form.set("id_funcionario_auxiliar", idAuxiliar);
 
       const resultado = await salvarExpedicao(form);
       if ("error" in resultado) {
@@ -344,7 +358,11 @@ function ExpedicaoEdicaoForm({
           <label className={ui.label}>Condutor</label>
           <select
             value={idCondutor}
-            onChange={(e) => setIdCondutor(e.target.value)}
+            onChange={(e) => {
+              setIdCondutor(e.target.value);
+              // O mesmo funcionário não pode acumular condutor e auxiliar.
+              if (e.target.value === idAuxiliar) setIdAuxiliar("");
+            }}
             className={ui.select}
             required
           >
@@ -358,6 +376,30 @@ function ExpedicaoEdicaoForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className={ui.field}>
+        <label className={ui.label}>Auxiliar (opcional)</label>
+        <select
+          value={idAuxiliar}
+          onChange={(e) => setIdAuxiliar(e.target.value)}
+          className={ui.select}
+        >
+          <option value="">Sem auxiliar</option>
+          {funcionarios
+            .filter(
+              (funcionario) =>
+                String(funcionario.id_funcionario) !== idCondutor,
+            )
+            .map((funcionario) => (
+              <option
+                key={funcionario.id_funcionario}
+                value={funcionario.id_funcionario}
+              >
+                {funcionario.nome}
+              </option>
+            ))}
+        </select>
       </div>
 
       <div className={ui.rowActions}>
@@ -549,7 +591,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
 
       <div className="flex flex-col gap-4 rounded-[1.25rem] border border-[#e2e8f0] bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="flex flex-col gap-1">
               <span className="font-sans text-xs uppercase tracking-[0.02em] text-[#697077]">
                 Data prevista
@@ -584,6 +626,14 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
               </span>
               <span className="font-sans text-base text-ink-strong">
                 {detalhe.condutor ?? ""}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="font-sans text-xs uppercase tracking-[0.02em] text-[#697077]">
+                Auxiliar
+              </span>
+              <span className="font-sans text-base text-ink-strong">
+                {detalhe.auxiliar ?? "—"}
               </span>
             </div>
           </div>
@@ -818,7 +868,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
           void confirmarDespacho();
         }}
         title="Despachar expedição"
-        message="Despachar a expedição? Ela passa para Em percurso, as notas também, e o veículo fica Em expedição."
+        message="Despachar a expedição? Ela passa para Em rota, as notas também, e o veículo fica Em expedição."
         confirmLabel="Despachar"
         loading={processando}
       />
@@ -920,7 +970,7 @@ export default function ExpedicaoClient({ inicial, perms }: Props) {
           void confirmarConclusao();
         }}
         title="Concluir expedição"
-        message="Concluir a expedição? As notas que ainda estiverem em percurso passam a Pendente, a expedição vai para Concluída e o veículo volta a ficar Disponível."
+        message="Concluir a expedição? As notas que ainda estiverem em rota passam a Pendente, a expedição vai para Concluída e o veículo volta a ficar Disponível."
         confirmLabel="Concluir"
         loading={processando}
       />

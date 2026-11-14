@@ -132,7 +132,7 @@ function lerDestinatarios(formData: FormData): DestinatariosLidos {
     const id = Number(registro.id_destinatario);
     const ordem = Number(registro.ordem_visita);
     if (!Number.isInteger(id) || id <= 0) {
-      return { error: "Destinatário inválido no percurso." };
+      return { error: "Destinatário inválido na rota." };
     }
     destinatarios.push({ id_destinatario: id, ordem_visita: ordem });
   }
@@ -149,7 +149,7 @@ export async function salvarPercurso(
   const idBruto = formData.get("id_percurso");
   const id = idBruto ? Number(idBruto) : null;
   if (idBruto && (!Number.isInteger(id) || (id ?? 0) <= 0)) {
-    return { error: "Percurso inválido." };
+    return { error: "Rota inválida." };
   }
   const permissao = id ? "percurso.alterar" : "percurso.criar";
   if (!(await usuarioPode(user, permissao))) return { error: "Sem permissão." };

@@ -8,7 +8,8 @@ import BarraFiltrosBase from "@/components/relatorios/BarraFiltrosBase";
 import type { CampoFiltro, Valores } from "@/components/relatorios/BarraFiltrosBase";
 import { useAviso } from "@/components/AvisoProvider";
 import type { Action, Column } from "@/components/DataTable";
-import type { PaginatedResult } from "@/types";
+import { useOrdenacao } from "@/lib/use-ordenacao";
+import type { DirecaoOrdenacao, PaginatedResult } from "@/types";
 import EntradaForm from "./EntradaForm";
 import {
   listarNotasEntrada,
@@ -52,15 +53,30 @@ function idsNumericos(
 }
 
 const columnsEntrada: Column<NotaEntradaListRow>[] = [
-  { key: "data", label: "Data", width: "1fr", align: "center" },
-  { key: "tipoLabel", label: "Tipo", width: "1fr", align: "center" },
-  { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left" },
+  {
+    key: "data",
+    label: "Data",
+    width: "1fr",
+    align: "center",
+    sortable: true,
+    sortKey: "data_criacao",
+  },
+  {
+    key: "tipoLabel",
+    label: "Tipo",
+    width: "1fr",
+    align: "center",
+    sortable: true,
+    sortKey: "tipo",
+  },
+  { key: "fornecedor", label: "Fornecedor", width: "2fr", align: "left", sortable: true },
   { key: "itens", label: "Itens", width: "0.7fr", align: "right" },
   {
     key: "chave_acesso",
     label: "Chave de acesso",
     width: "3fr",
     align: "left",
+    sortable: true,
     render: (_valor, row) => (
       <span title={row.chave_acesso ?? undefined}>{row.chave_acesso ?? "—"}</span>
     ),
@@ -84,6 +100,7 @@ export default function EntradaClient({
   tiposCodigoFornecedor,
 }: Props) {
   const mostrarAviso = useAviso();
+  const { ordenacao, ordenar, params: paramsOrdenacao } = useOrdenacao();
   const [resultado, setResultado] = useState(inicial);
   const [carregando, setCarregando] = useState(false);
   const [modalMode, setModalMode] = useState<ModoModal>(null);
@@ -122,11 +139,18 @@ export default function EntradaClient({
         page,
         limit,
         ...filtrosAtuais.current,
+        ...paramsOrdenacao(),
       });
       setResultado(atualizado);
     } finally {
       setCarregando(false);
     }
+  }
+
+  /** Ordenação server-side: grava campo/direção e recarrega a primeira página. */
+  function aoOrdenar(campo: string | null, direcao: DirecaoOrdenacao | null) {
+    ordenar(campo, direcao);
+    void carregar(1);
   }
 
   function aplicarFiltrosTela(novos: Valores) {
@@ -240,6 +264,7 @@ export default function EntradaClient({
         columns={columnsEntrada}
         data={resultado.data}
         idField="id_nota_entrada"
+        idTabela="entradas"
         actions={actions}
         paginacaoServidor={{
           total: resultado.total,
@@ -249,6 +274,8 @@ export default function EntradaClient({
           onPageSizeChange: (limit) => void carregar(1, limit),
         }}
         carregando={carregando || carregandoNota}
+        ordenacao={ordenacao}
+        onOrdenar={aoOrdenar}
       />
 
       <Modal

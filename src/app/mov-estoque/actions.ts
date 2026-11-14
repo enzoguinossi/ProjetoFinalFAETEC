@@ -25,7 +25,7 @@ import {
   STATUS_NOTA_SAIDA,
   TIPO_NOTA_ENTRADA,
   TIPO_NOTA_SAIDA,
-  type PaginationParams,
+  type ListParams,
   type PaginatedResult,
   type StatusNotaSaida,
   type TipoNotaEntrada,
@@ -134,12 +134,13 @@ const ROTULOS_TIPO_NOTA_ENTRADA: Record<string, string> = {
 };
 
 export async function listarNotasEntrada(
-  params: PaginationParams & NotaEntradaFiltrosPayload = {},
+  params: ListParams & NotaEntradaFiltrosPayload = {},
 ): Promise<PaginatedResult<NotaEntradaListRow>> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, PERMISSOES_VER))) return resultadoVazio(params);
 
   const resultado = await notaEntradaDAO.list({
+    ...params,
     page: params.page,
     limit: params.limit,
     de: dataFiltro(params.de),
@@ -360,7 +361,7 @@ export async function salvarNotaEntrada(id: number, payload: AtualizacaoEntradaP
 
 const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
   ABERTA: "Aberta",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   PENDENTE: "Pendente",
   BAIXA_TOTAL: "Baixa total",
   BAIXA_PARCIAL: "Baixa parcial",
@@ -377,7 +378,7 @@ const ROTULOS_TIPO_NOTA_SAIDA: Record<string, string> = {
 
 const ROTULOS_STATUS_EXPEDICAO: Record<string, string> = {
   PLANEJADA: "Planejada",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   CONCLUIDA: "Concluída",
 };
 
@@ -410,7 +411,7 @@ const STATUS_NOTA_SAIDA_CANCELAVEL = ["ABERTA"];
 const STATUS_NOTA_SAIDA_EDITAVEL = ["ABERTA"];
 
 export async function listarNotasSaida(
-  params: PaginationParams & NotaSaidaFiltrosPayload = {},
+  params: ListParams & NotaSaidaFiltrosPayload = {},
 ): Promise<PaginatedResult<NotaSaidaListRow>> {
   const user = await requireUser();
   if (!(await usuarioPodeAlguma(user, PERMISSOES_VER_SAIDA))) return resultadoVazio(params);
@@ -419,6 +420,7 @@ export async function listarNotasSaida(
   const status = enumFiltro<StatusNotaSaida>(params.status, STATUS_NOTA_SAIDA);
 
   const resultado = await notaSaidaDAO.list({
+    ...params,
     page: params.page,
     limit: params.limit,
     de: dataFiltro(params.de),

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+<defs>
+<pattern id="grade" width="219" height="151" patternUnits="userSpaceOnUse" patternTransform="translate(130.5 215.5)">
+<path d="M219 0H0V151" fill="none" stroke="#ffffff" stroke-opacity=".06" stroke-width="1.2"/>
+</pattern>
+</defs>
+<rect width="1920" height="1080" fill="url(#grade)"/>
+</svg>

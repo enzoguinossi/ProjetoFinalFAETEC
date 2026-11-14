@@ -3,10 +3,20 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist): só colunas reais, diretas ou por relação. */
+const ORDEM_DESTINATARIO: Record<string, Prisma.DestinatarioOrderByWithRelationInput> = {
+  codigo: { id_destinatario: "asc" },
+  razao: { pessoaJuridica: { razao_social: "asc" } },
+  nome_fantasia: { pessoaJuridica: { nome_fantasia: "asc" } },
+  tipo_nome: { tipoDestinatario: { nome: "asc" } },
+  ativo: { ativo: "asc" },
+};
 
 /** Filtros da listagem de destinatários (não se aplicam aos seletores operacionais). */
 export type DestinatarioListFiltros = {
@@ -36,7 +46,10 @@ export class DestinatarioDAO {
         skip, take,
         where,
         include: { pessoaJuridica: true, endereco: true, tipoDestinatario: true },
-        orderBy: { id_destinatario: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_DESTINATARIO, { id_destinatario: "desc" }),
+          { id_destinatario: "desc" },
+        ],
       }),
       prisma.destinatario.count({ where }),
     ]);
@@ -243,7 +256,7 @@ export class DestinatarioDAO {
     if (pedidos > 0) vinculos.push(`${pedidos} pedido(s)`);
     if (notasSaida > 0) vinculos.push(`${notasSaida} nota(s) de saída`);
     if (coletas > 0) vinculos.push(`${coletas} coleta(s)`);
-    if (percursos > 0) vinculos.push(`${percursos} percurso(s)`);
+    if (percursos > 0) vinculos.push(`${percursos} rota(s)`);
 
     return { podeExcluir: vinculos.length === 0, vinculos };
   }

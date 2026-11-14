@@ -84,6 +84,9 @@ function listaPermissoes() {
     "tipo_destinatario.criar",
     "tipo_destinatario.alterar",
     "tipo_destinatario.excluir",
+    "tipo_produto.criar",
+    "tipo_produto.alterar",
+    "tipo_produto.excluir",
     "estoque.entrada",
     "estoque.saida",
     "estoque.ver_saldo",
@@ -436,7 +439,7 @@ function validar() {
     console.log(`  seed.sql reaplicado: ${JSON.stringify(segunda)}`);
 
     const erros = [];
-    if (primeira.permissoes !== "89") erros.push(`permissões: ${primeira.permissoes} (esperado 89)`);
+    if (primeira.permissoes !== "92") erros.push(`permissões: ${primeira.permissoes} (esperado 92)`);
     if (primeira.perfis !== "2") erros.push(`perfis: ${primeira.perfis} (esperado 2)`);
     if (primeira.conversoes !== "UNIDADE:1:1,PCT10:10:0,CX50:50:0") {
       erros.push(`conversões: ${primeira.conversoes}`);
@@ -450,7 +453,7 @@ function validar() {
     }
     if (erros.length > 0) throw new Error(`Validação falhou:\n  - ${erros.join("\n  - ")}`);
 
-    console.log("  OK: 89 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), 4 tipos de escola, seed idempotente");
+    console.log("  OK: 92 permissões, 2 perfis, 3 conversões (UNIDADE/PCT10/CX50), 4 tipos de escola, seed idempotente");
   } finally {
     if (keep) {
       console.log(`  banco mantido: ${checkDb}`);

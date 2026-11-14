@@ -3,12 +3,27 @@ import { Prisma } from "@prisma/client";
 import { registrarAuditoria } from "./_audit";
 import { EntidadeComVinculosError } from "./_errors";
 import { buildPagination, type ListParams } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 import type { CodigoInput } from "@/lib/codigo";
 import type { ContatosInput } from "@/services/contato";
 
 const AUDIT_ENTIDADE = "Funcionario";
 
 type Db = Prisma.TransactionClient;
+
+/** Campos ordenáveis da listagem (whitelist): colunas reais, diretas ou por relação. */
+const ORDEM_FUNCIONARIO: Record<string, Prisma.FuncionarioOrderByWithRelationInput> = {
+  codigo: { id_funcionario: "asc" },
+  nome: { pessoaFisica: { nome: "asc" } },
+  cargo: { cargo: "asc" },
+  condutor: { condutor: "asc" },
+  ativo: { ativo: "asc" },
+};
+
+/** Data `DATE` no snapshot de auditoria (`YYYY-MM-DD`) — JSON não guarda `Date`. */
+function dataISO(valor: Date | null | undefined): string | null {
+  return valor ? valor.toISOString().slice(0, 10) : null;
+}
 
 /** Filtros da listagem de funcionários. */
 export type FuncionarioListFiltros = {
@@ -36,7 +51,10 @@ export class FuncionarioDAO {
           pessoaFisica: { select: { id_pessoa_fisica: true, nome: true, cpf: true } },
           usuario: { select: { id_usuario: true, login: true, ativo: true } },
         },
-        orderBy: { id_funcionario: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_FUNCIONARIO, { id_funcionario: "desc" }),
+          { id_funcionario: "desc" },
+        ],
       }),
       prisma.funcionario.count({ where }),
     ]);
@@ -82,7 +100,17 @@ export class FuncionarioDAO {
   }
 
   async create(
-    data: { nome: string; cpf?: string; cargo?: string; condutor?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
+    data: {
+      nome: string;
+      cpf?: string;
+      cargo?: string;
+      condutor?: boolean;
+      cnh?: string | null;
+      categoria_cnh?: string | null;
+      validade_cnh?: Date | null;
+      tipo_sanguineo?: string | null;
+      codigos?: CodigoInput[];
+    } & Partial<ContatosInput>,
     id_usuario: number,
     /** Executado na mesma transação, após o funcionário existir (foto/anexo). */
     depoisDeCriar?: (tx: Prisma.TransactionClient, id_funcionario: number) => Promise<void>,
@@ -103,6 +131,10 @@ export class FuncionarioDAO {
           id_pessoa_fisica: pf.id_pessoa_fisica,
           cargo: data.cargo,
           condutor: data.condutor ?? false,
+          cnh: data.cnh ?? null,
+          categoria_cnh: data.categoria_cnh ?? null,
+          validade_cnh: data.validade_cnh ?? null,
+          tipo_sanguineo: data.tipo_sanguineo ?? null,
         },
       });
       for (const c of data.codigos ?? []) {
@@ -125,7 +157,7 @@ export class FuncionarioDAO {
       await registrarAuditoria(
         id_usuario, "CRIAR", AUDIT_ENTIDADE, func.id_funcionario,
         null,
-        { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { cargo: data.cargo ?? null, id_pessoa_fisica: pf.id_pessoa_fisica, condutor: data.condutor ?? false, cnh: data.cnh ?? null, categoria_cnh: data.categoria_cnh ?? null, validade_cnh: dataISO(data.validade_cnh), tipo_sanguineo: data.tipo_sanguineo ?? null, codigos: data.codigos ?? [], emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 
@@ -149,7 +181,18 @@ export class FuncionarioDAO {
 
   async update(
     id: number,
-    data: { nome?: string; cpf?: string; cargo?: string; condutor?: boolean; ativo?: boolean; codigos?: CodigoInput[] } & Partial<ContatosInput>,
+    data: {
+      nome?: string;
+      cpf?: string;
+      cargo?: string;
+      condutor?: boolean;
+      ativo?: boolean;
+      cnh?: string | null;
+      categoria_cnh?: string | null;
+      validade_cnh?: Date | null;
+      tipo_sanguineo?: string | null;
+      codigos?: CodigoInput[];
+    } & Partial<ContatosInput>,
     id_usuario: number,
     /** Executado na mesma transação, após atualizar o funcionário (foto/anexo). */
     depoisDeAtualizar?: (tx: Prisma.TransactionClient) => Promise<void>,
@@ -199,6 +242,10 @@ export class FuncionarioDAO {
           cargo: data.cargo,
           condutor: data.condutor ?? antes.condutor,
           ativo: data.ativo ?? antes.ativo,
+          cnh: data.cnh,
+          categoria_cnh: data.categoria_cnh,
+          validade_cnh: data.validade_cnh,
+          tipo_sanguineo: data.tipo_sanguineo,
         },
       });
 
@@ -233,8 +280,8 @@ export class FuncionarioDAO {
         data.ativo === false && antes.ativo ? "DESATIVAR" : "ALTERAR",
         AUDIT_ENTIDADE,
         id,
-        { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
-        { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
+        { nome: antes.pessoaFisica.nome, cargo: antes.cargo, condutor: antes.condutor, cnh: antes.cnh, categoria_cnh: antes.categoria_cnh, validade_cnh: dataISO(antes.validade_cnh), tipo_sanguineo: antes.tipo_sanguineo, ativo: antes.ativo, codigos: antes.funcionarioCodigos.map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: antes.emails.map((e) => ({ endereco: e.endereco, principal: e.principal })), telefones: antes.telefones.map((t) => ({ numero: t.numero, tipo: t.tipo, principal: t.principal })) },
+        { nome: data.nome ?? antes.pessoaFisica.nome, cargo: data.cargo ?? antes.cargo, condutor: depois.condutor, cnh: depois.cnh, categoria_cnh: depois.categoria_cnh, validade_cnh: dataISO(depois.validade_cnh), tipo_sanguineo: depois.tipo_sanguineo, ativo: depois.ativo, codigos: (data.codigos ?? []).map((c) => ({ id_tipo_codigo: c.id_tipo_codigo, codigo: c.codigo })), emails: data.emails ?? [], telefones: data.telefones ?? [] },
         tx,
       );
 

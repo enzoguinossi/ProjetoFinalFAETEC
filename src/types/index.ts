@@ -33,6 +33,16 @@ export type TipoDestinatarioItem = {
   total_destinatarios?: number;
 };
 
+/** Tipo de produto vindo do cadastro editável (`tipo_produto`). */
+export type TipoProdutoItem = {
+  id_tipo_produto: number;
+  codigo: string;
+  nome: string;
+  padrao: boolean;
+  /** Quantidade de produtos vinculados (usada no modal de tipos). */
+  total_produtos?: number;
+};
+
 export const STATUS_VEICULO = ["DISPONIVEL", "INDISPONIVEL", "EM_EXPEDICAO"] as const;
 export type StatusVeiculo = (typeof STATUS_VEICULO)[number];
 
@@ -63,7 +73,17 @@ export type PaginationParams = {
   limit?: number;
 };
 
-export type ListParams = PaginationParams & { search?: string };
+/** Direção de ordenação de uma coluna/consulta. */
+export type DirecaoOrdenacao = "asc" | "desc";
+
+/** Ordenação ativa da tabela: um campo por vez. */
+export type OrdenacaoTabela = { campo: string; direcao: DirecaoOrdenacao };
+
+export type ListParams = PaginationParams & {
+  search?: string;
+  sort?: string;
+  dir?: DirecaoOrdenacao;
+};
 
 export type PaginatedResult<T> = {
   data: T[];

@@ -19,12 +19,14 @@ import {
   desativarExpedicao,
   listarCondutoresParaExpedicao,
   listarExpedicoes,
+  listarFuncionariosParaExpedicao,
   listarPercursosParaExpedicao,
   listarVeiculosParaExpedicao,
   salvarExpedicao,
   type CondutorExpedicaoRow,
   type DestinatarioExpedicaoRow,
   type ExpedicaoListRow,
+  type FuncionarioExpedicaoRow,
   type PercursoExpedicaoRow,
   type VeiculoExpedicaoRow,
 } from "./actions";
@@ -51,7 +53,7 @@ const statusCls: Record<string, string> = {
 
 const ROTULOS_STATUS_EXPEDICAO: Record<(typeof STATUS_EXPEDICAO)[number], string> = {
   PLANEJADA: "Planejada",
-  EM_PERCURSO: "Em percurso",
+  EM_PERCURSO: "Em rota",
   CONCLUIDA: "Concluída",
 };
 
@@ -70,6 +72,7 @@ const columns: Column<ExpedicaoListRow>[] = [
     label: "Data prevista",
     width: "1.1fr",
     align: "center",
+    sortable: true,
     render: (value) => formatarData(value ? String(value) : null),
   },
   {
@@ -77,6 +80,8 @@ const columns: Column<ExpedicaoListRow>[] = [
     label: "Status",
     width: "1.1fr",
     align: "center",
+    sortable: true,
+    sortKey: "status",
     render: (_value, row) => (
       <span
         className={`inline-flex rounded-full px-3 py-1 font-sans text-xs font-semibold ${
@@ -92,6 +97,7 @@ const columns: Column<ExpedicaoListRow>[] = [
     label: "Notas",
     width: "0.7fr",
     align: "right",
+    sortable: true,
     render: (value) => String(value ?? 0),
   },
   { key: "destinatarios", label: "Destinatários", width: "3fr", align: "left" },
@@ -100,6 +106,7 @@ const columns: Column<ExpedicaoListRow>[] = [
     label: "Veículo",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (value) => (value ? String(value) : "—"),
   },
 ];
@@ -116,9 +123,13 @@ function ExpedicaoForm({
   const [observacao, setObservacao] = useState("");
   const [idVeiculo, setIdVeiculo] = useState("");
   const [idCondutor, setIdCondutor] = useState("");
+  const [idAuxiliar, setIdAuxiliar] = useState("");
   const [idPercurso, setIdPercurso] = useState("");
   const [veiculos, setVeiculos] = useState<VeiculoExpedicaoRow[]>([]);
   const [condutores, setCondutores] = useState<CondutorExpedicaoRow[]>([]);
+  const [funcionarios, setFuncionarios] = useState<FuncionarioExpedicaoRow[]>(
+    [],
+  );
   const [percursos, setPercursos] = useState<PercursoExpedicaoRow[]>([]);
   const [salvando, setSalvando] = useState(false);
 
@@ -126,15 +137,17 @@ function ExpedicaoForm({
     let ativo = true;
 
     void (async () => {
-      const [listaVeiculos, listaCondutores, listaPercursos] =
+      const [listaVeiculos, listaCondutores, listaFuncionarios, listaPercursos] =
         await Promise.all([
           listarVeiculosParaExpedicao({ page: 1, limit: 100 }),
           listarCondutoresParaExpedicao({ page: 1, limit: 100 }),
+          listarFuncionariosParaExpedicao({ page: 1, limit: 100 }),
           listarPercursosParaExpedicao({ page: 1, limit: 100 }),
         ]);
       if (!ativo) return;
       setVeiculos(listaVeiculos.data);
       setCondutores(listaCondutores.data);
+      setFuncionarios(listaFuncionarios.data);
       setPercursos(listaPercursos.data);
     })();
 
@@ -160,6 +173,7 @@ function ExpedicaoForm({
       form.set("observacao", observacao);
       form.set("id_veiculo", idVeiculo);
       form.set("id_funcionario_condutor", idCondutor);
+      form.set("id_funcionario_auxiliar", idAuxiliar);
       form.set("id_percurso", idPercurso);
 
       const resultado = await salvarExpedicao(form);
@@ -225,7 +239,11 @@ function ExpedicaoForm({
           <label className={ui.label}>Condutor</label>
           <select
             value={idCondutor}
-            onChange={(e) => setIdCondutor(e.target.value)}
+            onChange={(e) => {
+              setIdCondutor(e.target.value);
+              // O mesmo funcionário não pode acumular condutor e auxiliar.
+              if (e.target.value === idAuxiliar) setIdAuxiliar("");
+            }}
             className={ui.select}
             required
           >
@@ -241,23 +259,50 @@ function ExpedicaoForm({
         </div>
       </div>
 
-      <div className={ui.field}>
-        <label className={ui.label}>Percurso (opcional)</label>
-        <select
-          value={idPercurso}
-          onChange={(e) => setIdPercurso(e.target.value)}
-          className={ui.select}
-        >
-          <option value="">Sem percurso</option>
-          {percursos.map((percurso) => (
-            <option key={percurso.id_percurso} value={percurso.id_percurso}>
-              {percurso.nome} ({percurso.destinatarios} destinatário(s))
-            </option>
-          ))}
-        </select>
-        <span className="font-sans text-xs text-[#697077]">
-          Ao escolher um percurso, as notas elegíveis das escolas dele entram
-          automaticamente, já na ordem do percurso. O percurso não fica gravado
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className={ui.field}>
+          <label className={ui.label}>Auxiliar (opcional)</label>
+          <select
+            value={idAuxiliar}
+            onChange={(e) => setIdAuxiliar(e.target.value)}
+            className={ui.select}
+          >
+            <option value="">Sem auxiliar</option>
+            {funcionarios
+              .filter(
+                (funcionario) =>
+                  String(funcionario.id_funcionario) !== idCondutor,
+              )
+              .map((funcionario) => (
+                <option
+                  key={funcionario.id_funcionario}
+                  value={funcionario.id_funcionario}
+                >
+                  {funcionario.nome}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        <div className={ui.field}>
+          <label className={ui.label}>Rota (opcional)</label>
+          <select
+            value={idPercurso}
+            onChange={(e) => setIdPercurso(e.target.value)}
+            className={ui.select}
+          >
+            <option value="">Sem rota</option>
+            {percursos.map((percurso) => (
+              <option key={percurso.id_percurso} value={percurso.id_percurso}>
+                {percurso.nome} ({percurso.destinatarios} destinatário(s))
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <span className="font-sans text-xs text-[#697077] sm:col-span-2">
+          Ao escolher uma rota, as notas elegíveis das escolas dela entram
+          automaticamente, já na ordem da rota. A rota não fica gravada
           na expedição.
         </span>
       </div>
@@ -432,6 +477,7 @@ export default function ExpedicoesClient({
         columns={columns}
         data={lista.resultado.data}
         idField="id_expedicao"
+        idTabela="expedicoes"
         actions={actions}
         paginacaoServidor={{
           total: lista.resultado.total,
@@ -441,6 +487,8 @@ export default function ExpedicoesClient({
           onPageSizeChange: lista.mudarTamanho,
         }}
         carregando={lista.carregando}
+        ordenacao={lista.ordenacao}
+        onOrdenar={lista.ordenar}
       />
 
       <Modal

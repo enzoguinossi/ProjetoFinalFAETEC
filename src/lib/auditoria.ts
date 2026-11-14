@@ -21,7 +21,7 @@ const ROTULOS_ENTIDADE: Record<string, string> = {
   ajuste_inventario: "Ajuste de inventário",
   reserva_estoque: "Reserva de estoque",
   coleta: "Coleta",
-  percurso: "Percurso",
+  percurso: "Rota",
   mensagem_mural: "Mensagem do mural",
   tipo_codigo: "Tipo de código",
   tipo_destinatario: "Tipo de escola",

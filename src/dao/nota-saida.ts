@@ -3,8 +3,9 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { registrarAuditoria } from "./_audit";
 import { pedidoDAO } from "./pedido";
-import { buildPagination, type PaginationParams } from "@/types";
+import { buildPagination, type ListParams } from "@/types";
 import { limitesDoDiaSaoPaulo } from "@/lib/datas";
+import { ordenarPor } from "@/lib/ordenacao";
 import { saldoDAO } from "./estoque";
 
 export type NotaSaidaItemCriacao = {
@@ -54,9 +55,18 @@ export type NotaSaidaAtualizacao = {
 
 const AUDIT_ENTIDADE = "NotaSaida";
 
+/** Campos ordenáveis da listagem (whitelist); `itens` é a soma calculada na linha. */
+const ORDEM_NOTA_SAIDA: Record<string, Prisma.NotaSaidaOrderByWithRelationInput> = {
+  id_nota_saida: { id_nota_saida: "asc" },
+  data_criacao: { data_criacao: "asc" },
+  destinatario: { destinatario: { pessoaJuridica: { razao_social: "asc" } } },
+  status: { status: "asc" },
+  tipo: { tipo: "asc" },
+};
+
 const ROTULOS_STATUS_NOTA_SAIDA: Record<string, string> = {
   ABERTA: "aberta",
-  EM_PERCURSO: "em percurso",
+  EM_PERCURSO: "em rota",
   PENDENTE: "pendente",
   BAIXA_TOTAL: "com baixa total",
   BAIXA_PARCIAL: "com baixa parcial",
@@ -259,7 +269,7 @@ function whereDe(filtros: NotaSaidaListFiltros): Prisma.NotaSaidaWhereInput {
 
 export class NotaSaidaDAO {
   /** Todas as notas de saída ativas (Remessa, Avaria e Consumo Interno). */
-  async list(params: PaginationParams & NotaSaidaListFiltros = {}) {
+  async list(params: ListParams & NotaSaidaListFiltros = {}) {
     const { skip, take } = buildPagination(params);
     const where = whereDe(params);
 
@@ -294,7 +304,10 @@ export class NotaSaidaDAO {
             },
           },
         },
-        orderBy: { data_criacao: "desc" },
+        orderBy: [
+          ordenarPor(params, ORDEM_NOTA_SAIDA, { data_criacao: "desc" }),
+          { id_nota_saida: "desc" },
+        ],
       }),
       prisma.notaSaida.count({ where }),
     ]);

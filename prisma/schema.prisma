@@ -113,13 +113,18 @@ model Funcionario {
   cargo                  String?               @map("cargo")
   ativo                  Boolean               @default(true) @map("ativo")
   condutor               Boolean               @default(false) @map("condutor")
+  cnh                    String?               @map("cnh") @db.VarChar(11)
+  categoria_cnh          String?               @map("categoria_cnh") @db.VarChar(5)
+  validade_cnh           DateTime?             @map("validade_cnh") @db.Date
+  tipo_sanguineo         String?               @map("tipo_sanguineo") @db.VarChar(3)
   contagens              ContagemInventario[]
   pessoaFisica           PessoaFisica          @relation(fields: [id_pessoa_fisica], references: [id_pessoa_fisica])
   funcionarioCodigos     FuncionarioCodigo[]
   emails                 FuncionarioEmail[]
   telefones              FuncionarioTelefone[]
   usuario                Usuario?
-  expedicoesComoCondutor Expedicao[]
+  expedicoesComoCondutor Expedicao[]           @relation("expedicao_condutor")
+  expedicoesComoAuxiliar Expedicao[]           @relation("expedicao_auxiliar")
   anexos                 Anexo[]
 
   @@map("funcionario")
@@ -302,12 +307,23 @@ model ConversaoUnidade {
   @@map("conversao_unidade")
 }
 
+model TipoProduto {
+  id_tipo_produto Int       @id @default(autoincrement()) @map("ID_tipo_produto")
+  codigo          String    @unique @map("codigo")
+  nome            String    @unique @map("nome")
+  padrao          Boolean   @default(false) @map("padrao")
+  produtos        Produto[]
+
+  @@map("tipo_produto")
+}
+
 model Produto {
   id_produto          Int                @id @default(autoincrement()) @map("ID_produto")
   descricao           String             @map("descricao")
   perecivel           Boolean            @default(false) @map("perecivel")
   composto            Boolean            @default(false) @map("composto")
   data_validade       DateTime?          @map("data_validade") @db.Date
+  id_tipo_produto     Int?               @map("ID_tipo_produto")
   id_conversao_padrao Int                @default(1) @map("ID_conversao_padrao")
   id_conversao_saida  Int                @default(1) @map("ID_conversao_saida")
   saldo               Float              @default(0) @map("saldo")
@@ -323,6 +339,7 @@ model Produto {
   ajustesInventario   AjusteInventario[]
   conversaoPadrao     ConversaoUnidade   @relation("produto_conversao_entrada", fields: [id_conversao_padrao], references: [id_conversao])
   conversaoSaida      ConversaoUnidade   @relation("produto_conversao_saida", fields: [id_conversao_saida], references: [id_conversao])
+  tipoProduto         TipoProduto?       @relation(fields: [id_tipo_produto], references: [id_tipo_produto], onDelete: SetNull)
   produtoCodigos      ProdutoCodigo[]
   insumosFilho        ProdutoInsumo[]    @relation("produto_filho")
   insumosPai          ProdutoInsumo[]    @relation("produto_pai")
@@ -330,6 +347,7 @@ model Produto {
 
   @@index([id_conversao_padrao], map: "produto_ID_conversao_padrao_fkey")
   @@index([id_conversao_saida], map: "produto_ID_conversao_saida_fkey")
+  @@index([id_tipo_produto], map: "produto_ID_tipo_produto_fkey")
   @@map("produto")
 }
 
@@ -598,16 +616,19 @@ model Expedicao {
   id_expedicao            Int             @id @default(autoincrement()) @map("ID_expedicao")
   id_veiculo              Int             @map("ID_veiculo")
   id_funcionario_condutor Int             @map("ID_funcionario_condutor")
+  id_funcionario_auxiliar Int?            @map("ID_funcionario_auxiliar")
   data_criacao            DateTime        @map("data_criacao") @db.Timestamp(0)
   data_prevista           DateTime        @map("data_prevista") @db.Date
   observacao              String?         @map("observacao") @db.Text
   status                  StatusExpedicao @default(PLANEJADA) @map("status")
   ativo                   Boolean         @default(true) @map("ativo")
   notas                   ExpedicaoNota[]
-  condutor                Funcionario     @relation(fields: [id_funcionario_condutor], references: [id_funcionario])
+  condutor                Funcionario     @relation("expedicao_condutor", fields: [id_funcionario_condutor], references: [id_funcionario])
+  auxiliar                Funcionario?    @relation("expedicao_auxiliar", fields: [id_funcionario_auxiliar], references: [id_funcionario], onDelete: SetNull)
   veiculo                 Veiculo         @relation(fields: [id_veiculo], references: [id_veiculo])
 
   @@index([id_funcionario_condutor], map: "expedicao_ID_funcionario_condutor_fkey")
+  @@index([id_funcionario_auxiliar], map: "expedicao_ID_funcionario_auxiliar_fkey")
   @@index([id_veiculo], map: "expedicao_ID_veiculo_fkey")
   @@map("expedicao")
 }

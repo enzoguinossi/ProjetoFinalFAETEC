@@ -24,7 +24,7 @@ vi.mock("@/services/permissao", () => ({
 import {
   excluirPercurso,
   salvarPercurso,
-} from "@/app/expedicoes/percursos/actions";
+} from "@/app/expedicoes/rotas/actions";
 
 async function criarDestinatarios(quantidade: number) {
   const lista = [];
@@ -113,7 +113,7 @@ describe("percursoService", () => {
 
     expect("error" in segundo).toBe(true);
     if ("error" in segundo) {
-      expect(segundo.error).toContain("Já existe um percurso com este nome");
+      expect(segundo.error).toContain("Já existe uma rota com este nome");
     }
     expect(await prismaTeste.percurso.count()).toBe(1);
   });
@@ -146,7 +146,7 @@ describe("percursoService", () => {
     );
     expect("error" in alterado).toBe(true);
     if ("error" in alterado) {
-      expect(alterado.error).toContain("Já existe um percurso com este nome");
+      expect(alterado.error).toContain("Já existe uma rota com este nome");
     }
 
     const excluido = await percursoService.excluir(

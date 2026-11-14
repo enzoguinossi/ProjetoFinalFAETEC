@@ -29,13 +29,22 @@ interface Props {
 }
 
 const columns: Column<FornecedorListRow>[] = [
-  { key: "codigo", label: "Código", width: "1fr", align: "center" },
-  { key: "razao", label: "Razão Social", width: "5fr", align: "left" },
+  { key: "codigo", label: "Código", width: "1fr", align: "center", sortable: true, fixed: true },
+  { key: "razao", label: "Razão Social", width: "5fr", align: "left", sortable: true },
+  {
+    key: "nome_fantasia",
+    label: "Nome Fantasia",
+    width: "3fr",
+    align: "left",
+    sortable: true,
+    defaultHidden: true,
+  },
   {
     key: "ativo",
     label: "Situação",
     width: "1fr",
     align: "center",
+    sortable: true,
     render: (_value, row) => <SituacaoBadge ativo={row.ativo} />,
   },
 ];
@@ -46,6 +55,8 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
     carregando,
     buscarPorTermo,
     aplicarFiltros,
+    ordenacao,
+    ordenar,
     paginacaoServidor,
     actions,
     modalMode,
@@ -120,9 +131,12 @@ export default function FornecedoresClient({ inicial, tiposCodigo, perms }: Prop
         columns={columns}
         data={resultado.data}
         idField="codigo"
+        idTabela="fornecedores"
         actions={actions}
         paginacaoServidor={paginacaoServidor}
         carregando={carregando}
+        ordenacao={ordenacao}
+        onOrdenar={ordenar}
       />
 
       <Modal open={modalMode === "create"} onClose={fecharModal} width="960px">

@@ -118,6 +118,8 @@ export function useCrudLista<TRow, TForm>({
     buscarPorTermo: lista.buscarPorTermo,
     aplicarFiltros: lista.aplicarFiltros,
     filtros: lista.filtros,
+    ordenacao: lista.ordenacao,
+    ordenar: lista.ordenar,
     paginacaoServidor,
     actions,
     modalMode,

@@ -1,7 +1,8 @@
 import type { Prisma, StatusPedido } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { limitesDoDiaSaoPaulo } from "@/lib/datas";
-import { buildPagination } from "@/types";
+import { buildPagination, type DirecaoOrdenacao } from "@/types";
+import { ordenarPor } from "@/lib/ordenacao";
 import { registrarAuditoria } from "./_audit";
 
 /** Item da solicitação: só produto e quantidade total (sem unidade/fator). */
@@ -31,9 +32,20 @@ export type PedidoFiltros = {
   produtos?: number[];
   /** `true` = com nota vinculada; `false` = sem nota; `null` = qualquer. */
   com_nota?: boolean | null;
+  /** Ordenação da tabela (campo da whitelist + direção). */
+  sort?: string;
+  dir?: DirecaoOrdenacao;
 };
 
 const AUDIT_ENTIDADE = "PedidoEscola";
+
+/** Campos ordenáveis da listagem (whitelist); o desempate é pelo ID. */
+const ORDEM_PEDIDO: Record<string, Prisma.PedidoEscolaOrderByWithRelationInput> = {
+  id_pedido_escola: { id_pedido_escola: "asc" },
+  data_criacao: { data_criacao: "asc" },
+  escola: { destinatario: { pessoaJuridica: { razao_social: "asc" } } },
+  status: { status: "asc" },
+};
 
 /** Limites do dia em São Paulo para `data_criacao` (inclusivo); inválidos viram `null`. */
 function intervaloPeriodo(de?: string, ate?: string) {
@@ -135,7 +147,7 @@ export class PedidoDAO {
         take,
         where,
         include: includePedido,
-        orderBy: { data_criacao: "desc" },
+        orderBy: [ordenarPor(filtros, ORDEM_PEDIDO, { data_criacao: "desc" }), { id_pedido_escola: "desc" }],
       }),
       prisma.pedidoEscola.count({ where }),
     ]);

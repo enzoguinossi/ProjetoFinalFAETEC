@@ -10,6 +10,12 @@ import { formatarCodigo } from "@/lib/formatar";
 import { textoFiltro } from "@/lib/filtros";
 import { validarCpf } from "@/lib/cpf";
 import {
+  validarCategoriaCnh,
+  validarCnh,
+  validarTipoSanguineo,
+  validarValidadeCnh,
+} from "@/lib/cnh";
+import {
   processarImagemDoFormulario,
   removerImagemAnexo,
   salvarImagemAnexo,
@@ -32,6 +38,12 @@ export type FuncionarioFormData = {
   cpf: string | null;
   cargo: string | null;
   condutor: boolean;
+  /** Dados de condutor (opcionais). */
+  cnh: string | null;
+  categoria_cnh: string | null;
+  /** `YYYY-MM-DD` ou `null`. */
+  validade_cnh: string | null;
+  tipo_sanguineo: string | null;
   ativo: boolean;
   /** Foto atual, derivada do anexo ativo. */
   foto_url: string | null;
@@ -51,6 +63,38 @@ function lerCpf(formData: FormData): { cpf?: string } | { error: string } {
   const resultado = validarCpf(bruto);
   if (!resultado.ok) return { error: resultado.erro };
   return { cpf: resultado.cpf };
+}
+
+type DadosCondutor = {
+  cnh: string | null;
+  categoria_cnh: string | null;
+  validade_cnh: Date | null;
+  tipo_sanguineo: string | null;
+};
+
+/**
+ * Lê os dados de condutor do formulário. Todos são opcionais: vazio vira
+ * `null`; preenchido precisa passar pelo helper correspondente.
+ */
+function lerDadosCondutor(formData: FormData): DadosCondutor | { error: string } {
+  const cnh = validarCnh(String(formData.get("cnh") ?? ""));
+  if (!cnh.ok) return { error: cnh.erro };
+
+  const categoria = validarCategoriaCnh(String(formData.get("categoria_cnh") ?? ""));
+  if (!categoria.ok) return { error: categoria.erro };
+
+  const validade = validarValidadeCnh(String(formData.get("validade_cnh") ?? ""));
+  if (!validade.ok) return { error: validade.erro };
+
+  const tipo = validarTipoSanguineo(String(formData.get("tipo_sanguineo") ?? ""));
+  if (!tipo.ok) return { error: tipo.erro };
+
+  return {
+    cnh: cnh.cnh,
+    categoria_cnh: categoria.categoria,
+    validade_cnh: validade.validade,
+    tipo_sanguineo: tipo.tipo,
+  };
 }
 
 /** IDs de anexos marcados para remoção no formulário (`remover_anexos`). */
@@ -118,6 +162,10 @@ export async function getFuncionario(id: number): Promise<FuncionarioFormData | 
     cpf: f.pessoaFisica.cpf,
     cargo: f.cargo,
     condutor: f.condutor,
+    cnh: f.cnh,
+    categoria_cnh: f.categoria_cnh,
+    validade_cnh: f.validade_cnh ? f.validade_cnh.toISOString().split("T")[0] : null,
+    tipo_sanguineo: f.tipo_sanguineo,
     ativo: f.ativo,
     foto_url: f.anexos[0]?.url ?? null,
     fotos: f.anexos.map((anexo) => ({ id_anexo: anexo.id_anexo, url: anexo.url })),
@@ -134,6 +182,9 @@ export async function createFuncionario(formData: FormData) {
 
     const cpfResult = lerCpf(formData);
     if ("error" in cpfResult) return { error: cpfResult.error };
+
+    const condutorResult = lerDadosCondutor(formData);
+    if ("error" in condutorResult) return { error: condutorResult.error };
 
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
@@ -157,6 +208,7 @@ export async function createFuncionario(formData: FormData) {
           cpf: cpfResult.cpf,
           cargo: (formData.get("cargo") as string) || undefined,
           condutor: formData.get("condutor") === "on",
+          ...condutorResult,
           codigos: codigoResult.codigos,
           ...contatoResult.contatos,
         },
@@ -207,6 +259,9 @@ export async function updateFuncionario(formData: FormData) {
     const cpfResult = lerCpf(formData);
     if ("error" in cpfResult) return { error: cpfResult.error };
 
+    const condutorResult = lerDadosCondutor(formData);
+    if ("error" in condutorResult) return { error: condutorResult.error };
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("FUNCIONARIO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
 
@@ -235,6 +290,7 @@ export async function updateFuncionario(formData: FormData) {
           cargo: (formData.get("cargo") as string) || undefined,
           condutor: formData.get("condutor") === "on",
           ativo,
+          ...condutorResult,
           codigos: codigoResult.codigos,
           ...contatoResult.contatos,
         },

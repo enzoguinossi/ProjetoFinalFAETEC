@@ -20,6 +20,7 @@ import {
 } from "@/lib/imagem";
 import { anexoService } from "@/services/anexo";
 import { produtoParaLinha, type ProdutoListRow } from "@/lib/produto-linha";
+import { compararValores } from "@/lib/ordenacao-tabela";
 import { textoFiltro } from "@/lib/filtros";
 import { resultadoVazio, type ListParams, type PaginatedResult } from "@/types";
 
@@ -38,6 +39,9 @@ export type ProdutoFormData = {
   foto_url: string | null;
   /** Anexos ativos do produto (o primeiro é a foto atual). */
   fotos: { id_anexo: number; url: string }[];
+  /** Tipo de produto (cadastro editável) ou `null` para sem tipo. */
+  id_tipo_produto: number | null;
+  tipo_nome: string | null;
   ativo: boolean;
   /** Saldo atual em base (somente leitura; não editável no formulário). */
   saldo: number;
@@ -53,7 +57,56 @@ export type ProdutoListaFiltros = {
   perecivel?: boolean;
   composto?: boolean;
   id_tipo_codigo?: number[];
+  id_tipo_produto?: number[];
 };
+
+/** Campos ordenáveis da busca (a mesma whitelist da listagem, na linha mapeada). */
+const CAMPOS_ORDEM_BUSCA = new Set(["codigo", "descricao", "tipo", "qtd", "ativo"]);
+
+/** Valor da linha para a ordenação da busca; `tipo` vazio conta como nulo. */
+function valorOrdenacaoBusca(linha: ProdutoListRow, campo: string): unknown {
+  switch (campo) {
+    case "codigo":
+      // `codigo` é `formatarCodigo(id)`: a ordem lexicográfica equivale à do ID.
+      return linha.codigo;
+    case "descricao":
+      return linha.descricao;
+    case "tipo":
+      return linha.tipo || null;
+    case "qtd":
+      return Number(linha.qtd);
+    case "ativo":
+      return linha.ativo;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Ordena o lote da busca priorizada conforme `sort`/`dir`. Só os campos da
+ * whitelist ordenam; sem `sort` (ou fora dela) a prioridade da busca é mantida.
+ * Nulos ficam por último nas duas direções.
+ */
+function ordenarBusca(
+  linhas: ProdutoListRow[],
+  sort?: string,
+  dir?: ListParams["dir"],
+): ProdutoListRow[] {
+  if (!sort || !CAMPOS_ORDEM_BUSCA.has(sort)) return linhas;
+
+  const sinal = dir === "desc" ? -1 : 1;
+  return [...linhas].sort((a, b) => {
+    const valorA = valorOrdenacaoBusca(a, sort);
+    const valorB = valorOrdenacaoBusca(b, sort);
+    const aNulo = valorA === null || valorA === undefined;
+    const bNulo = valorB === null || valorB === undefined;
+    if (aNulo || bNulo) {
+      if (aNulo && bNulo) return 0;
+      return aNulo ? 1 : -1;
+    }
+    return sinal * compararValores(valorA, valorB);
+  });
+}
 
 export async function listarProdutos(
   params: ListParams &
@@ -77,15 +130,20 @@ export async function listarProdutos(
     id_tipo_codigo: Array.isArray(params.id_tipo_codigo)
       ? params.id_tipo_codigo.filter((id) => Number.isInteger(id))
       : undefined,
+    id_tipo_produto: Array.isArray(params.id_tipo_produto)
+      ? params.id_tipo_produto.filter((id) => Number.isInteger(id))
+      : undefined,
   };
 
   const search = textoFiltro(params.search);
 
   if (search) {
     const excluidos = new Set(params.excludeIds ?? []);
-    const data = (await produtoDAO.searchPriorizadoComSaldo(search, 50, filtros))
+    const linhas = (await produtoDAO.searchPriorizadoComSaldo(search, 50, filtros))
       .map(produtoParaLinha)
       .filter((linha) => !excluidos.has(linha.id_produto));
+    // Com ordenação ativa, reordena o lote; sem ela, mantém a prioridade da busca.
+    const data = ordenarBusca(linhas, params.sort, params.dir);
     return {
       data,
       total: data.length,
@@ -129,6 +187,18 @@ function lerRemoverAnexos(formData: FormData): number[] {
     .filter((valor) => Number.isInteger(valor) && valor > 0);
 }
 
+/**
+ * Lê `id_tipo_produto` do formulário: vazio = sem tipo; valor não inteiro ou
+ * não positivo é recusado (o tipo em si é validado pela FK do banco).
+ */
+function lerIdTipoProduto(formData: FormData): number | null | { error: string } {
+  const bruto = String(formData.get("id_tipo_produto") ?? "").trim();
+  if (!bruto) return null;
+  const id = Number(bruto);
+  if (!Number.isInteger(id) || id <= 0) return { error: "Tipo de produto inválido." };
+  return id;
+}
+
 /** Lê o campo `insumos` (JSON: [{ id, qtd }]) do FormData. */
 function lerInsumos(formData: FormData): { id_produto_filho: number; quantidade: number }[] {
   const raw = lerJson(formData, "insumos");
@@ -164,6 +234,8 @@ export async function getProduto(id: number): Promise<ProdutoFormData | null> {
     id_conversao_saida: p.id_conversao_saida,
     foto_url: p.anexos[0]?.url ?? null,
     fotos: p.anexos.map((anexo) => ({ id_anexo: anexo.id_anexo, url: anexo.url })),
+    id_tipo_produto: p.id_tipo_produto,
+    tipo_nome: p.tipoProduto?.nome ?? null,
     ativo: p.ativo,
     saldo: Number(p.saldo),
     saldo_reservado: Number(p.saldo_reservado),
@@ -358,6 +430,9 @@ export async function createProduto(formData: FormData) {
       ? (formData.get("data_validade") as string) || undefined
       : undefined;
 
+    const tipoResult = lerIdTipoProduto(formData);
+    if (tipoResult !== null && typeof tipoResult === "object") return tipoResult;
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("PRODUTO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
     const codigos = codigoResult.codigos;
@@ -379,6 +454,7 @@ export async function createProduto(formData: FormData) {
           data_validade,
           id_conversao_padrao: id_conversao,
           id_conversao_saida,
+          id_tipo_produto: tipoResult,
           codigos,
           insumos,
         },
@@ -447,6 +523,9 @@ export async function updateProduto(formData: FormData) {
       ? (formData.get("data_validade") as string) || undefined
       : undefined;
 
+    const tipoResult = lerIdTipoProduto(formData);
+    if (tipoResult !== null && typeof tipoResult === "object") return tipoResult;
+
     const codigoResult = await codigoService.resolverCodigosParaSalvar("PRODUTO", formData);
     if ("error" in codigoResult) return { error: codigoResult.error };
     const codigos = codigoResult.codigos;
@@ -473,6 +552,7 @@ export async function updateProduto(formData: FormData) {
           data_validade,
           id_conversao_padrao: id_conversao,
           id_conversao_saida,
+          id_tipo_produto: tipoResult,
           codigos,
           insumos,
         },

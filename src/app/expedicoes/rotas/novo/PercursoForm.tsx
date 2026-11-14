@@ -114,7 +114,7 @@ export default function PercursoForm({
       }
 
       mostrarAviso(
-        isEdit ? "Alterações salvas com sucesso." : "Percurso cadastrado com sucesso.",
+        isEdit ? "Alterações salvas com sucesso." : "Rota cadastrada com sucesso.",
         "sucesso",
       );
       onSuccess?.();

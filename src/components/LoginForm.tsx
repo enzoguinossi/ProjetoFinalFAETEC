@@ -4,6 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginAction } from "@/app/login/actions";
 import { useAviso } from "@/components/AvisoProvider";
+import LoginOds from "@/components/LoginOds";
+import LoginBrand from "@/components/LoginBrand";
+import Cena from "@/components/cena/Cena";
 
 export default function LoginForm() {
   const [loading, setLoading] = useState(false);
@@ -28,8 +31,11 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-brand">
-      <form className="w-[clamp(300px,30vw,421px)] min-h-[25rem] bg-white rounded-[30px] border border-brand px-[0.6875rem] py-[0.75rem] flex flex-col gap-[2.125rem] box-border" onSubmit={handleSubmit}>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand">
+      <Cena />
+      <LoginBrand />
+      <LoginOds />
+      <form className="relative z-10 w-[clamp(300px,30vw,421px)] min-h-[25rem] bg-white rounded-[30px] border border-brand px-[0.6875rem] py-[0.75rem] flex flex-col gap-[2.125rem] box-border [@media(max-height:900px)]:[zoom:0.8]" onSubmit={handleSubmit}>
         {/* Logo */}
         <div className="flex justify-center items-center h-[7.5625rem]">
           <img src="/logo.svg" alt="Nexus" className="w-[6.875rem] h-auto" />

@@ -1,0 +1,21 @@
+{
+  "palco": { "largura": 1920, "altura": 1080 },
+  "camadas": [
+    { "id": "ceu", "arquivo": "ceu.svg", "tipo": "ceu", "fundo": true },
+    { "id": "mapa", "arquivo": "mapa.svg", "tipo": "mapa", "fundo": true },
+    { "id": "grade", "arquivo": "grade.svg", "tipo": "grade", "fundo": true },
+    { "id": "nos", "arquivo": "nos.svg", "tipo": "nos", "fundo": true },
+    { "id": "caminhao-1", "arquivo": "caminhao.svg", "tipo": "caminhao", "x": 2, "y": 476, "largura": 280, "escala": 1 },
+    { "id": "caminhao-2", "arquivo": "caminhao.svg", "tipo": "caminhao", "x": 67.4, "y": 740, "largura": 280, "escala": 0.95 },
+    { "id": "caminhao-3", "arquivo": "caminhao.svg", "tipo": "caminhao", "x": 32.6, "y": 838, "largura": 280, "escala": 0.92 },
+    { "id": "caminhao-4", "arquivo": "caminhao.svg", "tipo": "caminhao", "x": 1603.4, "y": 484, "largura": 280, "escala": 0.95 },
+    { "id": "caminhao-5", "arquivo": "caminhao.svg", "tipo": "caminhao", "x": 1308.2, "y": 900, "largura": 280, "escala": 0.85 },
+    { "id": "rastro-1", "arquivo": "rastro.svg", "tipo": "rastro", "x": 1618, "y": 812, "largura": 110, "escala": 1 },
+    { "id": "pino-1", "arquivo": "pino-azul.svg", "tipo": "pino", "x": 320, "y": 324, "largura": 64, "escala": 0.85, "ancora": "ponta" },
+    { "id": "pino-2", "arquivo": "pino-verde.svg", "tipo": "pino", "x": 675, "y": 675, "largura": 64, "escala": 0.9, "ancora": "ponta" },
+    { "id": "pino-3", "arquivo": "pino-verde.svg", "tipo": "pino", "x": 587, "y": 898, "largura": 64, "escala": 0.85, "ancora": "ponta" },
+    { "id": "pino-4", "arquivo": "pino-azul.svg", "tipo": "pino", "x": 1600, "y": 324, "largura": 64, "escala": 0.8, "ancora": "ponta" },
+    { "id": "pino-5", "arquivo": "pino-azul.svg", "tipo": "pino", "x": 1376, "y": 547, "largura": 64, "escala": 0.85, "ancora": "ponta" },
+    { "id": "pino-6", "arquivo": "pino-verde.svg", "tipo": "pino", "x": 1728, "y": 812, "largura": 64, "escala": 1, "ancora": "ponta" }
+  ]
+}

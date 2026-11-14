@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 84" width="64" height="84">
+<g transform="translate(32 0)">
+<ellipse cx="0" cy="78" rx="27" ry="6" fill="#ffffff" fill-opacity=".13"/>
+<path d="M0 0C-17 0-31 13-31 30C-31 49 0 76 0 76C0 76 31 49 31 30C31 13 17 0 0 0ZM0 19A11 11 0 1 0 0 41A11 11 0 1 0 0 19Z" fill="#8cc79a" fill-opacity=".55" fill-rule="evenodd"/>
+</g>
+</svg>

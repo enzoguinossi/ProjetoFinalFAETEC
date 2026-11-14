@@ -11,6 +11,7 @@ export type ExpedicaoInput = {
   observacao?: unknown;
   id_veiculo?: unknown;
   id_funcionario_condutor?: unknown;
+  id_funcionario_auxiliar?: unknown;
   id_percurso?: unknown;
 };
 
@@ -124,7 +125,8 @@ export class ExpedicaoService {
   /**
    * Valida e normaliza os campos da expedição. A data é aceita como
    * `YYYY-MM-DD` (valor do `<input type="date">`) e gravada como `Date`;
-   * vazia vira hoje. Veículo e condutor são obrigatórios.
+   * vazia vira hoje. Veículo e condutor são obrigatórios; o auxiliar é
+   * opcional (vazio/nulo vira `null`).
    */
   validar(
     input: ExpedicaoInput,
@@ -152,8 +154,11 @@ export class ExpedicaoService {
     const idCondutor = idPositivo(input.id_funcionario_condutor);
     if (!idCondutor) return { error: "Condutor inválido." };
 
+    const idAuxiliar = idOpcional(input.id_funcionario_auxiliar);
+    if (idAuxiliar === "invalido") return { error: "Auxiliar inválido." };
+
     const idPercurso = idOpcional(input.id_percurso);
-    if (idPercurso === "invalido") return { error: "Percurso inválido." };
+    if (idPercurso === "invalido") return { error: "Rota inválida." };
 
     return {
       dados: {
@@ -161,6 +166,7 @@ export class ExpedicaoService {
         observacao: textoOpcional(input.observacao),
         id_veiculo: idVeiculo,
         id_funcionario_condutor: idCondutor,
+        id_funcionario_auxiliar: idAuxiliar,
         id_percurso: idPercurso,
       },
     };

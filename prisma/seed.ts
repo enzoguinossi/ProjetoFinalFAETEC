@@ -66,6 +66,7 @@ async function main() {
     "unidade_conversao.listar", "unidade_conversao.criar", "unidade_conversao.alterar",
     "unidade_conversao.consultar", "unidade_conversao.excluir",
     "tipo_destinatario.criar", "tipo_destinatario.alterar", "tipo_destinatario.excluir",
+    "tipo_produto.criar", "tipo_produto.alterar", "tipo_produto.excluir",
     "estoque.entrada", "estoque.saida", "estoque.ver_saldo",
     "nota_entrada.criar", "nota_entrada.alterar", "nota_entrada.consultar", "nota_entrada.cancelar",
     "nota_saida.criar", "nota_saida.alterar", "nota_saida.consultar", "nota_saida.cancelar",

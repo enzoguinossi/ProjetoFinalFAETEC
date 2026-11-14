@@ -220,6 +220,13 @@ export default function BarraFiltrosBase({
   }
 
   function adicionar(campo: CampoFiltro) {
+    // O campo recém-adicionado pode não ter valor em `selecao`; o painel
+    // (período/multi) precisa do valor inicial para não renderizar undefined.
+    setSelecao((atual) =>
+      atual[campo.id] === undefined
+        ? { ...atual, [campo.id]: vazio(campo) }
+        : atual,
+    );
     setAdicionados((atuais) => (atuais.includes(campo.id) ? atuais : [...atuais, campo.id]));
     // Checkbox não tem painel: só vira chip e é marcado no próprio chip.
     setAberto(campo.tipo === "checkbox" ? null : campo.id);
@@ -408,9 +415,9 @@ export default function BarraFiltrosBase({
                   ) : (
                     <PeriodoPainel
                       valor={
-                        Array.isArray(selecao[campo.id])
-                          ? { de: "", ate: "" }
-                          : (selecao[campo.id] as { de: string; ate: string })
+                        selecao[campo.id] && !Array.isArray(selecao[campo.id])
+                          ? (selecao[campo.id] as { de: string; ate: string })
+                          : { de: "", ate: "" }
                       }
                       aoMudar={(periodo) => alterar(campo, periodo)}
                     />
@@ -495,8 +502,10 @@ function PeriodoPainel({
         De
         <input
           type="date"
-          value={valor.de}
-          onChange={(evento) => aoMudar({ ...valor, de: evento.target.value })}
+          value={valor?.de ?? ""}
+          onChange={(evento) =>
+            aoMudar({ de: evento.target.value, ate: valor?.ate ?? "" })
+          }
           className={classeInput}
         />
       </label>
@@ -504,8 +513,10 @@ function PeriodoPainel({
         Até
         <input
           type="date"
-          value={valor.ate}
-          onChange={(evento) => aoMudar({ ...valor, ate: evento.target.value })}
+          value={valor?.ate ?? ""}
+          onChange={(evento) =>
+            aoMudar({ de: valor?.de ?? "", ate: evento.target.value })
+          }
           className={classeInput}
         />
       </label>

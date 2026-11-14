@@ -570,7 +570,7 @@ describe("expedicaoService", () => {
     expect("error" in recusaEmPercurso).toBe(true);
     if ("error" in recusaEmPercurso) {
       expect(recusaEmPercurso.error).toContain(
-        "Veículo já está em outra expedição em percurso.",
+        "Veículo já está em outra expedição em rota.",
       );
     }
 

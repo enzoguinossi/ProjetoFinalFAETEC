@@ -19,6 +19,8 @@ export type FornecedorListRow = {
   id_fornecedor: number;
   codigo: string;
   razao: string;
+  /** Nome fantasia da pessoa jurídica; `null` = não informado. */
+  nome_fantasia: string | null;
   ativo: boolean;
 };
 
@@ -95,6 +97,7 @@ export async function listarFornecedores(
       id_fornecedor: f.id_fornecedor,
       codigo: formatarCodigo(f.id_fornecedor),
       razao: f.pessoaJuridica.razao_social,
+      nome_fantasia: f.pessoaJuridica.nome_fantasia,
       ativo: f.ativo,
     })),
   };

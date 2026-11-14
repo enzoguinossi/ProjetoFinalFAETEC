@@ -22,8 +22,8 @@ interface Props {
 }
 
 const columns: Column<PerfilListRow>[] = [
-  { key: "nome", label: "Nome", width: "2fr", align: "left" },
-  { key: "descricao", label: "Descrição", width: "3fr", align: "left" },
+  { key: "nome", label: "Nome", width: "2fr", align: "left", sortable: true },
+  { key: "descricao", label: "Descrição", width: "3fr", align: "left", sortable: true },
   {
     key: "permissoes", label: "Permissões", width: "1fr", align: "right",
     render: (v) => String((v as string[])?.length ?? 0),
@@ -141,6 +141,7 @@ export default function PerfisClient({ rows: initialRows, grupos }: Props) {
         columns={columns}
         data={rows}
         idField="id_perfil"
+        idTabela="perfis"
         actions={actions}
       />
 
