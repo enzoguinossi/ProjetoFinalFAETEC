@@ -1,9 +1,8 @@
 # PROJECT_STATE — Nexus
 
 > Estado corrente do trabalho orquestrado. **Escritor único: Orquestrador.**
-> Última consolidação: 2026-11-14 (sessão de apresentação: condutor, tipos de produto,
-> Percurso→Rota, auxiliar na expedição, login ODS + selo + cena modular; schema e dados
-> aplicados em `nexus_prod`).
+> Última consolidação: 2026-11-14 (release `2.14.11.2026`: instalador sem bloqueio de
+> contagens, seed de atualização e produção atualizada).
 
 ## Estado corrente — sessão de apresentação 2026-11-14 (pós-1.08.11.2026)
 
@@ -11,7 +10,7 @@
   commit `ecc7bb1`, com a tag anotada **`v1.14.11.2026` criada e publicada**. O estado
   corrente é este commit de registro da `2.14.11.2026`. Árvore limpa, exceto
   `.openchamber/` local (screenshots antigos não versionados). A produção está **instalada e
-  no ar com `1.14.11.2026`**.
+  no ar com `2.14.11.2026`**.
 - **Funcionário condutor:** `cnh`, `categoria_cnh`, `validade_cnh` (DATE) e `tipo_sanguineo`
   em `funcionario`, sempre opcionais; aba **Condutor** no formulário (`FormTabs`) aparece
   somente quando o checkbox **É condutor** está marcado (em `view`, somente se o registro for
@@ -70,17 +69,23 @@
   arquivos** passando (config temporária sem `globalSetup`, com `nexus_test` em sync);
   screenshots do login em 1360×768 e 1920×1080; `figma:check` passou depois da mudança do
   cabeçalho da tabela. Migração 003 testada sobre schema 1.08 (50 tabelas, 92/2/3).
-- **Release 1.14.11.2026:** commit `ecc7bb1` em `origin/main`, com a tag anotada
-  **`v1.14.11.2026` criada e publicada**; instalador
-  `deploy/windows/out/NexusSetup-1.14.11.2026.exe` (440.095.033 bytes; SHA-256
-  `FA8BED8C17B2471C1CA538C6AB08E1DD214F668896AE9B846327FE8BFD2710A0`), build de 6,8 min,
-  com as migrações 001–003 no payload. **Instalado em produção** em 14/11/2026.
-- **Incidente do update 1.14:** o bootstrap parou na validação de contagens do
+- **Release 2.14.11.2026:** commit final `1c01084` (`3e6877d` é a correção do script e
+  `1c01084` inclui o payload), tag anotada **`v2.14.11.2026`** publicada apontando para
+  `1c01084`; instalador `deploy/windows/out/NexusSetup-2.14.11.2026.exe`
+  (**440.116.810 bytes**; SHA-256
+  `AFEA43D8DBA9FAC71CF5FA385BE3EFC5810B18E5A8E6E5A7C04B5DD21778C79D`), build de 3,5 min com
+  artifacts reaproveitados. **Instalado em produção** em 14/11/2026 às 17:42: app
+  `2.14.11.2026`, health 200 `db=true`, HTTPS 200 e quatro serviços `Running`.
+- **Prova na produção:** o bootstrap rodou o Update sobre os dados reais e registrou
+  `[OK] seed-update.sql aplicado` / `[OK] Contagens (apenas log): 92 permissões, 3 perfis, 3
+  conversões` — exatamente o caso que antes falhava. O perfil **Administrador** (ID 20), os 5
+  tipos de destinatário e as 3 conversões seguem intactos; nada foi recriado. `Instalador\sql`
+  agora tem `seed-update.sql` e o `aplicar-sql.ps1` instalado não valida contagens.
+- **Incidente do update 1.14 (histórico):** o bootstrap parou na validação de contagens do
   `aplicar-sql.ps1` (`Contagem de referência divergente em profiles: esperado 2, obtido
   '3'`), porque `nexus_prod` tem o perfil personalizado **Administrador** (ID 20) além de
   Operador/Auxiliar. Migrações, seed e app já haviam sido aplicados; `NexusApp`/`NexusCaddy`
-  ficaram parados. A instalação foi retomada com o script ajustado e concluída:
-  smoke **OK**, health 200 `db=true`, versão 1.14.11.2026, quatro serviços `Running`.
+  ficaram parados. A instalação foi retomada e concluída; o 1.14 foi substituído pelo 2.14.
 - **Correção 2.14.11.2026:** o `aplicar-sql.ps1` **não valida mais contagem nenhuma**
   (permissões, perfis, conversões, renamed) — só registra no log; perfis, tipos e conversões
   são cadastros editáveis e podem ser apagados. O Update passou a aplicar as migrações +
@@ -92,11 +97,10 @@
   caminho Update testado em banco novo (50 tabelas) e em banco legado sintético com enum
   (4 tipos criados, 2 destinatários mapeados, coluna enum removida; segunda passada não
   recria nada); parse do PowerShell OK nos quatro scripts alterados.
-- **Pendências reais:** gerar o instalador `2.14.11.2026` e publicar tag/GitHub release;
-  rodar o setup na produção para atualizar o `Instalador\aplicar-sql.ps1` instalado; fazer a
-  validação visual autenticada das telas novas e das listagens (scroll, sticky, ordenação e
-  colunas visíveis), que não foi possível por falta de credencial de login; a suíte, o lint,
-  o build e o `figma:check` cobrem o código.
+- **Pendências reais:** criar o GitHub release da `v2.14.11.2026` (a tag já está publicada) e
+  fazer a validação visual autenticada das telas novas e das listagens (scroll, sticky,
+  ordenação e colunas visíveis), que não foi possível por falta de credencial de login; a
+  suíte, o lint, o build e o `figma:check` cobrem o código.
 - **Serviços:** `NexusMySQL84`, `NexusApp`, `NexusCaddy` e `NexusAgent` Running.
 
 ## Estado corrente — release 1.08.11.2026 (2026-11-08)
